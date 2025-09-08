@@ -5,7 +5,8 @@ import MemoBlock from './MemoBlock';
 interface CanvasProps {
   currentPage: Page | undefined;
   selectedMemoId: string | null;
-  onMemoSelect: (memoId: string) => void;
+  selectedMemoIds: string[];
+  onMemoSelect: (memoId: string, isShiftClick?: boolean) => void;
   onAddMemo: (position?: { x: number; y: number }) => void;
   onDeleteMemo: () => void;
   onDisconnectMemo: () => void;
@@ -20,11 +21,19 @@ interface CanvasProps {
   onCancelConnection: () => void;
   onRemoveConnection: (fromId: string, toId: string) => void;
   onUpdateDragLine: (mousePos: { x: number; y: number }) => void;
+  isDragSelecting: boolean;
+  dragSelectStart: { x: number; y: number } | null;
+  dragSelectEnd: { x: number; y: number } | null;
+  dragHoveredMemoIds: string[];
+  onDragSelectStart: (position: { x: number; y: number }, isShiftPressed: boolean) => void;
+  onDragSelectMove: (position: { x: number; y: number }) => void;
+  onDragSelectEnd: () => void;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
   currentPage,
   selectedMemoId,
+  selectedMemoIds,
   onMemoSelect,
   onAddMemo,
   onDeleteMemo,
@@ -39,7 +48,14 @@ const Canvas: React.FC<CanvasProps> = ({
   onConnectMemos,
   onCancelConnection,
   onRemoveConnection,
-  onUpdateDragLine
+  onUpdateDragLine,
+  isDragSelecting,
+  dragSelectStart,
+  dragSelectEnd,
+  dragHoveredMemoIds,
+  onDragSelectStart,
+  onDragSelectMove,
+  onDragSelectEnd
 }) => {
   const [isPanning, setIsPanning] = React.useState(false);
   const [panStart, setPanStart] = React.useState({ x: 0, y: 0 });
@@ -49,33 +65,69 @@ const Canvas: React.FC<CanvasProps> = ({
   const [isSpacePressed, setIsSpacePressed] = React.useState(false);
   const [isAltPressed, setIsAltPressed] = React.useState(false);
   const [baseTool, setBaseTool] = React.useState<'select' | 'pan' | 'zoom'>('select');
+  const [isMouseOverCanvas, setIsMouseOverCanvas] = React.useState(false);
+  
+  // 캔버스 최대 영역 (15000x15000px, SVG와 동일)
+  const CANVAS_BOUNDS = { width: 15000, height: 15000, offsetX: -5000, offsetY: -5000 };
+
+  // 메모 블록이 경계를 벗어나지 않도록 제한하는 함수
+  const constrainToBounds = (position: { x: number; y: number }, memoSize: { width: number; height: number }) => {
+    const { width, height, offsetX, offsetY } = CANVAS_BOUNDS;
+    const memoWidth = memoSize.width || 200;
+    const memoHeight = memoSize.height || 95;
+    
+    return {
+      x: Math.max(offsetX, Math.min(position.x, offsetX + width - memoWidth)),
+      y: Math.max(offsetY, Math.min(position.y, offsetY + height - memoHeight))
+    };
+  };
+
+  // 경계 체크를 포함한 메모 위치 변경 핸들러
+  const handleMemoPositionChange = (memoId: string, position: { x: number; y: number }) => {
+    const memo = currentPage?.memos.find(m => m.id === memoId);
+    if (memo) {
+      const constrainedPosition = constrainToBounds(position, memo.size || { width: 200, height: 95 });
+      onMemoPositionChange(memoId, constrainedPosition);
+    } else {
+      onMemoPositionChange(memoId, position);
+    }
+  };
 
   const getConnectionPoints = (memo: any) => {
     // 실제 메모 블록의 크기를 가져오기 (동적 크기 반영)
     const width = memo.size?.width || 200;
     const height = memo.size?.height || 95;
-    const offsetX = 5000; // SVG 오프셋 보정
-    const offsetY = 5000;
     
-    // 연결점의 실제 위치 계산 (연결점 원의 정확한 중심)
-    return {
+    // SVG가 overflow:visible이므로 오프셋 없이 원본 좌표 사용
+    const points = {
       top: { 
-        x: memo.position.x + width / 2 + offsetX,  // 가로 중앙
-        y: memo.position.y + offsetY  // 메모 블록 상단
+        x: memo.position.x + width / 2,  // 가로 중앙
+        y: memo.position.y  // 메모 블록 상단 경계
       },
       bottom: { 
-        x: memo.position.x + width / 2 + offsetX,  // 가로 중앙
-        y: memo.position.y + height + offsetY  // 메모 블록 하단
+        x: memo.position.x + width / 2,  // 가로 중앙
+        y: memo.position.y + height  // 메모 블록 하단 경계
       },
       left: { 
-        x: memo.position.x + offsetX,  // 메모 블록 좌측
-        y: memo.position.y + height / 2 + offsetY  // 세로 중앙
+        x: memo.position.x,  // 메모 블록 좌측 경계
+        y: memo.position.y + height / 2  // 세로 중앙
       },
       right: { 
-        x: memo.position.x + width + offsetX,  // 메모 블록 우측
-        y: memo.position.y + height / 2 + offsetY  // 세로 중앙
+        x: memo.position.x + width,  // 메모 블록 우측 경계
+        y: memo.position.y + height / 2  // 세로 중앙
       }
     };
+    
+    // 디버그: 연결점 위치 출력
+    if (memo.id.includes('1')) {  // 첫 번째 메모만 출력
+      console.log(`Memo ${memo.id} connection points:`, {
+        position: memo.position,
+        size: { width, height },
+        points
+      });
+    }
+    
+    return points;
   };
 
   const renderConnectionLines = () => {
@@ -98,8 +150,15 @@ const Canvas: React.FC<CanvasProps> = ({
         const toWidth = connectedMemo.size?.width || 200;
         const toHeight = connectedMemo.size?.height || 95;
         
-        const centerFrom = { x: memo.position.x + fromWidth / 2, y: memo.position.y + fromHeight / 2 };
-        const centerTo = { x: connectedMemo.position.x + toWidth / 2, y: connectedMemo.position.y + toHeight / 2 };
+        // 원본 메모 좌표로 중심점 계산
+        const centerFrom = { 
+          x: memo.position.x + fromWidth / 2, 
+          y: memo.position.y + fromHeight / 2 
+        };
+        const centerTo = { 
+          x: connectedMemo.position.x + toWidth / 2, 
+          y: connectedMemo.position.y + toHeight / 2 
+        };
         
         const dx = centerTo.x - centerFrom.x;
         const dy = centerTo.y - centerFrom.y;
@@ -174,10 +233,12 @@ const Canvas: React.FC<CanvasProps> = ({
         const connectingWidth = connectingMemo.size?.width || 200;
         const connectingHeight = connectingMemo.size?.height || 95;
         
+        // 원본 메모 좌표로 중심점 계산
         const centerFrom = { 
           x: connectingMemo.position.x + connectingWidth / 2, 
           y: connectingMemo.position.y + connectingHeight / 2 
         };
+        // dragLineEnd를 원본 좌표로 변환
         const dx = dragLineEnd.x - centerFrom.x;
         const dy = dragLineEnd.y - centerFrom.y;
         
@@ -193,8 +254,8 @@ const Canvas: React.FC<CanvasProps> = ({
             key="drag-line"
             x1={fromPoint.x}
             y1={fromPoint.y}
-            x2={dragLineEnd.x + 5000}
-            y2={dragLineEnd.y + 5000}
+            x2={dragLineEnd.x}
+            y2={dragLineEnd.y}
             stroke="#9ca3af"
             strokeWidth="2"
             strokeDasharray="6,4"
@@ -209,6 +270,11 @@ const Canvas: React.FC<CanvasProps> = ({
 
     return lines;
   };
+  // 전역 드래그 선택을 위한 상태
+  const [globalDragSelecting, setGlobalDragSelecting] = React.useState(false);
+  const [globalDragStart, setGlobalDragStart] = React.useState({ x: 0, y: 0 });
+  const [globalDragWithShift, setGlobalDragWithShift] = React.useState(false);
+
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
     console.log('Canvas mouse down:', { 
       isSpacePressed, 
@@ -234,21 +300,46 @@ const Canvas: React.FC<CanvasProps> = ({
       return;
     }
     
+    // 선택 도구이고 연결 모드가 아닐 때 전역 드래그 선택 시작 준비
+    if (currentTool === 'select' && !isConnecting) {
+      setGlobalDragSelecting(true);
+      setGlobalDragStart({ x: e.clientX, y: e.clientY });
+      setGlobalDragWithShift(e.shiftKey);
+    }
+    
     // 캔버스 배경 영역에서만 팬 도구 활성화
     const isCanvasBackground = target.hasAttribute('data-canvas') ||
                               target.tagName === 'svg' ||
                               target.tagName === 'line' ||
                               (target.tagName === 'DIV' && !target.closest('[data-memo-block="true"]') && !target.closest('button'));
     
-    if (isCanvasBackground && !isConnecting && currentTool === 'pan') {
-      console.log('Starting pan mode (tool selected)');
-      setIsPanning(true);
-      setPanStart({
-        x: e.clientX - canvasOffset.x,
-        y: e.clientY - canvasOffset.y
-      });
-      e.preventDefault();
-      e.stopPropagation();
+    if (isCanvasBackground && !isConnecting) {
+      if (currentTool === 'pan') {
+        console.log('Starting pan mode (tool selected)');
+        setIsPanning(true);
+        setPanStart({
+          x: e.clientX - canvasOffset.x,
+          y: e.clientY - canvasOffset.y
+        });
+        e.preventDefault();
+        e.stopPropagation();
+      } else if (currentTool === 'select') {
+        // 선택 도구로 캔버스 배경 드래그 시 드래그 선택 시작
+        console.log('Starting drag selection');
+        const rect = e.currentTarget.getBoundingClientRect();
+        // 올바른 월드 좌표 변환: 화면 좌표 → 캔버스 로컬 좌표
+        const localX = e.clientX - rect.left;
+        const localY = e.clientY - rect.top;
+        const worldX = (localX - canvasOffset.x) / canvasScale;
+        const worldY = (localY - canvasOffset.y) / canvasScale;
+        console.log('Mouse coords:', { clientX: e.clientX, clientY: e.clientY });
+        console.log('Local coords:', { localX, localY });
+        console.log('Canvas state:', { canvasOffset, canvasScale });
+        console.log('World coords:', { worldX, worldY });
+        onDragSelectStart({ x: worldX, y: worldY }, e.shiftKey);
+        e.preventDefault();
+        e.stopPropagation();
+      }
     }
   };
 
@@ -259,6 +350,7 @@ const Canvas: React.FC<CanvasProps> = ({
     if (e.altKey || currentTool === 'zoom') {
       console.log('Zooming...', { canvasScale, deltaY: e.deltaY });
       e.preventDefault();
+      e.stopPropagation();
       
       const rect = e.currentTarget.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
@@ -286,10 +378,19 @@ const Canvas: React.FC<CanvasProps> = ({
   const handleMouseMove = (e: React.MouseEvent) => {
     if (isConnecting) {
       const rect = e.currentTarget.getBoundingClientRect();
-      // 스케일과 오프셋을 고려한 실제 좌표 계산
+      // 화면 좌표를 원본 좌표로 변환 (SVG가 동일한 transform을 사용하므로)
       const mouseX = (e.clientX - rect.left - canvasOffset.x) / canvasScale;
       const mouseY = (e.clientY - rect.top - canvasOffset.y) / canvasScale;
       onUpdateDragLine({ x: mouseX, y: mouseY });
+    }
+    
+    if (isDragSelecting) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const localX = e.clientX - rect.left;
+      const localY = e.clientY - rect.top;
+      const worldX = (localX - canvasOffset.x) / canvasScale;
+      const worldY = (localY - canvasOffset.y) / canvasScale;
+      onDragSelectMove({ x: worldX, y: worldY });
     }
     
     if (isPanning) {
@@ -303,6 +404,9 @@ const Canvas: React.FC<CanvasProps> = ({
 
   const handleMouseUp = () => {
     setIsPanning(false);
+    if (isDragSelecting) {
+      onDragSelectEnd();
+    }
   };
 
   React.useEffect(() => {
@@ -330,6 +434,59 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   }, [isPanning, panStart, isSpacePressed, currentTool]);
 
+  // 전역 드래그 선택을 위한 이벤트 리스너
+  React.useEffect(() => {
+    if (globalDragSelecting) {
+      const handleGlobalMouseMove = (e: MouseEvent) => {
+        const deltaX = Math.abs(e.clientX - globalDragStart.x);
+        const deltaY = Math.abs(e.clientY - globalDragStart.y);
+        
+        // 충분히 드래그되었고 아직 드래그 선택이 시작되지 않았다면 시작
+        if ((deltaX > 5 || deltaY > 5) && !isDragSelecting) {
+          console.log('Starting global drag selection');
+          const canvasElement = document.querySelector('[data-canvas="true"]');
+          if (canvasElement) {
+            const rect = canvasElement.getBoundingClientRect();
+            const localStartX = globalDragStart.x - rect.left;
+            const localStartY = globalDragStart.y - rect.top;
+            const worldStartX = (localStartX - canvasOffset.x) / canvasScale;
+            const worldStartY = (localStartY - canvasOffset.y) / canvasScale;
+            onDragSelectStart({ x: worldStartX, y: worldStartY }, globalDragWithShift);
+          }
+        }
+        
+        // 드래그 선택이 진행중이면 업데이트
+        if (isDragSelecting) {
+          const canvasElement = document.querySelector('[data-canvas="true"]');
+          if (canvasElement) {
+            const rect = canvasElement.getBoundingClientRect();
+            const localX = e.clientX - rect.left;
+            const localY = e.clientY - rect.top;
+            const worldX = (localX - canvasOffset.x) / canvasScale;
+            const worldY = (localY - canvasOffset.y) / canvasScale;
+            onDragSelectMove({ x: worldX, y: worldY });
+          }
+        }
+      };
+
+      const handleGlobalMouseUp = () => {
+        setGlobalDragSelecting(false);
+        setGlobalDragWithShift(false);
+        if (isDragSelecting) {
+          onDragSelectEnd();
+        }
+      };
+
+      document.addEventListener('mousemove', handleGlobalMouseMove);
+      document.addEventListener('mouseup', handleGlobalMouseUp);
+
+      return () => {
+        document.removeEventListener('mousemove', handleGlobalMouseMove);
+        document.removeEventListener('mouseup', handleGlobalMouseUp);
+      };
+    }
+  }, [globalDragSelecting, globalDragStart, isDragSelecting, canvasOffset, canvasScale, onDragSelectStart, onDragSelectMove, onDragSelectEnd]);
+
   // 키보드 이벤트 처리
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -343,6 +500,12 @@ const Canvas: React.FC<CanvasProps> = ({
         console.log('Alt pressed, base tool:', baseTool);
         setIsAltPressed(true);
         setCurrentTool('zoom');
+      }
+      if (e.code === 'Escape') {
+        console.log('Escape pressed - clearing selection');
+        // 모든 선택 해제
+        onMemoSelect('', false); // 빈 문자열로 호출해서 선택 해제
+        e.preventDefault();
       }
     };
 
@@ -360,6 +523,8 @@ const Canvas: React.FC<CanvasProps> = ({
       }
       if ((e.code === 'AltLeft' || e.code === 'AltRight') && isAltPressed) {
         console.log('Alt released, restoring to base tool:', baseTool);
+        e.preventDefault();
+        e.stopImmediatePropagation();
         setIsAltPressed(false);
         // Space가 눌려있으면 pan, 아니면 baseTool로
         if (isSpacePressed) {
@@ -370,26 +535,19 @@ const Canvas: React.FC<CanvasProps> = ({
       }
     };
 
-    const handleWheel = (e: WheelEvent) => {
-      if (e.altKey) {
-        console.log('Alt + wheel detected');
-      }
-    };
-
     document.addEventListener('keydown', handleKeyDown, { capture: true });
     document.addEventListener('keyup', handleKeyUp, { capture: true });
-    document.addEventListener('wheel', handleWheel, { capture: true, passive: false });
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown, { capture: true } as any);
       document.removeEventListener('keyup', handleKeyUp, { capture: true } as any);
-      document.removeEventListener('wheel', handleWheel, { capture: true } as any);
     };
-  }, [baseTool, isSpacePressed, isAltPressed]);
+  }, [baseTool, isSpacePressed, isAltPressed, isMouseOverCanvas]);
 
   return (
     <div 
       data-canvas="true"
+      tabIndex={0}
       style={{
         flex: 1,
         position: 'relative',
@@ -402,44 +560,28 @@ const Canvas: React.FC<CanvasProps> = ({
                 currentTool === 'zoom' ? 'crosshair' : 'default'
       }}
       onClick={(e) => {
-        if (isConnecting && e.target === e.currentTarget) {
-          onCancelConnection();
+        const target = e.target as Element;
+        const isCanvasBackground = target.hasAttribute('data-canvas') ||
+                                  target.tagName === 'svg' ||
+                                  (target.tagName === 'DIV' && !target.closest('[data-memo-block="true"]') && !target.closest('button'));
+        
+        if (isCanvasBackground) {
+          if (isConnecting) {
+            onCancelConnection();
+          } else if (!isDragSelecting && !isSpacePressed && currentTool !== 'pan') {
+            // 캔버스 배경 클릭 시 모든 선택 해제 (드래그 선택 중이 아니고, 스페이스바가 안 눌려있고, 팬 모드가 아닐 때만)
+            onMemoSelect('', false);
+          }
         }
       }}
       onMouseDown={handleCanvasMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onWheelCapture={handleWheel}
+      onMouseEnter={() => setIsMouseOverCanvas(true)}
+      onMouseLeave={() => setIsMouseOverCanvas(false)}
+      onWheel={handleWheel}
     >
-      {/* SVG로 연결선 그리기 */}
-      <svg
-        style={{
-          position: 'absolute',
-          top: '-5000px',
-          left: '-5000px',
-          width: '15000px',
-          height: '15000px',
-          pointerEvents: isDisconnectMode ? 'auto' : 'none',
-          zIndex: isDisconnectMode ? 1 : 0,
-          transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px) scale(${canvasScale})`,
-          transformOrigin: '5000px 5000px'
-        }}
-      >
-        <defs>
-          <style>
-            {`
-              @keyframes dash {
-                to {
-                  stroke-dashoffset: -24;
-                }
-              }
-            `}
-          </style>
-        </defs>
-        {renderConnectionLines()}
-      </svg>
-
-      {/* 메모 블록들 */}
+      {/* 메모 블록들과 연결선 */}
       <div style={{
         transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px) scale(${canvasScale})`,
         transformOrigin: '0 0',
@@ -448,12 +590,40 @@ const Canvas: React.FC<CanvasProps> = ({
         position: 'absolute',
         pointerEvents: 'auto'
       }}>
+        {/* SVG로 연결선 그리기 */}
+        <svg
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            overflow: 'visible',
+            pointerEvents: isDisconnectMode ? 'auto' : 'none',
+            zIndex: isDisconnectMode ? 1 : 0
+          }}
+        >
+          <defs>
+            <style>
+              {`
+                @keyframes dash {
+                  to {
+                    stroke-dashoffset: -24;
+                  }
+                }
+              `}
+            </style>
+          </defs>
+          {renderConnectionLines()}
+        </svg>
+
         {currentPage?.memos.map(memo => (
           <MemoBlock
             key={memo.id}
             memo={memo}
-            isSelected={selectedMemoId === memo.id}
-            onClick={() => onMemoSelect(memo.id)}
+            isSelected={selectedMemoId === memo.id || selectedMemoIds.includes(memo.id)}
+            isDragHovered={dragHoveredMemoIds.includes(memo.id)}
+            onClick={(isShiftClick) => onMemoSelect(memo.id, isShiftClick)}
             onPositionChange={onMemoPositionChange}
             onSizeChange={onMemoSizeChange}
             isConnecting={isConnecting}
@@ -464,7 +634,26 @@ const Canvas: React.FC<CanvasProps> = ({
             canvasOffset={canvasOffset}
           />
         ))}
+
+        {/* 드래그 선택 영역 - 메모 블록과 같은 transform 공간 안에 위치 */}
+        {isDragSelecting && dragSelectStart && dragSelectEnd && (
+          <div
+            style={{
+              position: 'absolute',
+              left: `${Math.min(dragSelectStart.x, dragSelectEnd.x)}px`,
+              top: `${Math.min(dragSelectStart.y, dragSelectEnd.y)}px`,
+              width: `${Math.abs(dragSelectEnd.x - dragSelectStart.x)}px`,
+              height: `${Math.abs(dragSelectEnd.y - dragSelectStart.y)}px`,
+              backgroundColor: 'rgba(59, 130, 246, 0.2)',
+              border: '2px solid rgba(59, 130, 246, 0.6)',
+              borderRadius: '4px',
+              pointerEvents: 'none',
+              zIndex: 1000
+            }}
+          />
+        )}
       </div>
+
 
       {/* 하단 도구 버튼들 */}
       <div style={{

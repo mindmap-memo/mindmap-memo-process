@@ -10,6 +10,7 @@ const App: React.FC = () => {
   ]);
   const [currentPageId, setCurrentPageId] = useState<string>('1');
   const [selectedMemoId, setSelectedMemoId] = useState<string | null>(null);
+  const [selectedMemoIds, setSelectedMemoIds] = useState<string[]>([]);
   const [leftPanelOpen, setLeftPanelOpen] = useState<boolean>(true);
   const [rightPanelOpen, setRightPanelOpen] = useState<boolean>(true);
   const [leftPanelWidth, setLeftPanelWidth] = useState<number>(250);
@@ -18,9 +19,16 @@ const App: React.FC = () => {
   const [isDisconnectMode, setIsDisconnectMode] = useState<boolean>(false);
   const [connectingFromId, setConnectingFromId] = useState<string | null>(null);
   const [dragLineEnd, setDragLineEnd] = useState<{ x: number; y: number } | null>(null);
+  const [isDragSelecting, setIsDragSelecting] = useState<boolean>(false);
+  const [dragSelectStart, setDragSelectStart] = useState<{ x: number; y: number } | null>(null);
+  const [dragSelectEnd, setDragSelectEnd] = useState<{ x: number; y: number } | null>(null);
+  const [dragHoveredMemoIds, setDragHoveredMemoIds] = useState<string[]>([]);
+  const [isDragSelectingWithShift, setIsDragSelectingWithShift] = useState<boolean>(false);
 
   const currentPage = pages.find(page => page.id === currentPageId);
-  const selectedMemo = currentPage?.memos.find(memo => memo.id === selectedMemoId);
+  const selectedMemo = currentPage?.memos.find(memo => memo.id === selectedMemoId) || 
+                      (selectedMemoIds.length === 1 ? currentPage?.memos.find(memo => memo.id === selectedMemoIds[0]) : undefined);
+  const selectedMemos = currentPage?.memos.filter(memo => selectedMemoIds.includes(memo.id)) || [];
 
   const addPage = () => {
     const newPage: Page = {
@@ -37,6 +45,186 @@ const App: React.FC = () => {
         ? { ...page, name: newName }
         : page
     ));
+  };
+
+  const deletePage = (pageId: string) => {
+    if (pages.length <= 1) {
+      alert('마지막 페이지는 삭제할 수 없습니다.');
+      return;
+    }
+    
+    setPages(prev => prev.filter(page => page.id !== pageId));
+    
+    // 삭제된 페이지가 현재 페이지인 경우 첫 번째 페이지로 이동
+    if (currentPageId === pageId) {
+      const remainingPages = pages.filter(page => page.id !== pageId);
+      if (remainingPages.length > 0) {
+        setCurrentPageId(remainingPages[0].id);
+      }
+    }
+    
+    // 선택된 메모 초기화
+    setSelectedMemoId(null);
+    setSelectedMemoIds([]);
+  };
+
+  // 새로운 메모 선택 핸들러 (멀티 선택 지원)
+  const handleMemoSelect = (memoId: string, isShiftClick: boolean = false) => {
+    // 빈 문자열이거나 유효하지 않은 ID인 경우 모든 선택 해제
+    if (!memoId || !currentPage?.memos.find(m => m.id === memoId)) {
+      setSelectedMemoId(null);
+      setSelectedMemoIds([]);
+      return;
+    }
+
+    if (isShiftClick) {
+      // Shift + 클릭: 멀티 선택
+      setSelectedMemoIds(prev => {
+        // 기존에 단일 선택된 메모가 있으면 다중 선택 목록에 추가
+        const currentSelection = selectedMemoId ? [selectedMemoId, ...prev] : prev;
+        
+        if (currentSelection.includes(memoId)) {
+          // 이미 선택된 경우 제거
+          return currentSelection.filter(id => id !== memoId);
+        } else {
+          // 새로 추가
+          return [...currentSelection, memoId];
+        }
+      });
+      
+      // 멀티 선택 시에는 단일 선택 해제
+      setSelectedMemoId(null);
+    } else {
+      // 일반 클릭: 단일 선택
+      setSelectedMemoId(memoId);
+      setSelectedMemoIds([]);
+    }
+  };
+
+  // 드래그 선택 관련 핸들러들
+  const handleDragSelectStart = (position: { x: number; y: number }, isShiftPressed: boolean = false) => {
+    setIsDragSelecting(true);
+    setDragSelectStart(position);
+    setDragSelectEnd(position);
+    setIsDragSelectingWithShift(isShiftPressed);
+  };
+
+  const handleDragSelectMove = (position: { x: number; y: number }) => {
+    if (isDragSelecting) {
+      setDragSelectEnd(position);
+      
+      // 실시간으로 드래그 영역과 교집합된 메모들 계산
+      if (dragSelectStart && currentPage) {
+        const minX = Math.min(dragSelectStart.x, position.x);
+        const maxX = Math.max(dragSelectStart.x, position.x);
+        const minY = Math.min(dragSelectStart.y, position.y);
+        const maxY = Math.max(dragSelectStart.y, position.y);
+
+        const hoveredMemos = currentPage.memos.filter(memo => {
+          const memoWidth = memo.size?.width || 200;
+          const memoHeight = memo.size?.height || 95;
+          const memoLeft = memo.position.x;
+          const memoRight = memo.position.x + memoWidth;
+          const memoTop = memo.position.y;
+          const memoBottom = memo.position.y + memoHeight;
+          
+          return (memoLeft < maxX && memoRight > minX && memoTop < maxY && memoBottom > minY);
+        });
+
+        setDragHoveredMemoIds(hoveredMemos.map(memo => memo.id));
+      }
+    }
+  };
+
+  const handleDragSelectEnd = () => {
+    if (isDragSelecting && dragSelectStart && dragSelectEnd && currentPage) {
+      // 선택 영역 계산 (드래그 좌표는 이미 월드 좌표로 변환됨)
+      const minX = Math.min(dragSelectStart.x, dragSelectEnd.x);
+      const maxX = Math.max(dragSelectStart.x, dragSelectEnd.x);
+      const minY = Math.min(dragSelectStart.y, dragSelectEnd.y);
+      const maxY = Math.max(dragSelectStart.y, dragSelectEnd.y);
+
+      console.log('Drag selection area:', { minX, maxX, minY, maxY });
+      console.log('Available memos:');
+      currentPage.memos.forEach(memo => {
+        console.log(`Memo ${memo.id}:`, {
+          position: memo.position,
+          size: memo.size || { width: 200, height: 95 }
+        });
+      });
+
+      const memosInSelection = currentPage.memos.filter(memo => {
+        const memoWidth = memo.size?.width || 200;
+        const memoHeight = memo.size?.height || 95;
+        
+        // 메모 블록의 경계 계산
+        const memoLeft = memo.position.x;
+        const memoRight = memo.position.x + memoWidth;
+        const memoTop = memo.position.y;
+        const memoBottom = memo.position.y + memoHeight;
+        
+        // 사각형 교집합 확인
+        const intersects = (memoLeft < maxX && memoRight > minX && memoTop < maxY && memoBottom > minY);
+        
+        console.log(`Checking memo ${memo.id}:`, {
+          memoBounds: { left: memoLeft, right: memoRight, top: memoTop, bottom: memoBottom },
+          selectionBounds: { minX, maxX, minY, maxY },
+          intersects: intersects
+        });
+        
+        return intersects;
+      });
+
+      if (memosInSelection.length > 0) {
+        if (isDragSelectingWithShift) {
+          // Shift + 드래그: 기존 선택 유지하면서 드래그 영역 메모들 토글
+          const currentSelection = selectedMemoId ? [selectedMemoId, ...selectedMemoIds] : selectedMemoIds;
+          let newSelection = [...currentSelection];
+          
+          memosInSelection.forEach(memo => {
+            if (newSelection.includes(memo.id)) {
+              // 이미 선택된 메모는 선택 해제
+              newSelection = newSelection.filter(id => id !== memo.id);
+            } else {
+              // 선택되지 않은 메모는 선택에 추가
+              newSelection.push(memo.id);
+            }
+          });
+          
+          setSelectedMemoIds(newSelection);
+          setSelectedMemoId(null);
+        } else {
+          // 일반 드래그: 기존 선택 해제하고 드래그 영역 메모들만 선택
+          setSelectedMemoIds(memosInSelection.map(memo => memo.id));
+          setSelectedMemoId(null);
+        }
+      } else if (!isDragSelectingWithShift) {
+        // 일반 드래그로 아무것도 선택하지 않았으면 기존 선택 해제
+        setSelectedMemoIds([]);
+        setSelectedMemoId(null);
+      }
+    }
+
+    setIsDragSelecting(false);
+    setDragSelectStart(null);
+    setDragSelectEnd(null);
+    setDragHoveredMemoIds([]);
+    setIsDragSelectingWithShift(false);
+  };
+
+  // 특정 메모로 화면 이동하는 함수
+  const focusOnMemo = (memoId: string) => {
+    const memo = currentPage?.memos.find(m => m.id === memoId);
+    if (memo) {
+      // 메모를 중앙으로 이동시키는 offset 계산
+      const targetX = -(memo.position.x - window.innerWidth / 2 / 1 + (memo.size?.width || 200) / 2);
+      const targetY = -(memo.position.y - window.innerHeight / 2 / 1 + (memo.size?.height || 95) / 2);
+      
+      // Canvas offset 업데이트는 Canvas 컴포넌트에서 처리하도록 함
+      // 여기서는 단일 선택으로 변경
+      setSelectedMemoId(memoId);
+      setSelectedMemoIds([]);
+    }
   };
 
   const addMemoBlock = (position?: { x: number; y: number }) => {
@@ -206,6 +394,7 @@ const App: React.FC = () => {
           onPageSelect={setCurrentPageId}
           onAddPage={addPage}
           onPageNameChange={updatePageName}
+          onDeletePage={deletePage}
           width={leftPanelWidth}
           onResize={handleLeftPanelResize}
         />
@@ -237,7 +426,8 @@ const App: React.FC = () => {
       <Canvas
         currentPage={currentPage}
         selectedMemoId={selectedMemoId}
-        onMemoSelect={setSelectedMemoId}
+        selectedMemoIds={selectedMemoIds}
+        onMemoSelect={handleMemoSelect}
         onAddMemo={addMemoBlock}
         onDeleteMemo={deleteMemoBlock}
         onDisconnectMemo={disconnectMemo}
@@ -252,6 +442,13 @@ const App: React.FC = () => {
         onCancelConnection={cancelConnection}
         onRemoveConnection={removeConnection}
         onUpdateDragLine={updateDragLine}
+        isDragSelecting={isDragSelecting}
+        dragSelectStart={dragSelectStart}
+        dragSelectEnd={dragSelectEnd}
+        dragHoveredMemoIds={dragHoveredMemoIds}
+        onDragSelectStart={handleDragSelectStart}
+        onDragSelectMove={handleDragSelectMove}
+        onDragSelectEnd={handleDragSelectEnd}
       />
 
       {/* 접기/펼치기 버튼 (오른쪽) */}
@@ -280,9 +477,11 @@ const App: React.FC = () => {
       {rightPanelOpen && (
         <RightPanel
           selectedMemo={selectedMemo}
+          selectedMemos={selectedMemos}
           currentPage={currentPage}
           onMemoUpdate={updateMemo}
-          onMemoSelect={setSelectedMemoId}
+          onMemoSelect={handleMemoSelect}
+          onFocusMemo={focusOnMemo}
           width={rightPanelWidth}
           onResize={handleRightPanelResize}
         />

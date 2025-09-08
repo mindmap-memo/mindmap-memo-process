@@ -4,7 +4,8 @@ import { MemoBlock as MemoBlockType } from '../types';
 interface MemoBlockProps {
   memo: MemoBlockType;
   isSelected: boolean;
-  onClick: () => void;
+  isDragHovered?: boolean;
+  onClick: (isShiftClick?: boolean) => void;
   onPositionChange: (id: string, position: { x: number; y: number }) => void;
   onSizeChange?: (id: string, size: { width: number; height: number }) => void;
   isConnecting?: boolean;
@@ -17,7 +18,8 @@ interface MemoBlockProps {
 
 const MemoBlock: React.FC<MemoBlockProps> = ({ 
   memo, 
-  isSelected, 
+  isSelected,
+  isDragHovered = false,
   onClick, 
   onPositionChange,
   onSizeChange,
@@ -112,7 +114,11 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       const updateSize = () => {
         if (memoRef.current) {
           const rect = memoRef.current.getBoundingClientRect();
-          const newSize = { width: rect.width, height: rect.height };
+          // scale을 나누어서 실제 논리적 크기 계산
+          const newSize = { 
+            width: rect.width / canvasScale, 
+            height: rect.height / canvasScale 
+          };
           if (!memo.size || memo.size.width !== newSize.width || memo.size.height !== newSize.height) {
             onSizeChange(memo.id, newSize);
           }
@@ -128,13 +134,13 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         resizeObserver.disconnect();
       };
     }
-  }, [memo.title, memo.content, memo.tags, memo.id, onSizeChange]);
+  }, [memo.title, memo.content, memo.tags, memo.id, onSizeChange, canvasScale]);
 
   return (
     <div
       ref={memoRef}
       data-memo-block="true"
-      onClick={onClick}
+      onClick={(e) => onClick(e.shiftKey)}
       onMouseDown={handleMouseDown}
       onMouseUp={(e) => {
         // 연결 모드일 때 메모 블록 전체에서 연결 처리
@@ -149,7 +155,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         left: memo.position.x,
         top: memo.position.y,
         backgroundColor: isSelected ? '#f3f4f6' : 'white',
-        border: isSelected ? '2px solid #8b5cf6' : '1px solid #e5e7eb',
+        border: isDragHovered ? '2px solid #3b82f6' : (isSelected ? '2px solid #8b5cf6' : '1px solid #e5e7eb'),
         borderRadius: '12px',
         padding: '16px',
         minWidth: '200px',

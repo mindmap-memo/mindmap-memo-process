@@ -8,6 +8,7 @@ interface LeftPanelProps {
   onPageSelect: (pageId: string) => void;
   onAddPage: () => void;
   onPageNameChange: (pageId: string, newName: string) => void;
+  onDeletePage: (pageId: string) => void;
   width: number;
   onResize: (deltaX: number) => void;
 }
@@ -18,6 +19,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
   onPageSelect, 
   onAddPage,
   onPageNameChange,
+  onDeletePage,
   width,
   onResize
 }) => {
@@ -27,6 +29,19 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
   const handleDoubleClick = (page: Page) => {
     setEditingPageId(page.id);
     setEditingName(page.name);
+  };
+
+  const handleEditClick = (page: Page, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingPageId(page.id);
+    setEditingName(page.name);
+  };
+
+  const handleDeleteClick = (page: Page, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm(`"${page.name}" 페이지를 정말 삭제하시겠습니까?`)) {
+      onDeletePage(page.id);
+    }
   };
 
   const handleNameSubmit = () => {
@@ -103,7 +118,12 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
               cursor: 'pointer',
               transition: 'all 0.2s ease',
               fontSize: '14px',
-              fontWeight: '500'
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: '8px',
+              minHeight: '20px'
             }}
             onMouseOver={(e) => {
               if (currentPageId !== page.id) {
@@ -116,25 +136,113 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
               }
             }}
           >
-            {editingPageId === page.id ? (
-              <input
-                type="text"
-                value={editingName}
-                onChange={(e) => setEditingName(e.target.value)}
-                onBlur={handleNameSubmit}
-                onKeyDown={handleKeyPress}
-                autoFocus
-                style={{
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  color: '#374151',
-                  width: '100%',
-                  outline: 'none',
+            <div style={{ 
+              flex: 1, 
+              minWidth: 0,
+              marginRight: '8px'
+            }}>
+              {editingPageId === page.id ? (
+                <input
+                  type="text"
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onBlur={handleNameSubmit}
+                  onKeyDown={handleKeyPress}
+                  autoFocus
+                  style={{
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    color: '#374151',
+                    width: '100%',
+                    outline: 'none',
+                    fontSize: '14px'
+                  }}
+                />
+              ) : (
+                <span style={{ 
+                  display: 'block',
+                  wordBreak: 'break-word',
+                  whiteSpace: 'normal',
+                  lineHeight: '1.4',
                   fontSize: '14px'
-                }}
-              />
-            ) : (
-              page.name
+                }}>
+                  {page.name}
+                </span>
+              )}
+            </div>
+            
+            {editingPageId !== page.id && (
+              <div style={{ 
+                display: 'flex', 
+                gap: '4px',
+                flexShrink: 0,
+                paddingTop: '2px'
+              }}>
+                {/* 편집 아이콘 */}
+                <button
+                  onClick={(e) => handleEditClick(page, e)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    borderRadius: '4px',
+                    color: '#6b7280',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.backgroundColor = '#e5e7eb';
+                    e.currentTarget.style.color = '#374151';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#6b7280';
+                  }}
+                  title="페이지 이름 편집"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="m18.5 2.5 3 3L12 15l-4 1 1-4z"/>
+                  </svg>
+                </button>
+                
+                {/* 삭제 아이콘 */}
+                <button
+                  onClick={(e) => handleDeleteClick(page, e)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    borderRadius: '4px',
+                    color: '#6b7280',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.backgroundColor = '#fef2f2';
+                    e.currentTarget.style.color = '#ef4444';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#6b7280';
+                  }}
+                  title="페이지 삭제"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 6h18"/>
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                    <path d="M8 6V4c0-1 1-2 2-2h4c0 1 1 2 2 2v2"/>
+                    <line x1="10" y1="11" x2="10" y2="17"/>
+                    <line x1="14" y1="11" x2="14" y2="17"/>
+                  </svg>
+                </button>
+              </div>
             )}
           </div>
         ))}

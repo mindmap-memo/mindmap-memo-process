@@ -4,18 +4,22 @@ import Resizer from './Resizer';
 
 interface RightPanelProps {
   selectedMemo: MemoBlock | undefined;
+  selectedMemos: MemoBlock[];
   currentPage: Page | undefined;
   onMemoUpdate: (memoId: string, updates: Partial<MemoBlock>) => void;
-  onMemoSelect: (memoId: string) => void;
+  onMemoSelect: (memoId: string, isShiftClick?: boolean) => void;
+  onFocusMemo: (memoId: string) => void;
   width: number;
   onResize: (deltaX: number) => void;
 }
 
 const RightPanel: React.FC<RightPanelProps> = ({
   selectedMemo,
+  selectedMemos,
   currentPage,
   onMemoUpdate,
   onMemoSelect,
+  onFocusMemo,
   width,
   onResize
 }) => {
@@ -72,7 +76,67 @@ const RightPanel: React.FC<RightPanelProps> = ({
       position: 'relative'
     }}>
       
-      {selectedMemo ? (
+      {selectedMemos.length > 1 ? (
+        // 멀티 선택 모드
+        <div style={{ padding: '16px', borderRadius: '8px', backgroundColor: '#ffffff' }}>
+          <h3 style={{ 
+            marginBottom: '16px', 
+            fontSize: '18px', 
+            fontWeight: '600', 
+            color: '#1f2937' 
+          }}>
+            선택된 메모 ({selectedMemos.length}개)
+          </h3>
+          
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '8px', 
+            maxHeight: '400px', 
+            overflowY: 'auto' 
+          }}>
+            {selectedMemos.map(memo => (
+              <div
+                key={memo.id}
+                onClick={() => onFocusMemo(memo.id)}
+                style={{
+                  padding: '12px 16px',
+                  backgroundColor: '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: '#374151'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f3f4f6';
+                  e.currentTarget.style.borderColor = '#8b5cf6';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f9fafb';
+                  e.currentTarget.style.borderColor = '#e5e7eb';
+                }}
+              >
+                <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                  {memo.title}
+                </div>
+                <div style={{ 
+                  fontSize: '12px', 
+                  color: '#6b7280',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden'
+                }}>
+                  {memo.content || '내용 없음'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : selectedMemo ? (
         <div style={{ padding: '16px', borderRadius: '8px', backgroundColor: '#ffffff' }}>
           <div style={{ marginBottom: '8px' }}>
             <input
