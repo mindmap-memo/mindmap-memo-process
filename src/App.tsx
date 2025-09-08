@@ -39,14 +39,14 @@ const App: React.FC = () => {
     ));
   };
 
-  const addMemoBlock = () => {
+  const addMemoBlock = (position?: { x: number; y: number }) => {
     const newMemo: MemoBlock = {
       id: Date.now().toString(),
       title: '새 메모',
       content: '',
       tags: [],
       connections: [],
-      position: { x: 300, y: 200 }
+      position: position || { x: 300, y: 200 }
     };
     
     setPages(prev => prev.map(page => 
@@ -195,8 +195,8 @@ const App: React.FC = () => {
       display: 'flex',
       height: '100vh',
       width: '100vw',
-      backgroundColor: '#f0f0f0',
-      fontFamily: 'Arial, sans-serif'
+      backgroundColor: '#ffffff',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     }}>
       {/* 왼쪽 패널 */}
       {leftPanelOpen && (

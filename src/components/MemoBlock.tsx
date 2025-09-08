@@ -11,6 +11,8 @@ interface MemoBlockProps {
   connectingFromId?: string | null;
   onStartConnection?: (memoId: string) => void;
   onConnectMemos?: (fromId: string, toId: string) => void;
+  canvasScale?: number;
+  canvasOffset?: { x: number; y: number };
 }
 
 const MemoBlock: React.FC<MemoBlockProps> = ({ 
@@ -22,7 +24,9 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   isConnecting, 
   connectingFromId, 
   onStartConnection, 
-  onConnectMemos 
+  onConnectMemos,
+  canvasScale = 1,
+  canvasOffset = { x: 0, y: 0 }
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isConnectionDragging, setIsConnectionDragging] = useState(false);
@@ -32,9 +36,12 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button === 0 && !isConnecting) {
       setIsDragging(true);
+      // 스케일된 좌표계에서 드래그 시작점 계산
+      const scaledMemoX = (memo.position.x * canvasScale) + canvasOffset.x;
+      const scaledMemoY = (memo.position.y * canvasScale) + canvasOffset.y;
       setDragStart({
-        x: e.clientX - memo.position.x,
-        y: e.clientY - memo.position.y
+        x: e.clientX - scaledMemoX,
+        y: e.clientY - scaledMemoY
       });
       e.preventDefault();
     }
@@ -74,9 +81,12 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
 
   const handleMouseMove = (e: MouseEvent) => {
     if (isDragging) {
+      // 스케일과 오프셋을 고려한 실제 위치 계산
+      const rawX = e.clientX - dragStart.x - canvasOffset.x;
+      const rawY = e.clientY - dragStart.y - canvasOffset.y;
       const newPosition = {
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y
+        x: rawX / canvasScale,
+        y: rawY / canvasScale
       };
       onPositionChange(memo.id, newPosition);
     }
@@ -123,28 +133,50 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   return (
     <div
       ref={memoRef}
+      data-memo-block="true"
       onClick={onClick}
       onMouseDown={handleMouseDown}
+      onMouseUp={(e) => {
+        // 연결 모드일 때 메모 블록 전체에서 연결 처리
+        if (isConnecting && connectingFromId && connectingFromId !== memo.id) {
+          e.stopPropagation();
+          console.log('Connecting to memo block:', connectingFromId, 'to', memo.id);
+          onConnectMemos?.(connectingFromId, memo.id);
+        }
+      }}
       style={{
         position: 'absolute',
         left: memo.position.x,
         top: memo.position.y,
-        backgroundColor: isSelected ? '#e3f2fd' : 'white',
-        border: isSelected ? '2px solid #4a90e2' : '1px solid #ddd',
-        borderRadius: '8px',
-        padding: '15px',
+        backgroundColor: isSelected ? '#f3f4f6' : 'white',
+        border: isSelected ? '2px solid #8b5cf6' : '1px solid #e5e7eb',
+        borderRadius: '12px',
+        padding: '16px',
         minWidth: '200px',
         cursor: isDragging ? 'grabbing' : 'grab',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
         userSelect: 'none',
         zIndex: 10
       }}
     >
-      <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
-        {memo.title}
+      <div style={{ 
+        fontWeight: '600', 
+        marginBottom: '8px', 
+        fontSize: '16px',
+        color: '#1f2937',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px'
+      }}>
+        📝 {memo.title}
       </div>
-      <div style={{ fontSize: '14px', color: '#666' }}>
-        {memo.content.length > 50 ? `${memo.content.substring(0, 50)}...` : memo.content || '내용을 입력하세요...'}
+      <div style={{ 
+        fontSize: '14px', 
+        color: '#6b7280',
+        lineHeight: '1.5',
+        marginBottom: '8px'
+      }}>
+        {memo.content.length > 50 ? `${memo.content.substring(0, 50)}...` : memo.content || '텍스트를 입력하세요...'}
       </div>
       {memo.tags.length > 0 && (
         <div style={{ marginTop: '8px' }}>
@@ -152,12 +184,13 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
             <span
               key={tag}
               style={{
-                backgroundColor: '#4a90e2',
-                color: 'white',
-                padding: '2px 8px',
-                borderRadius: '12px',
+                backgroundColor: '#e5e7eb',
+                color: '#374151',
+                padding: '4px 8px',
+                borderRadius: '6px',
                 fontSize: '12px',
-                marginRight: '5px'
+                marginRight: '6px',
+                fontWeight: '500'
               }}
             >
               {tag}
@@ -185,12 +218,12 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         }} 
       >
         <div style={{
-          width: 6,
-          height: 6,
-          backgroundColor: isConnecting && connectingFromId === memo.id ? '#ef4444' : '#4a90e2',
+          width: 8,
+          height: 8,
+          backgroundColor: isConnecting && connectingFromId === memo.id ? '#ef4444' : '#8b5cf6',
           borderRadius: '50%',
-          border: '1px solid white',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+          border: '2px solid white',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
         }} />
       </div>
       <div 
@@ -211,12 +244,12 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         }} 
       >
         <div style={{
-          width: 6,
-          height: 6,
-          backgroundColor: isConnecting && connectingFromId === memo.id ? '#ef4444' : '#4a90e2',
+          width: 8,
+          height: 8,
+          backgroundColor: isConnecting && connectingFromId === memo.id ? '#ef4444' : '#8b5cf6',
           borderRadius: '50%',
-          border: '1px solid white',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+          border: '2px solid white',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
         }} />
       </div>
       <div 
@@ -237,12 +270,12 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         }} 
       >
         <div style={{
-          width: 6,
-          height: 6,
-          backgroundColor: isConnecting && connectingFromId === memo.id ? '#ef4444' : '#4a90e2',
+          width: 8,
+          height: 8,
+          backgroundColor: isConnecting && connectingFromId === memo.id ? '#ef4444' : '#8b5cf6',
           borderRadius: '50%',
-          border: '1px solid white',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+          border: '2px solid white',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
         }} />
       </div>
       <div 
@@ -263,12 +296,12 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         }} 
       >
         <div style={{
-          width: 6,
-          height: 6,
-          backgroundColor: isConnecting && connectingFromId === memo.id ? '#ef4444' : '#4a90e2',
+          width: 8,
+          height: 8,
+          backgroundColor: isConnecting && connectingFromId === memo.id ? '#ef4444' : '#8b5cf6',
           borderRadius: '50%',
-          border: '1px solid white',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+          border: '2px solid white',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
         }} />
       </div>
     </div>

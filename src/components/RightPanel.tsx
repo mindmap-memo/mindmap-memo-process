@@ -19,6 +19,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
   width,
   onResize
 }) => {
+  const [tagInput, setTagInput] = React.useState('');
+
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (selectedMemo) {
       onMemoUpdate(selectedMemo.id, { title: e.target.value });
@@ -32,6 +34,28 @@ const RightPanel: React.FC<RightPanelProps> = ({
     }
   };
 
+  const handleTagInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTagInput(e.target.value);
+  };
+
+  const handleTagInputKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && tagInput.trim() && selectedMemo) {
+      const newTag = tagInput.trim();
+      if (!selectedMemo.tags.includes(newTag)) {
+        onMemoUpdate(selectedMemo.id, { tags: [...selectedMemo.tags, newTag] });
+      }
+      setTagInput('');
+      e.preventDefault();
+    }
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    if (selectedMemo) {
+      const updatedTags = selectedMemo.tags.filter(tag => tag !== tagToRemove);
+      onMemoUpdate(selectedMemo.id, { tags: updatedTags });
+    }
+  };
+
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (selectedMemo) {
       onMemoUpdate(selectedMemo.id, { content: e.target.value });
@@ -41,77 +65,156 @@ const RightPanel: React.FC<RightPanelProps> = ({
   return (
     <div style={{
       width: `${width}px`,
-      backgroundColor: 'white',
-      color: '#374151',
-      padding: '20px',
+      backgroundColor: '#ffffff',
+      color: '#1f2937',
+      padding: '24px',
       borderLeft: '1px solid #e5e7eb',
       position: 'relative'
     }}>
-      <h3 style={{ marginTop: 0 }}>메모 편집</h3>
       
       {selectedMemo ? (
-        <div>
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '5px' }}>제목:</label>
+        <div style={{ padding: '16px', borderRadius: '8px', backgroundColor: '#ffffff' }}>
+          <div style={{ marginBottom: '8px' }}>
             <input
               type="text"
+              placeholder="메모 제목..."
               value={selectedMemo.title}
               onChange={handleTitleChange}
               style={{
                 width: '100%',
-                padding: '10px',
-                borderRadius: '6px',
-                border: '1px solid #d1d5db',
-                backgroundColor: 'white',
-                color: '#374151',
-                fontSize: '14px'
+                padding: '8px 0',
+                border: 'none',
+                backgroundColor: 'transparent',
+                color: '#1f2937',
+                fontSize: '18px',
+                outline: 'none',
+                fontWeight: '600'
+              }}
+              onFocus={(e) => {
+                e.target.style.backgroundColor = '#f9fafb';
+                e.target.style.padding = '8px 12px';
+                e.target.style.borderRadius = '6px';
+              }}
+              onBlur={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+                e.target.style.padding = '8px 0';
+                e.target.style.borderRadius = '0';
               }}
             />
           </div>
-
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '5px' }}>태그:</label>
+          
+          <div style={{ marginBottom: '12px' }}>
+            {/* 기존 태그들 표시 */}
+            {selectedMemo.tags.length > 0 && (
+              <div style={{ 
+                display: 'flex', 
+                flexWrap: 'wrap', 
+                gap: '6px', 
+                marginBottom: '8px' 
+              }}>
+                {selectedMemo.tags.map((tag, index) => (
+                  <span
+                    key={index}
+                    style={{
+                      backgroundColor: '#e5e7eb',
+                      color: '#374151',
+                      padding: '4px 8px',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    {tag}
+                    <button
+                      onClick={() => removeTag(tag)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#6b7280',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        padding: '0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            
+            {/* 새 태그 입력 */}
             <input
               type="text"
-              placeholder="쉼표로 구분하여 입력"
-              value={selectedMemo.tags.join(', ')}
-              onChange={handleTagsChange}
+              placeholder="태그 추가..."
+              value={tagInput}
+              onChange={handleTagInputChange}
+              onKeyPress={handleTagInputKeyPress}
               style={{
                 width: '100%',
-                padding: '10px',
-                borderRadius: '6px',
-                border: '1px solid #d1d5db',
-                backgroundColor: 'white',
-                color: '#374151',
-                fontSize: '14px'
+                padding: '6px 0',
+                border: 'none',
+                backgroundColor: 'transparent',
+                color: '#6b7280',
+                fontSize: '13px',
+                outline: 'none',
+                fontWeight: '400'
+              }}
+              onFocus={(e) => {
+                e.target.style.backgroundColor = '#f9fafb';
+                e.target.style.padding = '6px 12px';
+                e.target.style.borderRadius = '6px';
+              }}
+              onBlur={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+                e.target.style.padding = '6px 0';
+                e.target.style.borderRadius = '0';
               }}
             />
           </div>
 
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '5px' }}>내용:</label>
+          <div style={{ marginBottom: '16px' }}>
             <textarea
+              placeholder="텍스트를 입력하세요..."
               value={selectedMemo.content}
               onChange={handleContentChange}
-              rows={10}
+              rows={12}
               style={{
                 width: '100%',
-                padding: '10px',
-                borderRadius: '6px',
-                border: '1px solid #d1d5db',
-                backgroundColor: 'white',
+                padding: '8px 0',
+                border: 'none',
+                backgroundColor: 'transparent',
                 color: '#374151',
-                resize: 'vertical',
+                resize: 'none',
                 fontSize: '14px',
-                fontFamily: 'inherit'
+                fontFamily: 'inherit',
+                outline: 'none',
+                lineHeight: '1.6'
+              }}
+              onFocus={(e) => {
+                e.target.style.backgroundColor = '#f9fafb';
+                e.target.style.padding = '12px';
+                e.target.style.borderRadius = '6px';
+              }}
+              onBlur={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+                e.target.style.padding = '8px 0';
+                e.target.style.borderRadius = '0';
               }}
             />
           </div>
+
 
           {selectedMemo.connections.length > 0 && (
             <div>
               <label style={{ display: 'block', marginBottom: '5px' }}>연결된 메모:</label>
-              <div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 {selectedMemo.connections.map(connId => {
                   const connectedMemo = currentPage?.memos.find(m => m.id === connId);
                   return connectedMemo ? (
@@ -119,13 +222,15 @@ const RightPanel: React.FC<RightPanelProps> = ({
                       key={connId}
                       onClick={() => onMemoSelect(connId)}
                       style={{
-                        padding: '10px',
-                        marginBottom: '6px',
+                        padding: '6px 8px',
                         backgroundColor: '#f3f4f6',
                         border: '1px solid #e5e7eb',
-                        borderRadius: '6px',
+                        borderRadius: '4px',
                         cursor: 'pointer',
-                        transition: 'all 0.2s ease'
+                        transition: 'all 0.2s ease',
+                        fontSize: '12px',
+                        flex: '0 0 calc(50% - 3px)',
+                        textAlign: 'center'
                       }}
                       onMouseOver={(e) => {
                         e.currentTarget.style.backgroundColor = '#e5e7eb';
@@ -143,7 +248,9 @@ const RightPanel: React.FC<RightPanelProps> = ({
           )}
         </div>
       ) : (
-        <p style={{ color: '#9ca3af' }}>메모를 선택하세요</p>
+        <div style={{ textAlign: 'center', color: '#9ca3af', marginTop: '60px' }}>
+          <p style={{ fontSize: '16px' }}>노드를 선택하여 편집하세요</p>
+        </div>
       )}
       <Resizer direction="right" onResize={onResize} />
     </div>
