@@ -15,6 +15,8 @@ interface ContentBlockProps {
   isEditing?: boolean;
   isSelected?: boolean;
   isDragHovered?: boolean;
+  pageId?: string;
+  memoId?: string;
   onUpdate?: (block: ContentBlock) => void;
   onDelete?: (blockId: string) => void;
   onMoveUp?: (blockId: string) => void;
@@ -32,6 +34,8 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
   isEditing = false,
   isSelected = false,
   isDragHovered = false,
+  pageId,
+  memoId,
   onUpdate, 
   onDelete,
   onMoveUp,
@@ -80,7 +84,7 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
       case 'code':
         return <CodeBlockComponent {...commonProps} block={block as any} />;
       case 'table':
-        return <TableBlockComponent {...commonProps} block={block as any} />;
+        return <TableBlockComponent {...commonProps} block={block as any} pageId={pageId} memoId={memoId} />;
       default:
         return null;
     }

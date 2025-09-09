@@ -8,6 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run build` - Create production build in `build/` directory
 - `npm test` - Run Jest tests in watch mode
 - `npm run eject` - Eject from Create React App (irreversible)
+- `npx tsc --noEmit` - Type check without compilation
 
 ## Application Architecture
 
@@ -56,6 +57,18 @@ The application implements a Notion-inspired block-based content editor:
 - **Panel Management**: Collapsible panels with resize handles, fullscreen mode for right panel
 - **Multi-Selection**: Shift+click for memo selection, drag selection for content blocks, unified selection UI
 
+### Advanced Table System
+
+The application includes a sophisticated table system designed for business process management:
+
+- **Column-Based Typing**: Each table column has a fixed type (text, number, date, checkbox, select, formula) that applies to all cells in that column
+- **Data Registry**: Global named data system using @dataName syntax (e.g., "@예산_총액") for cross-table references and formula dependencies
+- **Formula Engine**: Business-specific functions including PROGRESS(), STATUS(), DEADLINE(), WORKDAYS(), APPROVAL(), LATEST(), PREVIOUS(), SUM_BY()
+- **Real-time Updates**: Data registry subscribes to changes and automatically updates dependent cells and formulas
+- **Column Type Management**: Click column headers to change column types; type changes automatically convert existing cell values
+- **Horizontal Scrolling**: Tables automatically add horizontal scroll when content exceeds container width
+- **Context Menu UI**: Column type selector appears as positioned context menu rather than modal dialog
+
 ### Advanced Features
 
 - **Canvas Interaction**: Pan, zoom, drag selection with visual feedback boxes
@@ -83,3 +96,23 @@ The application implements a Notion-inspired block-based content editor:
 - **Block Merging Logic**: Only text blocks can merge, content appends to previous block, cursor moves to merge point
 - **Drag Selection**: Works across entire right panel, uses collision detection with block boundaries
 - **Panel Fullscreen**: Right panel can overlay entire screen, hides resizer and changes positioning to fixed
+
+### Table System Architecture
+
+- **Column-Based Type System**: TableColumn interface defines column properties including type, options, validation
+- **Dual Data Structure**: Tables maintain both legacy `headers`/`rows` arrays and enhanced `columns`/`cells` arrays for backward compatibility
+- **Data Registry Manager**: Global singleton (`src/utils/dataRegistry.ts`) manages named data points with dependency tracking
+- **Formula Engine**: Separate class (`src/utils/formulaEngine.ts`) handles @dataName references and business-specific functions
+- **Cell Editor Component**: Type-aware cell editing with autocomplete for @dataName references and formula helper
+- **Column Type Selector**: Context menu positioned at click location for adding columns and changing existing column types
+- **Type Conversion**: Automatic value conversion when changing column types (e.g., text → number uses parseFloat())
+- **Table Scrolling**: Wrapper div with `overflowX: 'auto'` and `minWidth: 'max-content'` on table for horizontal scrolling
+
+## Development Guidelines
+
+- **File Management**: Always prefer editing existing files to creating new ones; never create files unless absolutely necessary
+- **Table System**: When working with tables, remember the dual data structure - maintain both legacy arrays and enhanced objects
+- **Error Handling**: Use proper TypeScript error handling with `error instanceof Error ? error.message : 'Unknown error'` pattern
+- **Function Parameters**: Ensure all function calls have correct number of parameters (e.g., updateBlock requires 4 parameters: headers, rows, cells, columns)
+- **Data Registry**: Use global data registry for cross-table references; remember @dataName syntax for formula references
+- **Context Menus**: Position context menus using getBoundingClientRect() and pass position props for proper placement

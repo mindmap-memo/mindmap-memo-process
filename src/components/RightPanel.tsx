@@ -875,6 +875,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
                         isEditing={true}
                         isSelected={isSelected}
                         isDragHovered={dragHoveredBlocks.includes(block.id)}
+                        pageId={currentPage?.id}
+                        memoId={selectedMemo?.id}
                         onUpdate={handleBlockUpdate}
                         onDelete={handleBlockDelete}
                         onMoveUp={(blockId) => handleBlockMove(blockId, 'up')}

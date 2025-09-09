@@ -72,10 +72,75 @@ export interface CodeBlock extends BaseContentBlock {
   language?: string;
 }
 
+// Enhanced table cell types
+export type CellType = 'text' | 'number' | 'date' | 'select' | 'checkbox' | 'formula';
+
+export interface ValidationRule {
+  type: 'required' | 'min' | 'max' | 'pattern' | 'custom';
+  value?: any;
+  message: string;
+  customValidator?: (value: any) => boolean;
+}
+
+export interface TableCell {
+  value: any;
+  type: CellType;
+  dataName?: string;     // Named data reference like "예산_총액"
+  description?: string;  // Description of the data
+  unit?: string;        // Unit (원, %, 개, etc.)
+  isKey: boolean;       // Is this a key data point for referencing
+  validation?: ValidationRule;
+  format?: string;      // Date format, number format, etc.
+  formula?: string;     // Formula if type is 'formula'
+  options?: string[];   // Options for select type
+}
+
+export interface CellReference {
+  pageId: string;
+  memoId: string;
+  blockId: string;
+  cellId: string;
+}
+
+export interface DataLink {
+  id: string;
+  sourceData: string;   // "@예산_총액"
+  targetCells: CellReference[];
+  linkType: 'direct' | 'formula' | 'condition';
+  updatePolicy: 'realtime' | 'manual' | 'scheduled';
+}
+
+export interface DataRegistry {
+  [key: string]: {
+    value: any;
+    source: CellReference;
+    type: string;
+    lastUpdated: Date;
+    dependents: string[]; // Other data names that reference this
+  };
+}
+
+export interface TableColumn {
+  id: string;
+  name: string;
+  type: CellType;
+  options?: string[]; // For select type columns
+  format?: string; // Date format, number format, etc.
+  validation?: ValidationRule;
+}
+
 export interface TableBlock extends BaseContentBlock {
   type: 'table';
   headers: string[];
   rows: string[][];
+  // Enhanced table properties
+  columns?: TableColumn[]; // Column definitions with types
+  cells?: TableCell[][]; // Enhanced cell data structure
+  tableType?: 'data-collection' | 'approval-matrix' | 'timeline' | 'checklist' | 'basic';
+  template?: string;
+  autoSum?: boolean;
+  dependencies?: DataLink[];
+  permissions?: { [cellId: string]: string[] }; // Cell permissions by user
 }
 
 export type ContentBlock = 
@@ -112,4 +177,5 @@ export interface AppState {
   selectedMemoId: string | null;
   leftPanelOpen: boolean;
   rightPanelOpen: boolean;
+  dataRegistry: DataRegistry; // Global data registry for named data
 }

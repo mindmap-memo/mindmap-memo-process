@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Page, MemoBlock } from './types';
+import React, { useState, useEffect } from 'react';
+import { Page, MemoBlock, DataRegistry } from './types';
+import { globalDataRegistry } from './utils/dataRegistry';
 import LeftPanel from './components/LeftPanel';
 import RightPanel from './components/RightPanel';
 import Canvas from './components/Canvas';
@@ -25,6 +26,16 @@ const App: React.FC = () => {
   const [dragHoveredMemoIds, setDragHoveredMemoIds] = useState<string[]>([]);
   const [isDragSelectingWithShift, setIsDragSelectingWithShift] = useState<boolean>(false);
   const [isRightPanelFullscreen, setIsRightPanelFullscreen] = useState<boolean>(false);
+  const [dataRegistry, setDataRegistry] = useState<DataRegistry>({});
+
+  // Initialize data registry
+  useEffect(() => {
+    globalDataRegistry.setRegistry(dataRegistry);
+    const unsubscribe = globalDataRegistry.subscribe(() => {
+      setDataRegistry({ ...globalDataRegistry.getRegistry() });
+    });
+    return unsubscribe;
+  }, [dataRegistry]);
 
   const currentPage = pages.find(page => page.id === currentPageId);
   const selectedMemo = currentPage?.memos.find(memo => memo.id === selectedMemoId) || 
