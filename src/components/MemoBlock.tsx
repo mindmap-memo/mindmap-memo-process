@@ -169,12 +169,12 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         fontWeight: '600', 
         marginBottom: '8px', 
         fontSize: '16px',
-        color: '#1f2937',
+        color: memo.title ? '#1f2937' : '#9ca3af',
         display: 'flex',
         alignItems: 'center',
         gap: '8px'
       }}>
-        📝 {memo.title}
+        📝 {memo.title || '제목을 입력해주세요'}
       </div>
       <div style={{ 
         fontSize: '14px', 

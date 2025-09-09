@@ -14,7 +14,7 @@ const App: React.FC = () => {
   const [leftPanelOpen, setLeftPanelOpen] = useState<boolean>(true);
   const [rightPanelOpen, setRightPanelOpen] = useState<boolean>(true);
   const [leftPanelWidth, setLeftPanelWidth] = useState<number>(250);
-  const [rightPanelWidth, setRightPanelWidth] = useState<number>(300);
+  const [rightPanelWidth, setRightPanelWidth] = useState<number>(600);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [isDisconnectMode, setIsDisconnectMode] = useState<boolean>(false);
   const [connectingFromId, setConnectingFromId] = useState<string | null>(null);
@@ -24,11 +24,16 @@ const App: React.FC = () => {
   const [dragSelectEnd, setDragSelectEnd] = useState<{ x: number; y: number } | null>(null);
   const [dragHoveredMemoIds, setDragHoveredMemoIds] = useState<string[]>([]);
   const [isDragSelectingWithShift, setIsDragSelectingWithShift] = useState<boolean>(false);
+  const [isRightPanelFullscreen, setIsRightPanelFullscreen] = useState<boolean>(false);
 
   const currentPage = pages.find(page => page.id === currentPageId);
   const selectedMemo = currentPage?.memos.find(memo => memo.id === selectedMemoId) || 
                       (selectedMemoIds.length === 1 ? currentPage?.memos.find(memo => memo.id === selectedMemoIds[0]) : undefined);
   const selectedMemos = currentPage?.memos.filter(memo => selectedMemoIds.includes(memo.id)) || [];
+
+  const toggleRightPanelFullscreen = () => {
+    setIsRightPanelFullscreen(!isRightPanelFullscreen);
+  };
 
   const addPage = () => {
     const newPage: Page = {
@@ -175,7 +180,9 @@ const App: React.FC = () => {
         return intersects;
       });
 
+      console.log('Memos in selection:', memosInSelection.length);
       if (memosInSelection.length > 0) {
+        console.log('Setting selected memo IDs:', memosInSelection.map(memo => memo.id));
         if (isDragSelectingWithShift) {
           // Shift + 드래그: 기존 선택 유지하면서 드래그 영역 메모들 토글
           const currentSelection = selectedMemoId ? [selectedMemoId, ...selectedMemoIds] : selectedMemoIds;
@@ -199,6 +206,7 @@ const App: React.FC = () => {
           setSelectedMemoId(null);
         }
       } else if (!isDragSelectingWithShift) {
+        console.log('No memos in selection - clearing selection');
         // 일반 드래그로 아무것도 선택하지 않았으면 기존 선택 해제
         setSelectedMemoIds([]);
         setSelectedMemoId(null);
@@ -230,8 +238,15 @@ const App: React.FC = () => {
   const addMemoBlock = (position?: { x: number; y: number }) => {
     const newMemo: MemoBlock = {
       id: Date.now().toString(),
-      title: '새 메모',
+      title: '',
       content: '',
+      blocks: [
+        {
+          id: Date.now().toString() + '_text',
+          type: 'text',
+          content: ''
+        }
+      ],
       tags: [],
       connections: [],
       position: position || { x: 300, y: 200 }
@@ -484,6 +499,8 @@ const App: React.FC = () => {
           onFocusMemo={focusOnMemo}
           width={rightPanelWidth}
           onResize={handleRightPanelResize}
+          isFullscreen={isRightPanelFullscreen}
+          onToggleFullscreen={toggleRightPanelFullscreen}
         />
       )}
     </div>

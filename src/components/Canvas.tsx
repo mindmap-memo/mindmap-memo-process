@@ -274,6 +274,8 @@ const Canvas: React.FC<CanvasProps> = ({
   const [globalDragSelecting, setGlobalDragSelecting] = React.useState(false);
   const [globalDragStart, setGlobalDragStart] = React.useState({ x: 0, y: 0 });
   const [globalDragWithShift, setGlobalDragWithShift] = React.useState(false);
+  const [dragThresholdMet, setDragThresholdMet] = React.useState(false);
+  const [justFinishedDragSelection, setJustFinishedDragSelection] = React.useState(false);
 
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
     console.log('Canvas mouse down:', { 
@@ -300,13 +302,6 @@ const Canvas: React.FC<CanvasProps> = ({
       return;
     }
     
-    // 선택 도구이고 연결 모드가 아닐 때 전역 드래그 선택 시작 준비
-    if (currentTool === 'select' && !isConnecting) {
-      setGlobalDragSelecting(true);
-      setGlobalDragStart({ x: e.clientX, y: e.clientY });
-      setGlobalDragWithShift(e.shiftKey);
-    }
-    
     // 캔버스 배경 영역에서만 팬 도구 활성화
     const isCanvasBackground = target.hasAttribute('data-canvas') ||
                               target.tagName === 'svg' ||
@@ -323,23 +318,17 @@ const Canvas: React.FC<CanvasProps> = ({
         });
         e.preventDefault();
         e.stopPropagation();
-      } else if (currentTool === 'select') {
-        // 선택 도구로 캔버스 배경 드래그 시 드래그 선택 시작
-        console.log('Starting drag selection');
-        const rect = e.currentTarget.getBoundingClientRect();
-        // 올바른 월드 좌표 변환: 화면 좌표 → 캔버스 로컬 좌표
-        const localX = e.clientX - rect.left;
-        const localY = e.clientY - rect.top;
-        const worldX = (localX - canvasOffset.x) / canvasScale;
-        const worldY = (localY - canvasOffset.y) / canvasScale;
-        console.log('Mouse coords:', { clientX: e.clientX, clientY: e.clientY });
-        console.log('Local coords:', { localX, localY });
-        console.log('Canvas state:', { canvasOffset, canvasScale });
-        console.log('World coords:', { worldX, worldY });
-        onDragSelectStart({ x: worldX, y: worldY }, e.shiftKey);
-        e.preventDefault();
-        e.stopPropagation();
+        return;
       }
+    }
+    
+    // 선택 도구이고 연결 모드가 아닐 때 전역 드래그 선택 시작 준비 (모든 영역에서)
+    if (currentTool === 'select' && !isConnecting && !isPanning) {
+      console.log('Setting up global drag selection');
+      setGlobalDragSelecting(true);
+      setGlobalDragStart({ x: e.clientX, y: e.clientY });
+      setGlobalDragWithShift(e.shiftKey);
+      setDragThresholdMet(false);
     }
   };
 
@@ -384,15 +373,6 @@ const Canvas: React.FC<CanvasProps> = ({
       onUpdateDragLine({ x: mouseX, y: mouseY });
     }
     
-    if (isDragSelecting) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const localX = e.clientX - rect.left;
-      const localY = e.clientY - rect.top;
-      const worldX = (localX - canvasOffset.x) / canvasScale;
-      const worldY = (localY - canvasOffset.y) / canvasScale;
-      onDragSelectMove({ x: worldX, y: worldY });
-    }
-    
     if (isPanning) {
       const newOffset = {
         x: e.clientX - panStart.x,
@@ -404,9 +384,6 @@ const Canvas: React.FC<CanvasProps> = ({
 
   const handleMouseUp = () => {
     setIsPanning(false);
-    if (isDragSelecting) {
-      onDragSelectEnd();
-    }
   };
 
   React.useEffect(() => {
@@ -442,8 +419,9 @@ const Canvas: React.FC<CanvasProps> = ({
         const deltaY = Math.abs(e.clientY - globalDragStart.y);
         
         // 충분히 드래그되었고 아직 드래그 선택이 시작되지 않았다면 시작
-        if ((deltaX > 5 || deltaY > 5) && !isDragSelecting) {
-          console.log('Starting global drag selection');
+        if ((deltaX > 5 || deltaY > 5) && !isDragSelecting && !dragThresholdMet) {
+          console.log('Starting global drag selection - threshold met');
+          setDragThresholdMet(true);
           const canvasElement = document.querySelector('[data-canvas="true"]');
           if (canvasElement) {
             const rect = canvasElement.getBoundingClientRect();
@@ -451,12 +429,13 @@ const Canvas: React.FC<CanvasProps> = ({
             const localStartY = globalDragStart.y - rect.top;
             const worldStartX = (localStartX - canvasOffset.x) / canvasScale;
             const worldStartY = (localStartY - canvasOffset.y) / canvasScale;
+            console.log('Global drag start coords:', { worldStartX, worldStartY });
             onDragSelectStart({ x: worldStartX, y: worldStartY }, globalDragWithShift);
           }
         }
         
         // 드래그 선택이 진행중이면 업데이트
-        if (isDragSelecting) {
+        if (isDragSelecting && dragThresholdMet) {
           const canvasElement = document.querySelector('[data-canvas="true"]');
           if (canvasElement) {
             const rect = canvasElement.getBoundingClientRect();
@@ -470,10 +449,16 @@ const Canvas: React.FC<CanvasProps> = ({
       };
 
       const handleGlobalMouseUp = () => {
+        console.log('Global mouse up - ending drag selection');
+        const wasSelecting = isDragSelecting && dragThresholdMet;
         setGlobalDragSelecting(false);
         setGlobalDragWithShift(false);
-        if (isDragSelecting) {
+        setDragThresholdMet(false);
+        if (wasSelecting) {
+          setJustFinishedDragSelection(true);
           onDragSelectEnd();
+          // 짧은 지연 후 플래그 해제
+          setTimeout(() => setJustFinishedDragSelection(false), 50);
         }
       };
 
@@ -485,7 +470,7 @@ const Canvas: React.FC<CanvasProps> = ({
         document.removeEventListener('mouseup', handleGlobalMouseUp);
       };
     }
-  }, [globalDragSelecting, globalDragStart, isDragSelecting, canvasOffset, canvasScale, onDragSelectStart, onDragSelectMove, onDragSelectEnd]);
+  }, [globalDragSelecting, globalDragStart, isDragSelecting, dragThresholdMet, canvasOffset, canvasScale, globalDragWithShift, onDragSelectStart, onDragSelectMove, onDragSelectEnd]);
 
   // 키보드 이벤트 처리
   React.useEffect(() => {
@@ -568,8 +553,8 @@ const Canvas: React.FC<CanvasProps> = ({
         if (isCanvasBackground) {
           if (isConnecting) {
             onCancelConnection();
-          } else if (!isDragSelecting && !isSpacePressed && currentTool !== 'pan') {
-            // 캔버스 배경 클릭 시 모든 선택 해제 (드래그 선택 중이 아니고, 스페이스바가 안 눌려있고, 팬 모드가 아닐 때만)
+          } else if (!isDragSelecting && !isSpacePressed && currentTool !== 'pan' && !justFinishedDragSelection) {
+            // 캔버스 배경 클릭 시 모든 선택 해제 (드래그 선택 중이 아니고, 방금 드래그 선택을 끝내지 않았고, 스페이스바가 안 눌려있고, 팬 모드가 아닐 때만)
             onMemoSelect('', false);
           }
         }
