@@ -142,7 +142,7 @@ const CellEditor: React.FC<CellEditorProps> = ({
             value={localValue || ''}
             onChange={(e) => handleValueChange(e.target.value)}
             onBlur={onFinishEdit}
-            style={{...inputStyle, minWidth: '100px'}}
+            style={{...inputStyle, minWidth: '100px', outline: 'none', boxShadow: 'none'}}
             autoFocus
           >
             <option value="">선택하세요</option>
@@ -171,7 +171,7 @@ const CellEditor: React.FC<CellEditorProps> = ({
                   setShowFormulaHelper(!showFormulaHelper);
                 }
               }}
-              style={{...inputStyle, fontFamily: 'monospace'}}
+              style={{...inputStyle, fontFamily: 'monospace', outline: 'none', boxShadow: 'none'}}
               placeholder="=SUM(@데이터1, @데이터2) | F1: 함수 도움말"
               autoFocus
             />
@@ -297,9 +297,11 @@ const CellEditor: React.FC<CellEditorProps> = ({
   const inputStyle: React.CSSProperties = {
     width: '100%',
     border: 'none',
+    outline: 'none',
     backgroundColor: 'transparent',
     fontSize: '14px',
-    padding: '0'
+    padding: '0',
+    boxShadow: 'none'
   };
 
   return (

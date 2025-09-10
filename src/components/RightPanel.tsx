@@ -120,6 +120,29 @@ const RightPanel: React.FC<RightPanelProps> = ({
     }
   };
 
+  const handleBlockDuplicate = (blockId: string) => {
+    if (selectedMemo && selectedMemo.blocks) {
+      const blockIndex = selectedMemo.blocks.findIndex(block => block.id === blockId);
+      if (blockIndex !== -1) {
+        const originalBlock = selectedMemo.blocks[blockIndex];
+        // 새로운 ID로 블록 복제
+        const duplicatedBlock: ContentBlock = {
+          ...originalBlock,
+          id: Date.now().toString()
+        };
+        
+        const updatedBlocks = [...selectedMemo.blocks];
+        updatedBlocks.splice(blockIndex + 1, 0, duplicatedBlock);
+        onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
+      }
+    }
+  };
+
+  const handleBlockSelect = (blockId: string) => {
+    // 드래그 핸들 버튼 클릭 시 해당 블록만 선택
+    setSelectedBlocks([blockId]);
+  };
+
   const handleBlockMove = (blockId: string, direction: 'up' | 'down') => {
     if (selectedMemo && selectedMemo.blocks) {
       const blocks = [...selectedMemo.blocks];
@@ -879,6 +902,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                         memoId={selectedMemo?.id}
                         onUpdate={handleBlockUpdate}
                         onDelete={handleBlockDelete}
+                        onDuplicate={handleBlockDuplicate}
                         onMoveUp={(blockId) => handleBlockMove(blockId, 'up')}
                         onMoveDown={(blockId) => handleBlockMove(blockId, 'down')}
                         onConvertToBlock={handleConvertBlock}
@@ -887,39 +911,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
                         onFocusNext={handleFocusNext}
                         onBlockClick={handleBlockClick}
                         onMergeWithPrevious={handleMergeWithPrevious}
+                        onBlockSelect={handleBlockSelect}
                       />
-                      
-                      {/* 점 세개 버튼 - 선택된 첫 번째 블록에만 표시 */}
-                      {isFirstSelected && selectedBlocks.length > 0 && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            setMenuPosition({ x: rect.left, y: rect.bottom + 5 });
-                            setShowMenu(!showMenu);
-                          }}
-                          style={{
-                            position: 'absolute',
-                            top: '-4px',
-                            left: '-32px',
-                            width: '24px',
-                            height: '24px',
-                            border: '1px solid #ddd',
-                            backgroundColor: 'white',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '14px',
-                            fontWeight: 'bold',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                            zIndex: 1000
-                          }}
-                        >
-                          ⋯
-                        </button>
-                      )}
                     </div>
                   </React.Fragment>
                 );

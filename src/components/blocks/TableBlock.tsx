@@ -30,6 +30,8 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
   const [typeSelectorPosition, setTypeSelectorPosition] = useState<{x: number, y: number}>({x: 0, y: 0});
   const [editingColumnIndex, setEditingColumnIndex] = useState<number | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
+  const [lastSelectedCell, setLastSelectedCell] = useState<{row: number, col: number} | null>(null);
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
   const [showRowContextMenu, setShowRowContextMenu] = useState(false);
   const [rowContextMenuPosition, setRowContextMenuPosition] = useState<{x: number, y: number}>({x: 0, y: 0});
@@ -39,6 +41,7 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
   const [resizeStartX, setResizeStartX] = useState(0);
   const [resizeStartWidth, setResizeStartWidth] = useState(0);
   const tableRef = useRef<HTMLTableElement>(null);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
   const formulaEngine = useMemo(() => 
     new FormulaEngine(globalDataRegistry.getRegistry()), 
@@ -60,6 +63,13 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
       type: 'text' as CellType
     }));
   }, []);
+
+  // Helper functions for cell selection
+  const getCellKey = (row: number, col: number) => `${row}-${col}`;
+  
+  const isCellSelected = (row: number, col: number) => {
+    return selectedCells.has(getCellKey(row, col));
+  };
 
   // Initialize cells from block data
   function initializeCells(tableBlock: TableBlock): TableCell[][] {
@@ -112,6 +122,27 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
     setColumns(initializedColumns);
     setCells(initializedCells);
   }, [initializeColumnsFromBlock]);
+
+  // Handle clicks outside table to finish editing
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (editingCell && tableContainerRef.current) {
+        const target = event.target as Node;
+        // 테이블 컨테이너 영역을 벗어난 클릭인지 확인
+        if (!tableContainerRef.current.contains(target)) {
+          finishEditingCell();
+        }
+      }
+    };
+
+    if (editingCell) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [editingCell]);
 
   useEffect(() => {
     // Subscribe to data registry updates
@@ -631,10 +662,19 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
   };
 
   const startEditingCell = (rowIndex: number, cellIndex: number) => {
+    // 편집 시작 시 선택 상태 해제
+    setSelectedCells(new Set());
+    setLastSelectedCell(null);
     setEditingCell({ row: rowIndex, col: cellIndex });
   };
 
   const finishEditingCell = () => {
+    if (editingCell) {
+      // 편집이 끝난 셀을 선택 상태로 만들기
+      const cellKey = getCellKey(editingCell.row, editingCell.col);
+      setSelectedCells(new Set([cellKey]));
+      setLastSelectedCell(editingCell);
+    }
     setEditingCell(null);
   };
 
@@ -671,23 +711,32 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
   }
 
   return (
-    <div style={{ 
-      marginBottom: '8px',
-      overflow: 'visible',
-      position: 'relative',
-      paddingLeft: isEditing ? '40px' : '0',
-      paddingBottom: isEditing ? '44px' : '0'
-    }}>
+    <div 
+      ref={tableContainerRef}
+      style={{ 
+        marginBottom: '8px',
+        overflow: 'visible',
+        position: 'relative',
+        paddingLeft: isEditing ? '40px' : '0',
+        paddingBottom: isEditing ? '44px' : '0'
+      }}
+    >
 
       <div style={{
         position: 'relative'
       }}>
-        <table ref={tableRef} style={{ 
-          width: '100%', 
-          borderCollapse: 'collapse',
-          fontSize: '14px',
-          tableLayout: 'fixed'
+        <div style={{
+          overflowX: 'auto',
+          border: '1px solid #e0e0e0',
+          borderRadius: '4px',
+          backgroundColor: 'white'
         }}>
+          <table ref={tableRef} style={{ 
+            minWidth: 'max-content',
+            borderCollapse: 'collapse',
+            fontSize: '14px',
+            tableLayout: 'auto'
+          }}>
         <thead>
           <tr style={{ backgroundColor: '#f8f9fa' }}>
             {headers.map((header, index) => {
@@ -701,9 +750,10 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
                 textAlign: 'left',
                 fontWeight: '600',
                 position: 'relative',
-                width: `${columnWidths[index] || 120}px`,
-                minWidth: '20px'
-              }}>
+                minWidth: `${columnWidths[index] || 120}px`,
+                whiteSpace: 'nowrap'
+              }}
+              onClick={(e) => e.stopPropagation()}>
                 <div 
                   onClick={(e) => {
                     e.preventDefault();
@@ -813,7 +863,8 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
               border: 'none',
               padding: '8px',
               width: '40px'
-            }}>
+            }}
+            onClick={(e) => e.stopPropagation()}>
               <div
                 onClick={addColumn}
                 style={{
@@ -842,12 +893,49 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
             >
               {row.map((cell, cellIndex) => (
                 <td key={cellIndex} style={{
-                  border: '1px solid #e0e0e0',
+                  border: (editingCell?.row === rowIndex && editingCell?.col === cellIndex) ? '1px solid #e0e0e0' :
+                          isCellSelected(rowIndex, cellIndex) ? '2px solid #007acc' : '1px solid #e0e0e0',
                   padding: '4px',
                   position: 'relative',
-                  backgroundColor: selectedRows.has(rowIndex) ? '#f0f8ff' : 'transparent',
-                  width: `${columnWidths[cellIndex] || 120}px`,
-                  minWidth: '20px'
+                  backgroundColor: (editingCell?.row === rowIndex && editingCell?.col === cellIndex) ? 'white' :
+                                   isCellSelected(rowIndex, cellIndex) ? '#e7f3ff' : 
+                                   selectedRows.has(rowIndex) ? '#f0f8ff' : 'transparent',
+                  minWidth: `${columnWidths[cellIndex] || 120}px`,
+                  whiteSpace: 'nowrap'
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // 셀 클릭 시 해당 셀을 선택 상태로 설정
+                  if (e.ctrlKey || e.metaKey) {
+                    // Ctrl/Cmd 클릭: 다중 선택
+                    const cellKey = getCellKey(rowIndex, cellIndex);
+                    const newSelection = new Set(selectedCells);
+                    if (newSelection.has(cellKey)) {
+                      newSelection.delete(cellKey);
+                    } else {
+                      newSelection.add(cellKey);
+                    }
+                    setSelectedCells(newSelection);
+                    setLastSelectedCell({row: rowIndex, col: cellIndex});
+                  } else if (e.shiftKey && lastSelectedCell) {
+                    // Shift 클릭: 범위 선택
+                    const startRow = Math.min(lastSelectedCell.row, rowIndex);
+                    const endRow = Math.max(lastSelectedCell.row, rowIndex);
+                    const startCol = Math.min(lastSelectedCell.col, cellIndex);
+                    const endCol = Math.max(lastSelectedCell.col, cellIndex);
+                    
+                    const newSelection = new Set<string>();
+                    for (let r = startRow; r <= endRow; r++) {
+                      for (let c = startCol; c <= endCol; c++) {
+                        newSelection.add(getCellKey(r, c));
+                      }
+                    }
+                    setSelectedCells(newSelection);
+                  } else {
+                    // 일반 클릭: 단일 선택
+                    setSelectedCells(new Set([getCellKey(rowIndex, cellIndex)]));
+                    setLastSelectedCell({row: rowIndex, col: cellIndex});
+                  }
                 }}>
                   <CellEditor
                     cell={cell}
@@ -862,7 +950,8 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
             </tr>
           ))}
         </tbody>
-        </table>
+          </table>
+        </div>
 
         {/* Floating checkbox overlay */}
         {isEditing && (
@@ -935,7 +1024,10 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
               backgroundColor: 'transparent',
               zIndex: 10
             }}
-            onClick={addRow}
+            onClick={(e) => {
+              e.stopPropagation();
+              addRow();
+            }}
             onMouseEnter={(e) => {
               const target = e.currentTarget as HTMLElement;
               target.style.backgroundColor = '#f8f9fa';
