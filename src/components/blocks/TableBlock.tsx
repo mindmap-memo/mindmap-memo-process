@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { TableBlock, TableCell, TableColumn, CellType } from '../../types';
 import { FormulaEngine } from '../../utils/formulaEngine';
 import { globalDataRegistry } from '../../utils/dataRegistry';
@@ -29,6 +29,16 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
   const [showColumnTypeSelector, setShowColumnTypeSelector] = useState(false);
   const [typeSelectorPosition, setTypeSelectorPosition] = useState<{x: number, y: number}>({x: 0, y: 0});
   const [editingColumnIndex, setEditingColumnIndex] = useState<number | null>(null);
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [hoveredRow, setHoveredRow] = useState<number | null>(null);
+  const [showRowContextMenu, setShowRowContextMenu] = useState(false);
+  const [rowContextMenuPosition, setRowContextMenuPosition] = useState<{x: number, y: number}>({x: 0, y: 0});
+  const [columnWidths, setColumnWidths] = useState<number[]>([]);
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizingColumn, setResizingColumn] = useState<number | null>(null);
+  const [resizeStartX, setResizeStartX] = useState(0);
+  const [resizeStartWidth, setResizeStartWidth] = useState(0);
+  const tableRef = useRef<HTMLTableElement>(null);
 
   const formulaEngine = useMemo(() => 
     new FormulaEngine(globalDataRegistry.getRegistry()), 
@@ -144,6 +154,65 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
     }
   }, [block, onUpdate]);
 
+  // 컬럼 너비 초기화
+  useEffect(() => {
+    if (headers.length > 0 && columnWidths.length === 0) {
+      setColumnWidths(new Array(headers.length).fill(120)); // 기본 120px
+    }
+  }, [headers.length, columnWidths.length]);
+
+  // 리사이즈 중
+  const handleResizeMove = useRef<((e: MouseEvent) => void) | null>(null);
+  const handleResizeEnd = useRef<(() => void) | null>(null);
+
+  // 리사이즈 시작
+  const handleResizeStart = (e: React.MouseEvent, columnIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log('Starting resize for column:', columnIndex);
+    
+    const startX = e.clientX;
+    const startWidth = columnWidths[columnIndex] || 120;
+    
+    setIsResizing(true);
+    setResizingColumn(columnIndex);
+    
+    handleResizeMove.current = (e: MouseEvent) => {
+      const deltaX = e.clientX - startX;
+      const newWidth = Math.max(20, startWidth + deltaX); // 최소 20px
+      
+      setColumnWidths(prevWidths => {
+        const newColumnWidths = [...prevWidths];
+        newColumnWidths[columnIndex] = newWidth;
+        return newColumnWidths;
+      });
+    };
+    
+    handleResizeEnd.current = () => {
+      console.log('Ending resize');
+      document.removeEventListener('mousemove', handleResizeMove.current!);
+      document.removeEventListener('mouseup', handleResizeEnd.current!);
+      setIsResizing(false);
+      setResizingColumn(null);
+    };
+    
+    document.addEventListener('mousemove', handleResizeMove.current);
+    document.addEventListener('mouseup', handleResizeEnd.current);
+  };
+
+  // 컴포넌트 언마운트 시 이벤트 리스너 정리
+  useEffect(() => {
+    return () => {
+      if (handleResizeMove.current) {
+        document.removeEventListener('mousemove', handleResizeMove.current);
+      }
+      if (handleResizeEnd.current) {
+        document.removeEventListener('mouseup', handleResizeEnd.current);
+      }
+    };
+  }, []);
+
   const handleUpdateHeader = (index: number, value: string) => {
     const newHeaders = [...headers];
     const newColumns = [...columns];
@@ -200,22 +269,68 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
   };
 
   const addColumn = (event: React.MouseEvent) => {
-    const rect = (event.target as HTMLElement).getBoundingClientRect();
-    setTypeSelectorPosition({
-      x: rect.left,
-      y: rect.bottom + 5
-    });
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const selectorWidth = 240; // ColumnTypeSelector 너비
+    const selectorHeight = 400; // 대략적인 높이 (검색창 + 옵션들)
+    
+    // 화면 크기 가져오기
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // x 위치 조정 (오른쪽으로 넘어가지 않게)
+    let x = rect.left;
+    if (x + selectorWidth > viewportWidth) {
+      x = viewportWidth - selectorWidth - 10; // 10px 여백
+    }
+    
+    // y 위치 조정 (아래쪽으로 넘어가지 않게)
+    let y = rect.bottom + 5;
+    if (y + selectorHeight > viewportHeight) {
+      y = rect.top - selectorHeight - 5; // 버튼 위쪽에 표시
+      if (y < 0) {
+        y = 10; // 위쪽도 안되면 화면 위쪽에
+      }
+    }
+    
+    setTypeSelectorPosition({ x, y });
     setEditingColumnIndex(null); // 새 컬럼 추가
     setShowColumnTypeSelector(true);
   };
 
   const handleHeaderClick = (event: React.MouseEvent, columnIndex: number) => {
-    const rect = (event.target as HTMLElement).getBoundingClientRect();
-    setTypeSelectorPosition({
-      x: rect.left,
-      y: rect.bottom + 5
-    });
-    setEditingColumnIndex(columnIndex); // 기존 컬럼 편집
+    if (isResizing) return; // 리사이즈 중일 때는 헤더 클릭 무시
+    
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const selectorWidth = 240; // ColumnTypeSelector 너비
+    const selectorHeight = 400; // 대략적인 높이 (검색창 + 옵션들)
+    
+    // 화면 크기 가져오기
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // x 위치 조정 (오른쪽으로 넘어가지 않게)
+    let x = rect.left;
+    if (x + selectorWidth > viewportWidth) {
+      x = viewportWidth - selectorWidth - 10; // 10px 여백
+    }
+    
+    // y 위치 조정 (아래쪽으로 넘어가지 않게)
+    let y = rect.bottom + 2;
+    if (y + selectorHeight > viewportHeight) {
+      y = rect.top - selectorHeight - 2; // 헤더 위쪽에 표시
+      if (y < 0) {
+        y = 10; // 위쪽도 안되면 화면 위쪽에
+      }
+    }
+    
+    setTypeSelectorPosition({ x, y });
+    setEditingColumnIndex(columnIndex);
     setShowColumnTypeSelector(true);
   };
 
@@ -253,6 +368,15 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
         case 'formula':
           defaultValue = '';
           break;
+        case 'file':
+          defaultValue = '';
+          break;
+        case 'email':
+          defaultValue = '';
+          break;
+        case 'phone':
+          defaultValue = '';
+          break;
         default:
           defaultValue = '';
       }
@@ -270,6 +394,7 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
       setColumns(newColumns);
       setRows(newRows);
       setCells(newCells);
+      setColumnWidths([...columnWidths, 120]); // 새 컬럼 기본 너비 120px
       updateBlock(newHeaders, newRows, newCells, newColumns);
     } else {
       // 기존 컬럼 타입 변경
@@ -286,22 +411,56 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
         if (newRow[editingColumnIndex]) {
           let convertedValue = newRow[editingColumnIndex].value;
           
-          // 타입에 따른 값 변환
-          switch (columnType) {
-            case 'number':
-              convertedValue = parseFloat(convertedValue) || 0;
-              break;
-            case 'checkbox':
-              convertedValue = convertedValue === 'true' || convertedValue === true || convertedValue === '1';
-              break;
-            case 'date':
-              convertedValue = convertedValue || new Date().toISOString().split('T')[0];
-              break;
-            case 'select':
-              convertedValue = options?.[0] || '';
-              break;
-            default:
-              convertedValue = convertedValue?.toString() || '';
+          // 타입에 따른 값 변환 (빈 값은 그대로 유지)
+          const isEmpty = !convertedValue || convertedValue === '' || convertedValue === null || convertedValue === undefined;
+          
+          if (isEmpty) {
+            // 빈 값은 빈 상태로 유지
+            switch (columnType) {
+              case 'number':
+                convertedValue = '';
+                break;
+              case 'checkbox':
+                convertedValue = false;
+                break;
+              case 'date':
+                convertedValue = '';
+                break;
+              case 'select':
+                convertedValue = '';
+                break;
+              default:
+                convertedValue = '';
+            }
+          } else {
+            // 값이 있는 경우에만 타입에 맞게 변환
+            switch (columnType) {
+              case 'number':
+                const numValue = parseFloat(convertedValue);
+                convertedValue = isNaN(numValue) ? '' : numValue;
+                break;
+              case 'checkbox':
+                convertedValue = convertedValue === 'true' || convertedValue === true || convertedValue === '1';
+                break;
+              case 'date':
+                // 기존 값이 유효한 날짜인지 확인
+                convertedValue = convertedValue?.toString() || '';
+                break;
+              case 'select':
+                convertedValue = convertedValue?.toString() || '';
+                break;
+              case 'file':
+                convertedValue = convertedValue?.toString() || '';
+                break;
+              case 'email':
+                convertedValue = convertedValue?.toString() || '';
+                break;
+              case 'phone':
+                convertedValue = convertedValue?.toString() || '';
+                break;
+              default:
+                convertedValue = convertedValue?.toString() || '';
+            }
           }
 
           newRow[editingColumnIndex] = {
@@ -323,6 +482,86 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
     setEditingColumnIndex(null);
   };
 
+  const handleColumnDelete = () => {
+    if (editingColumnIndex !== null && headers.length > 1) {
+      deleteColumn(editingColumnIndex);
+    }
+    setShowColumnTypeSelector(false);
+    setEditingColumnIndex(null);
+  };
+
+  const handleRowSelect = (rowIndex: number, checked: boolean) => {
+    const newSelectedRows = new Set(selectedRows);
+    if (checked) {
+      newSelectedRows.add(rowIndex);
+    } else {
+      newSelectedRows.delete(rowIndex);
+    }
+    setSelectedRows(newSelectedRows);
+  };
+
+  const handleRowContextMenu = (e: React.MouseEvent, rowIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!selectedRows.has(rowIndex)) {
+      setSelectedRows(new Set([rowIndex]));
+    }
+    
+    setRowContextMenuPosition({
+      x: e.clientX,
+      y: e.clientY
+    });
+    setShowRowContextMenu(true);
+  };
+
+  const handleCopySelectedRows = () => {
+    const sortedRows = Array.from(selectedRows).sort((a, b) => a - b);
+    const rowsToCopy = sortedRows.map(rowIndex => ({
+      row: [...rows[rowIndex]],
+      cell: [...cells[rowIndex]]
+    }));
+    
+    let newRows = [...rows];
+    let newCells = [...cells];
+    
+    // Insert copied rows after the last selected row
+    const insertIndex = Math.max(...sortedRows) + 1;
+    
+    rowsToCopy.forEach((rowData, index) => {
+      newRows.splice(insertIndex + index, 0, rowData.row);
+      newCells.splice(insertIndex + index, 0, rowData.cell);
+    });
+    
+    setRows(newRows);
+    setCells(newCells);
+    setSelectedRows(new Set());
+    setShowRowContextMenu(false);
+    updateBlock(headers, newRows, newCells, columns);
+  };
+
+  const handleDeleteSelectedRows = () => {
+    const sortedRows = Array.from(selectedRows).sort((a, b) => b - a);
+    
+    if (rows.length - sortedRows.length < 1) {
+      return; // 최소 1개 행은 유지
+    }
+    
+    let newRows = [...rows];
+    let newCells = [...cells];
+    
+    sortedRows.forEach(rowIndex => {
+      newRows = newRows.filter((_, index) => index !== rowIndex);
+      newCells = newCells.filter((_, index) => index !== rowIndex);
+    });
+    
+    setRows(newRows);
+    setCells(newCells);
+    setSelectedRows(new Set());
+    setShowRowContextMenu(false);
+    updateBlock(headers, newRows, newCells, columns);
+  };
+
   const addRow = () => {
     const newRow = columns.map(column => {
       switch (column.type) {
@@ -334,6 +573,12 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
           return new Date().toISOString().split('T')[0];
         case 'select':
           return column.options?.[0] || '';
+        case 'file':
+          return '';
+        case 'email':
+          return '';
+        case 'phone':
+          return '';
         default:
           return '';
       }
@@ -364,11 +609,13 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
     const newColumns = columns.filter((_, i) => i !== index);
     const newRows = rows.map(row => row.filter((_, i) => i !== index));
     const newCells = cells.map(row => row.filter((_, i) => i !== index));
+    const newColumnWidths = columnWidths.filter((_, i) => i !== index);
 
     setHeaders(newHeaders);
     setColumns(newColumns);
     setRows(newRows);
     setCells(newCells);
+    setColumnWidths(newColumnWidths);
     updateBlock(newHeaders, newRows, newCells, newColumns);
   };
 
@@ -408,219 +655,199 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
       }))
     );
     
-    if (isEditing) {
-      setHeaders(initialHeaders);
-      setColumns(initialColumns);
-      setRows(initialRows);
-      setCells(initialCells);
-      updateBlock(initialHeaders, initialRows, initialCells, initialColumns);
+    setHeaders(initialHeaders);
+    setColumns(initialColumns);
+    setRows(initialRows);
+    setCells(initialCells);
+    if (onUpdate) {
+      onUpdate({
+        ...block,
+        headers: initialHeaders,
+        rows: initialRows,
+        cells: initialCells,
+        columns: initialColumns
+      });
     }
   }
 
   return (
     <div style={{ 
       marginBottom: '8px',
-      border: '1px solid #e0e0e0',
-      borderRadius: '4px',
-      overflow: 'hidden'
+      overflow: 'visible',
+      position: 'relative',
+      paddingLeft: isEditing ? '40px' : '0',
+      paddingBottom: isEditing ? '44px' : '0'
     }}>
-      {/* Table type selector */}
-      {isEditing && (
-        <div style={{
-          padding: '8px',
-          backgroundColor: '#f8f9fa',
-          borderBottom: '1px solid #e0e0e0',
-          fontSize: '12px'
-        }}>
-          <label style={{ marginRight: '12px' }}>
-            테이블 타입:
-            <select
-              value={block.tableType || 'basic'}
-              onChange={(e) => {
-                if (onUpdate) {
-                  onUpdate({ ...block, tableType: e.target.value as any });
-                }
-              }}
-              style={{
-                marginLeft: '4px',
-                padding: '2px 4px',
-                fontSize: '12px'
-              }}
-            >
-              <option value="basic">기본</option>
-              <option value="data-collection">데이터 수집</option>
-              <option value="approval-matrix">승인 매트릭스</option>
-              <option value="timeline">타임라인</option>
-              <option value="checklist">체크리스트</option>
-            </select>
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={block.autoSum || false}
-              onChange={(e) => {
-                if (onUpdate) {
-                  onUpdate({ ...block, autoSum: e.target.checked });
-                }
-              }}
-              style={{ marginLeft: '12px', marginRight: '4px' }}
-            />
-            자동 합계
-          </label>
-        </div>
-      )}
 
       <div style={{
-        overflowX: 'auto',
-        maxWidth: '100%'
+        position: 'relative'
       }}>
-        <table style={{ 
+        <table ref={tableRef} style={{ 
           width: '100%', 
           borderCollapse: 'collapse',
           fontSize: '14px',
-          minWidth: 'max-content'
+          tableLayout: 'fixed'
         }}>
         <thead>
           <tr style={{ backgroundColor: '#f8f9fa' }}>
             {headers.map((header, index) => {
-              const column = columns[index];
-              const typeIcon = getColumnTypeIcon(column?.type);
-              
-              return (
-                <th key={index} style={{
-                  border: '1px solid #e0e0e0',
-                  padding: '8px',
-                  textAlign: 'left',
-                  fontWeight: '600',
-                  position: 'relative',
-                  minWidth: '120px'
-                }}>
+            const column = columns[index];
+            const typeIcon = getColumnTypeIcon(column?.type);
+            
+            return (
+              <th key={index} style={{
+                border: '1px solid #e0e0e0',
+                padding: '8px',
+                textAlign: 'left',
+                fontWeight: '600',
+                position: 'relative',
+                width: `${columnWidths[index] || 120}px`,
+                minWidth: '20px'
+              }}>
+                <div 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleHeaderClick(e, index);
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleHeaderClick(e, index);
+                  }}
+                  style={{
+                    cursor: 'pointer',
+                    padding: '4px',
+                    borderRadius: '3px',
+                    transition: 'background-color 0.1s',
+                    backgroundColor: 'transparent'
+                  }}
+                  onMouseEnter={(e) => {
+                    const target = e.currentTarget as HTMLElement;
+                    target.style.backgroundColor = '#f0f0f0';
+                  }}
+                  onMouseLeave={(e) => {
+                    const target = e.currentTarget as HTMLElement;
+                    target.style.backgroundColor = 'transparent';
+                  }}
+                >
                   {isEditing ? (
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                        <input
-                          type="text"
-                          value={header}
-                          onChange={(e) => handleUpdateHeader(index, e.target.value)}
-                          style={{
-                            flex: 1,
-                            border: 'none',
-                            backgroundColor: 'transparent',
-                            fontWeight: '600',
-                            fontSize: '14px'
-                          }}
-                        />
-                        {headers.length > 1 && (
-                          <button
-                            onClick={() => deleteColumn(index)}
-                            style={{
-                              padding: '2px 4px',
-                              backgroundColor: '#e53e3e',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '2px',
-                              fontSize: '10px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            ×
-                          </button>
-                        )}
-                      </div>
-                      <div 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleHeaderClick(e, index);
-                        }}
+                      <input
+                        type="text"
+                        value={header}
+                        onChange={(e) => handleUpdateHeader(index, e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
                         style={{
-                          fontSize: '11px',
-                          color: '#666',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          cursor: 'pointer',
-                          padding: '2px 4px',
-                          borderRadius: '3px',
-                          border: '1px solid transparent'
+                          width: '100%',
+                          border: 'none',
+                          backgroundColor: 'transparent',
+                          fontWeight: '600',
+                          fontSize: '14px',
+                          marginBottom: '4px'
                         }}
-                        onMouseEnter={(e) => {
-                          (e.target as HTMLElement).style.backgroundColor = '#e9ecef';
-                          (e.target as HTMLElement).style.border = '1px solid #dee2e6';
-                        }}
-                        onMouseLeave={(e) => {
-                          (e.target as HTMLElement).style.backgroundColor = 'transparent';
-                          (e.target as HTMLElement).style.border = '1px solid transparent';
-                        }}
-                      >
-                        <span>{typeIcon}</span>
-                        <span>{getColumnTypeLabel(column?.type)}</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div 
-                      onClick={(e) => handleHeaderClick(e, index)}
-                      style={{
-                        cursor: 'pointer',
-                        padding: '2px',
-                        borderRadius: '3px',
-                        transition: 'background-color 0.1s'
-                      }}
-                      onMouseEnter={(e) => {
-                        (e.target as HTMLElement).style.backgroundColor = '#f0f0f0';
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.target as HTMLElement).style.backgroundColor = 'transparent';
-                      }}
-                    >
-                      <div>{header}</div>
+                      />
                       <div style={{
                         fontSize: '11px',
                         color: '#666',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '4px',
-                        marginTop: '2px'
+                        gap: '4px'
+                      }}>
+                        <span>{typeIcon}</span>
+                        <span>{getColumnTypeLabel(column?.type)}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ fontWeight: '600', marginBottom: '2px' }}>{header}</div>
+                      <div style={{
+                        fontSize: '11px',
+                        color: '#666',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
                       }}>
                         <span>{typeIcon}</span>
                         <span>{getColumnTypeLabel(column?.type)}</span>
                       </div>
                     </div>
                   )}
-                </th>
-              );
-            })}
-            {isEditing && (
-              <th style={{
-                border: '1px solid #e0e0e0',
-                padding: '8px',
-                width: '40px'
-              }}>
-                <button
-                  onClick={addColumn}
-                  style={{
-                    padding: '2px 6px',
-                    backgroundColor: '#007bff',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '3px',
-                    fontSize: '12px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  +
-                </button>
+                </div>
+                
+                {/* 리사이즈 핸들 */}
+                {index < headers.length - 1 && ( // 마지막 컬럼은 리사이즈 핸들 없음
+                  <div
+                    onMouseDown={(e) => {
+                      console.log('Resize handle clicked for column:', index); // 디버깅용
+                      handleResizeStart(e, index);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      top: '0',
+                      right: '-4px',
+                      width: '8px',
+                      height: '100%',
+                      cursor: 'col-resize',
+                      backgroundColor: 'transparent',
+                      zIndex: 1000,
+                      borderRight: isResizing && resizingColumn === index ? '2px solid #007acc' : 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(0, 122, 204, 0.1)';
+                      (e.currentTarget as HTMLElement).style.borderRight = '2px solid #007acc';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isResizing) {
+                        (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+                        (e.currentTarget as HTMLElement).style.borderRight = 'none';
+                      }
+                    }}
+                  />
+                )}
               </th>
-            )}
-          </tr>
-        </thead>
+            );
+          })}
+          {isEditing && (
+            <th style={{
+              border: 'none',
+              padding: '8px',
+              width: '40px'
+            }}>
+              <div
+                onClick={addColumn}
+                style={{
+                  padding: '2px 6px',
+                  backgroundColor: 'transparent',
+                  color: '#666',
+                  border: 'none',
+                  borderRadius: '3px',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  fontFamily: 'monospace',
+                  fontWeight: 'bold'
+                }}
+              >
+                +
+              </div>
+            </th>
+          )}
+        </tr>
+      </thead>
         <tbody>
           {cells.map((row, rowIndex) => (
-            <tr key={rowIndex}>
+            <tr 
+              key={rowIndex}
+              onContextMenu={(e) => handleRowContextMenu(e, rowIndex)}
+            >
               {row.map((cell, cellIndex) => (
                 <td key={cellIndex} style={{
                   border: '1px solid #e0e0e0',
                   padding: '4px',
-                  position: 'relative'
+                  position: 'relative',
+                  backgroundColor: selectedRows.has(rowIndex) ? '#f0f8ff' : 'transparent',
+                  width: `${columnWidths[cellIndex] || 120}px`,
+                  minWidth: '20px'
                 }}>
                   <CellEditor
                     cell={cell}
@@ -632,95 +859,211 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
                   />
                 </td>
               ))}
-              {isEditing && (
-                <td style={{
-                  border: '1px solid #e0e0e0',
-                  padding: '8px',
-                  textAlign: 'center'
-                }}>
-                  {rows.length > 1 && (
-                    <button
-                      onClick={() => deleteRow(rowIndex)}
-                      style={{
-                        padding: '2px 6px',
-                        backgroundColor: '#e53e3e',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '3px',
-                        fontSize: '12px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      ×
-                    </button>
-                  )}
-                </td>
-              )}
             </tr>
           ))}
-          {isEditing && (
-            <tr>
-              <td 
-                colSpan={headers.length + 1} 
-                style={{
-                  border: '1px solid #e0e0e0',
-                  padding: '8px',
-                  textAlign: 'center'
-                }}
-              >
-                <button
-                  onClick={addRow}
-                  style={{
-                    padding: '4px 8px',
-                    backgroundColor: '#28a745',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  + 행 추가
-                </button>
-              </td>
-            </tr>
-          )}
         </tbody>
         </table>
+
+        {/* Floating checkbox overlay */}
+        {isEditing && (
+          <div style={{
+            position: 'absolute',
+            left: '-40px',
+            top: '0',
+            width: '40px',
+            pointerEvents: 'none',
+            zIndex: 10
+          }}>
+            {/* Header area */}
+            <div style={{ 
+              height: tableRef.current?.querySelector('thead tr')?.getBoundingClientRect().height || 49
+            }} />
+            
+            {/* Row checkboxes */}
+            {cells.map((_, rowIndex) => {
+              const rowHeight = tableRef.current?.querySelector(`tbody tr:nth-child(${rowIndex + 1})`)?.getBoundingClientRect().height || 35;
+              const isRowSelected = selectedRows.has(rowIndex);
+              const shouldShowCheckbox = hoveredRow === rowIndex || isRowSelected;
+              
+              return (
+                <div
+                  key={rowIndex}
+                  style={{
+                    height: `${rowHeight}px`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    pointerEvents: 'auto',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={() => {
+                    setHoveredRow(rowIndex);
+                  }}
+                  onMouseLeave={() => {
+                    setHoveredRow(null);
+                  }}
+                >
+                  {shouldShowCheckbox && (
+                    <input
+                      type="checkbox"
+                      checked={isRowSelected}
+                      onChange={(e) => handleRowSelect(rowIndex, e.target.checked)}
+                      style={{
+                        cursor: 'pointer'
+                      }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Floating add row button */}
+        {isEditing && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '-44px',
+              left: '0',
+              right: '0',
+              height: '44px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              backgroundColor: 'transparent',
+              zIndex: 10
+            }}
+            onClick={addRow}
+            onMouseEnter={(e) => {
+              const target = e.currentTarget as HTMLElement;
+              target.style.backgroundColor = '#f8f9fa';
+              target.innerHTML = '+ 행 추가';
+              target.style.fontWeight = 'normal';
+              target.style.color = '#666';
+              target.style.border = '1px dashed #ddd';
+              target.style.borderRadius = '4px';
+            }}
+            onMouseLeave={(e) => {
+              const target = e.currentTarget as HTMLElement;
+              target.style.backgroundColor = 'transparent';
+              target.style.border = 'none';
+              target.innerHTML = '';
+            }}
+          />
+        )}
       </div>
 
-      {/* Summary row for auto-sum */}
-      {block.autoSum && (
-        <div style={{
-          padding: '8px',
-          backgroundColor: '#f8f9fa',
-          borderTop: '1px solid #e0e0e0',
-          fontSize: '12px',
-          display: 'flex',
-          justifyContent: 'space-between'
-        }}>
-          <span>합계:</span>
-          {headers.map((header, colIndex) => {
-            const columnSum = cells.reduce((sum, row) => {
-              const cellValue = row[colIndex]?.value;
-              return sum + (typeof cellValue === 'number' ? cellValue : 0);
-            }, 0);
-            return (
-              <span key={colIndex} style={{ minWidth: '60px', textAlign: 'right' }}>
-                {columnSum > 0 ? columnSum.toLocaleString() : '-'}
-              </span>
-            );
-          })}
-        </div>
-      )}
 
       {/* Column Type Selector */}
       {showColumnTypeSelector && (
         <ColumnTypeSelector
           onSelectType={handleColumnTypeSelect}
-          onCancel={() => setShowColumnTypeSelector(false)}
+          onDeleteColumn={editingColumnIndex !== null ? handleColumnDelete : undefined}
+          onCancel={() => {
+            setShowColumnTypeSelector(false);
+          }}
           position={typeSelectorPosition}
+          isEditingExistingColumn={editingColumnIndex !== null}
         />
+      )}
+
+      {/* Row Context Menu */}
+      {showRowContextMenu && (
+        <>
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 999
+            }}
+            onClick={() => setShowRowContextMenu(false)}
+          />
+          <div
+            style={{
+              position: 'fixed',
+              top: rowContextMenuPosition.y,
+              left: rowContextMenuPosition.x,
+              backgroundColor: 'white',
+              border: '1px solid #e1e5e9',
+              borderRadius: '8px',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
+              zIndex: 1000,
+              minWidth: '160px',
+              padding: '8px 0',
+              fontFamily: 'system-ui, -apple-system, sans-serif'
+            }}
+          >
+            <div
+              onClick={handleCopySelectedRows}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '10px 12px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                color: '#374151',
+                transition: 'background-color 0.15s ease'
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+              }}
+            >
+              <div style={{
+                width: '20px',
+                height: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '16px',
+                color: '#6b7280'
+              }}>
+                ||
+              </div>
+              <span style={{ fontWeight: '500' }}>복제</span>
+            </div>
+            
+            <div
+              onClick={handleDeleteSelectedRows}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '10px 12px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                color: '#dc2626',
+                transition: 'background-color 0.15s ease'
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = '#fef2f2';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+              }}
+            >
+              <div style={{
+                width: '20px',
+                height: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '16px'
+              }}>
+                ×
+              </div>
+              <span style={{ fontWeight: '500' }}>삭제</span>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
@@ -729,13 +1072,16 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
 // Helper functions
 const getColumnTypeIcon = (type?: CellType): string => {
   switch (type) {
-    case 'text': return '📝';
-    case 'number': return '🔢';
-    case 'date': return '📅';
-    case 'checkbox': return '☑️';
-    case 'select': return '📋';
-    case 'formula': return '🧮';
-    default: return '📝';
+    case 'text': return 'T';
+    case 'number': return '#';
+    case 'date': return '|';
+    case 'file': return '[]';
+    case 'checkbox': return '☐';
+    case 'email': return '@';
+    case 'phone': return '☎';
+    case 'formula': return 'Σ';
+    case 'select': return '⌄';
+    default: return 'T';
   }
 };
 
@@ -744,9 +1090,12 @@ const getColumnTypeLabel = (type?: CellType): string => {
     case 'text': return '텍스트';
     case 'number': return '숫자';
     case 'date': return '날짜';
+    case 'file': return '파일과 미디어';
     case 'checkbox': return '체크박스';
-    case 'select': return '선택형';
+    case 'email': return '이메일';
+    case 'phone': return '전화번호';
     case 'formula': return '수식';
+    case 'select': return '선택형';
     default: return '텍스트';
   }
 };

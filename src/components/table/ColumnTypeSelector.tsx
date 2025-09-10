@@ -3,26 +3,33 @@ import { CellType } from '../../types';
 
 interface ColumnTypeSelectorProps {
   onSelectType: (type: CellType, options?: string[]) => void;
+  onDeleteColumn?: () => void;
   onCancel: () => void;
   position?: { x: number; y: number };
+  isEditingExistingColumn?: boolean;
 }
 
 const ColumnTypeSelector: React.FC<ColumnTypeSelectorProps> = ({
   onSelectType,
+  onDeleteColumn,
   onCancel,
-  position = { x: 0, y: 0 }
+  position = { x: 0, y: 0 },
+  isEditingExistingColumn = false
 }) => {
   const [showSelectOptions, setShowSelectOptions] = useState<CellType | null>(null);
   const [selectOptions, setSelectOptions] = useState<string>('');
   const menuRef = useRef<HTMLDivElement>(null);
 
   const columnTypes = [
-    { type: 'text' as CellType, label: '텍스트', icon: '📝' },
-    { type: 'number' as CellType, label: '숫자', icon: '🔢' },
-    { type: 'date' as CellType, label: '날짜', icon: '📅' },
-    { type: 'checkbox' as CellType, label: '체크박스', icon: '☑️' },
-    { type: 'select' as CellType, label: '선택형', icon: '📋' },
-    { type: 'formula' as CellType, label: '수식', icon: '🧮' }
+    { type: 'text' as CellType, label: '텍스트', icon: 'T', description: '' },
+    { type: 'number' as CellType, label: '숫자', icon: '#', description: '' },
+    { type: 'select' as CellType, label: '선택', icon: '○', description: '' },
+    { type: 'checkbox' as CellType, label: '체크박스', icon: '☐', description: '' },
+    { type: 'date' as CellType, label: '날짜', icon: '◐', description: '' },
+    { type: 'phone' as CellType, label: '전화번호', icon: '☎', description: '' },
+    { type: 'email' as CellType, label: '이메일', icon: '@', description: '' },
+    { type: 'file' as CellType, label: '파일과 미디어', icon: '📎', description: '' },
+    { type: 'formula' as CellType, label: '수식', icon: 'Σ', description: '' }
   ];
 
   useEffect(() => {
@@ -70,26 +77,27 @@ const ColumnTypeSelector: React.FC<ColumnTypeSelectorProps> = ({
       <div
         ref={menuRef}
         style={{
-          position: 'absolute',
+          position: 'fixed',
           top: position.y,
           left: position.x,
           backgroundColor: 'white',
-          border: '1px solid #e0e0e0',
-          borderRadius: '6px',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-          zIndex: 1000,
-          minWidth: '160px',
-          padding: '6px'
+          border: '1px solid #e1e5e9',
+          borderRadius: '8px',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
+          zIndex: 9999,
+          width: '240px',
+          padding: '8px 0',
+          fontFamily: 'system-ui, -apple-system, sans-serif'
         }}
       >
         {showSelectOptions ? (
           // Select options input
-          <div>
+          <div style={{ padding: '0 12px' }}>
             <div style={{
-              fontSize: '12px',
-              fontWeight: 'bold',
-              marginBottom: '8px',
-              color: '#333'
+              fontSize: '14px',
+              fontWeight: '600',
+              marginBottom: '12px',
+              color: '#374151'
             }}>
               선택 옵션 설정
             </div>
@@ -100,28 +108,31 @@ const ColumnTypeSelector: React.FC<ColumnTypeSelectorProps> = ({
               placeholder="옵션1, 옵션2, 옵션3"
               style={{
                 width: '100%',
-                padding: '6px 8px',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                fontSize: '12px',
-                marginBottom: '8px'
+                padding: '8px 12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                fontSize: '14px',
+                marginBottom: '12px',
+                outline: 'none',
+                boxSizing: 'border-box'
               }}
               autoFocus
             />
             <div style={{
               display: 'flex',
-              gap: '4px'
+              gap: '8px'
             }}>
               <button
                 onClick={handleSelectOptionsConfirm}
                 style={{
                   flex: 1,
-                  padding: '4px 8px',
-                  backgroundColor: '#007bff',
+                  padding: '8px 16px',
+                  backgroundColor: '#2563eb',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '11px',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '500',
                   cursor: 'pointer'
                 }}
               >
@@ -131,12 +142,13 @@ const ColumnTypeSelector: React.FC<ColumnTypeSelectorProps> = ({
                 onClick={() => setShowSelectOptions(null)}
                 style={{
                   flex: 1,
-                  padding: '4px 8px',
-                  backgroundColor: '#6c757d',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '11px',
+                  padding: '8px 16px',
+                  backgroundColor: 'transparent',
+                  color: '#6b7280',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '500',
                   cursor: 'pointer'
                 }}
               >
@@ -147,39 +159,104 @@ const ColumnTypeSelector: React.FC<ColumnTypeSelectorProps> = ({
         ) : (
           // Type selection menu
           <>
-            <div style={{
-              fontSize: '12px',
-              fontWeight: 'bold',
-              marginBottom: '6px',
-              color: '#333'
-            }}>
-              열 타입 선택
-            </div>
-            {columnTypes.map(({ type, label, icon }) => (
-              <div
-                key={type}
-                onClick={() => handleTypeSelect(type)}
+            {/* Search input */}
+            <div style={{ padding: '0 12px 8px 12px' }}>
+              <input
+                type="text"
+                placeholder="유형 검색"
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '6px 8px',
-                  cursor: 'pointer',
-                  borderRadius: '4px',
-                  fontSize: '13px',
-                  transition: 'background-color 0.1s'
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  backgroundColor: '#f9fafb',
+                  outline: 'none',
+                  boxSizing: 'border-box'
                 }}
-                onMouseEnter={(e) => {
-                  (e.target as HTMLElement).style.backgroundColor = '#f8f9fa';
-                }}
-                onMouseLeave={(e) => {
-                  (e.target as HTMLElement).style.backgroundColor = 'transparent';
-                }}
-              >
-                <span style={{ fontSize: '14px' }}>{icon}</span>
-                <span>{label}</span>
-              </div>
-            ))}
+              />
+            </div>
+            
+            {/* Column type options */}
+            <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              {columnTypes.map(({ type, label, icon }) => (
+                <div
+                  key={type}
+                  onClick={() => handleTypeSelect(type)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '10px 12px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    color: '#374151',
+                    transition: 'background-color 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '16px',
+                    color: '#6b7280'
+                  }}>
+                    {icon}
+                  </div>
+                  <span style={{ fontWeight: '500' }}>{label}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Delete column option (only for existing columns) */}
+            {isEditingExistingColumn && onDeleteColumn && (
+              <>
+                <div style={{
+                  height: '1px',
+                  backgroundColor: '#e5e7eb',
+                  margin: '8px 0'
+                }} />
+                <div
+                  onClick={onDeleteColumn}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '10px 12px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    color: '#dc2626',
+                    transition: 'background-color 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.backgroundColor = '#fef2f2';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '16px'
+                  }}>
+                    🗑
+                  </div>
+                  <span style={{ fontWeight: '500' }}>열 삭제</span>
+                </div>
+              </>
+            )}
           </>
         )}
       </div>

@@ -73,7 +73,7 @@ export interface CodeBlock extends BaseContentBlock {
 }
 
 // Enhanced table cell types
-export type CellType = 'text' | 'number' | 'date' | 'select' | 'checkbox' | 'formula';
+export type CellType = 'text' | 'number' | 'date' | 'select' | 'checkbox' | 'formula' | 'file' | 'email' | 'phone';
 
 export interface ValidationRule {
   type: 'required' | 'min' | 'max' | 'pattern' | 'custom';

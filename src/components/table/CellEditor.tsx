@@ -311,10 +311,6 @@ const CellEditor: React.FC<CellEditorProps> = ({
         cursor: isEditing ? 'text' : 'pointer'
       }}
       onClick={() => !isEditing && onStartEdit()}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        setShowDataNameInput(true);
-      }}
     >
       {/* Data name indicator */}
       {cell.dataName && (
