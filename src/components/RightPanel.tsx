@@ -2,6 +2,7 @@ import React from 'react';
 import { MemoBlock, Page, ContentBlock, ContentBlockType } from '../types';
 import Resizer from './Resizer';
 import ContentBlockComponent from './ContentBlock';
+import GoogleAuth from './GoogleAuth';
 
 interface RightPanelProps {
   selectedMemo: MemoBlock | undefined;
@@ -38,6 +39,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const rightPanelRef = React.useRef<HTMLDivElement>(null);
   const [showMenu, setShowMenu] = React.useState(false);
   const [menuPosition, setMenuPosition] = React.useState({ x: 0, y: 0 });
+  const [isGoogleSignedIn, setIsGoogleSignedIn] = React.useState(false);
 
   // 선택된 블록 중 첫 번째 블록의 위치 계산
   const getTopSelectedBlockPosition = () => {
@@ -51,6 +53,32 @@ const RightPanel: React.FC<RightPanelProps> = ({
     
     return firstSelectedIndex;
   };
+
+  // 전역 테이블 생성 신호 감지
+  React.useEffect(() => {
+    const checkForTableCreation = () => {
+      const signal = (window as any).createTableAfterBlock;
+      if (signal && selectedMemo) {
+        const { afterBlockId, tableBlock } = signal;
+        
+        // 현재 메모에서 해당 블록 찾기
+        const blockIndex = selectedMemo.blocks?.findIndex(block => block.id === afterBlockId);
+        
+        if (blockIndex !== undefined && blockIndex >= 0 && selectedMemo.blocks) {
+          const updatedBlocks = [...selectedMemo.blocks];
+          updatedBlocks.splice(blockIndex + 1, 0, tableBlock);
+          
+          onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
+          
+          // 신호 제거
+          delete (window as any).createTableAfterBlock;
+        }
+      }
+    };
+    
+    const interval = setInterval(checkForTableCreation, 100);
+    return () => clearInterval(interval);
+  }, [selectedMemo, onMemoUpdate]);
 
   // 키보드 단축키 처리
   React.useEffect(() => {
@@ -192,6 +220,15 @@ const RightPanel: React.FC<RightPanelProps> = ({
           type, 
           headers: ['컬럼 1', '컬럼 2'], 
           rows: [['', ''], ['', '']] 
+        };
+      case 'sheets':
+        return {
+          id: baseId,
+          type,
+          url: '',
+          width: 800,
+          height: 400,
+          zoom: 100
         };
       default:
         return { id: baseId, type: 'text', content: '' } as any;
@@ -661,6 +698,11 @@ const RightPanel: React.FC<RightPanelProps> = ({
                   e.target.style.borderBottomColor = 'transparent';
                 }}
               />
+            </div>
+
+            {/* Google 인증 */}
+            <div style={{ marginBottom: '16px', paddingLeft: '20px' }}>
+              <GoogleAuth onAuthSuccess={setIsGoogleSignedIn} />
             </div>
 
             {/* 태그 관리 */}

@@ -322,8 +322,8 @@ const Canvas: React.FC<CanvasProps> = ({
       }
     }
     
-    // 선택 도구이고 연결 모드가 아닐 때 전역 드래그 선택 시작 준비 (모든 영역에서)
-    if (currentTool === 'select' && !isConnecting && !isPanning) {
+    // 선택 도구이고 연결 모드가 아닐 때 전역 드래그 선택 시작 준비 (캔버스 배경에서만)
+    if (currentTool === 'select' && !isConnecting && !isPanning && isCanvasBackground) {
       console.log('Setting up global drag selection');
       setGlobalDragSelecting(true);
       setGlobalDragStart({ x: e.clientX, y: e.clientY });
@@ -729,7 +729,7 @@ const Canvas: React.FC<CanvasProps> = ({
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8"/>
-            <path d="21 21l-4.35-4.35"/>
+            <path d="M21 21l-4.35-4.35"/>
             <line x1="11" y1="8" x2="11" y2="14"/>
             <line x1="8" y1="11" x2="14" y2="11"/>
           </svg>

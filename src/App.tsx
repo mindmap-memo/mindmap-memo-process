@@ -401,7 +401,7 @@ const App: React.FC = () => {
   };
 
   const handleRightPanelResize = (deltaX: number) => {
-    setRightPanelWidth(prev => Math.max(250, Math.min(600, prev + deltaX)));
+    setRightPanelWidth(prev => Math.max(250, Math.min(1200, prev + deltaX)));
   };
 
   return (

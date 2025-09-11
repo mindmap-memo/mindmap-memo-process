@@ -8,7 +8,8 @@ export type ContentBlockType =
   | 'bookmark'
   | 'quote'
   | 'code'
-  | 'table';
+  | 'table'
+  | 'sheets';
 
 export interface BaseContentBlock {
   id: string;
@@ -143,6 +144,15 @@ export interface TableBlock extends BaseContentBlock {
   permissions?: { [cellId: string]: string[] }; // Cell permissions by user
 }
 
+export interface SheetsBlock extends BaseContentBlock {
+  type: 'sheets';
+  url: string;
+  width?: number;
+  height?: number;
+  title?: string;
+  zoom?: number; // 확대/축소 비율 (%)
+}
+
 export type ContentBlock = 
   | TextBlock
   | CalloutBlock
@@ -152,7 +162,8 @@ export type ContentBlock =
   | BookmarkBlock
   | QuoteBlock
   | CodeBlock
-  | TableBlock;
+  | TableBlock
+  | SheetsBlock;
 
 export interface MemoBlock {
   id: string;

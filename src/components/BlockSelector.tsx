@@ -25,7 +25,7 @@ const BlockSelector: React.FC<BlockSelectorProps> = ({
     { type: 'image' as ContentBlockType, label: '이미지', icon: '🖼️', description: '이미지를 삽입합니다' },
     { type: 'file' as ContentBlockType, label: '파일', icon: '📎', description: '파일을 첨부합니다' },
     { type: 'bookmark' as ContentBlockType, label: '북마크', icon: '🔖', description: 'URL 북마크를 추가합니다' },
-    { type: 'table' as ContentBlockType, label: '테이블', icon: '📊', description: '표를 생성합니다' }
+    { type: 'sheets' as ContentBlockType, label: '구글 시트', icon: '📋', description: '구글 시트를 삽입합니다' }
   ];
 
   const filteredBlocks = blockTypes.filter(block => 

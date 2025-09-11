@@ -87,13 +87,83 @@ const CellEditor: React.FC<CellEditorProps> = ({
         return <span>{formattedDate}</span>;
       
       case 'select':
-        return <span>{cell.value}</span>;
+        return (
+          <span style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            display: 'block'
+          }}>
+            {cell.value}
+          </span>
+        );
+      
+      case 'email':
+        return (
+          <span style={{
+            color: '#007bff',
+            textDecoration: 'underline',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            display: 'block'
+          }}>
+            {cell.value}
+          </span>
+        );
+      
+      case 'phone':
+        return (
+          <span style={{
+            color: '#28a745',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            display: 'block'
+          }}>
+            {cell.value}
+          </span>
+        );
+      
+      case 'file':
+        return (
+          <span style={{
+            color: '#6c757d',
+            fontStyle: 'italic',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            display: 'block'
+          }}>
+            {cell.value}
+          </span>
+        );
       
       case 'formula':
-        return <span style={{ fontStyle: 'italic', color: '#666' }}>{cell.value}</span>;
+        return (
+          <span style={{ 
+            fontStyle: 'italic', 
+            color: '#666',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            display: 'block'
+          }}>
+            {cell.value}
+          </span>
+        );
       
       default:
-        return <span>{cell.value}</span>;
+        return (
+          <span style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            display: 'block'
+          }}>
+            {cell.value}
+          </span>
+        );
     }
   };
 
@@ -150,6 +220,51 @@ const CellEditor: React.FC<CellEditorProps> = ({
               <option key={index} value={option}>{option}</option>
             ))}
           </select>
+        );
+      
+      case 'email':
+        return (
+          <input
+            ref={inputRef}
+            type="email"
+            value={localValue || ''}
+            onChange={(e) => handleValueChange(e.target.value)}
+            onBlur={onFinishEdit}
+            onKeyDown={(e) => e.key === 'Enter' && onFinishEdit()}
+            style={inputStyle}
+            placeholder="example@email.com"
+            autoFocus
+          />
+        );
+      
+      case 'phone':
+        return (
+          <input
+            ref={inputRef}
+            type="tel"
+            value={localValue || ''}
+            onChange={(e) => handleValueChange(e.target.value)}
+            onBlur={onFinishEdit}
+            onKeyDown={(e) => e.key === 'Enter' && onFinishEdit()}
+            style={inputStyle}
+            placeholder="010-1234-5678"
+            autoFocus
+          />
+        );
+      
+      case 'file':
+        return (
+          <input
+            ref={inputRef}
+            type="text"
+            value={localValue || ''}
+            onChange={(e) => handleValueChange(e.target.value)}
+            onBlur={onFinishEdit}
+            onKeyDown={(e) => e.key === 'Enter' && onFinishEdit()}
+            style={inputStyle}
+            placeholder="파일 경로 또는 이름"
+            autoFocus
+          />
         );
       
       case 'formula':

@@ -10,6 +10,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run eject` - Eject from Create React App (irreversible)
 - `npx tsc --noEmit` - Type check without compilation
 
+## Google Sheets Integration
+
+The application integrates with Google Sheets API for data extraction and table creation:
+
+- **API Configuration**: Google OAuth client configured in `src/config/google.ts` with read-only sheets access
+- **Authentication**: Uses Google Identity Services (GIS) via GoogleAuth component for secure sign-in
+- **Range Detection**: Smart clipboard-based system detects copied sheet ranges and auto-calculates A1 notation
+- **Data Extraction**: Supports both structured table conversion and plain text extraction from sheet ranges
+- **SheetsBlock**: Embedded iframe view of Google Sheets with range selection tools and extraction controls
+
 ## Application Architecture
 
 This is a React TypeScript mindmap memo application built with Create React App. The app provides an interactive canvas for creating, connecting, and organizing memo blocks in a mind mapping interface.
@@ -33,7 +43,7 @@ This is a React TypeScript mindmap memo application built with Create React App.
 Core types in `src/types/index.ts`:
 
 - **MemoBlock**: Individual memo with title, content, tags, connections array, position, and optional size. Contains both legacy `content` field and new `blocks` array for rich content
-- **ContentBlock**: Notion-style content blocks with 9 types: text, callout, checklist, image, file, bookmark, quote, code, table
+- **ContentBlock**: Notion-style content blocks with 10 types: text, callout, checklist, image, file, bookmark, quote, code, table, sheets
 - **Page**: Contains array of memos with id and name
 - **AppState**: Global application state interface
 
@@ -41,7 +51,7 @@ Core types in `src/types/index.ts`:
 
 The application implements a Notion-inspired block-based content editor:
 
-- **ContentBlock Types**: 9 distinct block types each with specific properties and rendering logic
+- **ContentBlock Types**: 10 distinct block types each with specific properties and rendering logic: text, callout, checklist, image, file, bookmark, quote, code, table, sheets
 - **Block Components**: Individual components in `src/components/blocks/` for each block type
 - **ContentBlockComponent**: Wrapper component that renders appropriate block type and handles common functionality
 - **Block Selection**: Multi-select blocks with drag selection, keyboard shortcuts (Ctrl+A, Delete), and context menu
@@ -116,3 +126,11 @@ The application includes a sophisticated table system designed for business proc
 - **Function Parameters**: Ensure all function calls have correct number of parameters (e.g., updateBlock requires 4 parameters: headers, rows, cells, columns)
 - **Data Registry**: Use global data registry for cross-table references; remember @dataName syntax for formula references
 - **Context Menus**: Position context menus using getBoundingClientRect() and pass position props for proper placement
+- **Google Sheets Safety**: Always validate array data before using .map() - check `Array.isArray()` and filter non-arrays to prevent runtime errors
+- **Range Detection**: Use clipboard-based detection for Google Sheets ranges; implement fallback UI for manual range input when automatic detection fails
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.

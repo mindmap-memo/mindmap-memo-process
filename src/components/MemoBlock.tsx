@@ -33,11 +33,13 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isConnectionDragging, setIsConnectionDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [dragMoved, setDragMoved] = useState(false);
   const memoRef = React.useRef<HTMLDivElement>(null);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button === 0 && !isConnecting) {
       setIsDragging(true);
+      setDragMoved(false);
       // 스케일된 좌표계에서 드래그 시작점 계산
       const scaledMemoX = (memo.position.x * canvasScale) + canvasOffset.x;
       const scaledMemoY = (memo.position.y * canvasScale) + canvasOffset.y;
@@ -83,6 +85,9 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
 
   const handleMouseMove = (e: MouseEvent) => {
     if (isDragging) {
+      if (!dragMoved) {
+        setDragMoved(true);
+      }
       // 스케일과 오프셋을 고려한 실제 위치 계산
       const rawX = e.clientX - dragStart.x - canvasOffset.x;
       const rawY = e.clientY - dragStart.y - canvasOffset.y;
@@ -140,7 +145,12 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
     <div
       ref={memoRef}
       data-memo-block="true"
-      onClick={(e) => onClick(e.shiftKey)}
+      onClick={(e) => {
+        // 드래그로 이동했다면 클릭 이벤트를 무시
+        if (!dragMoved) {
+          onClick(e.shiftKey);
+        }
+      }}
       onMouseDown={handleMouseDown}
       onMouseUp={(e) => {
         // 연결 모드일 때 메모 블록 전체에서 연결 처리
