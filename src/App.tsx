@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Page, MemoBlock, DataRegistry } from './types';
+import { Page, MemoBlock, DataRegistry, MemoDisplaySize } from './types';
 import { globalDataRegistry } from './utils/dataRegistry';
 import LeftPanel from './components/LeftPanel';
 import RightPanel from './components/RightPanel';
@@ -396,6 +396,21 @@ const App: React.FC = () => {
     ));
   };
 
+  const updateMemoDisplaySize = (memoId: string, displaySize: MemoDisplaySize) => {
+    setPages(prev => prev.map(page => 
+      page.id === currentPageId 
+        ? {
+            ...page,
+            memos: page.memos.map(memo => 
+              memo.id === memoId 
+                ? { ...memo, displaySize }
+                : memo
+            )
+          }
+        : page
+    ));
+  };
+
   const handleLeftPanelResize = (deltaX: number) => {
     setLeftPanelWidth(prev => Math.max(200, Math.min(500, prev + deltaX)));
   };
@@ -459,6 +474,7 @@ const App: React.FC = () => {
         onDisconnectMemo={disconnectMemo}
         onMemoPositionChange={updateMemoPosition}
         onMemoSizeChange={updateMemoSize}
+        onMemoDisplaySizeChange={updateMemoDisplaySize}
         isConnecting={isConnecting}
         isDisconnectMode={isDisconnectMode}
         connectingFromId={connectingFromId}

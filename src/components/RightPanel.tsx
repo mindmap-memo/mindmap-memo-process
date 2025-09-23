@@ -31,10 +31,12 @@ const RightPanel: React.FC<RightPanelProps> = ({
 }) => {
   const [tagInput, setTagInput] = React.useState('');
   const [selectedBlocks, setSelectedBlocks] = React.useState<string[]>([]);
+  const [dragSelectedBlocks, setDragSelectedBlocks] = React.useState<string[]>([]); // 드래그로 선택된 블록들
   const [isDragSelecting, setIsDragSelecting] = React.useState(false);
   const [dragStart, setDragStart] = React.useState({ x: 0, y: 0 });
   const [dragEnd, setDragEnd] = React.useState({ x: 0, y: 0 });
   const [dragHoveredBlocks, setDragHoveredBlocks] = React.useState<string[]>([]);
+  const [isDragMoved, setIsDragMoved] = React.useState(false); // 실제 드래그 움직임 감지
   const blocksContainerRef = React.useRef<HTMLDivElement>(null);
   const rightPanelRef = React.useRef<HTMLDivElement>(null);
   const [showMenu, setShowMenu] = React.useState(false);
@@ -89,6 +91,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
           handleBlocksDelete();
         } else if (e.key === 'Escape') {
           setSelectedBlocks([]);
+          setDragSelectedBlocks([]);
         } else if (e.key === 'ArrowUp' && (e.ctrlKey || e.metaKey)) {
           e.preventDefault();
           handleBlocksMove('up');
@@ -133,11 +136,16 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
   // 블록 관련 핸들러들
   const handleBlockUpdate = (updatedBlock: ContentBlock) => {
+    console.log('RightPanel handleBlockUpdate called with:', updatedBlock);
     if (selectedMemo) {
+      console.log('Selected memo before update:', selectedMemo);
       const updatedBlocks = selectedMemo.blocks?.map(block =>
         block.id === updatedBlock.id ? updatedBlock : block
       ) || [];
+      console.log('Updated blocks array:', updatedBlocks);
       onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
+    } else {
+      console.log('No selected memo found');
     }
   };
 
@@ -339,6 +347,9 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
   // 블록 선택 관련 핸들러들
   const handleBlockClick = (blockId: string, event: React.MouseEvent) => {
+    // 드래그가 아닌 클릭으로 선택하는 경우 dragSelectedBlocks 초기화
+    setDragSelectedBlocks([]);
+    
     if (event.shiftKey || event.ctrlKey || event.metaKey) {
       // Shift/Ctrl/Cmd + 클릭: 다중 선택
       setSelectedBlocks(prev => 
@@ -382,10 +393,12 @@ const RightPanel: React.FC<RightPanelProps> = ({
         };
         
         setIsDragSelecting(true);
+        setIsDragMoved(false); // 드래그 움직임 초기화
         setDragStart(startPos);
         setDragEnd(startPos);
         setDragHoveredBlocks([]);
         setSelectedBlocks([]); // 드래그 시작할 때 기존 선택 해제
+        setDragSelectedBlocks([]); // 드래그 선택 상태도 초기화
       }
     }
   };
@@ -400,6 +413,16 @@ const RightPanel: React.FC<RightPanelProps> = ({
           x: event.clientX - containerRect.left,
           y: event.clientY - containerRect.top
         };
+        
+        // 드래그 임계값 확인 (5픽셀 이상 움직여야 드래그로 인식)
+        const dragDistance = Math.sqrt(
+          Math.pow(currentPos.x - dragStart.x, 2) + 
+          Math.pow(currentPos.y - dragStart.y, 2)
+        );
+        
+        if (dragDistance > 5) {
+          setIsDragMoved(true);
+        }
         
         setDragEnd(currentPos);
         
@@ -460,12 +483,16 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
   const handleMouseUp = React.useCallback(() => {
     if (isDragSelecting) {
-      // 드래그 종료 시 hoveredBlocks를 최종 선택으로 적용
-      setSelectedBlocks(dragHoveredBlocks);
+      if (isDragMoved) {
+        // 실제 드래그가 일어난 경우에만 선택 적용
+        setSelectedBlocks(dragHoveredBlocks);
+        setDragSelectedBlocks(dragHoveredBlocks); // 드래그로 선택된 블록들 저장
+      }
       setIsDragSelecting(false);
+      setIsDragMoved(false);
       setDragHoveredBlocks([]);
     }
-  }, [isDragSelecting, dragHoveredBlocks]);
+  }, [isDragSelecting, isDragMoved, dragHoveredBlocks]);
 
   // 마우스 이벤트 리스너 등록
   React.useEffect(() => {
@@ -533,6 +560,82 @@ const RightPanel: React.FC<RightPanelProps> = ({
     return memo;
   };
 
+  // 스마트 클릭 핸들러: 빈 공간 클릭 시 가장 가까운 블록에 포커스하거나 선택 해제
+  const handleMemoAreaClick = (event: React.MouseEvent) => {
+    const target = event.target as HTMLElement;
+    
+    // 버튼이나 중요한 인터랙티브 요소만 제외
+    const isButton = target.tagName === 'BUTTON' || target.closest('button') !== null;
+    const isImportanceMenu = target.closest('[data-importance-menu]') !== null;
+    
+    // 텍스트 입력 중인 textarea는 제외 (클릭된 것이 textarea인 경우만)
+    const isClickedTextarea = target.tagName === 'TEXTAREA';
+    
+    if (!isButton && !isImportanceMenu && !isClickedTextarea && selectedMemo?.blocks) {
+      // 이미 선택된 블록이 있으면 선택 해제
+      if (selectedBlocks.length > 0) {
+        setSelectedBlocks([]);
+        return;
+      }
+      
+      // 클릭 위치에서 가장 가까운 블록 찾기 (거리 제한 없음)
+      const clickY = event.clientY;
+      const clickX = event.clientX;
+      const container = blocksContainerRef.current;
+      
+      if (container) {
+        const blockElements = container.querySelectorAll('[data-block-id]');
+        
+        if (blockElements.length === 0) {
+          return;
+        }
+        
+        type ClosestBlockType = { element: HTMLElement; distance: number; blockId: string };
+        let closestBlock: ClosestBlockType | null = null;
+        
+        blockElements.forEach(element => {
+          const rect = element.getBoundingClientRect();
+          
+          // 블록의 중심점과 클릭 위치의 거리 계산 (유클리드 거리)
+          const blockCenterX = rect.left + rect.width / 2;
+          const blockCenterY = rect.top + rect.height / 2;
+          const distance = Math.sqrt(
+            Math.pow(clickX - blockCenterX, 2) + 
+            Math.pow(clickY - blockCenterY, 2)
+          );
+          
+          if (!closestBlock || distance < closestBlock.distance) {
+            const blockId = element.getAttribute('data-block-id');
+            if (blockId) {
+              const newClosestBlock: ClosestBlockType = { 
+                element: element as HTMLElement, 
+                distance, 
+                blockId 
+              };
+              closestBlock = newClosestBlock;
+            }
+          }
+        });
+        
+        // 가장 가까운 블록의 텍스트 영역에 포커스 (거리에 관계없이)
+        if (closestBlock) {
+          const blockElement = (closestBlock as ClosestBlockType).element;
+          const textarea = blockElement.querySelector('textarea') as HTMLTextAreaElement;
+          if (textarea) {
+            // 블록 선택 방지 - 단일 포커스만
+            setTimeout(() => {
+              textarea.focus();
+              // 커서를 텍스트 끝으로 이동
+              const length = textarea.value.length;
+              textarea.setSelectionRange(length, length);
+            }, 50);
+          }
+        }
+      }
+    }
+  };
+
+
   const blockTypes = [
     { type: 'text' as ContentBlockType, label: '텍스트', icon: '📝' },
     { type: 'callout' as ContentBlockType, label: '콜아웃', icon: '💡' },
@@ -546,10 +649,13 @@ const RightPanel: React.FC<RightPanelProps> = ({
   ];
 
   return (
-    <div style={{
-      display: 'flex',
-      height: '100vh',
-      flexDirection: 'column',
+    <div 
+      ref={rightPanelRef}
+      onClick={handleMemoAreaClick}
+      style={{
+        display: 'flex',
+        height: '100vh',
+        flexDirection: 'column',
       backgroundColor: '#f8f9fa',
       borderLeft: '1px solid #e1e5e9',
       position: isFullscreen ? 'fixed' : 'relative',
@@ -700,10 +806,12 @@ const RightPanel: React.FC<RightPanelProps> = ({
               />
             </div>
 
-            {/* Google 인증 */}
-            <div style={{ marginBottom: '16px', paddingLeft: '20px' }}>
-              <GoogleAuth onAuthSuccess={setIsGoogleSignedIn} />
-            </div>
+            {/* Google 인증 - 임시 숨김 */}
+            {false && (
+              <div style={{ marginBottom: '16px', paddingLeft: '20px' }}>
+                <GoogleAuth onAuthSuccess={setIsGoogleSignedIn} />
+              </div>
+            )}
 
             {/* 태그 관리 */}
             <div style={{ marginBottom: '16px', paddingLeft: '20px' }}>
@@ -911,7 +1019,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
               }}
             >
               {/* 드래그 선택 박스 오버레이 */}
-              {isDragSelecting && (
+              {isDragSelecting && isDragMoved && (
                 <div
                   style={{
                     position: 'absolute',
@@ -919,11 +1027,12 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     top: `${Math.min(dragStart.y, dragEnd.y)}px`,
                     width: `${Math.abs(dragEnd.x - dragStart.x)}px`,
                     height: `${Math.abs(dragEnd.y - dragStart.y)}px`,
-                    backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                    backgroundColor: 'rgba(33, 150, 243, 0.15)', // 약간 더 진한 배경
                     border: '2px solid #2196f3',
-                    borderRadius: '4px',
+                    borderRadius: '2px', // 살짝 둥근 모서리
                     pointerEvents: 'none',
-                    zIndex: 999
+                    zIndex: 999,
+                    boxShadow: '0 2px 8px rgba(33, 150, 243, 0.2)' // 그림자 추가로 더 잘 보이게
                   }}
                 />
               )}
@@ -934,11 +1043,12 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
                 return (
                   <React.Fragment key={block.id}>
-                    <div data-block-id={block.id} style={{ position: 'relative', marginBottom: '2px' }}>
+                    <div data-block-id={block.id} style={{ position: 'relative', marginBottom: '0px' }}>
                       <ContentBlockComponent
                         block={block}
                         isEditing={true}
                         isSelected={isSelected}
+                        isDragSelected={dragSelectedBlocks.includes(block.id)}
                         isDragHovered={dragHoveredBlocks.includes(block.id)}
                         pageId={currentPage?.id}
                         memoId={selectedMemo?.id}

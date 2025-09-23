@@ -1,5 +1,5 @@
 import React from 'react';
-import { Page } from '../types';
+import { Page, MemoDisplaySize } from '../types';
 import MemoBlock from './MemoBlock';
 
 interface CanvasProps {
@@ -12,6 +12,7 @@ interface CanvasProps {
   onDisconnectMemo: () => void;
   onMemoPositionChange: (memoId: string, position: { x: number; y: number }) => void;
   onMemoSizeChange: (memoId: string, size: { width: number; height: number }) => void;
+  onMemoDisplaySizeChange?: (memoId: string, size: MemoDisplaySize) => void;
   isConnecting: boolean;
   isDisconnectMode: boolean;
   connectingFromId: string | null;
@@ -40,6 +41,7 @@ const Canvas: React.FC<CanvasProps> = ({
   onDisconnectMemo,
   onMemoPositionChange,
   onMemoSizeChange,
+  onMemoDisplaySizeChange,
   isConnecting,
   isDisconnectMode,
   connectingFromId,
@@ -608,9 +610,10 @@ const Canvas: React.FC<CanvasProps> = ({
             memo={memo}
             isSelected={selectedMemoId === memo.id || selectedMemoIds.includes(memo.id)}
             isDragHovered={dragHoveredMemoIds.includes(memo.id)}
-            onClick={(isShiftClick) => onMemoSelect(memo.id, isShiftClick)}
+            onClick={(isShiftClick?: boolean) => onMemoSelect(memo.id, isShiftClick)}
             onPositionChange={onMemoPositionChange}
             onSizeChange={onMemoSizeChange}
+            onDisplaySizeChange={onMemoDisplaySizeChange}
             isConnecting={isConnecting}
             connectingFromId={connectingFromId}
             onStartConnection={onStartConnection}

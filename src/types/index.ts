@@ -11,6 +11,16 @@ export type ContentBlockType =
   | 'table'
   | 'sheets';
 
+// Importance System
+export type ImportanceLevel = 'critical' | 'high' | 'medium' | 'low' | 'info' | 'none';
+
+export interface ImportanceRange {
+  start: number;
+  end: number;
+  level: ImportanceLevel;
+  note?: string; // 사용자 메모나 이유
+}
+
 export interface BaseContentBlock {
   id: string;
   type: ContentBlockType;
@@ -19,6 +29,7 @@ export interface BaseContentBlock {
 export interface TextBlock extends BaseContentBlock {
   type: 'text';
   content: string;
+  importanceRanges?: ImportanceRange[]; // 텍스트 내 중요도 범위들
 }
 
 export interface CalloutBlock extends BaseContentBlock {
@@ -165,6 +176,8 @@ export type ContentBlock =
   | TableBlock
   | SheetsBlock;
 
+export type MemoDisplaySize = 'small' | 'medium' | 'large';
+
 export interface MemoBlock {
   id: string;
   title: string;
@@ -174,6 +187,7 @@ export interface MemoBlock {
   connections: string[];
   position: { x: number; y: number };
   size?: { width: number; height: number };
+  displaySize?: MemoDisplaySize; // 캔버스에서의 표시 크기
 }
 
 export interface Page {

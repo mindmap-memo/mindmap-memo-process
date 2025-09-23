@@ -15,6 +15,7 @@ interface ContentBlockProps {
   block: ContentBlock;
   isEditing?: boolean;
   isSelected?: boolean;
+  isDragSelected?: boolean; // 드래그로 선택된 블록인지
   isDragHovered?: boolean;
   pageId?: string;
   memoId?: string;
@@ -36,6 +37,7 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
   block, 
   isEditing = false,
   isSelected = false,
+  isDragSelected = false,
   isDragHovered = false,
   pageId,
   memoId,
@@ -238,35 +240,35 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
   const getBlockStyle = () => {
     if (isDragHovered) {
       return {
-        marginBottom: '2px',
-        padding: '2px 0',
+        marginBottom: '0px', // 블록 간 간격 제거
+        padding: '4px 8px', // 내부 여백 추가
         position: 'relative' as const,
-        backgroundColor: '#e3f2fd',
-        borderLeft: '3px solid #64b5f6',
-        borderRadius: '4px',
+        backgroundColor: '#e3f2fd', // 드래그 호버 시 배경색
+        border: 'none', // 경계선 제거
+        borderRadius: '0px', // 둥근 모서리 제거로 연속성 확보
         cursor: 'pointer',
         transition: 'all 0.15s ease'
       };
-    } else if (isSelected) {
+    } else if (isSelected && isDragSelected) {
       return {
-        marginBottom: '2px',
-        padding: '2px 0',
+        marginBottom: '0px', // 블록 간 간격 제거
+        padding: '4px 8px', // 내부 여백 추가
         position: 'relative' as const,
-        backgroundColor: '#e3f2fd',
-        borderLeft: '3px solid #2196f3',
-        borderRadius: '4px',
-        cursor: 'pointer',
+        backgroundColor: '#e8f4fd', // 드래그 선택된 경우에만 파란색 배경
+        border: 'none', // 경계선 완전 제거
+        borderRadius: '0px', // 둥근 모서리 제거로 연속성 확보
+        cursor: 'text',
         transition: 'all 0.15s ease'
       };
     } else {
       return {
-        marginBottom: '2px',
-        padding: '2px 0',
+        marginBottom: '0px', // 블록 간 간격 제거
+        padding: '4px 8px', // 일관된 내부 여백
         position: 'relative' as const,
         backgroundColor: 'transparent',
-        borderLeft: '3px solid transparent',
-        borderRadius: '4px',
-        cursor: 'pointer',
+        border: 'none', // 경계선 완전 제거
+        borderRadius: '0px', // 둥근 모서리 제거
+        cursor: 'text', // 텍스트 커서로 변경
         transition: 'all 0.15s ease'
       };
     }
@@ -280,125 +282,11 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
       onMouseLeave={handleMouseLeave}
       style={getBlockStyle()}
     >
-      {/* 세로 라인 호버 영역 - 보이지 않지만 마우스 감지용 */}
-      <div
-        style={{
-          position: 'absolute',
-          left: '-40px',
-          top: '0',
-          width: '30px',
-          height: '100%',
-          zIndex: 5
-        }}
-        onMouseEnter={handleHandleAreaMouseEnter}
-        onMouseLeave={handleHandleAreaMouseLeave}
-      />
+      {/* 드래그 핸들 영역 제거 */}
 
-      {/* 드래그 핸들 버튼 */}
-      {(isHovered || showMenu) && (
-        <div
-          style={{
-            position: 'absolute',
-            left: '-30px',
-            top: '4px', // 블록 왼쪽 위에 고정
-            width: '20px',
-            height: '20px',
-            backgroundColor: showMenu ? '#f5f5f5' : 'white',
-            border: showMenu ? '1px solid #999' : '1px solid #ddd',
-            borderRadius: '4px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            zIndex: 10,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-          }}
-          onClick={handleDragHandleClick}
-          onMouseEnter={(e) => {
-            const element = e.currentTarget as HTMLElement;
-            element.style.backgroundColor = '#f5f5f5';
-            element.style.borderColor = '#999';
-            handleHandleAreaMouseEnter();
-          }}
-          onMouseLeave={(e) => {
-            const element = e.currentTarget as HTMLElement;
-            element.style.backgroundColor = showMenu ? '#f5f5f5' : 'white';
-            element.style.borderColor = showMenu ? '#999' : '#ddd';
-          }}
-        >
-          <DragHandleIcon />
-        </div>
-      )}
+      {/* 드래그 핸들 버튼 제거 */}
 
-      {/* 메뉴 */}
-      {showMenu && (
-        <div
-          style={{
-            position: 'absolute',
-            ...menuPosition, // 동적으로 계산된 위치 적용
-            top: '26px', // 드래그 핸들 바로 아래에 위치
-            backgroundColor: 'white',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            zIndex: 1000, // z-index 높이기
-            minWidth: '90px',
-            overflow: 'visible'
-          }}
-          onMouseEnter={handleHandleAreaMouseEnter}
-          onMouseLeave={handleHandleAreaMouseLeave}
-        >
-          <div
-            style={{
-              padding: '8px 12px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              borderBottom: '1px solid #eee'
-            }}
-            onClick={() => handleMenuAction('duplicate')}
-            onMouseEnter={(e) => {
-              (e.target as HTMLElement).style.backgroundColor = '#f5f5f5';
-            }}
-            onMouseLeave={(e) => {
-              (e.target as HTMLElement).style.backgroundColor = 'white';
-            }}
-          >
-            복제
-          </div>
-          <div
-            style={{
-              padding: '8px 12px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              color: '#dc3545'
-            }}
-            onClick={() => handleMenuAction('delete')}
-            onMouseEnter={(e) => {
-              (e.target as HTMLElement).style.backgroundColor = '#f5f5f5';
-            }}
-            onMouseLeave={(e) => {
-              (e.target as HTMLElement).style.backgroundColor = 'white';
-            }}
-          >
-            삭제
-          </div>
-        </div>
-      )}
-
-      {/* 메뉴가 열려있을 때 바깥 클릭 감지용 오버레이 */}
-      {showMenu && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 15
-          }}
-          onClick={() => setShowMenu(false)}
-        />
-      )}
+      {/* 메뉴 제거 */}
 
       {renderBlock()}
     </div>
