@@ -68,14 +68,14 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     if (block.content !== content) {
       setContent(block.content);
     }
-  }, [block.content, block.importanceRanges]);
+  }, [block.content]);
 
   // 자동 저장 (디바운스)
   useEffect(() => {
     if (content !== block.content) {
       const timeoutId = setTimeout(() => {
         if (onUpdate) {
-          onUpdate({ ...block, content });
+          onUpdate({ ...block, content, importanceRanges: block.importanceRanges });
         }
       }, 300); // 300ms 후 자동 저장
 
@@ -322,8 +322,9 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
       return;
     }
     
-    console.log('Applying importance:', level, 'to range:', selectedRange);
-    console.log('Current block before update:', block);
+    console.log('🎨 Applying importance:', level, 'to range:', selectedRange);
+    console.log('🎨 Current block before update:', block);
+    console.log('🎨 Current importanceRanges:', block.importanceRanges);
     
     const ranges = block.importanceRanges || [];
     const newRange: ImportanceRange = {
@@ -340,14 +341,15 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     // level이 'none'이 아닌 경우에만 새 범위 추가
     const updatedRanges = level === 'none' ? filteredRanges : [...filteredRanges, newRange];
     
-    console.log('Updated ranges:', updatedRanges);
-    
-    const updatedBlock = { 
-      ...block, 
-      importanceRanges: updatedRanges 
+    console.log('🎨 Updated ranges:', updatedRanges);
+
+    const updatedBlock = {
+      ...block,
+      importanceRanges: updatedRanges
     };
-    
-    console.log('Updated block being sent to onUpdate:', updatedBlock);
+
+    console.log('🎨 Updated block being sent to onUpdate:', updatedBlock);
+    console.log('🎨 Updated block importanceRanges:', updatedBlock.importanceRanges);
     
     if (onUpdate) {
       onUpdate(updatedBlock);
@@ -362,6 +364,13 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     console.log('🎨 TextBlock renderStyledText called for block:', block.id);
     console.log('🎨 Block content:', text);
     console.log('🎨 Block importance ranges:', block.importanceRanges);
+
+    // 배열 내용 자세히 확인
+    if (block.importanceRanges && block.importanceRanges.length > 0) {
+      block.importanceRanges.forEach((range, index) => {
+        console.log(`🎨 Range ${index}:`, range);
+      });
+    }
     
     if (!block.importanceRanges || block.importanceRanges.length === 0) {
       console.log('🎨 No importance ranges found, returning plain text');
@@ -397,10 +406,11 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
         key={index}
         style={part.level ? {
           ...getImportanceStyle(part.level),
-          padding: '1px 3px',
-          borderRadius: '3px',
+          padding: '1px 2px',
+          borderRadius: '2px',
           fontWeight: '500',
-          color: 'transparent' // 텍스트는 투명하게, 배경색만 표시
+          color: 'transparent', // 텍스트는 투명하게, 배경색만 표시
+          margin: '0 1px'
         } : {
           color: 'transparent' // 일반 텍스트도 투명하게
         }}
@@ -418,8 +428,8 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
           position: 'relative',
           minHeight: '28px'
         }}>
-          {/* 배경에 스타일된 텍스트 표시 - 포커스가 없을 때만 */}
-          {!isFocused && block.importanceRanges && block.importanceRanges.length > 0 && (
+          {/* 배경에 스타일된 텍스트 표시 - 항상 표시 */}
+          {block.importanceRanges && block.importanceRanges.length > 0 && (
             <div
               style={{
                 position: 'absolute',
@@ -550,7 +560,14 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     console.log('🎨 ReadMode renderStyledText called for block:', block.id);
     console.log('🎨 Block content:', text);
     console.log('🎨 Block importance ranges:', block.importanceRanges);
-    
+
+    // 배열 내용 자세히 확인
+    if (block.importanceRanges && block.importanceRanges.length > 0) {
+      block.importanceRanges.forEach((range, index) => {
+        console.log(`🎨 ReadMode Range ${index}:`, range);
+      });
+    }
+
     if (!block.importanceRanges || block.importanceRanges.length === 0) {
       console.log('🎨 No importance ranges found, returning plain text');
       return text;
@@ -585,9 +602,10 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
         key={index}
         style={part.level ? {
           ...getImportanceStyle(part.level),
-          padding: '1px 3px',
-          borderRadius: '3px',
-          fontWeight: '500'
+          padding: '1px 2px',
+          borderRadius: '2px',
+          fontWeight: '500',
+          margin: '0 1px'
         } : {}}
       >
         {part.text}

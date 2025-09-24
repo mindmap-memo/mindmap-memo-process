@@ -5,17 +5,64 @@ import LeftPanel from './components/LeftPanel';
 import RightPanel from './components/RightPanel';
 import Canvas from './components/Canvas';
 
+// localStorage 키 상수
+const STORAGE_KEYS = {
+  PAGES: 'mindmap-memo-pages',
+  CURRENT_PAGE_ID: 'mindmap-memo-current-page-id',
+  PANEL_SETTINGS: 'mindmap-memo-panel-settings'
+};
+
+// 기본 데이터
+const DEFAULT_PAGES: Page[] = [
+  { id: '1', name: '페이지 1', memos: [] }
+];
+
+// localStorage에서 데이터 로드
+const loadFromStorage = <T,>(key: string, defaultValue: T): T => {
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error(`localStorage 로드 오류 (${key}):`, error);
+  }
+  return defaultValue;
+};
+
+// localStorage에 데이터 저장
+const saveToStorage = (key: string, data: any): void => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (error) {
+    console.error(`localStorage 저장 오류 (${key}):`, error);
+  }
+};
+
 const App: React.FC = () => {
-  const [pages, setPages] = useState<Page[]>([
-    { id: '1', name: '페이지 1', memos: [] }
-  ]);
-  const [currentPageId, setCurrentPageId] = useState<string>('1');
+  // localStorage에서 초기 데이터 로드
+  const [pages, setPages] = useState<Page[]>(() =>
+    loadFromStorage(STORAGE_KEYS.PAGES, DEFAULT_PAGES)
+  );
+  const [currentPageId, setCurrentPageId] = useState<string>(() =>
+    loadFromStorage(STORAGE_KEYS.CURRENT_PAGE_ID, '1')
+  );
   const [selectedMemoId, setSelectedMemoId] = useState<string | null>(null);
   const [selectedMemoIds, setSelectedMemoIds] = useState<string[]>([]);
-  const [leftPanelOpen, setLeftPanelOpen] = useState<boolean>(true);
-  const [rightPanelOpen, setRightPanelOpen] = useState<boolean>(true);
-  const [leftPanelWidth, setLeftPanelWidth] = useState<number>(250);
-  const [rightPanelWidth, setRightPanelWidth] = useState<number>(600);
+
+  // 패널 설정도 localStorage에서 로드
+  const [panelSettings] = useState(() =>
+    loadFromStorage(STORAGE_KEYS.PANEL_SETTINGS, {
+      leftPanelOpen: true,
+      rightPanelOpen: true,
+      leftPanelWidth: 250,
+      rightPanelWidth: 600
+    })
+  );
+  const [leftPanelOpen, setLeftPanelOpen] = useState<boolean>(panelSettings.leftPanelOpen);
+  const [rightPanelOpen, setRightPanelOpen] = useState<boolean>(panelSettings.rightPanelOpen);
+  const [leftPanelWidth, setLeftPanelWidth] = useState<number>(panelSettings.leftPanelWidth);
+  const [rightPanelWidth, setRightPanelWidth] = useState<number>(panelSettings.rightPanelWidth);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [isDisconnectMode, setIsDisconnectMode] = useState<boolean>(false);
   const [connectingFromId, setConnectingFromId] = useState<string | null>(null);
@@ -36,6 +83,38 @@ const App: React.FC = () => {
     });
     return unsubscribe;
   }, [dataRegistry]);
+
+  // localStorage 자동 저장 - 페이지 데이터
+  useEffect(() => {
+    console.log('💾 페이지 데이터 저장 중...');
+    saveToStorage(STORAGE_KEYS.PAGES, pages);
+  }, [pages]);
+
+  // localStorage 자동 저장 - 현재 페이지 ID
+  useEffect(() => {
+    console.log('💾 현재 페이지 ID 저장 중:', currentPageId);
+    saveToStorage(STORAGE_KEYS.CURRENT_PAGE_ID, currentPageId);
+  }, [currentPageId]);
+
+  // localStorage 자동 저장 - 패널 설정
+  useEffect(() => {
+    const settings = {
+      leftPanelOpen,
+      rightPanelOpen,
+      leftPanelWidth,
+      rightPanelWidth
+    };
+    console.log('💾 패널 설정 저장 중:', settings);
+    saveToStorage(STORAGE_KEYS.PANEL_SETTINGS, settings);
+  }, [leftPanelOpen, rightPanelOpen, leftPanelWidth, rightPanelWidth]);
+
+  // 현재 페이지 ID가 유효한지 확인하고 수정
+  useEffect(() => {
+    if (pages.length > 0 && !pages.find(page => page.id === currentPageId)) {
+      console.log('⚠️ 현재 페이지 ID가 유효하지 않음. 첫 번째 페이지로 변경:', pages[0].id);
+      setCurrentPageId(pages[0].id);
+    }
+  }, [pages, currentPageId]);
 
   const currentPage = pages.find(page => page.id === currentPageId);
   const selectedMemo = currentPage?.memos.find(memo => memo.id === selectedMemoId) || 
@@ -438,6 +517,10 @@ const App: React.FC = () => {
           onDeletePage={deletePage}
           width={leftPanelWidth}
           onResize={handleLeftPanelResize}
+          onSearch={(query, category, results) => {
+            console.log('🔍 Search:', query, category, results.length, 'results');
+            // 검색 결과 처리 로직은 필요에 따라 추가
+          }}
         />
       )}
 

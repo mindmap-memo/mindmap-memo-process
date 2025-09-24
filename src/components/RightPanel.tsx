@@ -1,5 +1,5 @@
 import React from 'react';
-import { MemoBlock, Page, ContentBlock, ContentBlockType } from '../types';
+import { MemoBlock, Page, ContentBlock, ContentBlockType, TextBlock } from '../types';
 import Resizer from './Resizer';
 import ContentBlockComponent from './ContentBlock';
 import GoogleAuth from './GoogleAuth';
@@ -136,16 +136,39 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
   // 블록 관련 핸들러들
   const handleBlockUpdate = (updatedBlock: ContentBlock) => {
-    console.log('RightPanel handleBlockUpdate called with:', updatedBlock);
+    console.log('🔄 RightPanel handleBlockUpdate called with:', updatedBlock);
     if (selectedMemo) {
-      console.log('Selected memo before update:', selectedMemo);
-      const updatedBlocks = selectedMemo.blocks?.map(block =>
-        block.id === updatedBlock.id ? updatedBlock : block
-      ) || [];
-      console.log('Updated blocks array:', updatedBlocks);
+      console.log('📝 Selected memo before update:', selectedMemo);
+      const updatedBlocks = selectedMemo.blocks?.map(block => {
+        if (block.id === updatedBlock.id) {
+          console.log('🎯 Updating block:', block.id, 'type:', block.type);
+          // TextBlock의 경우 importanceRanges를 확실히 보존
+          if (block.type === 'text' && updatedBlock.type === 'text') {
+            const textBlock = block as TextBlock;
+            const updatedTextBlock = updatedBlock as TextBlock;
+            console.log('💾 Original importanceRanges:', textBlock.importanceRanges);
+            console.log('📨 Updated importanceRanges:', updatedTextBlock.importanceRanges);
+
+            // 업데이트된 블록에 importanceRanges가 있으면 사용, 없으면 원본 보존
+            const finalImportanceRanges = updatedTextBlock.importanceRanges !== undefined
+              ? updatedTextBlock.importanceRanges
+              : (textBlock.importanceRanges || []);
+
+            console.log('✅ Final importanceRanges:', finalImportanceRanges);
+
+            return {
+              ...updatedTextBlock,
+              importanceRanges: finalImportanceRanges
+            };
+          }
+          return updatedBlock;
+        }
+        return block;
+      }) || [];
+      console.log('📤 Updated blocks array:', updatedBlocks);
       onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
     } else {
-      console.log('No selected memo found');
+      console.log('❌ No selected memo found');
     }
   };
 

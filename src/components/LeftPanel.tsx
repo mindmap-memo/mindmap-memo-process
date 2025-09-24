@@ -1,6 +1,8 @@
 import React from 'react';
-import { Page } from '../types';
+import { Page, MemoBlock } from '../types';
 import Resizer from './Resizer';
+
+type SearchCategory = 'all' | 'title' | 'tags' | 'content';
 
 interface LeftPanelProps {
   pages: Page[];
@@ -11,20 +13,26 @@ interface LeftPanelProps {
   onDeletePage: (pageId: string) => void;
   width: number;
   onResize: (deltaX: number) => void;
+  onSearch?: (query: string, category: SearchCategory, results: MemoBlock[]) => void;
 }
 
-const LeftPanel: React.FC<LeftPanelProps> = ({ 
-  pages, 
-  currentPageId, 
-  onPageSelect, 
+const LeftPanel: React.FC<LeftPanelProps> = ({
+  pages,
+  currentPageId,
+  onPageSelect,
   onAddPage,
   onPageNameChange,
   onDeletePage,
   width,
-  onResize
+  onResize,
+  onSearch
 }) => {
   const [editingPageId, setEditingPageId] = React.useState<string | null>(null);
   const [editingName, setEditingName] = React.useState<string>('');
+  const [searchQuery, setSearchQuery] = React.useState<string>('');
+  const [searchCategory, setSearchCategory] = React.useState<SearchCategory>('all');
+  const [searchResults, setSearchResults] = React.useState<MemoBlock[]>([]);
+  const [isSearchMode, setIsSearchMode] = React.useState<boolean>(false);
 
   const handleDoubleClick = (page: Page) => {
     setEditingPageId(page.id);
@@ -61,6 +69,103 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
     }
   };
 
+  // 텍스트를 공백 제거한 상태로 정규화
+  const normalizeText = (text: string): string => {
+    return text.toLowerCase().replace(/\s+/g, '');
+  };
+
+  // 유연한 검색 함수 (공백 무시)
+  const flexibleMatch = (text: string, query: string): boolean => {
+    const normalizedText = normalizeText(text);
+    const normalizedQuery = normalizeText(query);
+
+    // 공백 제거한 상태에서 포함 여부 확인
+    if (normalizedText.includes(normalizedQuery)) {
+      return true;
+    }
+
+    // 추가적으로 단어별로 분리해서 모든 단어가 포함되는지 확인
+    const queryWords = query.toLowerCase().split(/\s+/).filter(word => word.length > 0);
+    if (queryWords.length > 1) {
+      return queryWords.every(word => text.toLowerCase().includes(word));
+    }
+
+    return false;
+  };
+
+  // 검색 로직
+  const searchMemos = (query: string, category: SearchCategory): MemoBlock[] => {
+    if (!query.trim()) {
+      return [];
+    }
+
+    const allMemos: MemoBlock[] = pages.flatMap(page => page.memos || []);
+
+    return allMemos.filter(memo => {
+      switch (category) {
+        case 'title':
+          return flexibleMatch(memo.title, query);
+        case 'tags':
+          return memo.tags?.some(tag => flexibleMatch(tag, query)) || false;
+        case 'content':
+          // 기본 content 검색
+          if (memo.content && flexibleMatch(memo.content, query)) {
+            return true;
+          }
+          // blocks 내용도 검색
+          return memo.blocks?.some(block => {
+            if (block.type === 'text' && block.content) {
+              return flexibleMatch(block.content, query);
+            }
+            return false;
+          }) || false;
+        case 'all':
+        default:
+          // 제목 검색
+          if (flexibleMatch(memo.title, query)) return true;
+          // 태그 검색
+          if (memo.tags?.some(tag => flexibleMatch(tag, query))) return true;
+          // 내용 검색
+          if (memo.content && flexibleMatch(memo.content, query)) return true;
+          // blocks 내용 검색
+          return memo.blocks?.some(block => {
+            if (block.type === 'text' && block.content) {
+              return flexibleMatch(block.content, query);
+            }
+            return false;
+          }) || false;
+      }
+    });
+  };
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    if (query.trim()) {
+      const results = searchMemos(query, searchCategory);
+      setSearchResults(results);
+      setIsSearchMode(true);
+      if (onSearch) {
+        onSearch(query, searchCategory, results);
+      }
+    } else {
+      setSearchResults([]);
+      setIsSearchMode(false);
+    }
+  };
+
+  const handleCategoryChange = (category: SearchCategory) => {
+    setSearchCategory(category);
+    if (searchQuery.trim()) {
+      handleSearch(searchQuery);
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setIsSearchMode(false);
+  };
+
   return (
     <div style={{
       width: `${width}px`,
@@ -72,11 +177,172 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
     }}>
       <div style={{ marginBottom: '32px' }}>
         <h2 style={{ margin: '0 0 20px 0', fontSize: '24px', fontWeight: '700', color: '#1f2937' }}>마인드맵</h2>
+
+        {/* 검색 UI */}
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            marginBottom: '8px',
+            gap: '8px'
+          }}>
+            <input
+              type="text"
+              placeholder="메모 검색..."
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                fontSize: '14px',
+                outline: 'none',
+                transition: 'border-color 0.2s ease'
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = '#3b82f6';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#d1d5db';
+              }}
+            />
+            {searchQuery && (
+              <button
+                onClick={clearSearch}
+                style={{
+                  backgroundColor: '#f3f4f6',
+                  color: '#6b7280',
+                  border: 'none',
+                  borderRadius: '4px',
+                  width: '24px',
+                  height: '24px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* 검색 카테고리 선택 */}
+          <div style={{
+            display: 'flex',
+            gap: '4px',
+            flexWrap: 'wrap'
+          }}>
+            {['all', 'title', 'tags', 'content'].map((category) => (
+              <button
+                key={category}
+                onClick={() => handleCategoryChange(category as SearchCategory)}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '12px',
+                  backgroundColor: searchCategory === category ? '#3b82f6' : '#f3f4f6',
+                  color: searchCategory === category ? 'white' : '#6b7280',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {category === 'all' ? '전체' :
+                 category === 'title' ? '제목' :
+                 category === 'tags' ? '태그' : '내용'}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
       
+      {/* 검색 결과 섹션 */}
+      {isSearchMode && (
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+            <h3 style={{ margin: 0, flex: 1, fontSize: '18px', fontWeight: '600', color: '#374151' }}>
+              검색 결과 ({searchResults.length}개)
+            </h3>
+          </div>
+          <div>
+            {searchResults.length > 0 ? (
+              searchResults.map(memo => {
+                const parentPage = pages.find(p => p.memos?.some(m => m.id === memo.id));
+                return (
+                  <div
+                    key={memo.id}
+                    onClick={() => {
+                      if (parentPage) {
+                        onPageSelect(parentPage.id);
+                      }
+                    }}
+                    style={{
+                      padding: '12px 16px',
+                      marginBottom: '8px',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      fontSize: '13px'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f1f5f9';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f8fafc';
+                    }}
+                  >
+                    <div style={{ fontWeight: '600', color: '#1e293b', marginBottom: '4px' }}>
+                      {memo.title || '제목 없음'}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>
+                      📄 {parentPage?.name || '페이지 없음'}
+                    </div>
+                    {memo.tags && memo.tags.length > 0 && (
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                        {memo.tags.map(tag => (
+                          <span key={tag} style={{
+                            padding: '2px 6px',
+                            backgroundColor: '#3b82f6',
+                            color: 'white',
+                            borderRadius: '3px',
+                            fontSize: '10px'
+                          }}>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{ color: '#475569', fontSize: '11px', lineHeight: '1.3' }}>
+                      {memo.content || '내용 없음'}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div style={{
+                padding: '20px',
+                textAlign: 'center',
+                color: '#6b7280',
+                fontSize: '14px'
+              }}>
+                검색 결과가 없습니다.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 페이지 섹션 */}
       <div style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ margin: 0, flex: 1, fontSize: '18px', fontWeight: '600', color: '#374151' }}>페이지</h3>
+          <h3 style={{ margin: 0, flex: 1, fontSize: '18px', fontWeight: '600', color: '#374151' }}>
+            페이지
+          </h3>
           <button
             onClick={onAddPage}
             style={{
@@ -104,7 +370,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
           </button>
         </div>
         <div>
-        {pages.map(page => (
+          {pages.map(page => (
           <div
             key={page.id}
             onClick={() => onPageSelect(page.id)}
@@ -245,7 +511,8 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
               </div>
             )}
           </div>
-        ))}
+        ))
+          }
         </div>
       </div>
 
