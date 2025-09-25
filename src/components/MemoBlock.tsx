@@ -1,5 +1,86 @@
 import React, { useState } from 'react';
-import { MemoBlock as MemoBlockType, MemoDisplaySize } from '../types';
+import { MemoBlock as MemoBlockType, MemoDisplaySize, ImportanceLevel, ImportanceRange } from '../types';
+
+// 중요도 레벨별 형광펜 스타일 정의 (TextBlock과 동일)
+const getImportanceStyle = (level: ImportanceLevel) => {
+  switch (level) {
+    case 'critical':
+      return { backgroundColor: '#ffcdd2', color: '#000' }; // 빨간 형광펜 - 매우중요
+    case 'important':
+      return { backgroundColor: '#ffcc80', color: '#000' }; // 주황 형광펜 - 중요
+    case 'opinion':
+      return { backgroundColor: '#e1bee7', color: '#000' }; // 보라 형광펜 - 의견
+    case 'reference':
+      return { backgroundColor: '#81d4fa', color: '#000' }; // 파란 형광펜 - 참고
+    case 'question':
+      return { backgroundColor: '#fff59d', color: '#000' }; // 노란 형광펜 - 질문
+    case 'idea':
+      return { backgroundColor: '#c8e6c9', color: '#000' }; // 초록 형광펜 - 아이디어
+    case 'data':
+      return { backgroundColor: '#ffab91', color: '#000' }; // 코랄 형광펜 - 데이터
+    default:
+      return {};
+  }
+};
+
+// 읽기 모드에서 하이라이팅된 텍스트 렌더링 (필터링 적용)
+const renderHighlightedText = (text: string, importanceRanges?: ImportanceRange[], activeFilters?: Set<ImportanceLevel>, showGeneral?: boolean) => {
+  if (!importanceRanges || importanceRanges.length === 0) {
+    // 하이라이팅이 없는 일반 텍스트는 일반 텍스트 필터에 따라 표시/숨김
+    return showGeneral === false ? '' : text;
+  }
+
+  const ranges = [...importanceRanges].sort((a, b) => a.start - b.start);
+  const parts: Array<{ text: string; level?: ImportanceLevel }> = [];
+  let lastIndex = 0;
+
+  ranges.forEach(range => {
+    // 이전 부분 (스타일 없음)
+    if (range.start > lastIndex) {
+      parts.push({ text: text.substring(lastIndex, range.start) });
+    }
+
+    // 현재 범위 (스타일 적용)
+    parts.push({
+      text: text.substring(range.start, range.end),
+      level: range.level
+    });
+
+    lastIndex = range.end;
+  });
+
+  // 마지막 부분 (스타일 없음)
+  if (lastIndex < text.length) {
+    parts.push({ text: text.substring(lastIndex) });
+  }
+
+  return parts.map((part, index) => {
+    // 필터링 적용: 중요도가 있는 부분은 필터에 따라 표시/숨김
+    if (part.level && activeFilters && !activeFilters.has(part.level)) {
+      return null; // 필터에 포함되지 않은 중요도는 숨김
+    }
+
+    // 일반 텍스트 필터링 적용
+    if (!part.level && showGeneral === false) {
+      return null; // 일반 텍스트가 비활성화되면 숨김
+    }
+
+    return (
+      <span
+        key={index}
+        style={part.level ? {
+          backgroundColor: getImportanceStyle(part.level).backgroundColor,
+          padding: '1px 0px',
+          borderRadius: '2px',
+          fontWeight: '500',
+          margin: '0'
+        } : {}}
+      >
+        {part.text}
+      </span>
+    );
+  });
+};
 
 interface MemoBlockProps {
   memo: MemoBlockType;
@@ -15,22 +96,26 @@ interface MemoBlockProps {
   onConnectMemos?: (fromId: string, toId: string) => void;
   canvasScale?: number;
   canvasOffset?: { x: number; y: number };
+  activeImportanceFilters?: Set<ImportanceLevel>;
+  showGeneralContent?: boolean;
 }
 
-const MemoBlock: React.FC<MemoBlockProps> = ({ 
-  memo, 
+const MemoBlock: React.FC<MemoBlockProps> = ({
+  memo,
   isSelected,
   isDragHovered = false,
-  onClick, 
+  onClick,
   onPositionChange,
   onSizeChange,
   onDisplaySizeChange,
-  isConnecting, 
-  connectingFromId, 
-  onStartConnection, 
+  isConnecting,
+  connectingFromId,
+  onStartConnection,
   onConnectMemos,
   canvasScale = 1,
-  canvasOffset = { x: 0, y: 0 }
+  canvasOffset = { x: 0, y: 0 },
+  activeImportanceFilters,
+  showGeneralContent = true
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isConnectionDragging, setIsConnectionDragging] = useState(false);
@@ -47,7 +132,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       case 'small':
         return {
           width: 180,
-          maxHeight: 120,
+          maxHeight: 3000,
           showContent: false,
           showTags: true,
           contentLength: 0
@@ -55,7 +140,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       case 'medium':
         return {
           width: 300,
-          maxHeight: 200,
+          maxHeight: 3000,
           showContent: true,
           showTags: true,
           contentLength: 500
@@ -63,7 +148,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       case 'large':
         return {
           width: 400,
-          maxHeight: 300,
+          maxHeight: 3000,
           showContent: true,
           showTags: true,
           contentLength: 1000
@@ -71,7 +156,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       default:
         return {
           width: 200,
-          maxHeight: 150,
+          maxHeight: 3000,
           showContent: true,
           showTags: true,
           contentLength: 50
@@ -370,8 +455,17 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
                 return memo.content || '텍스트를 입력하세요...';
               }
 
+              // 기본 상태(모든 필터 활성화) 확인
+              const allLevels: ImportanceLevel[] = ['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'];
+              const isDefaultFilterState = (!activeImportanceFilters ||
+                                          (activeImportanceFilters.size === allLevels.length &&
+                                           allLevels.every(level => activeImportanceFilters.has(level)))) &&
+                                         showGeneralContent !== false;
+
               let totalContentLength = 0;
               const renderedBlocks: React.ReactNode[] = [];
+              let consecutiveHiddenBlocks = 0; // 연속으로 숨겨진 블록 개수
+              let consecutiveEmptyBlocks = 0; // 연속으로 표시된 빈 블록 개수
 
               for (const block of memo.blocks) {
                 if (totalContentLength >= sizeConfig.contentLength) {
@@ -382,35 +476,101 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
                 if (block.type === 'text') {
                   const content = block.content || '';
                   if (content.trim() === '') {
-                    // 빈 텍스트 블록 - 줄바꿈으로 표시
-                    renderedBlocks.push(<br key={block.id} />);
+                    // 빈 텍스트 블록 처리
+                    if (isDefaultFilterState) {
+                      // 기본 상태에서는 모든 빈 블록을 표시
+                      renderedBlocks.push(<br key={block.id} />);
+                    } else {
+                      // 필터링 상태에서는 연속된 빈 블록 제한
+                      if (consecutiveEmptyBlocks < 1) {
+                        renderedBlocks.push(<br key={block.id} />);
+                        consecutiveEmptyBlocks++;
+                      }
+                    }
+                    consecutiveHiddenBlocks = 0; // 리셋
                   } else {
                     const remainingLength = sizeConfig.contentLength - totalContentLength;
-                    const displayContent = content.length > remainingLength 
+                    const displayContent = content.length > remainingLength
                       ? content.substring(0, remainingLength) + '...'
                       : content;
-                    
-                    renderedBlocks.push(
-                      <div key={block.id} style={{ 
-                        whiteSpace: 'pre-wrap',
-                        wordWrap: 'break-word',
-                        overflowWrap: 'break-word'
-                      }}>
-                        {displayContent}
-                      </div>
-                    );
-                    totalContentLength += content.length;
+
+                    // importanceRanges 적용을 위해 TextBlock 타입으로 캐스팅
+                    const textBlock = block as any;
+
+                    // 기본 상태에서는 필터링 없이 원본 표시, 그 외에는 필터링 적용
+                    const filteredResult = isDefaultFilterState
+                      ? displayContent
+                      : renderHighlightedText(displayContent, textBlock.importanceRanges, activeImportanceFilters, showGeneralContent);
+                    const isContentVisible = filteredResult && filteredResult.toString().trim() !== '';
+
+                    if (isContentVisible) {
+                      // 기본 상태가 아닐 때만 공백 처리 로직 적용
+                      if (!isDefaultFilterState && consecutiveHiddenBlocks >= 2) {
+                        renderedBlocks.push(
+                          <div key={`spacer-${block.id}`} style={{
+                            height: '1em',
+                            opacity: 0.3,
+                            fontSize: '12px',
+                            color: '#9ca3af',
+                            textAlign: 'center'
+                          }}>
+                            ⋯
+                          </div>
+                        );
+                      }
+
+                      // 실제 내용 렌더링
+                      renderedBlocks.push(
+                        <div key={block.id} style={{
+                          whiteSpace: 'pre-wrap',
+                          wordWrap: 'break-word',
+                          overflowWrap: 'break-word'
+                        }}>
+                          {isDefaultFilterState ? (
+                            // 기본 상태에서는 하이라이팅 적용된 원본 표시
+                            renderHighlightedText(displayContent, textBlock.importanceRanges, undefined, true)
+                          ) : (
+                            filteredResult
+                          )}
+                        </div>
+                      );
+                      totalContentLength += content.length;
+                      consecutiveHiddenBlocks = 0; // 리셋
+                      if (!isDefaultFilterState) {
+                        consecutiveEmptyBlocks = 0; // 리셋 (기본 상태가 아닐 때만)
+                      }
+                    } else {
+                      // 내용이 필터링되어 숨겨짐 (기본 상태가 아닐 때만)
+                      if (!isDefaultFilterState) {
+                        consecutiveHiddenBlocks++;
+                      }
+                    }
                   }
                 } else if (block.type === 'image') {
                   const imageBlock = block as any;
                   if (imageBlock.url) {
+                    // 기본 상태가 아닐 때만 공백 처리 로직 적용
+                    if (!isDefaultFilterState && consecutiveHiddenBlocks >= 2) {
+                      renderedBlocks.push(
+                        <div key={`spacer-${block.id}`} style={{
+                          height: '1em',
+                          opacity: 0.3,
+                          fontSize: '12px',
+                          color: '#9ca3af',
+                          textAlign: 'center'
+                        }}>
+                          ⋯
+                        </div>
+                      );
+                    }
+
                     renderedBlocks.push(
                       <div key={block.id} style={{ margin: '4px 0' }}>
-                        <img 
-                          src={imageBlock.url} 
+                        <img
+                          src={imageBlock.url}
                           alt={imageBlock.alt || '이미지'}
-                          style={{ 
-                            maxWidth: '100%', 
+                          style={{
+                            maxWidth: '100%',
                             maxHeight: '60px',
                             borderRadius: '4px',
                             objectFit: 'cover'
@@ -424,13 +584,33 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
                       </div>
                     );
                     totalContentLength += 50; // 이미지는 대략 50글자로 계산
+                    consecutiveHiddenBlocks = 0; // 리셋
+                    if (!isDefaultFilterState) {
+                      consecutiveEmptyBlocks = 0; // 리셋 (기본 상태가 아닐 때만)
+                    }
                   }
                 } else if (block.type === 'callout') {
                   const calloutBlock = block as any;
+
+                  // 기본 상태가 아닐 때만 공백 처리 로직 적용
+                  if (!isDefaultFilterState && consecutiveHiddenBlocks >= 2) {
+                    renderedBlocks.push(
+                      <div key={`spacer-${block.id}`} style={{
+                        height: '1em',
+                        opacity: 0.3,
+                        fontSize: '12px',
+                        color: '#9ca3af',
+                        textAlign: 'center'
+                      }}>
+                        ⋯
+                      </div>
+                    );
+                  }
+
                   renderedBlocks.push(
-                    <div key={block.id} style={{ 
-                      backgroundColor: '#f3f4f6', 
-                      padding: '4px 8px', 
+                    <div key={block.id} style={{
+                      backgroundColor: '#f3f4f6',
+                      padding: '4px 8px',
                       borderRadius: '4px',
                       margin: '2px 0',
                       fontSize: '12px'
@@ -440,6 +620,10 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
                     </div>
                   );
                   totalContentLength += calloutBlock.content?.length || 0;
+                  consecutiveHiddenBlocks = 0; // 리셋
+                  if (!isDefaultFilterState) {
+                    consecutiveEmptyBlocks = 0; // 리셋 (기본 상태가 아닐 때만)
+                  }
                 }
               }
 

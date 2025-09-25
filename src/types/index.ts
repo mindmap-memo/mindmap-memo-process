@@ -12,7 +12,7 @@ export type ContentBlockType =
   | 'sheets';
 
 // Importance System
-export type ImportanceLevel = 'critical' | 'high' | 'medium' | 'low' | 'info' | 'none';
+export type ImportanceLevel = 'critical' | 'important' | 'opinion' | 'reference' | 'question' | 'idea' | 'data' | 'none';
 
 export interface ImportanceRange {
   start: number;

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { ContentBlock, ContentBlockType } from '../types';
+import { ContentBlock, ContentBlockType, ImportanceLevel } from '../types';
 import TextBlockComponent from './blocks/TextBlock';
 import CalloutBlockComponent from './blocks/CalloutBlock';
 import ChecklistBlockComponent from './blocks/ChecklistBlock';
@@ -31,17 +31,20 @@ interface ContentBlockProps {
   onBlockClick?: (blockId: string, event: React.MouseEvent) => void;
   onMergeWithPrevious?: (blockId: string, content: string) => void;
   onBlockSelect?: (blockId: string) => void;
+  activeImportanceFilters?: Set<ImportanceLevel>;
+  showGeneralContent?: boolean;
+  onResetFilters?: () => void;
 }
 
-const ContentBlockComponent: React.FC<ContentBlockProps> = ({ 
-  block, 
+const ContentBlockComponent: React.FC<ContentBlockProps> = ({
+  block,
   isEditing = false,
   isSelected = false,
   isDragSelected = false,
   isDragHovered = false,
   pageId,
   memoId,
-  onUpdate, 
+  onUpdate,
   onDelete,
   onDuplicate,
   onMoveUp,
@@ -52,7 +55,10 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
   onFocusNext,
   onBlockClick,
   onMergeWithPrevious,
-  onBlockSelect
+  onBlockSelect,
+  activeImportanceFilters,
+  showGeneralContent,
+  onResetFilters
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -70,15 +76,18 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
 
     switch (block.type) {
       case 'text':
-        return <TextBlockComponent 
-          {...commonProps} 
-          block={block as any} 
+        return <TextBlockComponent
+          {...commonProps}
+          block={block as any}
           onConvertToBlock={onConvertToBlock ? (newBlockType) => onConvertToBlock(block.id, newBlockType) : undefined}
           onCreateNewBlock={onCreateNewBlock}
           onDeleteBlock={onDelete}
           onFocusPrevious={onFocusPrevious}
           onFocusNext={onFocusNext}
           onMergeWithPrevious={onMergeWithPrevious}
+          activeImportanceFilters={activeImportanceFilters}
+          showGeneralContent={showGeneralContent}
+          onResetFilters={onResetFilters}
         />;
       case 'callout':
         return <CalloutBlockComponent {...commonProps} block={block as any} />;

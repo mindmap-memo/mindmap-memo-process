@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Page, MemoBlock, DataRegistry, MemoDisplaySize } from './types';
+import { Page, MemoBlock, DataRegistry, MemoDisplaySize, ImportanceLevel } from './types';
 import { globalDataRegistry } from './utils/dataRegistry';
 import LeftPanel from './components/LeftPanel';
 import RightPanel from './components/RightPanel';
@@ -67,6 +67,12 @@ const App: React.FC = () => {
   const [isDisconnectMode, setIsDisconnectMode] = useState<boolean>(false);
   const [connectingFromId, setConnectingFromId] = useState<string | null>(null);
   const [dragLineEnd, setDragLineEnd] = useState<{ x: number; y: number } | null>(null);
+
+  // 중요도 필터 상태
+  const [activeImportanceFilters, setActiveImportanceFilters] = useState<Set<ImportanceLevel>>(
+    new Set(['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'] as ImportanceLevel[])
+  );
+  const [showGeneralContent, setShowGeneralContent] = useState<boolean>(true);
   const [isDragSelecting, setIsDragSelecting] = useState<boolean>(false);
   const [dragSelectStart, setDragSelectStart] = useState<{ x: number; y: number } | null>(null);
   const [dragSelectEnd, setDragSelectEnd] = useState<{ x: number; y: number } | null>(null);
@@ -310,6 +316,26 @@ const App: React.FC = () => {
     setIsDragSelectingWithShift(false);
   };
 
+  // 중요도 필터 토글 함수
+  const toggleImportanceFilter = (level: ImportanceLevel) => {
+    setActiveImportanceFilters(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(level)) {
+        newSet.delete(level);
+      } else {
+        newSet.add(level);
+      }
+      return newSet;
+    });
+  };
+
+  // 필터를 기본 상태로 리셋 (모든 중요도 필터 활성화 + 일반 내용 표시)
+  const resetFiltersToDefault = () => {
+    const allLevels: ImportanceLevel[] = ['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'];
+    setActiveImportanceFilters(new Set(allLevels));
+    setShowGeneralContent(true);
+  };
+
   // 특정 메모로 화면 이동하는 함수
   const focusOnMemo = (memoId: string) => {
     const memo = currentPage?.memos.find(m => m.id === memoId);
@@ -351,10 +377,18 @@ const App: React.FC = () => {
 
   const deleteMemoBlock = () => {
     if (!selectedMemoId) return;
-    
-    setPages(prev => prev.map(page => 
-      page.id === currentPageId 
-        ? { ...page, memos: page.memos.filter(memo => memo.id !== selectedMemoId) }
+
+    setPages(prev => prev.map(page =>
+      page.id === currentPageId
+        ? {
+            ...page,
+            memos: page.memos
+              .filter(memo => memo.id !== selectedMemoId) // 해당 메모 삭제
+              .map(memo => ({
+                ...memo,
+                connections: memo.connections.filter(connId => connId !== selectedMemoId) // 다른 메모들에서 삭제된 메모로의 연결 제거
+              }))
+          }
         : page
     ));
     setSelectedMemoId(null);
@@ -574,6 +608,10 @@ const App: React.FC = () => {
         onDragSelectStart={handleDragSelectStart}
         onDragSelectMove={handleDragSelectMove}
         onDragSelectEnd={handleDragSelectEnd}
+        activeImportanceFilters={activeImportanceFilters}
+        onToggleImportanceFilter={toggleImportanceFilter}
+        showGeneralContent={showGeneralContent}
+        onToggleGeneralContent={() => setShowGeneralContent(!showGeneralContent)}
       />
 
       {/* 접기/펼치기 버튼 (오른쪽) */}
@@ -611,6 +649,9 @@ const App: React.FC = () => {
           onResize={handleRightPanelResize}
           isFullscreen={isRightPanelFullscreen}
           onToggleFullscreen={toggleRightPanelFullscreen}
+          activeImportanceFilters={activeImportanceFilters}
+          showGeneralContent={showGeneralContent}
+          onResetFilters={resetFiltersToDefault}
         />
       )}
     </div>

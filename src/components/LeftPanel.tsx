@@ -1,8 +1,30 @@
 import React from 'react';
-import { Page, MemoBlock } from '../types';
+import { Page, MemoBlock, ImportanceLevel } from '../types';
 import Resizer from './Resizer';
 
 type SearchCategory = 'all' | 'title' | 'tags' | 'content';
+
+// 중요도 레벨별 형광펜 스타일 정의
+const getImportanceStyle = (level: ImportanceLevel) => {
+  switch (level) {
+    case 'critical':
+      return { backgroundColor: '#ffcdd2', color: '#000' }; // 빨간 형광펜 - 매우중요
+    case 'important':
+      return { backgroundColor: '#ffcc80', color: '#000' }; // 주황 형광펜 - 중요
+    case 'opinion':
+      return { backgroundColor: '#e1bee7', color: '#000' }; // 보라 형광펜 - 의견
+    case 'reference':
+      return { backgroundColor: '#81d4fa', color: '#000' }; // 파란 형광펜 - 참고
+    case 'question':
+      return { backgroundColor: '#fff59d', color: '#000' }; // 노란 형광펜 - 질문
+    case 'idea':
+      return { backgroundColor: '#c8e6c9', color: '#000' }; // 초록 형광펜 - 아이디어
+    case 'data':
+      return { backgroundColor: '#ffab91', color: '#000' }; // 코랄 형광펜 - 데이터
+    default:
+      return {};
+  }
+};
 
 interface LeftPanelProps {
   pages: Page[];
@@ -33,6 +55,19 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
   const [searchCategory, setSearchCategory] = React.useState<SearchCategory>('all');
   const [searchResults, setSearchResults] = React.useState<MemoBlock[]>([]);
   const [isSearchMode, setIsSearchMode] = React.useState<boolean>(false);
+  const [showSearchFilters, setShowSearchFilters] = React.useState<boolean>(false);
+  const [searchImportanceFilters, setSearchImportanceFilters] = React.useState<Set<ImportanceLevel>>(
+    new Set(['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'] as ImportanceLevel[])
+  );
+  const [searchShowGeneralContent, setSearchShowGeneralContent] = React.useState<boolean>(true);
+
+  // 필터 상태가 변경될 때마다 검색 결과 업데이트
+  React.useEffect(() => {
+    if (searchQuery.trim()) {
+      const results = searchMemos(searchQuery, searchCategory);
+      setSearchResults(results);
+    }
+  }, [searchImportanceFilters, searchShowGeneralContent]);
 
   const handleDoubleClick = (page: Page) => {
     setEditingPageId(page.id);
@@ -93,6 +128,272 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
     return false;
   };
 
+  // 중요도 필터에 맞는 텍스트만 추출하는 함수
+  const getFilteredTextFromBlock = (block: any): string => {
+    if (block.type !== 'text' || !block.content) return '';
+
+    const { content, importanceRanges } = block;
+
+    if (!importanceRanges || importanceRanges.length === 0) {
+      // 중요도 없는 일반 텍스트
+      return searchShowGeneralContent ? content : '';
+    }
+
+    // 중요도 필터 적용
+    const ranges = [...importanceRanges].sort((a, b) => a.start - b.start);
+    let filteredText = '';
+    let lastIndex = 0;
+
+    ranges.forEach(range => {
+      // 이전 부분 (일반 텍스트)
+      if (range.start > lastIndex) {
+        if (searchShowGeneralContent) {
+          filteredText += content.substring(lastIndex, range.start);
+        }
+      }
+
+      // 현재 범위 (중요도 있는 텍스트)
+      if (searchImportanceFilters.has(range.level)) {
+        filteredText += content.substring(range.start, range.end);
+      }
+
+      lastIndex = range.end;
+    });
+
+    // 마지막 부분 (일반 텍스트)
+    if (lastIndex < content.length) {
+      if (searchShowGeneralContent) {
+        filteredText += content.substring(lastIndex);
+      }
+    }
+
+    return filteredText;
+  };
+
+  // 검색 결과용 하이라이팅 렌더링 함수
+  const renderSearchResultContent = (memo: MemoBlock) => {
+    // blocks 배열에서 텍스트 내용 추출하여 중요도 표시
+    if (memo.blocks && memo.blocks.length > 0) {
+      const textBlocks = memo.blocks.filter(block => block.type === 'text' && block.content);
+      if (textBlocks.length > 0) {
+        const results = textBlocks.map((block, blockIndex) => {
+          const textBlock = block as any;
+          const { content, importanceRanges } = textBlock;
+
+          if (!content) return null;
+
+          // 중요도 필터가 모든 것을 선택한 상태인지 확인
+          const allLevels: ImportanceLevel[] = ['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'];
+          const isDefaultFilterState = searchImportanceFilters.size === allLevels.length &&
+                                      allLevels.every(level => searchImportanceFilters.has(level)) &&
+                                      searchShowGeneralContent;
+
+          if (isDefaultFilterState) {
+            // 기본 상태: 모든 하이라이팅 표시
+            return renderHighlightedText(content, importanceRanges, blockIndex);
+          } else {
+            // 필터 적용 상태: 필터에 맞는 내용만 하이라이팅하여 표시
+            return renderFilteredHighlightedText(content, importanceRanges, blockIndex);
+          }
+        }).filter(result => result !== null);
+
+        // 결과가 있으면 반환, 없으면 빈 배열 반환 (빈 텍스트 방지)
+        return results.length > 0 ? results : [];
+      }
+    }
+
+    // 레거시 content 필드 확인
+    if (memo.content) {
+      return memo.content.length > 100 ? memo.content.substring(0, 100) + '...' : memo.content;
+    }
+
+    return '내용 없음';
+  };
+
+  // 하이라이팅된 텍스트 렌더링 (모든 중요도 표시)
+  const renderHighlightedText = (text: string, importanceRanges?: any[], blockIndex: number = 0) => {
+    if (!importanceRanges || importanceRanges.length === 0) {
+      const displayText = text.length > 200 ? text.substring(0, 200) + '...' : text;
+      return (
+        <span key={blockIndex}>
+          {blockIndex > 0 && <br />}
+          {displayText}
+        </span>
+      );
+    }
+
+    const ranges = [...importanceRanges].sort((a, b) => a.start - b.start);
+    const parts: Array<{ text: string; level?: ImportanceLevel }> = [];
+    let lastIndex = 0;
+    let totalLength = 0;
+    const maxLength = 100;
+
+    ranges.forEach(range => {
+      // 길이 제한 체크
+      if (totalLength >= maxLength) return;
+
+      // 이전 부분 (스타일 없음)
+      if (range.start > lastIndex) {
+        const beforeText = text.substring(lastIndex, range.start);
+        const remainingLength = maxLength - totalLength;
+        const truncatedText = beforeText.length > remainingLength ?
+                             beforeText.substring(0, remainingLength) : beforeText;
+        parts.push({ text: truncatedText });
+        totalLength += truncatedText.length;
+      }
+
+      // 길이 제한 체크
+      if (totalLength >= maxLength) return;
+
+      // 현재 범위 (스타일 적용)
+      const rangeText = text.substring(range.start, range.end);
+      const remainingLength = maxLength - totalLength;
+      const truncatedRangeText = rangeText.length > remainingLength ?
+                                rangeText.substring(0, remainingLength) : rangeText;
+      parts.push({
+        text: truncatedRangeText,
+        level: range.level
+      });
+      totalLength += truncatedRangeText.length;
+      lastIndex = range.end;
+    });
+
+    // 마지막 부분 (스타일 없음)
+    if (lastIndex < text.length && totalLength < maxLength) {
+      const afterText = text.substring(lastIndex);
+      const remainingLength = maxLength - totalLength;
+      const truncatedText = afterText.length > remainingLength ?
+                           afterText.substring(0, remainingLength) : afterText;
+      parts.push({ text: truncatedText });
+      totalLength += truncatedText.length;
+    }
+
+    return (
+      <span key={blockIndex}>
+        {blockIndex > 0 && <br />}
+        {parts.map((part, index) => (
+          <span
+            key={index}
+            style={part.level ? {
+              backgroundColor: getImportanceStyle(part.level).backgroundColor,
+              padding: '1px 2px',
+              borderRadius: '2px',
+              fontWeight: '500'
+            } : {}}
+          >
+            {part.text}
+          </span>
+        ))}
+        {totalLength >= maxLength ? '...' : ''}
+      </span>
+    );
+  };
+
+  // 필터링된 하이라이팅 텍스트 렌더링 (선택된 중요도만 표시, 검색어 매칭 고려)
+  const renderFilteredHighlightedText = (text: string, importanceRanges?: any[], blockIndex: number = 0) => {
+    if (!importanceRanges || importanceRanges.length === 0) {
+      if (searchShowGeneralContent && (!searchQuery || flexibleMatch(text, searchQuery))) {
+        // 일반 내용: 검색어가 포함된 경우 전체 블록 표시 (길이 제한 있음)
+        const displayText = text.length > 200 ? text.substring(0, 200) + '...' : text;
+        return (
+          <span key={blockIndex}>
+            {blockIndex > 0 && <br />}
+            {displayText}
+          </span>
+        );
+      }
+      return null;
+    }
+
+    const ranges = [...importanceRanges].sort((a, b) => a.start - b.start);
+    const parts: Array<{ text: string; level?: ImportanceLevel }> = [];
+    let lastIndex = 0;
+    let totalLength = 0;
+    const maxLength = 100;
+    let hasMatchingContent = false;
+
+    ranges.forEach(range => {
+      // 길이 제한 체크
+      if (totalLength >= maxLength) return;
+
+      // 이전 부분 (일반 텍스트) - 검색어 매칭 및 필터 확인
+      if (range.start > lastIndex && searchShowGeneralContent) {
+        const beforeText = text.substring(lastIndex, range.start);
+        if (!searchQuery || flexibleMatch(beforeText, searchQuery)) {
+          // 일반 내용이 검색어를 포함하면 전체 구간 표시 (길이 제한 적용)
+          const remainingLength = maxLength - totalLength;
+          const truncatedText = beforeText.length > remainingLength ?
+                               beforeText.substring(0, remainingLength) : beforeText;
+          parts.push({ text: truncatedText });
+          totalLength += truncatedText.length;
+          hasMatchingContent = true;
+        }
+      }
+
+      // 현재 범위 (중요도 있는 텍스트 - 필터 적용 및 검색어 매칭)
+      if (searchImportanceFilters.has(range.level)) {
+        const rangeText = text.substring(range.start, range.end);
+
+        // 검색어가 있으면 해당 범위 텍스트에서 검색어 매칭 확인
+        if (!searchQuery || flexibleMatch(rangeText, searchQuery)) {
+          // 길이 제한 체크
+          if (totalLength >= maxLength) return;
+
+          const remainingLength = maxLength - totalLength;
+          const truncatedRangeText = rangeText.length > remainingLength ?
+                                    rangeText.substring(0, remainingLength) : rangeText;
+          parts.push({
+            text: truncatedRangeText,
+            level: range.level
+          });
+          totalLength += truncatedRangeText.length;
+          hasMatchingContent = true;
+        }
+      }
+
+      lastIndex = range.end;
+    });
+
+    // 마지막 부분 (일반 텍스트) - 검색어 매칭 및 필터 확인
+    if (lastIndex < text.length && totalLength < maxLength && searchShowGeneralContent) {
+      const afterText = text.substring(lastIndex);
+      if (!searchQuery || flexibleMatch(afterText, searchQuery)) {
+        // 일반 내용이 검색어를 포함하면 전체 구간 표시 (길이 제한 적용)
+        const remainingLength = maxLength - totalLength;
+        const truncatedText = afterText.length > remainingLength ?
+                             afterText.substring(0, remainingLength) : afterText;
+        parts.push({ text: truncatedText });
+        totalLength += truncatedText.length;
+        hasMatchingContent = true;
+      }
+    }
+
+    // 매칭되는 내용이 없으면 null 반환 (빈 메시지 표시 안함)
+    if (parts.length === 0 || !hasMatchingContent) {
+      return null;
+    }
+
+    return (
+      <span key={blockIndex}>
+        {blockIndex > 0 && <br />}
+        {parts.map((part, index) => (
+          <span
+            key={index}
+            style={part.level ? {
+              backgroundColor: getImportanceStyle(part.level).backgroundColor,
+              padding: '1px 2px',
+              borderRadius: '2px',
+              fontWeight: '500'
+            } : {}}
+          >
+            {part.text}
+          </span>
+        ))}
+        {totalLength >= maxLength ? '...' : ''}
+      </span>
+    );
+  };
+
   // 검색 로직
   const searchMemos = (query: string, category: SearchCategory): MemoBlock[] => {
     if (!query.trim()) {
@@ -108,14 +409,15 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
         case 'tags':
           return memo.tags?.some(tag => flexibleMatch(tag, query)) || false;
         case 'content':
-          // 기본 content 검색
+          // 기본 content 검색 (중요도 필터 적용)
           if (memo.content && flexibleMatch(memo.content, query)) {
             return true;
           }
-          // blocks 내용도 검색
+          // blocks 내용도 검색 (중요도 필터 적용)
           return memo.blocks?.some(block => {
-            if (block.type === 'text' && block.content) {
-              return flexibleMatch(block.content, query);
+            if (block.type === 'text') {
+              const filteredContent = getFilteredTextFromBlock(block);
+              return filteredContent && flexibleMatch(filteredContent, query);
             }
             return false;
           }) || false;
@@ -125,12 +427,13 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
           if (flexibleMatch(memo.title, query)) return true;
           // 태그 검색
           if (memo.tags?.some(tag => flexibleMatch(tag, query))) return true;
-          // 내용 검색
+          // 내용 검색 (중요도 필터 적용)
           if (memo.content && flexibleMatch(memo.content, query)) return true;
-          // blocks 내용 검색
+          // blocks 내용 검색 (중요도 필터 적용)
           return memo.blocks?.some(block => {
-            if (block.type === 'text' && block.content) {
-              return flexibleMatch(block.content, query);
+            if (block.type === 'text') {
+              const filteredContent = getFilteredTextFromBlock(block);
+              return filteredContent && flexibleMatch(filteredContent, query);
             }
             return false;
           }) || false;
@@ -207,6 +510,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 e.currentTarget.style.borderColor = '#d1d5db';
               }}
             />
+
             {searchQuery && (
               <button
                 onClick={clearSearch}
@@ -229,33 +533,177 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
             )}
           </div>
 
-          {/* 검색 카테고리 선택 */}
-          <div style={{
-            display: 'flex',
-            gap: '4px',
-            flexWrap: 'wrap'
-          }}>
-            {['all', 'title', 'tags', 'content'].map((category) => (
-              <button
-                key={category}
-                onClick={() => handleCategoryChange(category as SearchCategory)}
-                style={{
-                  padding: '4px 8px',
-                  fontSize: '12px',
-                  backgroundColor: searchCategory === category ? '#3b82f6' : '#f3f4f6',
-                  color: searchCategory === category ? 'white' : '#6b7280',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                {category === 'all' ? '전체' :
-                 category === 'title' ? '제목' :
-                 category === 'tags' ? '태그' : '내용'}
-              </button>
-            ))}
+          {/* 필터 토글 버튼 - 검색창 아래로 이동 */}
+          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '8px' }}>
+            <button
+              onClick={() => setShowSearchFilters(!showSearchFilters)}
+              style={{
+                backgroundColor: showSearchFilters ? '#3b82f6' : '#f8f9fa',
+                color: showSearchFilters ? 'white' : '#6b7280',
+                border: '1px solid #e5e7eb',
+                borderRadius: '6px',
+                padding: '6px 10px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {/* 엑셀 스타일 필터 아이콘 (와이어프레임) */}
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M1 2h12l-4 6v4l-4-2v-2L1 2z" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              필터
+            </button>
           </div>
+
+          {/* 검색 필터들 - 기본적으로 숨김 */}
+          {showSearchFilters && (
+            <div style={{
+              padding: '12px',
+              backgroundColor: '#f8f9fa',
+              borderRadius: '6px',
+              marginBottom: '8px'
+            }}>
+              {/* 검색 카테고리 선택 */}
+              <div style={{ marginBottom: '12px' }}>
+                <span style={{ fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '4px', display: 'block' }}>
+                  검색 범위
+                </span>
+                <div style={{
+                  display: 'flex',
+                  gap: '4px',
+                  flexWrap: 'wrap'
+                }}>
+                  {['all', 'title', 'tags', 'content'].map((category) => (
+                    <button
+                      key={category}
+                      onClick={() => handleCategoryChange(category as SearchCategory)}
+                      style={{
+                        padding: '4px 8px',
+                        fontSize: '12px',
+                        backgroundColor: searchCategory === category ? '#3b82f6' : '#ffffff',
+                        color: searchCategory === category ? 'white' : '#6b7280',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {category === 'all' ? '전체' :
+                       category === 'title' ? '제목' :
+                       category === 'tags' ? '태그' : '내용'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 중요도 필터 선택 - 내용 검색일 때만 표시 */}
+              {(searchCategory === 'content' || searchCategory === 'all') && (
+                <div>
+                  <span style={{ fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '4px', display: 'block' }}>
+                    중요도 필터
+                  </span>
+
+                  {/* 일반 내용 토글 */}
+                  <div style={{ marginBottom: '8px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '12px' }}>
+                      <input
+                        type="checkbox"
+                        checked={searchShowGeneralContent}
+                        onChange={(e) => {
+                          setSearchShowGeneralContent(e.target.checked);
+                        }}
+                        style={{ marginRight: '6px' }}
+                      />
+                      <span style={{ color: '#6b7280' }}>일반 내용</span>
+                    </label>
+                  </div>
+
+                  {/* 중요도 레벨 선택 */}
+                  <div style={{
+                    display: 'flex',
+                    gap: '4px',
+                    flexWrap: 'wrap',
+                    marginBottom: '8px'
+                  }}>
+                    {([
+                      { level: 'critical', label: '🔴 매우중요', color: '#ffcdd2' },
+                      { level: 'important', label: '🟠 중요', color: '#ffcc80' },
+                      { level: 'opinion', label: '🟣 의견', color: '#e1bee7' },
+                      { level: 'reference', label: '🔵 참고', color: '#81d4fa' },
+                      { level: 'question', label: '🟡 질문', color: '#fff59d' },
+                      { level: 'idea', label: '🟢 아이디어', color: '#c8e6c9' },
+                      { level: 'data', label: '🟤 데이터', color: '#ffab91' }
+                    ] as Array<{level: ImportanceLevel, label: string, color: string}>).map(({level, label, color}) => (
+                      <button
+                        key={level}
+                        onClick={() => {
+                          const newFilters = new Set(searchImportanceFilters);
+                          if (newFilters.has(level)) {
+                            newFilters.delete(level);
+                          } else {
+                            newFilters.add(level);
+                          }
+                          setSearchImportanceFilters(newFilters);
+                        }}
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: '11px',
+                          backgroundColor: searchImportanceFilters.has(level) ? color : '#ffffff',
+                          color: searchImportanceFilters.has(level) ? '#000' : '#6b7280',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* 전체 선택/해제 버튼 */}
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <button
+                      onClick={() => {
+                        setSearchImportanceFilters(new Set(['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'] as ImportanceLevel[]));
+                      }}
+                      style={{
+                        padding: '2px 6px',
+                        fontSize: '10px',
+                        backgroundColor: '#f3f4f6',
+                        color: '#6b7280',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '3px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      전체 선택
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSearchImportanceFilters(new Set());
+                      }}
+                      style={{
+                        padding: '2px 6px',
+                        fontSize: '10px',
+                        backgroundColor: '#f3f4f6',
+                        color: '#6b7280',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '3px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      전체 해제
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
       
@@ -318,7 +766,14 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                       </div>
                     )}
                     <div style={{ color: '#475569', fontSize: '11px', lineHeight: '1.3' }}>
-                      {memo.content || '내용 없음'}
+                      {(() => {
+                        const content = renderSearchResultContent(memo);
+                        // 빈 배열이나 null인 경우 "내용 없음" 표시
+                        if (Array.isArray(content) && content.length === 0) {
+                          return '내용 없음';
+                        }
+                        return content;
+                      })()}
                     </div>
                   </div>
                 );
@@ -516,35 +971,6 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
         </div>
       </div>
 
-      <div style={{ marginTop: '32px' }}>
-        <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '600', color: '#374151' }}>프로세스</h3>
-        <button
-          style={{
-            width: '100%',
-            backgroundColor: '#8b5cf6',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '12px 16px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '600',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.backgroundColor = '#7c3aed';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.backgroundColor = '#8b5cf6';
-          }}
-        >
-          + 프로세스 생성
-        </button>
-      </div>
       <Resizer direction="left" onResize={onResize} />
     </div>
   );

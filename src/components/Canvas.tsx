@@ -1,6 +1,7 @@
 import React from 'react';
-import { Page, MemoDisplaySize } from '../types';
+import { Page, MemoDisplaySize, ImportanceLevel } from '../types';
 import MemoBlock from './MemoBlock';
+import ImportanceFilter from './ImportanceFilter';
 
 interface CanvasProps {
   currentPage: Page | undefined;
@@ -29,6 +30,10 @@ interface CanvasProps {
   onDragSelectStart: (position: { x: number; y: number }, isShiftPressed: boolean) => void;
   onDragSelectMove: (position: { x: number; y: number }) => void;
   onDragSelectEnd: () => void;
+  activeImportanceFilters: Set<ImportanceLevel>;
+  onToggleImportanceFilter: (level: ImportanceLevel) => void;
+  showGeneralContent: boolean;
+  onToggleGeneralContent: () => void;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -57,13 +62,19 @@ const Canvas: React.FC<CanvasProps> = ({
   dragHoveredMemoIds,
   onDragSelectStart,
   onDragSelectMove,
-  onDragSelectEnd
+  onDragSelectEnd,
+  activeImportanceFilters,
+  onToggleImportanceFilter,
+  showGeneralContent,
+  onToggleGeneralContent
 }) => {
   const [isPanning, setIsPanning] = React.useState(false);
   const [panStart, setPanStart] = React.useState({ x: 0, y: 0 });
   const [canvasOffset, setCanvasOffset] = React.useState({ x: 0, y: 0 });
   const [canvasScale, setCanvasScale] = React.useState(1);
   const [currentTool, setCurrentTool] = React.useState<'select' | 'pan' | 'zoom'>('select');
+
+  // 메모 블럭은 항상 표시하고, 내용 필터링은 MemoBlock 내부에서 처리
   const [isSpacePressed, setIsSpacePressed] = React.useState(false);
   const [isAltPressed, setIsAltPressed] = React.useState(false);
   const [baseTool, setBaseTool] = React.useState<'select' | 'pan' | 'zoom'>('select');
@@ -620,6 +631,8 @@ const Canvas: React.FC<CanvasProps> = ({
             onConnectMemos={onConnectMemos}
             canvasScale={canvasScale}
             canvasOffset={canvasOffset}
+            activeImportanceFilters={activeImportanceFilters}
+            showGeneralContent={showGeneralContent}
           />
         ))}
 
@@ -801,6 +814,14 @@ const Canvas: React.FC<CanvasProps> = ({
           삭제
         </button>
       </div>
+
+      {/* 중요도 필터 UI */}
+      <ImportanceFilter
+        activeFilters={activeImportanceFilters}
+        onToggleFilter={onToggleImportanceFilter}
+        showGeneralContent={showGeneralContent}
+        onToggleGeneralContent={onToggleGeneralContent}
+      />
     </div>
   );
 };

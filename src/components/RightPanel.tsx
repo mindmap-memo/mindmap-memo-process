@@ -1,5 +1,5 @@
 import React from 'react';
-import { MemoBlock, Page, ContentBlock, ContentBlockType, TextBlock } from '../types';
+import { MemoBlock, Page, ContentBlock, ContentBlockType, TextBlock, ImportanceLevel } from '../types';
 import Resizer from './Resizer';
 import ContentBlockComponent from './ContentBlock';
 import GoogleAuth from './GoogleAuth';
@@ -15,6 +15,9 @@ interface RightPanelProps {
   onResize: (deltaX: number) => void;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
+  activeImportanceFilters?: Set<ImportanceLevel>;
+  showGeneralContent?: boolean;
+  onResetFilters?: () => void;
 }
 
 const RightPanel: React.FC<RightPanelProps> = ({
@@ -27,8 +30,20 @@ const RightPanel: React.FC<RightPanelProps> = ({
   width,
   onResize,
   isFullscreen = false,
-  onToggleFullscreen
+  onToggleFullscreen,
+  activeImportanceFilters,
+  showGeneralContent = true,
+  onResetFilters
 }) => {
+  // 모든 중요도 필터가 활성화되어 있고 일반 내용도 표시하는 기본 상태인지 확인
+  const isDefaultFilterState = () => {
+    const allLevels: ImportanceLevel[] = ['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'];
+
+    return (!activeImportanceFilters ||
+            (activeImportanceFilters.size === allLevels.length &&
+             allLevels.every(level => activeImportanceFilters.has(level)))) &&
+           showGeneralContent !== false;
+  };
   const [tagInput, setTagInput] = React.useState('');
   const [selectedBlocks, setSelectedBlocks] = React.useState<string[]>([]);
   const [dragSelectedBlocks, setDragSelectedBlocks] = React.useState<string[]>([]); // 드래그로 선택된 블록들
@@ -85,6 +100,19 @@ const RightPanel: React.FC<RightPanelProps> = ({
   // 키보드 단축키 처리
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // 현재 포커스된 요소가 텍스트 입력 요소인지 확인
+      const activeElement = document.activeElement;
+      const isTyping = activeElement && (
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.tagName === 'INPUT' ||
+        (activeElement as HTMLElement).isContentEditable
+      );
+
+      // 텍스트 입력 중이면 키보드 단축키를 실행하지 않음
+      if (isTyping) {
+        return;
+      }
+
       if (selectedBlocks.length > 0) {
         if (e.key === 'Delete' || e.key === 'Backspace') {
           e.preventDefault();
@@ -703,15 +731,45 @@ const RightPanel: React.FC<RightPanelProps> = ({
         alignItems: 'center',
         justifyContent: 'space-between'
       }}>
-        <h2 style={{
-          margin: '0',
-          fontSize: '16px',
-          fontWeight: '600',
-          color: '#1f2937'
-        }}>
-          메모 편집
-        </h2>
-        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <h2 style={{
+            margin: '0',
+            fontSize: '16px',
+            fontWeight: '600',
+            color: '#1f2937'
+          }}>
+            메모 편집
+          </h2>
+
+          {/* 필터링 해제 버튼 - 기본 상태가 아닐 때만 표시 */}
+          {!isDefaultFilterState() && (
+            <button
+              onClick={() => onResetFilters && onResetFilters()}
+              style={{
+                fontSize: '12px',
+                padding: '4px 8px',
+                backgroundColor: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                transition: 'background-color 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#2563eb';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#3b82f6';
+              }}
+            >
+              📝 필터링 해제 후 편집
+            </button>
+          )}
+        </div>
+
         {onToggleFullscreen && (
           <button
             onClick={onToggleFullscreen}
@@ -1087,6 +1145,9 @@ const RightPanel: React.FC<RightPanelProps> = ({
                         onBlockClick={handleBlockClick}
                         onMergeWithPrevious={handleMergeWithPrevious}
                         onBlockSelect={handleBlockSelect}
+                        activeImportanceFilters={activeImportanceFilters}
+                        showGeneralContent={showGeneralContent}
+                        onResetFilters={onResetFilters}
                       />
                     </div>
                   </React.Fragment>
