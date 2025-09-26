@@ -48,15 +48,59 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const [selectedBlocks, setSelectedBlocks] = React.useState<string[]>([]);
   const [dragSelectedBlocks, setDragSelectedBlocks] = React.useState<string[]>([]); // 드래그로 선택된 블록들
   const [isDragSelecting, setIsDragSelecting] = React.useState(false);
+  const [dragJustCompleted, setDragJustCompleted] = React.useState(false); // 드래그 완료 직후 상태
   const [dragStart, setDragStart] = React.useState({ x: 0, y: 0 });
   const [dragEnd, setDragEnd] = React.useState({ x: 0, y: 0 });
   const [dragHoveredBlocks, setDragHoveredBlocks] = React.useState<string[]>([]);
   const [isDragMoved, setIsDragMoved] = React.useState(false); // 실제 드래그 움직임 감지
+
+  // Undo/Redo 히스토리 관리
+  const [undoHistory, setUndoHistory] = React.useState<any[]>([]);
+  const [redoHistory, setRedoHistory] = React.useState<any[]>([]);
+  const [isUndoRedoAction, setIsUndoRedoAction] = React.useState(false); // Undo/Redo 중인지 확인
   const blocksContainerRef = React.useRef<HTMLDivElement>(null);
   const rightPanelRef = React.useRef<HTMLDivElement>(null);
   const [showMenu, setShowMenu] = React.useState(false);
   const [menuPosition, setMenuPosition] = React.useState({ x: 0, y: 0 });
   const [isGoogleSignedIn, setIsGoogleSignedIn] = React.useState(false);
+  const [showConnectedMemos, setShowConnectedMemos] = React.useState(false);
+
+  // 공백 크기를 계산하는 함수 (최대 1블록 높이로 제한)
+  const getSpacerHeight = (consecutiveHiddenBlocks: number): string => {
+    if (consecutiveHiddenBlocks <= 1) return '0';
+    return '0.8em'; // 적당한 공백 크기
+  };
+
+  // 블록이 필터링되어 보이는지 확인하는 함수
+  const isBlockVisible = (block: ContentBlock): boolean => {
+    // 모든 중요도 필터가 활성화되어 있고 일반 내용도 표시하는 기본 상태인지 확인
+    const allLevels: ImportanceLevel[] = ['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'];
+    const isDefaultFilterState = (!activeImportanceFilters ||
+                                 (activeImportanceFilters.size === allLevels.length &&
+                                  allLevels.every(level => activeImportanceFilters.has(level)))) &&
+                                showGeneralContent !== false;
+
+    if (isDefaultFilterState) return true;
+
+    if (block.type === 'text') {
+      const textBlock = block as TextBlock;
+      if (!textBlock.content || textBlock.content.trim() === '') {
+        return showGeneralContent !== false;
+      }
+
+      if (!textBlock.importanceRanges || textBlock.importanceRanges.length === 0) {
+        return showGeneralContent !== false;
+      }
+
+      // 필터에 맞는 중요도 범위가 있는지 확인
+      return textBlock.importanceRanges.some(range =>
+        activeImportanceFilters && activeImportanceFilters.has(range.level)
+      ) || (showGeneralContent !== false && textBlock.importanceRanges.length < textBlock.content.length);
+    }
+
+    // 다른 블록 타입들은 기본적으로 표시
+    return true;
+  };
 
   // 선택된 블록 중 첫 번째 블록의 위치 계산
   const getTopSelectedBlockPosition = () => {
@@ -97,42 +141,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
     return () => clearInterval(interval);
   }, [selectedMemo, onMemoUpdate]);
 
-  // 키보드 단축키 처리
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // 현재 포커스된 요소가 텍스트 입력 요소인지 확인
-      const activeElement = document.activeElement;
-      const isTyping = activeElement && (
-        activeElement.tagName === 'TEXTAREA' ||
-        activeElement.tagName === 'INPUT' ||
-        (activeElement as HTMLElement).isContentEditable
-      );
-
-      // 텍스트 입력 중이면 키보드 단축키를 실행하지 않음
-      if (isTyping) {
-        return;
-      }
-
-      if (selectedBlocks.length > 0) {
-        if (e.key === 'Delete' || e.key === 'Backspace') {
-          e.preventDefault();
-          handleBlocksDelete();
-        } else if (e.key === 'Escape') {
-          setSelectedBlocks([]);
-          setDragSelectedBlocks([]);
-        } else if (e.key === 'ArrowUp' && (e.ctrlKey || e.metaKey)) {
-          e.preventDefault();
-          handleBlocksMove('up');
-        } else if (e.key === 'ArrowDown' && (e.ctrlKey || e.metaKey)) {
-          e.preventDefault();
-          handleBlocksMove('down');
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [selectedBlocks]);
+  // 기존 키보드 이벤트 리스너 제거 (중복)
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (selectedMemo) {
@@ -202,6 +211,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
   const handleBlockDelete = (blockId: string) => {
     if (selectedMemo && selectedMemo.blocks && selectedMemo.blocks.length > 1) {
+      saveToHistory(); // 삭제 전 히스토리 저장
       const updatedBlocks = selectedMemo.blocks.filter(block => block.id !== blockId);
       onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
     }
@@ -209,6 +219,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
   const handleBlockDuplicate = (blockId: string) => {
     if (selectedMemo && selectedMemo.blocks) {
+      saveToHistory(); // 복제 전 히스토리 저장
       const blockIndex = selectedMemo.blocks.findIndex(block => block.id === blockId);
       if (blockIndex !== -1) {
         const originalBlock = selectedMemo.blocks[blockIndex];
@@ -312,6 +323,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const handleCreateNewBlock = (afterBlockId: string, content: string) => {
     console.log('handleCreateNewBlock called:', afterBlockId, content);
     if (selectedMemo && selectedMemo.blocks) {
+      saveToHistory(); // Enter 키로 새 블록 생성 시 히스토리 저장
       const blockIndex = selectedMemo.blocks.findIndex(block => block.id === afterBlockId);
       if (blockIndex === -1) return;
 
@@ -336,13 +348,14 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const handleMergeWithPrevious = (blockId: string, currentContent: string) => {
     if (selectedMemo && selectedMemo.blocks) {
       const blockIndex = selectedMemo.blocks.findIndex(block => block.id === blockId);
-      
+
       if (blockIndex > 0) {
         const currentBlock = selectedMemo.blocks[blockIndex];
         const previousBlock = selectedMemo.blocks[blockIndex - 1];
-        
+
         // 이전 블록이 텍스트 블록인 경우에만 합치기
         if (previousBlock.type === 'text' && currentBlock.type === 'text') {
+          saveToHistory(); // 블록 병합 시 히스토리 저장
           const previousContent = (previousBlock as any).content || '';
           const mergedContent = previousContent + currentContent;
           
@@ -424,14 +437,17 @@ const RightPanel: React.FC<RightPanelProps> = ({
                                 target.closest('button') !== null;
     
     // 오른쪽 패널 전체에서 드래그 허용 (블록 편집 모드일 때만)
-    const isInRightPanel = rightPanelRef.current?.contains(target) || 
+    const isInRightPanel = rightPanelRef.current?.contains(target) ||
                            blocksContainerRef.current?.contains(target);
-    const isNotInBlockContent = !target.closest('[data-block-id]') || 
+    const isNotInBlockContent = !target.closest('[data-block-id]') ||
                                target.style.cursor === 'crosshair' ||
                                target.classList.contains('drag-zone');
-    
-    if (!isInteractiveElement && isInRightPanel && isNotInBlockContent && 
-        selectedMemo && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
+
+    // Ctrl 키를 누르고 있으면 블록 내부에서도 드래그 선택 허용
+    const allowBlockSelection = event.ctrlKey || event.metaKey;
+
+    if (!isInteractiveElement && isInRightPanel && (isNotInBlockContent || allowBlockSelection) &&
+        selectedMemo && !event.shiftKey) {
       event.preventDefault();
       
       // 블록 컨테이너가 있으면 그것 기준으로, 없으면 오른쪽 패널 기준으로 좌표 계산
@@ -448,8 +464,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
         setDragStart(startPos);
         setDragEnd(startPos);
         setDragHoveredBlocks([]);
-        setSelectedBlocks([]); // 드래그 시작할 때 기존 선택 해제
-        setDragSelectedBlocks([]); // 드래그 선택 상태도 초기화
+        // 드래그 시작할 때 기존 선택 해제하지 않음 - 드래그 완료 후 새 선택으로 덮어씀
       }
     }
   };
@@ -534,11 +549,29 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
   const handleMouseUp = React.useCallback(() => {
     if (isDragSelecting) {
+      console.log('🖱️ Mouse up - drag selecting:', {
+        isDragMoved,
+        dragHoveredBlocks,
+        dragHoveredCount: dragHoveredBlocks.length
+      });
+
       if (isDragMoved) {
         // 실제 드래그가 일어난 경우에만 선택 적용
-        setSelectedBlocks(dragHoveredBlocks);
-        setDragSelectedBlocks(dragHoveredBlocks); // 드래그로 선택된 블록들 저장
+        console.log('✅ Setting selected blocks:', dragHoveredBlocks);
+        const selectedIds = [...dragHoveredBlocks]; // 복사본 생성
+        setSelectedBlocks(selectedIds);
+        setDragSelectedBlocks(selectedIds); // 드래그로 선택된 블록들 저장
+
+        // 드래그 완료 직후 플래그 설정
+        setDragJustCompleted(true);
+        setTimeout(() => {
+          setDragJustCompleted(false);
+        }, 200); // 200ms 후 해제
+      } else {
+        console.log('❌ No drag movement detected');
       }
+
+      // 드래그 상태 초기화는 선택 설정 후에
       setIsDragSelecting(false);
       setIsDragMoved(false);
       setDragHoveredBlocks([]);
@@ -557,20 +590,214 @@ const RightPanel: React.FC<RightPanelProps> = ({
     }
   }, [isDragSelecting, handleMouseMove, handleMouseUp]);
 
+  // selectedBlocks 변경 감지
+  React.useEffect(() => {
+    console.log('🎯 Selected blocks changed:', selectedBlocks);
+  }, [selectedBlocks]);
+
+  // 히스토리에 현재 상태 저장 (즉시 실행)
+  const saveToHistory = React.useCallback(() => {
+    if (!selectedMemo || isUndoRedoAction) {
+      console.log('🚫 Not saving to history:', { selectedMemo: !!selectedMemo, isUndoRedoAction });
+      return;
+    }
+
+    console.log('💾 saveToHistory called');
+    const currentState = {
+      blocks: selectedMemo.blocks ? JSON.parse(JSON.stringify(selectedMemo.blocks)) : [],
+      timestamp: Date.now()
+    };
+
+    // 마지막 상태와 동일하면 저장하지 않음
+    setUndoHistory(prev => {
+      const lastState = prev[prev.length - 1];
+      if (lastState && JSON.stringify(lastState.blocks) === JSON.stringify(currentState.blocks)) {
+        console.log('⏭️ Skipping duplicate history state');
+        return prev;
+      }
+
+      console.log('✅ Saving new history state, total blocks:', currentState.blocks.length);
+      const newHistory = [...prev, currentState];
+      // 히스토리 크기 제한 (최대 50개)
+      return newHistory.length > 50 ? newHistory.slice(-50) : newHistory;
+    });
+
+    // 새로운 액션이 발생하면 redo 히스토리 클리어
+    setRedoHistory([]);
+  }, [selectedMemo, isUndoRedoAction]);
+
+  // 자동 히스토리 저장 제거 - 명시적인 액션에만 저장하도록 변경
+
+  // Undo 기능
+  const handleUndo = React.useCallback(() => {
+    if (undoHistory.length === 0 || !selectedMemo) return;
+
+    console.log('↩️ Performing undo');
+    setIsUndoRedoAction(true);
+
+    // 현재 상태를 redo 히스토리에 저장
+    const currentState = {
+      blocks: selectedMemo.blocks ? JSON.parse(JSON.stringify(selectedMemo.blocks)) : [],
+      timestamp: Date.now()
+    };
+    setRedoHistory(prev => [currentState, ...prev]);
+
+    // undo 히스토리에서 이전 상태 복원
+    const previousState = undoHistory[undoHistory.length - 1];
+    setUndoHistory(prev => prev.slice(0, -1));
+
+    onMemoUpdate(selectedMemo.id, { blocks: previousState.blocks });
+
+    setTimeout(() => {
+      setIsUndoRedoAction(false);
+    }, 100);
+  }, [undoHistory, selectedMemo, onMemoUpdate]);
+
+  // Redo 기능
+  const handleRedo = React.useCallback(() => {
+    if (redoHistory.length === 0 || !selectedMemo) return;
+
+    console.log('↪️ Performing redo');
+    setIsUndoRedoAction(true);
+
+    // 현재 상태를 undo 히스토리에 저장
+    const currentState = {
+      blocks: selectedMemo.blocks ? JSON.parse(JSON.stringify(selectedMemo.blocks)) : [],
+      timestamp: Date.now()
+    };
+    setUndoHistory(prev => [...prev, currentState]);
+
+    // redo 히스토리에서 다음 상태 복원
+    const nextState = redoHistory[0];
+    setRedoHistory(prev => prev.slice(1));
+
+    onMemoUpdate(selectedMemo.id, { blocks: nextState.blocks });
+
+    setTimeout(() => {
+      setIsUndoRedoAction(false);
+    }, 100);
+  }, [redoHistory, selectedMemo, onMemoUpdate]);
+
+  // 키보드 이벤트 처리 (Delete 키로 블록 삭제)
+  React.useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+
+      // 입력 필드에 포커스가 있을 때 처리
+      const activeElement = document.activeElement;
+      const isInputFocused = activeElement && (
+        activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        (activeElement as HTMLElement).contentEditable === 'true'
+      );
+
+      if (isInputFocused) {
+
+        // Enter 키는 항상 허용 (블록 생성을 위해)
+        if (event.key === 'Enter') {
+          return;
+        }
+
+        // Undo/Redo는 입력 필드에서도 허용 (z 또는 Z)
+        if ((event.key === 'z' || event.key === 'Z') && (event.ctrlKey || event.metaKey)) {
+          // Undo/Redo 로직으로 넘어감
+        }
+        // 선택된 블록이 있고 Delete/Backspace를 눌렀을 때만 예외 처리
+        else if ((event.key === 'Delete' || event.key === 'Backspace') && selectedBlocks.length > 0) {
+          // 텍스트가 선택되어 있거나 커서가 중간에 있으면 일반 편집 동작
+          const textarea = activeElement as HTMLTextAreaElement;
+          console.log('📝 Textarea info:', {
+            selectionStart: textarea.selectionStart,
+            selectionEnd: textarea.selectionEnd,
+            valueLength: textarea.value.length,
+            value: textarea.value
+          });
+
+          if (textarea.selectionStart !== textarea.selectionEnd ||
+              (textarea.selectionStart > 0 && textarea.selectionStart < textarea.value.length)) {
+            console.log('🔤 Text editing in progress - allowing normal behavior');
+            return;
+          }
+
+          // 빈 입력 필드이거나 커서가 맨 앞/뒤에 있으면 블록 삭제 허용
+          console.log('🎯 Input field focused but allowing block deletion');
+        } else {
+          return;
+        }
+      }
+
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        if (selectedBlocks.length > 0) {
+          event.preventDefault();
+          handleBlocksDelete();
+        } else {
+        }
+      } else if (event.key === 'Escape') {
+        if (selectedBlocks.length > 0) {
+          setSelectedBlocks([]);
+          setDragSelectedBlocks([]);
+        }
+      } else if (event.key === 'ArrowUp' && (event.ctrlKey || event.metaKey)) {
+        if (selectedBlocks.length > 0) {
+          event.preventDefault();
+          handleBlocksMove('up');
+        }
+      } else if (event.key === 'ArrowDown' && (event.ctrlKey || event.metaKey)) {
+        if (selectedBlocks.length > 0) {
+          event.preventDefault();
+          handleBlocksMove('down');
+        }
+      } else if ((event.key === 'z' || event.key === 'Z') && (event.ctrlKey || event.metaKey)) {
+        if (event.shiftKey) {
+          // Ctrl+Shift+Z: Redo
+          event.preventDefault();
+          handleRedo();
+        } else {
+          // Ctrl+Z: Undo
+          event.preventDefault();
+          handleUndo();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedBlocks, selectedMemo, onMemoUpdate, handleUndo, handleRedo]);
+
   const handleBlocksDelete = () => {
+    console.log('🗑️ handleBlocksDelete called', {
+      selectedMemo: selectedMemo?.id,
+      selectedBlocks,
+      blocksLength: selectedMemo?.blocks?.length
+    });
+
     if (selectedMemo && selectedBlocks.length > 0) {
-      const updatedBlocks = selectedMemo.blocks?.filter(block => 
+      // 삭제 전에 현재 상태를 히스토리에 저장
+      saveToHistory();
+      const updatedBlocks = selectedMemo.blocks?.filter(block =>
         !selectedBlocks.includes(block.id)
       ) || [];
-      
+
+      console.log('🔄 Filtered blocks:', {
+        originalLength: selectedMemo.blocks?.length,
+        filteredLength: updatedBlocks.length,
+        deletedBlocks: selectedBlocks
+      });
+
       // 최소 하나의 블록은 유지
       if (updatedBlocks.length === 0) {
         const newBlock = createNewBlock('text');
         updatedBlocks.push(newBlock);
+        console.log('➕ Added new empty text block');
       }
-      
+
+      console.log('💾 Calling onMemoUpdate with updatedBlocks');
       onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
       setSelectedBlocks([]);
+      console.log('✅ Blocks deleted successfully');
+    } else {
+      console.log('❌ Cannot delete: no memo or no selected blocks');
     }
   };
 
@@ -614,19 +841,54 @@ const RightPanel: React.FC<RightPanelProps> = ({
   // 스마트 클릭 핸들러: 빈 공간 클릭 시 가장 가까운 블록에 포커스하거나 선택 해제
   const handleMemoAreaClick = (event: React.MouseEvent) => {
     const target = event.target as HTMLElement;
-    
+    console.log('🖱️ Memo area clicked:', {
+      tagName: target.tagName,
+      className: target.className,
+      selectedBlocks: selectedBlocks.length,
+      dragSelectedBlocks: dragSelectedBlocks.length
+    });
+
     // 버튼이나 중요한 인터랙티브 요소만 제외
     const isButton = target.tagName === 'BUTTON' || target.closest('button') !== null;
     const isImportanceMenu = target.closest('[data-importance-menu]') !== null;
-    
+
     // 텍스트 입력 중인 textarea는 제외 (클릭된 것이 textarea인 경우만)
     const isClickedTextarea = target.tagName === 'TEXTAREA';
-    
-    if (!isButton && !isImportanceMenu && !isClickedTextarea && selectedMemo?.blocks) {
-      // 이미 선택된 블록이 있으면 선택 해제
+
+    console.log('🔍 Memo area click analysis:', {
+      isButton,
+      isImportanceMenu,
+      isClickedTextarea,
+      dragJustCompleted
+    });
+
+    // 드래그 완료 직후에는 클릭 이벤트 무시
+    if (dragJustCompleted) {
+      console.log('⏱️ Ignoring click - drag just completed');
+      return;
+    }
+
+    if (!isButton && !isImportanceMenu && selectedMemo?.blocks) {
+      // 선택된 블록 위를 클릭한 경우인지 확인
+      const clickedBlockElement = target.closest('[data-block-id]');
+      const clickedBlockId = clickedBlockElement?.getAttribute('data-block-id');
+
       if (selectedBlocks.length > 0) {
+        // 선택된 블록 중 하나를 클릭한 경우 - 선택 유지
+        if (clickedBlockId && selectedBlocks.includes(clickedBlockId)) {
+          console.log('💡 Clicked on selected block - maintaining selection');
+          return;
+        }
+
+        // 다른 블록을 클릭하거나 빈 공간을 클릭한 경우 - 선택 해제
+        console.log('🔄 Clearing selection - clicked elsewhere');
         setSelectedBlocks([]);
-        return;
+        setDragSelectedBlocks([]);
+
+        // 다른 블록을 클릭한 경우에는 해당 블록 선택하지 않고 여기서 종료
+        if (clickedBlockId) {
+          return;
+        }
       }
       
       // 클릭 위치에서 가장 가까운 블록 찾기 (거리 제한 없음)
@@ -966,6 +1228,102 @@ const RightPanel: React.FC<RightPanelProps> = ({
               />
             </div>
 
+            {/* 연결된 메모들 */}
+            {selectedMemo.connections.length > 0 && (
+              <div style={{ marginBottom: '16px', paddingLeft: '20px' }}>
+                <div
+                  onClick={() => setShowConnectedMemos(!showConnectedMemos)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    marginBottom: '12px',
+                    cursor: 'pointer',
+                    userSelect: 'none'
+                  }}
+                >
+                  <h4 style={{
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: '#374151',
+                    margin: 0,
+                    marginRight: '8px'
+                  }}>
+                    연결된 메모 ({selectedMemo.connections.length})
+                  </h4>
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 12 12"
+                    style={{
+                      transform: showConnectedMemos ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.2s ease'
+                    }}
+                  >
+                    <path
+                      d="M3 4.5L6 7.5L9 4.5"
+                      stroke="#6b7280"
+                      strokeWidth="1.5"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+                {showConnectedMemos && (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '8px',
+                    alignItems: 'start'
+                  }}>
+                    {selectedMemo.connections.map(connectionId => {
+                      const connectedMemo = currentPage?.memos.find(m => m.id === connectionId);
+                      return connectedMemo ? (
+                        <div
+                          key={connectionId}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onFocusMemo(connectionId);
+                          }}
+                          style={{
+                            padding: '8px 10px',
+                            backgroundColor: 'white',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            color: '#6b7280',
+                            transition: 'all 0.2s ease',
+                            textAlign: 'center',
+                            minHeight: '40px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f8fafc';
+                            e.currentTarget.style.borderColor = '#3b82f6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'white';
+                            e.currentTarget.style.borderColor = '#e5e7eb';
+                          }}
+                        >
+                          <div style={{
+                            textOverflow: 'ellipsis',
+                            overflow: 'hidden',
+                            whiteSpace: 'nowrap',
+                            width: '100%'
+                          }}>
+                            {connectedMemo.title || '제목 없음'}
+                          </div>
+                        </div>
+                      ) : null;
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* 드롭다운 메뉴 */}
             {showMenu && (
@@ -1117,88 +1475,95 @@ const RightPanel: React.FC<RightPanelProps> = ({
                   }}
                 />
               )}
-              {ensureBlocks(selectedMemo).blocks?.map((block, index) => {
-                const isSelected = selectedBlocks.includes(block.id);
-                const topSelectedIndex = getTopSelectedBlockPosition();
-                const isFirstSelected = topSelectedIndex === index;
+{(() => {
+                const blocks = ensureBlocks(selectedMemo).blocks || [];
+                const renderedElements: React.ReactElement[] = [];
+                let consecutiveHiddenBlocks = 0;
 
-                return (
-                  <React.Fragment key={block.id}>
-                    <div data-block-id={block.id} style={{ position: 'relative', marginBottom: '0px' }}>
-                      <ContentBlockComponent
-                        block={block}
-                        isEditing={true}
-                        isSelected={isSelected}
-                        isDragSelected={dragSelectedBlocks.includes(block.id)}
-                        isDragHovered={dragHoveredBlocks.includes(block.id)}
-                        pageId={currentPage?.id}
-                        memoId={selectedMemo?.id}
-                        onUpdate={handleBlockUpdate}
-                        onDelete={handleBlockDelete}
-                        onDuplicate={handleBlockDuplicate}
-                        onMoveUp={(blockId) => handleBlockMove(blockId, 'up')}
-                        onMoveDown={(blockId) => handleBlockMove(blockId, 'down')}
-                        onConvertToBlock={handleConvertBlock}
-                        onCreateNewBlock={handleCreateNewBlock}
-                        onFocusPrevious={handleFocusPrevious}
-                        onFocusNext={handleFocusNext}
-                        onBlockClick={handleBlockClick}
-                        onMergeWithPrevious={handleMergeWithPrevious}
-                        onBlockSelect={handleBlockSelect}
-                        activeImportanceFilters={activeImportanceFilters}
-                        showGeneralContent={showGeneralContent}
-                        onResetFilters={onResetFilters}
-                      />
-                    </div>
-                  </React.Fragment>
-                );
-              })}
+                // 모든 중요도 필터가 활성화되어 있고 일반 내용도 표시하는 기본 상태인지 확인
+                const allLevels: ImportanceLevel[] = ['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'];
+                const isDefaultFilterState = (!activeImportanceFilters ||
+                                             (activeImportanceFilters.size === allLevels.length &&
+                                              allLevels.every(level => activeImportanceFilters.has(level)))) &&
+                                            showGeneralContent !== false;
+
+                blocks.forEach((block, index) => {
+                  const isSelected = selectedBlocks.includes(block.id);
+                  const topSelectedIndex = getTopSelectedBlockPosition();
+                  const isFirstSelected = topSelectedIndex === index;
+                  const blockVisible = isBlockVisible(block);
+
+                  if (blockVisible) {
+                    // 공백 처리: 숨겨진 블록이 2개 이상 연속으로 있었고, 기본 상태가 아닐 때
+                    if (!isDefaultFilterState && consecutiveHiddenBlocks >= 2) {
+                      // 마지막 블록인지 확인 (뒤에 보이는 블록이 있는지 체크)
+                      const hasVisibleBlocksAfter = blocks.slice(index + 1).some(laterBlock => isBlockVisible(laterBlock));
+
+                      if (hasVisibleBlocksAfter) {
+                        const spacerHeight = getSpacerHeight(consecutiveHiddenBlocks);
+                        renderedElements.push(
+                          <div key={`spacer-${block.id}`} style={{
+                            height: spacerHeight,
+                            opacity: 0.4,
+                            fontSize: '12px',
+                            color: '#9ca3af',
+                            textAlign: 'center',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '4px 0'
+                          }}>
+                            ⋯
+                          </div>
+                        );
+                      }
+                    }
+
+                    renderedElements.push(
+                      <React.Fragment key={block.id}>
+                        <div data-block-id={block.id} style={{ position: 'relative', marginBottom: '0px' }}>
+                          <ContentBlockComponent
+                            block={block}
+                            isEditing={true}
+                            isSelected={isSelected}
+                            isDragSelected={dragSelectedBlocks.includes(block.id)}
+                            isDragHovered={dragHoveredBlocks.includes(block.id)}
+                            pageId={currentPage?.id}
+                            memoId={selectedMemo?.id}
+                            onUpdate={handleBlockUpdate}
+                            onDelete={handleBlockDelete}
+                            onDuplicate={handleBlockDuplicate}
+                            onMoveUp={(blockId) => handleBlockMove(blockId, 'up')}
+                            onMoveDown={(blockId) => handleBlockMove(blockId, 'down')}
+                            onConvertToBlock={handleConvertBlock}
+                            onCreateNewBlock={handleCreateNewBlock}
+                            onFocusPrevious={handleFocusPrevious}
+                            onFocusNext={handleFocusNext}
+                            onBlockClick={handleBlockClick}
+                            onMergeWithPrevious={handleMergeWithPrevious}
+                            onBlockSelect={handleBlockSelect}
+                            onSaveToHistory={saveToHistory}
+                            activeImportanceFilters={activeImportanceFilters}
+                            showGeneralContent={showGeneralContent}
+                            onResetFilters={onResetFilters}
+                          />
+                        </div>
+                      </React.Fragment>
+                    );
+
+                    consecutiveHiddenBlocks = 0; // 리셋
+                  } else {
+                    // 블록이 숨겨짐
+                    if (!isDefaultFilterState) {
+                      consecutiveHiddenBlocks++;
+                    }
+                  }
+                });
+
+                return renderedElements;
+              })()}
             </div>
 
-            {/* 연결된 메모들 */}
-            {selectedMemo.connections.length > 0 && (
-              <div style={{ marginTop: '24px' }}>
-                <h4 style={{ 
-                  marginBottom: '12px', 
-                  fontSize: '14px', 
-                  fontWeight: '600', 
-                  color: '#374151' 
-                }}>
-                  연결된 메모 ({selectedMemo.connections.length})
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {selectedMemo.connections.map(connectionId => {
-                    const connectedMemo = currentPage?.memos.find(m => m.id === connectionId);
-                    return connectedMemo ? (
-                      <div
-                        key={connectionId}
-                        onClick={() => onFocusMemo(connectionId)}
-                        style={{
-                          padding: '8px 12px',
-                          backgroundColor: 'white',
-                          border: '1px solid #e5e7eb',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '13px',
-                          color: '#6b7280',
-                          transition: 'all 0.2s ease'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.borderColor = '#8b5cf6';
-                          e.currentTarget.style.color = '#8b5cf6';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.borderColor = '#e5e7eb';
-                          e.currentTarget.style.color = '#6b7280';
-                        }}
-                      >
-                        → {connectedMemo.title}
-                      </div>
-                    ) : null;
-                  })}
-                </div>
-              </div>
-            )}
           </div>
         ) : (
           <div style={{

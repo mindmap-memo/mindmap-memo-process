@@ -188,12 +188,39 @@ export interface MemoBlock {
   position: { x: number; y: number };
   size?: { width: number; height: number };
   displaySize?: MemoDisplaySize; // 캔버스에서의 표시 크기
+  parentId?: string; // 부모 카테고리 ID (종속 관계)
+}
+
+// 카테고리(폴더) 블록 타입
+export interface CategoryBlock {
+  id: string;
+  title: string;
+  tags: string[];
+  connections: string[]; // 연결된 아이템 IDs (MemoBlock 또는 CategoryBlock)
+  position: { x: number; y: number };
+  size?: { width: number; height: number };
+  isExpanded: boolean; // 펼침/접기 상태
+  children: string[]; // 하위 블록 IDs (MemoBlock 또는 CategoryBlock)
+  parentId?: string; // 부모 카테고리 ID
+}
+
+// 캔버스 아이템 타입 (메모 또는 카테고리)
+export type CanvasItem = MemoBlock | CategoryBlock;
+
+// 타입 가드 함수들
+export function isMemoBlock(item: CanvasItem): item is MemoBlock {
+  return 'content' in item;
+}
+
+export function isCategoryBlock(item: CanvasItem): item is CategoryBlock {
+  return 'isExpanded' in item;
 }
 
 export interface Page {
   id: string;
   name: string;
   memos: MemoBlock[];
+  categories: CategoryBlock[]; // 카테고리 블록들
 }
 
 export interface AppState {

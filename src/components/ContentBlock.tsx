@@ -31,6 +31,7 @@ interface ContentBlockProps {
   onBlockClick?: (blockId: string, event: React.MouseEvent) => void;
   onMergeWithPrevious?: (blockId: string, content: string) => void;
   onBlockSelect?: (blockId: string) => void;
+  onSaveToHistory?: () => void;
   activeImportanceFilters?: Set<ImportanceLevel>;
   showGeneralContent?: boolean;
   onResetFilters?: () => void;
@@ -56,6 +57,7 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
   onBlockClick,
   onMergeWithPrevious,
   onBlockSelect,
+  onSaveToHistory,
   activeImportanceFilters,
   showGeneralContent,
   onResetFilters
@@ -85,6 +87,7 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
           onFocusPrevious={onFocusPrevious}
           onFocusNext={onFocusNext}
           onMergeWithPrevious={onMergeWithPrevious}
+          onSaveToHistory={onSaveToHistory}
           activeImportanceFilters={activeImportanceFilters}
           showGeneralContent={showGeneralContent}
           onResetFilters={onResetFilters}
@@ -142,7 +145,6 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
   };
 
   const handleClick = (e: React.MouseEvent) => {
-    console.log('Block clicked:', block.id);
     if (onBlockClick) {
       onBlockClick(block.id, e);
     }
@@ -258,12 +260,12 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
         cursor: 'pointer',
         transition: 'all 0.15s ease'
       };
-    } else if (isSelected && isDragSelected) {
+    } else if (isSelected || isDragSelected) {
       return {
         marginBottom: '0px', // 블록 간 간격 제거
         padding: '4px 8px', // 내부 여백 추가
         position: 'relative' as const,
-        backgroundColor: '#e8f4fd', // 드래그 선택된 경우에만 파란색 배경
+        backgroundColor: '#e8f4fd', // 선택된 블록 파란색 배경
         border: 'none', // 경계선 완전 제거
         borderRadius: '0px', // 둥근 모서리 제거로 연속성 확보
         cursor: 'text',

@@ -45,6 +45,7 @@ interface TextBlockProps {
   onFocusPrevious?: (blockId: string) => void;
   onFocusNext?: (blockId: string) => void;
   onMergeWithPrevious?: (blockId: string, content: string) => void;
+  onSaveToHistory?: () => void;
   activeImportanceFilters?: Set<ImportanceLevel>;
   showGeneralContent?: boolean;
   onResetFilters?: () => void; // 필터를 기본 상태로 리셋하는 함수
@@ -60,6 +61,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   onFocusPrevious,
   onFocusNext,
   onMergeWithPrevious,
+  onSaveToHistory,
   activeImportanceFilters,
   showGeneralContent,
   onResetFilters
@@ -133,38 +135,37 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     }
   }, [block.content]);
 
-  // 자동 저장 (디바운스)
-  useEffect(() => {
-    if (content !== block.content) {
-      const timeoutId = setTimeout(() => {
-        if (onUpdate) {
-          onUpdate({ ...block, content, importanceRanges: block.importanceRanges });
-        }
-      }, 300); // 300ms 후 자동 저장
 
-      return () => clearTimeout(timeoutId);
-    }
-  }, [content, block, onUpdate]);
+  // 자동 저장 제거 - 블록 단위 히스토리를 위해
 
   // block 전체 변경 시 강제 리렌더링 (특히 importanceRanges)
   useEffect(() => {
-    console.log('🎨 Block updated, forcing rerender:', block);
     forceUpdate({});
+    // importanceRanges가 있는데 렌더링이 안되는 경우를 위한 추가 체크
+    if (block.importanceRanges && block.importanceRanges.length > 0) {
+      setTimeout(() => {
+        console.log('🎨 Block has importance ranges, forcing additional update');
+        forceUpdate({});
+      }, 50);
+    }
   }, [block]);
+
+  // importanceRanges 전용 감지
+  useEffect(() => {
+    if (block.importanceRanges && block.importanceRanges.length > 0) {
+      console.log('🎨 ImportanceRanges changed, forcing update:', block.importanceRanges.length);
+      forceUpdate({});
+      setTimeout(() => forceUpdate({}), 10);
+    }
+  }, [block.importanceRanges]);
 
   // 편집모드 진입 시 상태 동기화
   useEffect(() => {
     if (isEditing && textareaRef.current) {
-      console.log('🔧 Entering edit mode, syncing content:', {
-        blockContent: block.content,
-        localContent: content,
-        textareaValue: textareaRef.current.value
-      });
 
       // 텍스트박스 값이 로컬 content와 다르면 동기화
       if (textareaRef.current.value !== content) {
         textareaRef.current.value = content;
-        console.log('🔧 Synced textarea value to local content:', content);
       }
 
       // 로컬 content가 블록 content와 다르면 동기화
@@ -173,7 +174,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
         if (textareaRef.current) {
           textareaRef.current.value = block.content;
         }
-        console.log('🔧 Synced local content to block content:', block.content);
       }
     }
   }, [isEditing]);
@@ -203,15 +203,15 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     const textarea = textareaRef.current;
     if (textarea) {
       const adjustHeight = () => {
-        textarea.style.height = '28px'; // 먼저 기본 높이로 설정
-        
-        // 빈 내용이면 28px로 유지
+        textarea.style.height = '24px'; // 먼저 기본 높이로 설정
+
+        // 빈 내용이면 24px로 유지
         if (content.trim() === '') {
           return;
         }
-        
-        // 내용이 있으면 scrollHeight 사용하되, 한 줄일 때는 28px 유지
-        if (content.includes('\n') || textarea.scrollHeight > 28) {
+
+        // 내용이 있으면 scrollHeight 사용하되, 한 줄일 때는 24px 유지
+        if (content.includes('\n') || textarea.scrollHeight > 24) {
           textarea.style.height = `${textarea.scrollHeight}px`;
         }
       };
@@ -232,7 +232,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     // Enter로 새 텍스트 블록 생성 (Shift+Enter는 줄바꿈)
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      console.log('Enter key pressed, creating new block');
       
       // 현재 커서 위치에서 텍스트 분할
       const textarea = e.currentTarget;
@@ -248,21 +247,22 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
       }
       
       // 새 텍스트 블록 생성 (커서 이후 내용으로)
-      console.log('onCreateNewBlock available:', !!onCreateNewBlock);
       if (onCreateNewBlock) {
-        console.log('Calling onCreateNewBlock with:', block.id, afterCursor);
         onCreateNewBlock(block.id, afterCursor);
-        // 현재 textarea에서 포커스 해제
-        if (textareaRef.current) {
-          textareaRef.current.blur();
-        }
+        // blur 제거 - 새 블록으로의 포커스 이동을 방해하지 않도록
       } else if (onConvertToBlock) {
-        console.log('Fallback to onConvertToBlock');
         onConvertToBlock('text');
       }
     }
 
     if (e.key === 'Escape') {
+      // Escape 키로 편집 종료 시 내용 저장
+      if (content !== block.content && onUpdate) {
+        onUpdate({ ...block, content, importanceRanges: block.importanceRanges });
+      }
+      if (onSaveToHistory) {
+        onSaveToHistory();
+      }
       if (textareaRef.current) {
         textareaRef.current.blur();
       }
@@ -277,23 +277,15 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
       const selectionEnd = textarea.selectionEnd;
       const currentContent = textarea.value || '';
 
-      console.log('🔧 Backspace pressed:', {
-        selectionStart,
-        selectionEnd,
-        currentContent: `"${currentContent}"`,
-        contentLength: currentContent.length
-      });
 
       // 텍스트가 선택되어 있으면 기본 백스페이스 동작 (선택된 텍스트 삭제)
       if (selectionStart !== selectionEnd) {
-        console.log('🔧 Text selected - allowing normal backspace');
         e.stopPropagation();
         return;
       }
 
       // 커서가 맨 앞에 있는 경우 - 블록 합치기 로직
       if (selectionStart === 0) {
-        console.log('🔧 Cursor at start - attempting merge/delete');
         e.preventDefault();
         e.stopPropagation();
 
@@ -330,10 +322,10 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     
     // 높이 자동 조정
     const textarea = e.target;
-    textarea.style.height = '28px'; // 먼저 기본 높이로 설정
-    
-    // 내용이 있고 줄바꿈이 있거나 scrollHeight가 28px보다 크면 확장
-    if (newContent.trim() !== '' && (newContent.includes('\n') || textarea.scrollHeight > 28)) {
+    textarea.style.height = '24px'; // 먼저 기본 높이로 설정
+
+    // 내용이 있고 줄바꿈이 있거나 scrollHeight가 24px보다 크면 확장
+    if (newContent.trim() !== '' && (newContent.includes('\n') || textarea.scrollHeight > 24)) {
       textarea.style.height = `${textarea.scrollHeight}px`;
     }
     
@@ -404,6 +396,16 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   const handleBlur = () => {
     if (!showBlockSelector) {
       setIsFocused(false);
+
+      // 내용이 변경되었으면 저장
+      if (content !== block.content && onUpdate) {
+        onUpdate({ ...block, content, importanceRanges: block.importanceRanges });
+
+        // 실제로 내용이 변경되었을 때만 히스토리 저장
+        if (onSaveToHistory) {
+          setTimeout(() => onSaveToHistory(), 100); // 약간의 지연으로 업데이트 완료 후 저장
+        }
+      }
     }
   };
 
@@ -424,7 +426,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
         const start = textarea.selectionStart;
         const end = textarea.selectionEnd;
         
-        console.log('Selection:', { start, end, selectedText: textarea.value.substring(start, end) });
         
         if (start !== end && end > start) {
           setSelectedRange({ start, end });
@@ -433,7 +434,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
             y: e.clientY - 10
           });
           setShowImportanceMenu(true);
-          console.log('Showing importance menu');
         } else {
           setShowImportanceMenu(false);
           setSelectedRange(null);
@@ -449,9 +449,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
       return;
     }
     
-    console.log('🎨 Applying importance:', level, 'to range:', selectedRange);
-    console.log('🎨 Current block before update:', block);
-    console.log('🎨 Current importanceRanges:', block.importanceRanges);
     
     const ranges = block.importanceRanges || [];
     const newRange: ImportanceRange = {
@@ -526,23 +523,26 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
       updatedRanges.push(newRange);
     }
     
-    console.log('🎨 Updated ranges:', updatedRanges);
 
     // 배열을 완전히 새로운 객체로 만들어서 React가 변경을 확실히 감지하도록 함
     const freshUpdatedRanges = updatedRanges.map(range => ({ ...range }));
 
     const updatedBlock = {
       ...block,
-      importanceRanges: freshUpdatedRanges,
-      // 추가적인 변경 감지를 위해 임시 timestamp 추가
-      _lastImportanceUpdate: Date.now()
+      content: content, // 현재 입력 중인 content 상태 사용
+      importanceRanges: freshUpdatedRanges
     };
 
-    console.log('🎨 Updated block being sent to onUpdate:', updatedBlock);
-    console.log('🎨 Updated block importanceRanges:', updatedBlock.importanceRanges);
+    // 로컬 content 상태만 업데이트 (importanceRanges는 props에 의존)
+    setContent(updatedBlock.content);
 
     if (onUpdate) {
       onUpdate(updatedBlock);
+    }
+
+    // 중요도 변경 시 히스토리 저장
+    if (onSaveToHistory) {
+      setTimeout(() => onSaveToHistory(), 50); // 약간의 지연으로 업데이트 후 저장
     }
 
     // 상태를 즉시 업데이트하여 리렌더링 강제
@@ -551,8 +551,24 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
 
     // 강제로 리렌더링 (다중 호출로 확실히)
     forceUpdate({});
-    setTimeout(() => forceUpdate({}), 10);
+
+    // 즉시 DOM을 직접 업데이트하여 배경색 반영
+    setTimeout(() => {
+      forceUpdate({});
+      // DOM 요소를 직접 업데이트
+      if (textareaRef.current && textareaRef.current.parentElement) {
+        const backgroundDiv = textareaRef.current.parentElement.querySelector('div[style*="position: absolute"]');
+        if (backgroundDiv && !backgroundDiv.textContent) {
+          // 배경 div가 존재하지만 내용이 없다면 강제로 다시 렌더링
+          console.log('🎨 Force updating background div');
+          forceUpdate({});
+        }
+      }
+    }, 10);
+
     setTimeout(() => forceUpdate({}), 50);
+    setTimeout(() => forceUpdate({}), 100);
+    setTimeout(() => forceUpdate({}), 200);
 
     // 포커스 복원
     setTimeout(() => {
@@ -630,28 +646,23 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   };
 
   // 텍스트에 중요도 스타일 적용
-  const renderStyledText = (text: string) => {
-    console.log('🎨 TextBlock renderStyledText called for block:', block.id);
-    console.log('🎨 Block content:', text);
-    console.log('🎨 Block importance ranges:', block.importanceRanges);
+  const renderStyledText = (text: string, ranges: ImportanceRange[] = block.importanceRanges || []) => {
 
     // 배열 내용 자세히 확인
-    if (block.importanceRanges && block.importanceRanges.length > 0) {
-      block.importanceRanges.forEach((range, index) => {
-        console.log(`🎨 Range ${index}:`, range);
+    if (ranges && ranges.length > 0) {
+      ranges.forEach((range, index) => {
       });
     }
-    
-    if (!block.importanceRanges || block.importanceRanges.length === 0) {
-      console.log('🎨 No importance ranges found, returning plain text');
+
+    if (!ranges || ranges.length === 0) {
       return text;
     }
-    
-    const ranges = [...block.importanceRanges].sort((a, b) => a.start - b.start);
+
+    const sortedRanges = [...ranges].sort((a, b) => a.start - b.start);
     const parts: Array<{ text: string; level?: ImportanceLevel }> = [];
     let lastIndex = 0;
-    
-    ranges.forEach(range => {
+
+    sortedRanges.forEach(range => {
       // 이전 부분 (스타일 없음)
       if (lastIndex < range.start) {
         parts.push({ text: text.substring(lastIndex, range.start) });
@@ -673,7 +684,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     
     return parts.map((part, index) => {
       const importanceStyle = part.level ? getImportanceStyle(part.level) : {};
-      console.log('🎨 Rendering part:', part.text, 'level:', part.level, 'style:', importanceStyle);
 
       return (
         <span
@@ -703,7 +713,9 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
         <div style={{
           marginBottom: '0px',
           position: 'relative',
-          minHeight: '28px'
+          minHeight: '24px',
+          display: 'flex',
+          alignItems: 'center'
         }}>
           {/* 배경에 스타일된 텍스트 표시 - 항상 표시 */}
           {block.importanceRanges && block.importanceRanges.length > 0 && (
@@ -728,7 +740,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
             >
               {(activeImportanceFilters || showGeneralContent !== undefined) ?
                 renderFilteredStyledText(content, block.importanceRanges, activeImportanceFilters, showGeneralContent) :
-                renderStyledText(content)}
+                renderStyledText(content, block.importanceRanges)}
             </div>
           )}
           <textarea
@@ -747,10 +759,10 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
               position: 'relative',
               zIndex: 2,
               width: '100%',
-              minHeight: '28px',
+              minHeight: '24px',
               border: 'none',
               borderRadius: '4px',
-              padding: '2px 0',
+              padding: '1px 0',
               fontFamily: 'inherit',
               fontSize: '14px',
               resize: 'none',
@@ -808,7 +820,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
                 key={level}
                 onClick={(e) => {
                   e.stopPropagation();
-                  console.log('Menu button clicked:', level);
                   applyImportance(level as ImportanceLevel);
                 }}
                 style={{
@@ -900,28 +911,24 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   };
 
   // 읽기 모드에서만 제대로 된 색상으로 중요도 표시
-  const renderStyledTextForReadMode = (text: string) => {
-    console.log('🎨 ReadMode renderStyledText called for block:', block.id);
-    console.log('🎨 Block content:', text);
-    console.log('🎨 Block importance ranges:', block.importanceRanges);
+  const renderStyledTextForReadMode = (text: string, ranges: ImportanceRange[] = block.importanceRanges || []) => {
 
     // 배열 내용 자세히 확인
-    if (block.importanceRanges && block.importanceRanges.length > 0) {
-      block.importanceRanges.forEach((range, index) => {
+    if (ranges && ranges.length > 0) {
+      ranges.forEach((range, index) => {
         console.log(`🎨 ReadMode Range ${index}:`, range);
       });
     }
 
-    if (!block.importanceRanges || block.importanceRanges.length === 0) {
-      console.log('🎨 No importance ranges found, returning plain text');
+    if (!ranges || ranges.length === 0) {
       return text;
     }
-    
-    const ranges = [...block.importanceRanges].sort((a, b) => a.start - b.start);
+
+    const sortedRanges = [...ranges].sort((a, b) => a.start - b.start);
     const parts: Array<{ text: string; level?: ImportanceLevel }> = [];
     let lastIndex = 0;
-    
-    ranges.forEach(range => {
+
+    sortedRanges.forEach(range => {
       // 이전 부분 (스타일 없음)
       if (lastIndex < range.start) {
         parts.push({ text: text.substring(lastIndex, range.start) });
@@ -962,10 +969,12 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     <div
       onClick={handleClick}
       style={{
-        padding: '2px 0',
+        display: 'flex',
+        alignItems: 'center',
+        padding: '1px 0',
         borderRadius: '4px',
         cursor: 'text',
-        minHeight: '28px',
+        minHeight: '24px',
         whiteSpace: 'pre-wrap',
         wordBreak: 'break-word',
         lineHeight: '1.4',
@@ -975,7 +984,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
 {block.content ? (
         (activeImportanceFilters || showGeneralContent !== undefined) ?
           renderFilteredHighlightedText(block.content, block.importanceRanges, activeImportanceFilters, showGeneralContent) :
-          renderStyledTextForReadMode(block.content)
+          renderStyledTextForReadMode(block.content, block.importanceRanges)
       ) : (
         <span style={{ color: '#999', fontStyle: 'italic' }}>빈 텍스트</span>
       )}

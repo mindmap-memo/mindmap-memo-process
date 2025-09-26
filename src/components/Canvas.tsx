@@ -1,18 +1,28 @@
 import React from 'react';
-import { Page, MemoDisplaySize, ImportanceLevel } from '../types';
+import { Page, MemoDisplaySize, ImportanceLevel, CategoryBlock, MemoBlock as MemoBlockType, isMemoBlock, isCategoryBlock } from '../types';
 import MemoBlock from './MemoBlock';
+import CategoryBlockComponent from './CategoryBlock';
 import ImportanceFilter from './ImportanceFilter';
 
 interface CanvasProps {
   currentPage: Page | undefined;
   selectedMemoId: string | null;
   selectedMemoIds: string[];
+  selectedCategoryId: string | null; // 선택된 카테고리 ID
   onMemoSelect: (memoId: string, isShiftClick?: boolean) => void;
+  onCategorySelect: (categoryId: string) => void; // 카테고리 선택 핸들러
   onAddMemo: (position?: { x: number; y: number }) => void;
+  onAddCategory: (position?: { x: number; y: number }) => void; // 카테고리 생성 핸들러
   onDeleteMemo: () => void;
+  onDeleteCategory: (categoryId: string) => void; // 카테고리 삭제 핸들러
   onDisconnectMemo: () => void;
   onMemoPositionChange: (memoId: string, position: { x: number; y: number }) => void;
+  onCategoryPositionChange: (categoryId: string, position: { x: number; y: number }) => void; // 카테고리 위치 변경
   onMemoSizeChange: (memoId: string, size: { width: number; height: number }) => void;
+  onCategorySizeChange: (categoryId: string, size: { width: number; height: number }) => void; // 카테고리 크기 변경
+  onCategoryUpdate: (category: CategoryBlock) => void; // 카테고리 업데이트
+  onCategoryToggleExpanded: (categoryId: string) => void; // 카테고리 펼침/접기
+  onMoveToCategory: (itemId: string, categoryId: string | null) => void; // 아이템을 카테고리로 이동
   onMemoDisplaySizeChange?: (memoId: string, size: MemoDisplaySize) => void;
   isConnecting: boolean;
   isDisconnectMode: boolean;
@@ -40,12 +50,21 @@ const Canvas: React.FC<CanvasProps> = ({
   currentPage,
   selectedMemoId,
   selectedMemoIds,
+  selectedCategoryId,
   onMemoSelect,
+  onCategorySelect,
   onAddMemo,
+  onAddCategory,
   onDeleteMemo,
+  onDeleteCategory,
   onDisconnectMemo,
   onMemoPositionChange,
+  onCategoryPositionChange,
   onMemoSizeChange,
+  onCategorySizeChange,
+  onCategoryUpdate,
+  onCategoryToggleExpanded,
+  onMoveToCategory,
   onMemoDisplaySizeChange,
   isConnecting,
   isDisconnectMode,
@@ -131,14 +150,6 @@ const Canvas: React.FC<CanvasProps> = ({
       }
     };
     
-    // 디버그: 연결점 위치 출력
-    if (memo.id.includes('1')) {  // 첫 번째 메모만 출력
-      console.log(`Memo ${memo.id} connection points:`, {
-        position: memo.position,
-        size: { width, height },
-        points
-      });
-    }
     
     return points;
   };
@@ -214,7 +225,6 @@ const Canvas: React.FC<CanvasProps> = ({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log('Removing connection:', memo.id, 'to', connId);
                   onRemoveConnection(memo.id, connId);
                 }}
               />
@@ -237,30 +247,199 @@ const Canvas: React.FC<CanvasProps> = ({
       });
     });
 
+    // 카테고리 연결선들 (카테고리끼리만)
+    (currentPage.categories || []).forEach(category => {
+      category.connections.forEach(connId => {
+        // 연결된 대상이 카테고리인지 확인 (메모와의 연결은 제외)
+        const connectedCategory = currentPage.categories?.find(c => c.id === connId);
+
+        if (!connectedCategory) return; // 카테고리끼리만 연결
+        if (category.id >= connId) return; // 중복 연결선 방지
+
+        // 카테고리의 연결점 계산
+        const categoryWidth = category.size?.width || 200;
+        const categoryHeight = category.size?.height || 80;
+        const fromPoints = {
+          top: {
+            x: category.position.x + categoryWidth / 2,
+            y: category.position.y
+          },
+          bottom: {
+            x: category.position.x + categoryWidth / 2,
+            y: category.position.y + categoryHeight
+          },
+          left: {
+            x: category.position.x,
+            y: category.position.y + categoryHeight / 2
+          },
+          right: {
+            x: category.position.x + categoryWidth,
+            y: category.position.y + categoryHeight / 2
+          }
+        };
+
+        // 연결된 카테고리의 연결점 계산
+        const connWidth = connectedCategory.size?.width || 200;
+        const connHeight = connectedCategory.size?.height || 80;
+        const toPoints = {
+          top: {
+            x: connectedCategory.position.x + connWidth / 2,
+            y: connectedCategory.position.y
+          },
+          bottom: {
+            x: connectedCategory.position.x + connWidth / 2,
+            y: connectedCategory.position.y + connHeight
+          },
+          left: {
+            x: connectedCategory.position.x,
+            y: connectedCategory.position.y + connHeight / 2
+          },
+          right: {
+            x: connectedCategory.position.x + connWidth,
+            y: connectedCategory.position.y + connHeight / 2
+          }
+        };
+
+        // 최적 연결점 선택
+        const centerFrom = {
+          x: category.position.x + categoryWidth / 2,
+          y: category.position.y + categoryHeight / 2
+        };
+        const centerTo = {
+          x: connectedCategory.position.x + connWidth / 2,
+          y: connectedCategory.position.y + connHeight / 2
+        };
+
+        const dx = centerTo.x - centerFrom.x;
+        const dy = centerTo.y - centerFrom.y;
+
+        let fromPoint, toPoint;
+
+        if (Math.abs(dx) > Math.abs(dy)) {
+          if (dx > 0) {
+            fromPoint = fromPoints.right;
+            toPoint = toPoints.left;
+          } else {
+            fromPoint = fromPoints.left;
+            toPoint = toPoints.right;
+          }
+        } else {
+          if (dy > 0) {
+            fromPoint = fromPoints.bottom;
+            toPoint = toPoints.top;
+          } else {
+            fromPoint = fromPoints.top;
+            toPoint = toPoints.bottom;
+          }
+        }
+
+        lines.push(
+          <g key={`category-${category.id}-${connId}`}>
+            {/* 투명한 넓은 클릭 영역 */}
+            {isDisconnectMode && (
+              <line
+                x1={fromPoint.x}
+                y1={fromPoint.y}
+                x2={toPoint.x}
+                y2={toPoint.y}
+                stroke="transparent"
+                strokeWidth="16"
+                style={{
+                  cursor: 'pointer',
+                  pointerEvents: 'auto'
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onRemoveConnection(category.id, connId);
+                }}
+              />
+            )}
+            {/* 실제 보이는 연결선 (카테고리는 주황색으로) */}
+            <line
+              x1={fromPoint.x}
+              y1={fromPoint.y}
+              x2={toPoint.x}
+              y2={toPoint.y}
+              stroke={isDisconnectMode ? "#ef4444" : "#ff9800"}
+              strokeWidth={isDisconnectMode ? "4" : "2"}
+              style={{
+                strokeDasharray: isDisconnectMode ? '5,5' : '8,4',
+                pointerEvents: 'none'
+              }}
+            />
+          </g>
+        );
+      });
+    });
+
     // 드래그 중인 라인 추가
     if (isConnecting && connectingFromId && dragLineEnd) {
       const connectingMemo = currentPage.memos.find(m => m.id === connectingFromId);
+      const connectingCategory = (currentPage.categories || []).find(c => c.id === connectingFromId);
+
+      let fromPoint;
+
       if (connectingMemo) {
         const fromPoints = getConnectionPoints(connectingMemo);
-        
+
         const connectingWidth = connectingMemo.size?.width || 200;
         const connectingHeight = connectingMemo.size?.height || 95;
-        
+
         // 원본 메모 좌표로 중심점 계산
-        const centerFrom = { 
-          x: connectingMemo.position.x + connectingWidth / 2, 
-          y: connectingMemo.position.y + connectingHeight / 2 
+        const centerFrom = {
+          x: connectingMemo.position.x + connectingWidth / 2,
+          y: connectingMemo.position.y + connectingHeight / 2
         };
         // dragLineEnd를 원본 좌표로 변환
         const dx = dragLineEnd.x - centerFrom.x;
         const dy = dragLineEnd.y - centerFrom.y;
-        
-        let fromPoint;
+
         if (Math.abs(dx) > Math.abs(dy)) {
           fromPoint = dx > 0 ? fromPoints.right : fromPoints.left;
         } else {
           fromPoint = dy > 0 ? fromPoints.bottom : fromPoints.top;
         }
+      } else if (connectingCategory) {
+        const categoryWidth = connectingCategory.size?.width || 200;
+        const categoryHeight = connectingCategory.size?.height || 40;
+
+        const fromPoints = {
+          top: {
+            x: connectingCategory.position.x + categoryWidth / 2,
+            y: connectingCategory.position.y
+          },
+          bottom: {
+            x: connectingCategory.position.x + categoryWidth / 2,
+            y: connectingCategory.position.y + categoryHeight
+          },
+          left: {
+            x: connectingCategory.position.x,
+            y: connectingCategory.position.y + categoryHeight / 2
+          },
+          right: {
+            x: connectingCategory.position.x + categoryWidth,
+            y: connectingCategory.position.y + categoryHeight / 2
+          }
+        };
+
+        // 카테고리 중심점 계산
+        const centerFrom = {
+          x: connectingCategory.position.x + categoryWidth / 2,
+          y: connectingCategory.position.y + categoryHeight / 2
+        };
+
+        const dx = dragLineEnd.x - centerFrom.x;
+        const dy = dragLineEnd.y - centerFrom.y;
+
+        if (Math.abs(dx) > Math.abs(dy)) {
+          fromPoint = dx > 0 ? fromPoints.right : fromPoints.left;
+        } else {
+          fromPoint = dy > 0 ? fromPoints.bottom : fromPoints.top;
+        }
+      }
+
+      if (fromPoint) {
         
         const dragLine = (
           <line
@@ -283,6 +462,94 @@ const Canvas: React.FC<CanvasProps> = ({
 
     return lines;
   };
+
+  // 카테고리와 하위 아이템들을 재귀적으로 렌더링하는 함수
+  const renderCategoryWithChildren = (category: CategoryBlock): React.ReactNode => {
+    if (!currentPage) return null;
+
+    // 하위 메모들과 카테고리들 찾기
+    const childMemos = currentPage.memos.filter(memo => memo.parentId === category.id);
+    const childCategories = currentPage.categories?.filter(cat => cat.parentId === category.id) || [];
+
+    // 하위 아이템들 렌더링
+    const childrenElements = category.isExpanded ? (
+      <>
+        {childMemos.map(memo => (
+          <MemoBlock
+            key={memo.id}
+            memo={memo}
+            isSelected={selectedMemoId === memo.id || selectedMemoIds.includes(memo.id)}
+            isDragHovered={dragHoveredMemoIds.includes(memo.id)}
+            onClick={(isShiftClick?: boolean) => onMemoSelect(memo.id, isShiftClick)}
+            onPositionChange={onMemoPositionChange}
+            onSizeChange={onMemoSizeChange}
+            onDisplaySizeChange={onMemoDisplaySizeChange}
+            isConnecting={isConnecting}
+            connectingFromId={connectingFromId}
+            onStartConnection={onStartConnection}
+            onConnectMemos={onConnectMemos}
+            canvasScale={canvasScale}
+            canvasOffset={canvasOffset}
+            activeImportanceFilters={activeImportanceFilters}
+            showGeneralContent={showGeneralContent}
+          />
+        ))}
+        {childCategories.map(childCategory =>
+          renderCategoryWithChildren(childCategory)
+        )}
+      </>
+    ) : null;
+
+    return (
+      <CategoryBlockComponent
+        key={category.id}
+        category={category}
+        isSelected={selectedCategoryId === category.id}
+        isConnecting={isConnecting}
+        isDisconnectMode={isDisconnectMode}
+        connectingFromId={connectingFromId}
+        onUpdate={onCategoryUpdate}
+        onDelete={onDeleteCategory}
+        onToggleExpanded={onCategoryToggleExpanded}
+        onClick={onCategorySelect}
+        onStartConnection={onStartConnection}
+        onConnectItems={onConnectMemos}
+        onRemoveConnection={onRemoveConnection}
+        onPositionChange={onCategoryPositionChange}
+        onSizeChange={onCategorySizeChange}
+        canvasScale={canvasScale}
+        onDragStart={handleCategoryDragStart}
+        onDragEnd={handleCategoryDragEnd}
+        onDrop={(e) => handleDropOnCategory(e, category.id)}
+        onDragOver={handleCategoryDragOver}
+      >
+        {childrenElements}
+      </CategoryBlockComponent>
+    );
+  };
+
+  // 카테고리 드래그 핸들러들
+  const handleCategoryDragStart = (e: React.DragEvent) => {
+    // 드래그 시작 로직
+  };
+
+  const handleCategoryDragEnd = (e: React.DragEvent) => {
+    // 드래그 종료 로직
+  };
+
+  const handleCategoryDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDropOnCategory = (e: React.DragEvent, categoryId: string) => {
+    e.preventDefault();
+    const dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
+
+    if (dragData.type === 'memo' || dragData.type === 'category') {
+      onMoveToCategory(dragData.id, categoryId);
+    }
+  };
+
   // 전역 드래그 선택을 위한 상태
   const [globalDragSelecting, setGlobalDragSelecting] = React.useState(false);
   const [globalDragStart, setGlobalDragStart] = React.useState({ x: 0, y: 0 });
@@ -319,7 +586,10 @@ const Canvas: React.FC<CanvasProps> = ({
     const isCanvasBackground = target.hasAttribute('data-canvas') ||
                               target.tagName === 'svg' ||
                               target.tagName === 'line' ||
-                              (target.tagName === 'DIV' && !target.closest('[data-memo-block="true"]') && !target.closest('button'));
+                              (target.tagName === 'DIV' &&
+                               !target.closest('[data-memo-block="true"]') &&
+                               !target.closest('[data-category-block="true"]') &&
+                               !target.closest('button'));
     
     if (isCanvasBackground && !isConnecting) {
       if (currentTool === 'pan') {
@@ -636,6 +906,11 @@ const Canvas: React.FC<CanvasProps> = ({
           />
         ))}
 
+        {/* 카테고리 블록들 렌더링 */}
+        {currentPage?.categories?.filter(category => !category.parentId).map(category =>
+          renderCategoryWithChildren(category)
+        )}
+
         {/* 드래그 선택 영역 - 메모 블록과 같은 transform 공간 안에 위치 */}
         {isDragSelecting && dragSelectStart && dragSelectEnd && (
           <div
@@ -779,6 +1054,32 @@ const Canvas: React.FC<CanvasProps> = ({
           }}
         >
           + 블록 생성
+        </button>
+        <button
+          onClick={() => {
+            const canvas = document.querySelector('[data-canvas="true"]') as HTMLElement;
+            if (canvas) {
+              const rect = canvas.getBoundingClientRect();
+              const centerX = (rect.width / 2 - canvasOffset.x) / canvasScale;
+              const centerY = (rect.height / 2 - canvasOffset.y) / canvasScale;
+              onAddCategory({ x: centerX - 100, y: centerY - 20 });
+            } else {
+              onAddCategory();
+            }
+          }}
+          style={{
+            backgroundColor: '#ff9800',
+            color: 'white',
+            border: 'none',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '600',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          📁 카테고리 생성
         </button>
         <button
           onClick={onDisconnectMemo}
