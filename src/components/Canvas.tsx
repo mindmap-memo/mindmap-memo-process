@@ -9,12 +9,14 @@ interface CanvasProps {
   selectedMemoId: string | null;
   selectedMemoIds: string[];
   selectedCategoryId: string | null; // 선택된 카테고리 ID
+  selectedCategoryIds: string[]; // 다중 선택된 카테고리 ID들
   onMemoSelect: (memoId: string, isShiftClick?: boolean) => void;
-  onCategorySelect: (categoryId: string) => void; // 카테고리 선택 핸들러
+  onCategorySelect: (categoryId: string, isShiftClick?: boolean) => void; // 카테고리 선택 핸들러
   onAddMemo: (position?: { x: number; y: number }) => void;
   onAddCategory: (position?: { x: number; y: number }) => void; // 카테고리 생성 핸들러
   onDeleteMemo: () => void;
   onDeleteCategory: (categoryId: string) => void; // 카테고리 삭제 핸들러
+  onDeleteSelected: () => void; // 통합 삭제 핸들러
   onDisconnectMemo: () => void;
   onMemoPositionChange: (memoId: string, position: { x: number; y: number }) => void;
   onCategoryPositionChange: (categoryId: string, position: { x: number; y: number }) => void; // 카테고리 위치 변경
@@ -23,6 +25,7 @@ interface CanvasProps {
   onCategoryUpdate: (category: CategoryBlock) => void; // 카테고리 업데이트
   onCategoryToggleExpanded: (categoryId: string) => void; // 카테고리 펼침/접기
   onMoveToCategory: (itemId: string, categoryId: string | null) => void; // 아이템을 카테고리로 이동
+  onDetectCategoryOnDrop: (memoId: string, position: { x: number; y: number }) => void; // 드래그 완료 시 카테고리 감지
   onMemoDisplaySizeChange?: (memoId: string, size: MemoDisplaySize) => void;
   isConnecting: boolean;
   isDisconnectMode: boolean;
@@ -44,6 +47,13 @@ interface CanvasProps {
   onToggleImportanceFilter: (level: ImportanceLevel) => void;
   showGeneralContent: boolean;
   onToggleGeneralContent: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+  isDraggingMemo?: boolean;
+  onMemoDragStart?: () => void;
+  onMemoDragEnd?: () => void;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -51,12 +61,14 @@ const Canvas: React.FC<CanvasProps> = ({
   selectedMemoId,
   selectedMemoIds,
   selectedCategoryId,
+  selectedCategoryIds,
   onMemoSelect,
   onCategorySelect,
   onAddMemo,
   onAddCategory,
   onDeleteMemo,
   onDeleteCategory,
+  onDeleteSelected,
   onDisconnectMemo,
   onMemoPositionChange,
   onCategoryPositionChange,
@@ -65,6 +77,7 @@ const Canvas: React.FC<CanvasProps> = ({
   onCategoryUpdate,
   onCategoryToggleExpanded,
   onMoveToCategory,
+  onDetectCategoryOnDrop,
   onMemoDisplaySizeChange,
   isConnecting,
   isDisconnectMode,
@@ -85,7 +98,14 @@ const Canvas: React.FC<CanvasProps> = ({
   activeImportanceFilters,
   onToggleImportanceFilter,
   showGeneralContent,
-  onToggleGeneralContent
+  onToggleGeneralContent,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
+  isDraggingMemo = false,
+  onMemoDragStart,
+  onMemoDragEnd
 }) => {
   const [isPanning, setIsPanning] = React.useState(false);
   const [panStart, setPanStart] = React.useState({ x: 0, y: 0 });
@@ -98,7 +118,28 @@ const Canvas: React.FC<CanvasProps> = ({
   const [isAltPressed, setIsAltPressed] = React.useState(false);
   const [baseTool, setBaseTool] = React.useState<'select' | 'pan' | 'zoom'>('select');
   const [isMouseOverCanvas, setIsMouseOverCanvas] = React.useState(false);
-  
+  const [areaUpdateTrigger, setAreaUpdateTrigger] = React.useState(0);
+
+  // 메모와 카테고리 위치 변경 시 영역 업데이트 (더 정밀한 감지)
+  React.useEffect(() => {
+    if (currentPage) {
+      // 모든 메모의 위치와 크기를 포함한 상세한 의존성
+      setAreaUpdateTrigger(prev => prev + 1);
+    }
+  }, [
+    currentPage?.memos?.map(m => `${m.id}:${m.position.x}:${m.position.y}:${m.size?.width}:${m.size?.height}:${m.parentId}`).join('|'),
+    currentPage?.categories?.map(c => `${c.id}:${c.position.x}:${c.position.y}:${c.size?.width}:${c.size?.height}:${c.isExpanded}`).join('|')
+  ]);
+
+  // 추가적으로 실시간 업데이트를 위한 효과
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setAreaUpdateTrigger(prev => prev + 1);
+    }, 100); // 100ms마다 강제 업데이트
+
+    return () => clearInterval(interval);
+  }, []);
+
   // 캔버스 최대 영역 (15000x15000px, SVG와 동일)
   const CANVAS_BOUNDS = { width: 15000, height: 15000, offsetX: -5000, offsetY: -5000 };
 
@@ -463,6 +504,248 @@ const Canvas: React.FC<CanvasProps> = ({
     return lines;
   };
 
+  // 카테고리 영역 색상 생성 (카테고리 ID 기반)
+  const getCategoryAreaColor = (categoryId: string): string => {
+    const colors = [
+      'rgba(59, 130, 246, 0.15)',   // 파란색
+      'rgba(16, 185, 129, 0.15)',   // 초록색
+      'rgba(245, 101, 101, 0.15)',  // 빨간색
+      'rgba(139, 92, 246, 0.15)',   // 보라색
+      'rgba(245, 158, 11, 0.15)',   // 노란색
+      'rgba(236, 72, 153, 0.15)',   // 핑크색
+      'rgba(20, 184, 166, 0.15)',   // 청록색
+      'rgba(251, 146, 60, 0.15)',   // 오렌지색
+    ];
+
+    // 카테고리 ID를 해시하여 일관된 색상 선택
+    let hash = 0;
+    for (let i = 0; i < categoryId.length; i++) {
+      hash = categoryId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  // 카테고리의 경계 영역 계산 (memoized)
+  const calculateCategoryArea = React.useCallback((category: CategoryBlock, visited: Set<string> = new Set()) => {
+    if (!currentPage) return null;
+
+    // 순환 참조 방지
+    if (visited.has(category.id)) {
+      return null;
+    }
+    visited.add(category.id);
+
+    const childMemos = currentPage.memos.filter(memo => memo.parentId === category.id);
+    const childCategories = currentPage.categories?.filter(cat => cat.parentId === category.id) || [];
+
+    // 하위 아이템이 없으면 영역 표시 안함
+    if (childMemos.length === 0 && childCategories.length === 0) {
+      visited.delete(category.id);
+      return null;
+    }
+
+    // 카테고리 블록 자체의 위치와 크기
+    const categoryWidth = category.size?.width || 200;
+    const categoryHeight = category.size?.height || 80;
+
+    let minX = category.position.x;
+    let minY = category.position.y;
+    let maxX = category.position.x + categoryWidth;
+    let maxY = category.position.y + categoryHeight;
+
+    // 하위 메모들의 경계 포함
+    childMemos.forEach(memo => {
+      const memoWidth = memo.size?.width || 200;
+      const memoHeight = memo.size?.height || 95;
+      minX = Math.min(minX, memo.position.x);
+      minY = Math.min(minY, memo.position.y);
+      maxX = Math.max(maxX, memo.position.x + memoWidth);
+      maxY = Math.max(maxY, memo.position.y + memoHeight);
+    });
+
+    // 하위 카테고리들의 경계도 포함 (재귀적으로, 방문 집합 전달)
+    childCategories.forEach(childCategory => {
+      const childArea = calculateCategoryArea(childCategory, visited);
+      if (childArea) {
+        minX = Math.min(minX, childArea.x);
+        minY = Math.min(minY, childArea.y);
+        maxX = Math.max(maxX, childArea.x + childArea.width);
+        maxY = Math.max(maxY, childArea.y + childArea.height);
+      }
+    });
+
+    // 방문 완료 후 제거 (다른 브랜치에서 재방문 가능하도록)
+    visited.delete(category.id);
+
+    // 여백 추가 (적절한 간격 유지)
+    const padding = 70;
+    return {
+      x: minX - padding,
+      y: minY - padding,
+      width: maxX - minX + padding * 2,
+      height: maxY - minY + padding * 2,
+      color: getCategoryAreaColor(category.id)
+    };
+  }, [
+    // 더 효율적인 의존성 관리 - 드래그 중에는 과도한 계산 방지
+    currentPage?.memos?.length,
+    currentPage?.categories?.length,
+    // areaUpdateTrigger를 사용하여 수동 업데이트 제어
+    areaUpdateTrigger,
+    // 위치는 200ms마다만 체크 (빠른 드래그 시 성능 개선)
+    Math.floor(Date.now() / 200)
+  ]);
+
+  // 단일 카테고리 영역 렌더링 (재귀적으로 하위 카테고리도 포함)
+  const renderSingleCategoryArea = (category: CategoryBlock): React.ReactNode[] => {
+    const areas: React.ReactNode[] = [];
+
+    // 현재 카테고리의 영역 렌더링
+    const area = calculateCategoryArea(category);
+
+    // 하위 아이템이 있으면 항상 카테고리 라벨 표시 (펼침/접기 상관없이)
+    const hasChildren = currentPage?.memos.some(memo => memo.parentId === category.id) ||
+                       currentPage?.categories?.some(cat => cat.parentId === category.id);
+
+    if (area && hasChildren) {
+      // 펼쳐진 경우에만 영역 배경 표시
+      if (category.isExpanded) {
+        areas.push(
+          <div
+            key={`area-${category.id}`}
+            style={{
+              position: 'absolute',
+              left: `${area.x}px`,
+              top: `${area.y}px`,
+              width: `${area.width}px`,
+              height: `${area.height}px`,
+              backgroundColor: area.color,
+              border: '2px dashed rgba(139, 92, 246, 0.3)',
+              borderRadius: '12px',
+              pointerEvents: 'auto',
+              zIndex: -1,
+              transition: 'all 0.1s ease'
+            }}
+            onDrop={(e) => handleDropOnCategoryArea(e, category.id)}
+            onDragOver={handleCategoryAreaDragOver}
+          />
+        );
+      }
+
+      // 카테고리 이름 라벨은 항상 표시 (접어도 보임) - 마우스 드래그 사용
+      areas.push(
+        <div
+          key={`label-${category.id}`}
+          draggable={false}
+          style={{
+            position: 'absolute',
+            top: `${area.y + 8}px`,
+            left: `${area.x + 12}px`,
+            backgroundColor: '#8b5cf6',
+            color: 'white',
+            padding: '4px 12px',
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: '600',
+            pointerEvents: 'auto',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            cursor: 'grab',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            zIndex: 10
+          }}
+          onClick={() => onCategorySelect(category.id)}
+          onDoubleClick={() => {
+            // 더블클릭 시 편집 모드로 전환하는 함수 호출
+            console.log('카테고리 편집:', category.id);
+          }}
+          onMouseDown={(e) => {
+            if (e.button === 0) {
+              // 카테고리 라벨 드래그를 위한 임시 상태 설정
+              console.log('🚀 CategoryLabel mouse drag start:', category.id);
+              // 카테고리 전체를 이동하는 마우스 드래그 구현
+              let startX = e.clientX;
+              let startY = e.clientY;
+              const originalPosition = { x: area.x, y: area.y };
+
+              const handleMouseMove = (moveEvent: MouseEvent) => {
+                const deltaX = (moveEvent.clientX - startX) / canvasScale;
+                const deltaY = (moveEvent.clientY - startY) / canvasScale;
+
+                const newPosition = {
+                  x: originalPosition.x + deltaX,
+                  y: originalPosition.y + deltaY
+                };
+
+                // 카테고리 위치 업데이트
+                onCategoryPositionChange(category.id, {
+                  x: category.position.x + deltaX,
+                  y: category.position.y + deltaY
+                });
+              };
+
+              const handleMouseUp = () => {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+                console.log('🏁 CategoryLabel mouse drag end:', category.id);
+              };
+
+              document.addEventListener('mousemove', handleMouseMove);
+              document.addEventListener('mouseup', handleMouseUp);
+              e.preventDefault();
+            }
+          }}
+        >
+          <span>{category.title}</span>
+          <button
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              borderRadius: '3px',
+              color: 'white',
+              fontSize: '10px',
+              padding: '2px 4px',
+              cursor: 'pointer'
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCategoryToggleExpanded(category.id);
+            }}
+            title={category.isExpanded ? "접기" : "펼치기"}
+          >
+            {category.isExpanded ? '−' : '+'}
+          </button>
+        </div>
+      );
+    }
+
+    // 하위 카테고리들의 영역도 재귀적으로 렌더링
+    if (currentPage?.categories) {
+      const childCategories = currentPage.categories.filter(cat => cat.parentId === category.id);
+      childCategories.forEach(childCategory => {
+        areas.push(...renderSingleCategoryArea(childCategory));
+      });
+    }
+
+    return areas;
+  };
+
+  // 카테고리 영역 렌더링
+  const renderCategoryAreas = () => {
+    if (!currentPage?.categories) return null;
+
+    const allAreas: React.ReactNode[] = [];
+
+    // 최상위 카테고리들부터 시작해서 재귀적으로 모든 영역 렌더링
+    const topLevelCategories = currentPage.categories.filter(category => !category.parentId);
+    topLevelCategories.forEach(category => {
+      allAreas.push(...renderSingleCategoryArea(category));
+    });
+
+    return allAreas;
+  };
+
   // 카테고리와 하위 아이템들을 재귀적으로 렌더링하는 함수
   const renderCategoryWithChildren = (category: CategoryBlock): React.ReactNode => {
     if (!currentPage) return null;
@@ -484,6 +767,7 @@ const Canvas: React.FC<CanvasProps> = ({
             onPositionChange={onMemoPositionChange}
             onSizeChange={onMemoSizeChange}
             onDisplaySizeChange={onMemoDisplaySizeChange}
+            onDetectCategoryOnDrop={onDetectCategoryOnDrop}
             isConnecting={isConnecting}
             connectingFromId={connectingFromId}
             onStartConnection={onStartConnection}
@@ -492,6 +776,8 @@ const Canvas: React.FC<CanvasProps> = ({
             canvasOffset={canvasOffset}
             activeImportanceFilters={activeImportanceFilters}
             showGeneralContent={showGeneralContent}
+            onDragStart={onMemoDragStart}
+            onDragEnd={onMemoDragEnd}
           />
         ))}
         {childCategories.map(childCategory =>
@@ -500,41 +786,52 @@ const Canvas: React.FC<CanvasProps> = ({
       </>
     ) : null;
 
+    // 하위 아이템이 있으면 카테고리 블록 숨기기
+    const hasChildren = childMemos.length > 0 || childCategories.length > 0;
+
     return (
-      <CategoryBlockComponent
-        key={category.id}
-        category={category}
-        isSelected={selectedCategoryId === category.id}
-        isConnecting={isConnecting}
-        isDisconnectMode={isDisconnectMode}
-        connectingFromId={connectingFromId}
-        onUpdate={onCategoryUpdate}
-        onDelete={onDeleteCategory}
-        onToggleExpanded={onCategoryToggleExpanded}
-        onClick={onCategorySelect}
-        onStartConnection={onStartConnection}
-        onConnectItems={onConnectMemos}
-        onRemoveConnection={onRemoveConnection}
-        onPositionChange={onCategoryPositionChange}
-        onSizeChange={onCategorySizeChange}
-        canvasScale={canvasScale}
-        onDragStart={handleCategoryDragStart}
-        onDragEnd={handleCategoryDragEnd}
-        onDrop={(e) => handleDropOnCategory(e, category.id)}
-        onDragOver={handleCategoryDragOver}
-      >
-        {childrenElements}
-      </CategoryBlockComponent>
+      <>
+        {!hasChildren && (
+          <CategoryBlockComponent
+            key={category.id}
+            category={category}
+            hasChildren={hasChildren}
+            isSelected={selectedCategoryId === category.id || selectedCategoryIds.includes(category.id)}
+            isConnecting={isConnecting}
+            isDisconnectMode={isDisconnectMode}
+            connectingFromId={connectingFromId}
+            onUpdate={onCategoryUpdate}
+            onDelete={onDeleteCategory}
+            onToggleExpanded={onCategoryToggleExpanded}
+            onClick={onCategorySelect}
+            onStartConnection={onStartConnection}
+            onConnectItems={onConnectMemos}
+            onRemoveConnection={onRemoveConnection}
+            onPositionChange={onCategoryPositionChange}
+            onSizeChange={onCategorySizeChange}
+            onMoveToCategory={onMoveToCategory}
+            canvasScale={canvasScale}
+            canvasOffset={canvasOffset}
+            onDragStart={handleCategoryDragStart}
+            onDragEnd={handleCategoryDragEnd}
+            onDrop={(e) => handleDropOnCategory(e, category.id)}
+            onDragOver={handleCategoryDragOver}
+            isMemoBeingDragged={isDraggingMemo}
+          >
+            {childrenElements}
+          </CategoryBlockComponent>
+        )}
+      </>
     );
   };
 
   // 카테고리 드래그 핸들러들
   const handleCategoryDragStart = (e: React.DragEvent) => {
-    // 드래그 시작 로직
+    // 드래그 시작 로직 (현재는 기본)
   };
 
   const handleCategoryDragEnd = (e: React.DragEvent) => {
-    // 드래그 종료 로직
+    // 드래그 종료 로직 (현재는 기본)
   };
 
   const handleCategoryDragOver = (e: React.DragEvent) => {
@@ -543,12 +840,47 @@ const Canvas: React.FC<CanvasProps> = ({
 
   const handleDropOnCategory = (e: React.DragEvent, categoryId: string) => {
     e.preventDefault();
-    const dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
+    console.log('드롭 이벤트 발생 - 카테고리 블록:', categoryId);
 
-    if (dragData.type === 'memo' || dragData.type === 'category') {
-      onMoveToCategory(dragData.id, categoryId);
+    try {
+      const dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
+      console.log('드래그 데이터:', dragData);
+
+      if (dragData.type === 'memo' || dragData.type === 'category') {
+        console.log('카테고리로 이동:', dragData.id, '->', categoryId);
+        onMoveToCategory(dragData.id, categoryId);
+      }
+    } catch (error) {
+      console.error('드롭 처리 중 오류:', error);
     }
   };
+
+  // 카테고리 영역 드래그 오버 핸들러
+  const handleCategoryAreaDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // 영역에 추가적인 드래그 오버 효과를 줄 수 있음 (현재는 기본)
+  };
+
+  // 카테고리 영역에 드롭 핸들러
+  const handleDropOnCategoryArea = (e: React.DragEvent, categoryId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('드롭 이벤트 발생 - 카테고리 영역:', categoryId);
+
+    try {
+      const dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
+      console.log('드래그 데이터 (영역):', dragData);
+
+      if (dragData.type === 'memo' || dragData.type === 'category') {
+        console.log('카테고리 영역으로 이동:', dragData.id, '->', categoryId);
+        onMoveToCategory(dragData.id, categoryId);
+      }
+    } catch (error) {
+      console.error('카테고리 영역 드롭 처리 중 오류:', error);
+    }
+  };
+
 
   // 전역 드래그 선택을 위한 상태
   const [globalDragSelecting, setGlobalDragSelecting] = React.useState(false);
@@ -558,15 +890,15 @@ const Canvas: React.FC<CanvasProps> = ({
   const [justFinishedDragSelection, setJustFinishedDragSelection] = React.useState(false);
 
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
-    console.log('Canvas mouse down:', { 
-      isSpacePressed, 
-      currentTool, 
+    console.log('Canvas mouse down:', {
+      isSpacePressed,
+      currentTool,
       target: e.target,
       currentTarget: e.currentTarget,
       targetTagName: (e.target as Element).tagName,
-      isConnecting 
+      isConnecting
     });
-    
+
     const target = e.target as Element;
     
     // 스페이스바가 눌린 상태에서는 항상 팬 모드 (메모 블록 위에서도)
@@ -669,6 +1001,29 @@ const Canvas: React.FC<CanvasProps> = ({
     setIsPanning(false);
   };
 
+  // Canvas 전체에서 카테고리 라벨 드롭 처리
+  const handleCanvasDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    try {
+      const dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
+      if (dragData.type === 'category') {
+        // 드롭 위치를 캔버스 좌표로 변환
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const x = (e.clientX - rect.left - canvasOffset.x) / canvasScale;
+        const y = (e.clientY - rect.top - canvasOffset.y) / canvasScale;
+
+        console.log('🎯 Canvas category drop:', dragData.id, 'at', { x, y });
+        onCategoryPositionChange(dragData.id, { x, y });
+      }
+    } catch (error) {
+      console.log('Canvas drop - not JSON data, might be memo drag');
+    }
+  };
+
+  const handleCanvasDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
   React.useEffect(() => {
     if (isPanning) {
       const handleGlobalMouseMove = (e: MouseEvent) => {
@@ -684,15 +1039,31 @@ const Canvas: React.FC<CanvasProps> = ({
         setIsPanning(false);
       };
 
+      // 마우스가 윈도우를 벗어났을 때도 팬 종료
+      const handleMouseLeave = () => {
+        console.log('Mouse left window, ending pan');
+        setIsPanning(false);
+      };
+
+      // 윈도우 포커스를 잃었을 때도 팬 종료
+      const handleBlur = () => {
+        console.log('Window lost focus, ending pan');
+        setIsPanning(false);
+      };
+
       document.addEventListener('mousemove', handleGlobalMouseMove);
       document.addEventListener('mouseup', handleGlobalMouseUp);
+      document.addEventListener('mouseleave', handleMouseLeave);
+      window.addEventListener('blur', handleBlur);
 
       return () => {
         document.removeEventListener('mousemove', handleGlobalMouseMove);
         document.removeEventListener('mouseup', handleGlobalMouseUp);
+        document.removeEventListener('mouseleave', handleMouseLeave);
+        window.removeEventListener('blur', handleBlur);
       };
     }
-  }, [isPanning, panStart, isSpacePressed, currentTool]);
+  }, [isPanning, panStart]);
 
   // 전역 드래그 선택을 위한 이벤트 리스너
   React.useEffect(() => {
@@ -745,12 +1116,28 @@ const Canvas: React.FC<CanvasProps> = ({
         }
       };
 
+      // 마우스가 윈도우를 벗어났을 때도 드래그 선택 종료
+      const handleMouseLeave = () => {
+        console.log('Mouse left window, ending drag selection');
+        handleGlobalMouseUp();
+      };
+
+      // 윈도우 포커스를 잃었을 때도 드래그 선택 종료
+      const handleBlur = () => {
+        console.log('Window lost focus, ending drag selection');
+        handleGlobalMouseUp();
+      };
+
       document.addEventListener('mousemove', handleGlobalMouseMove);
       document.addEventListener('mouseup', handleGlobalMouseUp);
+      document.addEventListener('mouseleave', handleMouseLeave);
+      window.addEventListener('blur', handleBlur);
 
       return () => {
         document.removeEventListener('mousemove', handleGlobalMouseMove);
         document.removeEventListener('mouseup', handleGlobalMouseUp);
+        document.removeEventListener('mouseleave', handleMouseLeave);
+        window.removeEventListener('blur', handleBlur);
       };
     }
   }, [globalDragSelecting, globalDragStart, isDragSelecting, dragThresholdMet, canvasOffset, canvasScale, globalDragWithShift, onDragSelectStart, onDragSelectMove, onDragSelectEnd]);
@@ -770,9 +1157,14 @@ const Canvas: React.FC<CanvasProps> = ({
         setCurrentTool('zoom');
       }
       if (e.code === 'Escape') {
-        console.log('Escape pressed - clearing selection');
+        console.log('Escape pressed - clearing selection and resetting drag states');
         // 모든 선택 해제
         onMemoSelect('', false); // 빈 문자열로 호출해서 선택 해제
+        // 모든 드래그 상태 리셋
+        setIsPanning(false);
+        if (isConnecting) {
+          onCancelConnection();
+        }
         e.preventDefault();
       }
     };
@@ -839,6 +1231,7 @@ const Canvas: React.FC<CanvasProps> = ({
           } else if (!isDragSelecting && !isSpacePressed && currentTool !== 'pan' && !justFinishedDragSelection) {
             // 캔버스 배경 클릭 시 모든 선택 해제 (드래그 선택 중이 아니고, 방금 드래그 선택을 끝내지 않았고, 스페이스바가 안 눌려있고, 팬 모드가 아닐 때만)
             onMemoSelect('', false);
+            onCategorySelect('', false);
           }
         }
       }}
@@ -848,6 +1241,8 @@ const Canvas: React.FC<CanvasProps> = ({
       onMouseEnter={() => setIsMouseOverCanvas(true)}
       onMouseLeave={() => setIsMouseOverCanvas(false)}
       onWheel={handleWheel}
+      onDrop={handleCanvasDrop}
+      onDragOver={handleCanvasDragOver}
     >
       {/* 메모 블록들과 연결선 */}
       <div style={{
@@ -858,6 +1253,9 @@ const Canvas: React.FC<CanvasProps> = ({
         position: 'absolute',
         pointerEvents: 'auto'
       }}>
+        {/* 카테고리 영역들 */}
+        {renderCategoryAreas()}
+
         {/* SVG로 연결선 그리기 */}
         <svg
           style={{
@@ -885,7 +1283,14 @@ const Canvas: React.FC<CanvasProps> = ({
           {renderConnectionLines()}
         </svg>
 
-        {currentPage?.memos.map(memo => (
+        {currentPage?.memos.filter(memo => {
+          // parentId가 없으면 항상 표시
+          if (!memo.parentId) return true;
+
+          // parentId가 있으면 해당 카테고리가 펼쳐져 있을 때만 표시
+          const parentCategory = currentPage?.categories?.find(cat => cat.id === memo.parentId);
+          return parentCategory?.isExpanded || false;
+        }).map(memo => (
           <MemoBlock
             key={memo.id}
             memo={memo}
@@ -895,6 +1300,7 @@ const Canvas: React.FC<CanvasProps> = ({
             onPositionChange={onMemoPositionChange}
             onSizeChange={onMemoSizeChange}
             onDisplaySizeChange={onMemoDisplaySizeChange}
+            onDetectCategoryOnDrop={onDetectCategoryOnDrop}
             isConnecting={isConnecting}
             connectingFromId={connectingFromId}
             onStartConnection={onStartConnection}
@@ -903,6 +1309,8 @@ const Canvas: React.FC<CanvasProps> = ({
             canvasOffset={canvasOffset}
             activeImportanceFilters={activeImportanceFilters}
             showGeneralContent={showGeneralContent}
+            onDragStart={onMemoDragStart}
+            onDragEnd={onMemoDragEnd}
           />
         ))}
 
@@ -1042,9 +1450,9 @@ const Canvas: React.FC<CanvasProps> = ({
             }
           }}
           style={{
-            backgroundColor: '#8b5cf6',
-            color: 'white',
-            border: 'none',
+            backgroundColor: 'white',
+            color: '#8b5cf6',
+            border: '2px solid #8b5cf6',
             padding: '12px 16px',
             borderRadius: '8px',
             cursor: 'pointer',
@@ -1068,7 +1476,7 @@ const Canvas: React.FC<CanvasProps> = ({
             }
           }}
           style={{
-            backgroundColor: '#ff9800',
+            backgroundColor: '#8b5cf6',
             color: 'white',
             border: 'none',
             padding: '12px 16px',
@@ -1079,7 +1487,7 @@ const Canvas: React.FC<CanvasProps> = ({
             transition: 'all 0.2s ease'
           }}
         >
-          📁 카테고리 생성
+          카테고리 생성
         </button>
         <button
           onClick={onDisconnectMemo}
@@ -1098,21 +1506,79 @@ const Canvas: React.FC<CanvasProps> = ({
           {isDisconnectMode ? '연결 해제 모드' : '연결 해제'}
         </button>
         <button
-          onClick={onDeleteMemo}
-          disabled={!selectedMemoId}
+          onClick={onDeleteSelected}
+          disabled={!selectedMemoId && !selectedCategoryId}
           style={{
             backgroundColor: 'white',
-            color: selectedMemoId ? '#ef4444' : '#9ca3af',
+            color: (selectedMemoId || selectedCategoryId) ? '#ef4444' : '#9ca3af',
             border: '1px solid #d1d5db',
             padding: '12px 16px',
             borderRadius: '8px',
-            cursor: selectedMemoId ? 'pointer' : 'not-allowed',
+            cursor: (selectedMemoId || selectedCategoryId) ? 'pointer' : 'not-allowed',
             fontSize: '14px',
             fontWeight: '500',
             transition: 'all 0.2s ease'
           }}
         >
           삭제
+        </button>
+      </div>
+
+      {/* Canvas Undo/Redo Controls */}
+      <div style={{
+        position: 'absolute',
+        top: '10px',
+        left: '10px',
+        display: 'flex',
+        gap: '8px',
+        zIndex: 1000,
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        borderRadius: '8px',
+        padding: '8px',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+        backdropFilter: 'blur(4px)'
+      }}>
+        <button
+          onClick={onUndo}
+          disabled={!canUndo}
+          title="실행 취소 (Ctrl+Z)"
+          style={{
+            padding: '6px 12px',
+            backgroundColor: canUndo ? '#3b82f6' : '#e5e7eb',
+            color: canUndo ? 'white' : '#9ca3af',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: '500',
+            cursor: canUndo ? 'pointer' : 'not-allowed',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}
+        >
+          ↶ 실행취소
+        </button>
+        <button
+          onClick={onRedo}
+          disabled={!canRedo}
+          title="다시 실행 (Ctrl+Shift+Z)"
+          style={{
+            padding: '6px 12px',
+            backgroundColor: canRedo ? '#3b82f6' : '#e5e7eb',
+            color: canRedo ? 'white' : '#9ca3af',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: '500',
+            cursor: canRedo ? 'pointer' : 'not-allowed',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}
+        >
+          ↷ 다시실행
         </button>
       </div>
 

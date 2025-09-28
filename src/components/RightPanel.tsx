@@ -1,5 +1,5 @@
 import React from 'react';
-import { MemoBlock, Page, ContentBlock, ContentBlockType, TextBlock, ImportanceLevel } from '../types';
+import { MemoBlock, Page, ContentBlock, ContentBlockType, TextBlock, ImportanceLevel, CategoryBlock } from '../types';
 import Resizer from './Resizer';
 import ContentBlockComponent from './ContentBlock';
 import GoogleAuth from './GoogleAuth';
@@ -7,9 +7,13 @@ import GoogleAuth from './GoogleAuth';
 interface RightPanelProps {
   selectedMemo: MemoBlock | undefined;
   selectedMemos: MemoBlock[];
+  selectedCategory: CategoryBlock | undefined;
+  selectedCategories: CategoryBlock[];
   currentPage: Page | undefined;
   onMemoUpdate: (memoId: string, updates: Partial<MemoBlock>) => void;
+  onCategoryUpdate: (category: CategoryBlock) => void;
   onMemoSelect: (memoId: string, isShiftClick?: boolean) => void;
+  onCategorySelect: (categoryId: string, isShiftClick?: boolean) => void;
   onFocusMemo: (memoId: string) => void;
   width: number;
   onResize: (deltaX: number) => void;
@@ -23,9 +27,13 @@ interface RightPanelProps {
 const RightPanel: React.FC<RightPanelProps> = ({
   selectedMemo,
   selectedMemos,
+  selectedCategory,
+  selectedCategories,
   currentPage,
   onMemoUpdate,
+  onCategoryUpdate,
   onMemoSelect,
+  onCategorySelect,
   onFocusMemo,
   width,
   onResize,
@@ -608,6 +616,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
       timestamp: Date.now()
     };
 
+    console.log('📝 Current blocks being saved:', currentState.blocks.map((b: any) => ({ id: b.id, type: b.type, content: b.content?.substring(0, 50) })));
+
     // 마지막 상태와 동일하면 저장하지 않음
     setUndoHistory(prev => {
       const lastState = prev[prev.length - 1];
@@ -633,6 +643,13 @@ const RightPanel: React.FC<RightPanelProps> = ({
     if (undoHistory.length === 0 || !selectedMemo) return;
 
     console.log('↩️ Performing undo');
+    console.log('📊 Current undo history length:', undoHistory.length);
+    console.log('📊 Undo history items (newest to oldest):', undoHistory.slice().reverse().map((h, i) => ({
+      index: undoHistory.length - 1 - i,
+      timestamp: new Date(h.timestamp).toLocaleTimeString(),
+      blocks: h.blocks.map((b: any) => ({ id: b.id, type: b.type, content: b.content?.substring(0, 30) }))
+    })));
+
     setIsUndoRedoAction(true);
 
     // 현재 상태를 redo 히스토리에 저장
@@ -640,10 +657,14 @@ const RightPanel: React.FC<RightPanelProps> = ({
       blocks: selectedMemo.blocks ? JSON.parse(JSON.stringify(selectedMemo.blocks)) : [],
       timestamp: Date.now()
     };
-    setRedoHistory(prev => [currentState, ...prev]);
+    setRedoHistory(prev => [...prev, currentState]);
 
     // undo 히스토리에서 이전 상태 복원
     const previousState = undoHistory[undoHistory.length - 1];
+    console.log('🔄 Restoring to state:', {
+      timestamp: new Date(previousState.timestamp).toLocaleTimeString(),
+      blocks: previousState.blocks.map((b: any) => ({ id: b.id, type: b.type, content: b.content?.substring(0, 30) }))
+    });
     setUndoHistory(prev => prev.slice(0, -1));
 
     onMemoUpdate(selectedMemo.id, { blocks: previousState.blocks });
@@ -668,8 +689,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
     setUndoHistory(prev => [...prev, currentState]);
 
     // redo 히스토리에서 다음 상태 복원
-    const nextState = redoHistory[0];
-    setRedoHistory(prev => prev.slice(1));
+    const nextState = redoHistory[redoHistory.length - 1];
+    setRedoHistory(prev => prev.slice(0, -1));
 
     onMemoUpdate(selectedMemo.id, { blocks: nextState.blocks });
 
@@ -1068,25 +1089,68 @@ const RightPanel: React.FC<RightPanelProps> = ({
         style={{ flex: 1, overflow: 'auto', padding: '16px' }}
         onMouseDown={handleMouseDown}
       >
-        {selectedMemos.length > 1 ? (
+        {(selectedMemos.length > 1 || selectedCategories.length > 1 || (selectedMemos.length > 0 && selectedCategories.length > 0)) ? (
           // 멀티 선택 모드
           <div>
-            <h3 style={{ 
-              marginBottom: '16px', 
-              fontSize: '18px', 
-              fontWeight: '600', 
-              color: '#1f2937' 
+            <h3 style={{
+              marginBottom: '16px',
+              fontSize: '18px',
+              fontWeight: '600',
+              color: '#1f2937'
             }}>
-              선택된 메모 ({selectedMemos.length}개)
+              선택된 아이템 (메모 {selectedMemos.length}개, 카테고리 {selectedCategories.length}개)
             </h3>
-            
-            <div style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: '8px', 
-              maxHeight: '400px', 
-              overflowY: 'auto' 
+
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              maxHeight: '400px',
+              overflowY: 'auto'
             }}>
+              {/* 선택된 카테고리들 */}
+              {selectedCategories.map(category => (
+                <div
+                  key={category.id}
+                  onClick={() => onCategorySelect(category.id)}
+                  style={{
+                    padding: '12px',
+                    backgroundColor: '#fff3e0',
+                    border: '1px solid #ffb74d',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#ffe0b2';
+                    e.currentTarget.style.borderColor = '#ff9800';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#fff3e0';
+                    e.currentTarget.style.borderColor = '#ffb74d';
+                  }}
+                >
+                  <div style={{
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    color: '#1f2937',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    {category.title}
+                  </div>
+                  <div style={{
+                    fontSize: '12px',
+                    color: '#6b7280',
+                    marginTop: '4px'
+                  }}>
+                    하위 아이템: {category.children.length}개
+                  </div>
+                </div>
+              ))}
+
+              {/* 선택된 메모들 */}
               {selectedMemos.map(memo => (
                 <div
                   key={memo.id}
@@ -1115,6 +1179,253 @@ const RightPanel: React.FC<RightPanelProps> = ({
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        ) : selectedCategory ? (
+          // 단일 카테고리 편집 모드
+          <div>
+            <div style={{ marginBottom: '16px', paddingLeft: '20px' }}>
+              <input
+                type="text"
+                value={selectedCategory.title}
+                onChange={(e) => onCategoryUpdate({ ...selectedCategory, title: e.target.value })}
+                placeholder="카테고리 제목을 입력하세요..."
+                style={{
+                  width: '100%',
+                  padding: '2px 0',
+                  border: 'none',
+                  borderBottom: '2px solid transparent',
+                  borderRadius: '0',
+                  fontSize: '24px',
+                  fontWeight: '700',
+                  backgroundColor: 'transparent',
+                  outline: 'none',
+                  color: '#ff9800',
+                  transition: 'border-bottom-color 0.2s ease'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderBottomColor = '#ff9800';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderBottomColor = 'transparent';
+                }}
+              />
+            </div>
+
+            {/* 태그 관리 */}
+            <div style={{ marginBottom: '16px', paddingLeft: '20px' }}>
+              {selectedCategory.tags.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '6px',
+                  marginBottom: '8px'
+                }}>
+                  {selectedCategory.tags.map((tag, index) => (
+                    <span
+                      key={index}
+                      style={{
+                        backgroundColor: '#ffe0b2',
+                        color: '#e65100',
+                        padding: '4px 8px',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      #{tag}
+                      <button
+                        onClick={() => {
+                          const newTags = selectedCategory.tags.filter((_, i) => i !== index);
+                          onCategoryUpdate({ ...selectedCategory, tags: newTags });
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#e65100',
+                          fontSize: '14px',
+                          padding: '0',
+                          marginLeft: '2px'
+                        }}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <input
+                type="text"
+                placeholder="태그를 입력하고 Enter를 누르세요..."
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  transition: 'border-color 0.2s ease'
+                }}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                    const newTag = e.currentTarget.value.trim();
+                    if (!selectedCategory.tags.includes(newTag)) {
+                      onCategoryUpdate({
+                        ...selectedCategory,
+                        tags: [...selectedCategory.tags, newTag]
+                      });
+                    }
+                    e.currentTarget.value = '';
+                  }
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#ff9800';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#e5e7eb';
+                }}
+              />
+            </div>
+
+            {/* 연결된 아이템들 */}
+            <div style={{ marginBottom: '16px' }}>
+              <h4 style={{
+                fontSize: '16px',
+                fontWeight: '600',
+                color: '#1f2937',
+                marginBottom: '12px',
+                paddingLeft: '20px'
+              }}>
+                연결된 카테고리
+              </h4>
+
+              <div style={{ paddingLeft: '20px' }}>
+                {selectedCategory.connections && selectedCategory.connections.length > 0 ? (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}>
+                    {selectedCategory.connections.map(connectionId => {
+                      const connectedMemo = currentPage?.memos.find(m => m.id === connectionId);
+                      const connectedCategory = currentPage?.categories?.find(c => c.id === connectionId);
+                      const connectedItem = connectedMemo || connectedCategory;
+
+                      if (!connectedItem) return null;
+
+                      return (
+                        <div
+                          key={connectionId}
+                          onClick={() => {
+                            if (connectedMemo) {
+                              onFocusMemo(connectionId);
+                            } else if (connectedCategory) {
+                              onCategorySelect(connectionId);
+                            }
+                          }}
+                          style={{
+                            padding: '8px 12px',
+                            backgroundColor: connectedMemo ? '#f0f9ff' : '#fff3e0',
+                            border: `1px solid ${connectedMemo ? '#bae6fd' : '#ffcc02'}`,
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <div style={{ fontWeight: '500' }}>
+                            {connectedMemo ? '📝 ' : ''}{connectedItem.title}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{
+                    padding: '16px',
+                    textAlign: 'center',
+                    color: '#6b7280',
+                    fontSize: '14px',
+                    border: '1px dashed #d1d5db',
+                    borderRadius: '6px'
+                  }}>
+                    연결된 아이템이 없습니다
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 하위 카테고리 */}
+            <div style={{ marginBottom: '16px' }}>
+              <h4 style={{
+                fontSize: '16px',
+                fontWeight: '600',
+                color: '#1f2937',
+                marginBottom: '12px',
+                paddingLeft: '20px'
+              }}>
+                하위 카테고리
+              </h4>
+
+              <div style={{ paddingLeft: '20px' }}>
+                {selectedCategory.children && selectedCategory.children.length > 0 ? (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}>
+                    {selectedCategory.children.map(childId => {
+                      const childCategory = currentPage?.categories?.find(c => c.id === childId);
+                      const childMemo = currentPage?.memos.find(m => m.id === childId);
+                      const childItem = childCategory || childMemo;
+
+                      if (!childItem) return null;
+
+                      return (
+                        <div
+                          key={childId}
+                          onClick={() => {
+                            if (childMemo) {
+                              onFocusMemo(childId);
+                            } else if (childCategory) {
+                              onCategorySelect(childId);
+                            }
+                          }}
+                          style={{
+                            padding: '8px 12px',
+                            backgroundColor: childMemo ? '#f0f9ff' : '#fff3e0',
+                            border: `1px solid ${childMemo ? '#bae6fd' : '#ffcc02'}`,
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <div style={{ fontWeight: '500' }}>
+                            {childMemo ? '📝 ' : ''}{childItem.title}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{
+                    padding: '16px',
+                    textAlign: 'center',
+                    color: '#6b7280',
+                    fontSize: '14px',
+                    border: '1px dashed #d1d5db',
+                    borderRadius: '6px'
+                  }}>
+                    하위 아이템이 없습니다
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         ) : selectedMemo ? (
@@ -1572,7 +1883,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
             color: '#6b7280',
             fontSize: '14px'
           }}>
-            메모를 선택하여 편집하세요
+            메모나 카테고리를 선택하여 편집하세요
           </div>
         )}
       </div>

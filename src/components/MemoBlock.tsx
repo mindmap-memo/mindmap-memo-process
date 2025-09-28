@@ -152,6 +152,7 @@ interface MemoBlockProps {
   onPositionChange: (id: string, position: { x: number; y: number }) => void;
   onSizeChange?: (id: string, size: { width: number; height: number }) => void;
   onDisplaySizeChange?: (id: string, size: MemoDisplaySize) => void;
+  onDetectCategoryOnDrop?: (memoId: string, position: { x: number; y: number }) => void;
   isConnecting?: boolean;
   connectingFromId?: string | null;
   onStartConnection?: (memoId: string) => void;
@@ -160,6 +161,8 @@ interface MemoBlockProps {
   canvasOffset?: { x: number; y: number };
   activeImportanceFilters?: Set<ImportanceLevel>;
   showGeneralContent?: boolean;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
   enableImportanceBackground?: boolean;
 }
 
@@ -171,6 +174,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   onPositionChange,
   onSizeChange,
   onDisplaySizeChange,
+  onDetectCategoryOnDrop,
   isConnecting,
   connectingFromId,
   onStartConnection,
@@ -179,7 +183,9 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   canvasOffset = { x: 0, y: 0 },
   activeImportanceFilters,
   showGeneralContent,
-  enableImportanceBackground = false
+  enableImportanceBackground = false,
+  onDragStart,
+  onDragEnd
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isConnectionDragging, setIsConnectionDragging] = useState(false);
@@ -188,6 +194,10 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   const [isScrolling, setIsScrolling] = useState(false);
   const [scrollTimeout, setScrollTimeout] = useState<NodeJS.Timeout | null>(null);
   const [isHovering, setIsHovering] = useState(false);
+
+  // 빠른 드래그 최적화를 위한 상태
+  const lastUpdateTime = React.useRef<number>(0);
+  const pendingPosition = React.useRef<{ x: number; y: number } | null>(null);
   const memoRef = React.useRef<HTMLDivElement>(null);
 
   // 크기별 스타일 정의
@@ -308,20 +318,19 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         clearTimeout(scrollTimeout);
       }
     };
-  }, [scrollTimeout]);
+  }, []); // 의존성 배열을 빈 배열로 변경
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    // 연결 모드가 아닐 때만 드래그 준비
     if (e.button === 0 && !isConnecting) {
       setIsDragging(true);
       setDragMoved(false);
-      // 스케일된 좌표계에서 드래그 시작점 계산
-      const scaledMemoX = (memo.position.x * canvasScale) + canvasOffset.x;
-      const scaledMemoY = (memo.position.y * canvasScale) + canvasOffset.y;
       setDragStart({
-        x: e.clientX - scaledMemoX,
-        y: e.clientY - scaledMemoY
+        x: e.clientX - (memo.position.x * canvasScale + canvasOffset.x),
+        y: e.clientY - (memo.position.y * canvasScale + canvasOffset.y)
       });
-      e.preventDefault();
+      onDragStart?.();
+      e.preventDefault(); // HTML5 드래그 방지, 마우스 드래그 우선
     }
   };
 
@@ -343,25 +352,53 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
     setIsConnectionDragging(false);
   };
 
-  const handleMouseMove = (e: MouseEvent) => {
+  const handleMouseMove = React.useCallback((e: MouseEvent) => {
     if (isDragging) {
       if (!dragMoved) {
         setDragMoved(true);
       }
-      // 스케일과 오프셋을 고려한 실제 위치 계산
-      const rawX = e.clientX - dragStart.x - canvasOffset.x;
-      const rawY = e.clientY - dragStart.y - canvasOffset.y;
-      const newPosition = {
-        x: rawX / canvasScale,
-        y: rawY / canvasScale
-      };
-      onPositionChange(memo.id, newPosition);
-    }
-  };
 
-  const handleMouseUp = () => {
+      // 마우스 현재 위치에서 드래그 시작 오프셋을 빼고 캔버스 좌표계로 변환
+      const newPosition = {
+        x: (e.clientX - dragStart.x - canvasOffset.x) / canvasScale,
+        y: (e.clientY - dragStart.y - canvasOffset.y) / canvasScale
+      };
+
+      // 빠른 드래그 시 업데이트 빈도 조절 (50ms마다만 업데이트)
+      const now = Date.now();
+      pendingPosition.current = newPosition;
+
+      if (now - lastUpdateTime.current >= 50) {
+        onPositionChange(memo.id, newPosition);
+        lastUpdateTime.current = now;
+      }
+    }
+  }, [isDragging, dragMoved, dragStart, canvasOffset, canvasScale, onPositionChange, memo.id]);
+
+  const handleMouseUp = React.useCallback((e: MouseEvent) => {
+    if (isDragging) {
+      // 드래그가 끝날 때 최종 위치 업데이트 (대기 중인 위치가 있으면 사용)
+      const finalPosition = pendingPosition.current || {
+        x: (e.clientX - dragStart.x - canvasOffset.x) / canvasScale,
+        y: (e.clientY - dragStart.y - canvasOffset.y) / canvasScale
+      };
+
+      // 최종 위치 업데이트
+      onPositionChange(memo.id, finalPosition);
+
+      // 카테고리 감지
+      if (dragMoved && onDetectCategoryOnDrop) {
+        console.log('🎯 드래그 완료 - 카테고리 감지 시도:', memo.id, finalPosition);
+        onDetectCategoryOnDrop(memo.id, finalPosition);
+      }
+
+      // 상태 초기화
+      pendingPosition.current = null;
+      lastUpdateTime.current = 0;
+    }
     setIsDragging(false);
-  };
+    onDragEnd?.();
+  }, [isDragging, dragMoved, dragStart, canvasOffset, canvasScale, onDetectCategoryOnDrop, onPositionChange, memo.id, onDragEnd]);
 
   React.useEffect(() => {
     if (isDragging) {
@@ -372,34 +409,63 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, dragStart]);
+  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   React.useEffect(() => {
     if (memoRef.current && onSizeChange) {
+      let timeoutId: NodeJS.Timeout;
+
       const updateSize = () => {
+        // 드래그 중일 때는 크기 업데이트 방지
+        if (isDragging) {
+          return;
+        }
+
         if (memoRef.current) {
           const rect = memoRef.current.getBoundingClientRect();
+          // 0이거나 매우 작은 크기는 무시 (컴포넌트가 사라지는 중일 수 있음)
+          if (rect.width < 10 || rect.height < 10) {
+            return;
+          }
+
           // scale을 나누어서 실제 논리적 크기 계산
-          const newSize = { 
-            width: rect.width / canvasScale, 
-            height: rect.height / canvasScale 
+          const newSize = {
+            width: Math.round(rect.width / canvasScale),
+            height: Math.round(rect.height / canvasScale)
           };
-          if (!memo.size || memo.size.width !== newSize.width || memo.size.height !== newSize.height) {
-            onSizeChange(memo.id, newSize);
+
+          // 크기 변화가 충분히 클 때만 업데이트 (5px 이상 차이)
+          if (!memo.size ||
+              Math.abs(memo.size.width - newSize.width) > 5 ||
+              Math.abs(memo.size.height - newSize.height) > 5) {
+            // 디바운싱: 100ms 후에 업데이트
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+              onSizeChange(memo.id, newSize);
+            }, 100);
           }
         }
       };
-      
-      updateSize();
-      
-      const resizeObserver = new ResizeObserver(updateSize);
-      resizeObserver.observe(memoRef.current);
-      
+
+      // 초기 크기 설정을 위한 지연 실행
+      timeoutId = setTimeout(updateSize, 50);
+
+      const resizeObserver = new ResizeObserver(() => {
+        // ResizeObserver 콜백도 디바운싱
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(updateSize, 100);
+      });
+
+      if (memoRef.current) {
+        resizeObserver.observe(memoRef.current);
+      }
+
       return () => {
+        clearTimeout(timeoutId);
         resizeObserver.disconnect();
       };
     }
-  }, [memo.title, memo.content, memo.tags, memo.blocks, memo.id, onSizeChange, canvasScale]);
+  }, [memo.title, memo.content, memo.tags, memo.blocks, memo.id, onSizeChange, canvasScale, isDragging]);
 
   return (
     <div style={{
@@ -431,13 +497,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         onScroll={handleScroll}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
-        draggable
-        onDragStart={(e) => {
-          e.dataTransfer.setData('text/plain', JSON.stringify({
-            type: 'memo',
-            id: memo.id
-          }));
-        }}
+        draggable={false}
         style={{
           backgroundColor,
           border: isDragHovered ? '2px solid #3b82f6' : (isSelected ? '2px solid #8b5cf6' : '1px solid #e5e7eb'),
@@ -459,8 +519,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
           alignItems: 'center',
           marginBottom: '8px'
         }}>
-          <div style={{ 
-            fontWeight: '600', 
+          <div style={{
+            fontWeight: '600',
             fontSize: '16px',
             color: memo.title ? '#1f2937' : '#9ca3af',
             display: 'flex',

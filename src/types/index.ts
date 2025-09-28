@@ -188,7 +188,7 @@ export interface MemoBlock {
   position: { x: number; y: number };
   size?: { width: number; height: number };
   displaySize?: MemoDisplaySize; // 캔버스에서의 표시 크기
-  parentId?: string; // 부모 카테고리 ID (종속 관계)
+  parentId?: string | null; // 부모 카테고리 ID (종속 관계)
 }
 
 // 카테고리(폴더) 블록 타입
@@ -223,6 +223,41 @@ export interface Page {
   categories: CategoryBlock[]; // 카테고리 블록들
 }
 
+// Canvas action types for history tracking
+export type CanvasActionType =
+  | 'memo_create'
+  | 'memo_delete'
+  | 'memo_move'
+  | 'memo_resize'
+  | 'category_create'
+  | 'category_delete'
+  | 'category_move'
+  | 'category_resize'
+  | 'category_expand'
+  | 'connection_add'
+  | 'connection_remove'
+  | 'move_to_category'
+  | 'bulk_select'
+  | 'bulk_move'
+  | 'bulk_delete';
+
+export interface CanvasAction {
+  type: CanvasActionType;
+  timestamp: number;
+  pageSnapshot: {
+    memos: MemoBlock[];
+    categories: CategoryBlock[];
+  };
+  description: string;
+}
+
+export interface CanvasHistory {
+  past: CanvasAction[];
+  present: CanvasAction | null;
+  future: CanvasAction[];
+  maxHistorySize: number;
+}
+
 export interface AppState {
   pages: Page[];
   currentPageId: string;
@@ -230,4 +265,5 @@ export interface AppState {
   leftPanelOpen: boolean;
   rightPanelOpen: boolean;
   dataRegistry: DataRegistry; // Global data registry for named data
+  canvasHistory: CanvasHistory; // Canvas-specific undo/redo history
 }
