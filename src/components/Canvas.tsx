@@ -54,6 +54,10 @@ interface CanvasProps {
   isDraggingMemo?: boolean;
   onMemoDragStart?: () => void;
   onMemoDragEnd?: () => void;
+  isDraggingCategory?: boolean;
+  onCategoryDragStart?: () => void;
+  onCategoryDragEnd?: () => void;
+  onCategoryPositionDragEnd?: (categoryId: string) => void;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -105,7 +109,11 @@ const Canvas: React.FC<CanvasProps> = ({
   onRedo,
   isDraggingMemo = false,
   onMemoDragStart,
-  onMemoDragEnd
+  onMemoDragEnd,
+  isDraggingCategory = false,
+  onCategoryDragStart,
+  onCategoryDragEnd,
+  onCategoryPositionDragEnd
 }) => {
   const [isPanning, setIsPanning] = React.useState(false);
   const [panStart, setPanStart] = React.useState({ x: 0, y: 0 });
@@ -119,6 +127,9 @@ const Canvas: React.FC<CanvasProps> = ({
   const [baseTool, setBaseTool] = React.useState<'select' | 'pan' | 'zoom'>('select');
   const [isMouseOverCanvas, setIsMouseOverCanvas] = React.useState(false);
   const [areaUpdateTrigger, setAreaUpdateTrigger] = React.useState(0);
+
+  // 드래그 중인 카테고리의 영역 캐시 (드래그 중에 크기가 변하지 않도록)
+  const [draggedCategoryAreas, setDraggedCategoryAreas] = React.useState<{[categoryId: string]: {area: any, originalPosition: {x: number, y: number}}}>({});
 
   // 메모와 카테고리 위치 변경 시 영역 업데이트 (더 정밀한 감지)
   React.useEffect(() => {
@@ -525,7 +536,8 @@ const Canvas: React.FC<CanvasProps> = ({
     return colors[Math.abs(hash) % colors.length];
   };
 
-  // 카테고리의 경계 영역 계산 (memoized)
+
+  // 카테고리의 경계 영역 계산 (memoized) - 확장 가능한 영역 (메모-카테고리 변환용)
   const calculateCategoryArea = React.useCallback((category: CategoryBlock, visited: Set<string> = new Set()) => {
     if (!currentPage) return null;
 
@@ -578,7 +590,7 @@ const Canvas: React.FC<CanvasProps> = ({
     visited.delete(category.id);
 
     // 여백 추가 (적절한 간격 유지)
-    const padding = 70;
+    const padding = 20;
     return {
       x: minX - padding,
       y: minY - padding,
@@ -600,47 +612,71 @@ const Canvas: React.FC<CanvasProps> = ({
   const renderSingleCategoryArea = (category: CategoryBlock): React.ReactNode[] => {
     const areas: React.ReactNode[] = [];
 
-    // 현재 카테고리의 영역 렌더링
-    const area = calculateCategoryArea(category);
+    // 현재 카테고리의 영역 렌더링 (하위 아이템 포함한 확장 가능한 영역)
+    // 드래그 중인 카테고리는 캐시된 영역 사용 (크기 고정)
+    let area: any = null;
+
+    if (draggedCategoryAreas[category.id]) {
+      // 캐시된 영역이 있다면 현재 카테고리 위치에 맞게 좌표 조정
+      const cached = draggedCategoryAreas[category.id];
+      const deltaX = category.position.x - cached.originalPosition.x;
+      const deltaY = category.position.y - cached.originalPosition.y;
+
+      area = {
+        x: cached.area.x + deltaX,
+        y: cached.area.y + deltaY,
+        width: cached.area.width,   // 캐시된 크기 유지
+        height: cached.area.height, // 캐시된 크기 유지
+        color: cached.area.color
+      };
+    } else {
+      // 캐시된 영역이 없으면 동적 계산
+      area = calculateCategoryArea(category);
+    }
 
     // 하위 아이템이 있으면 항상 카테고리 라벨 표시 (펼침/접기 상관없이)
-    const hasChildren = currentPage?.memos.some(memo => memo.parentId === category.id) ||
-                       currentPage?.categories?.some(cat => cat.parentId === category.id);
+    const childMemos = currentPage?.memos.filter(memo => memo.parentId === category.id) || [];
+    const childCategories = currentPage?.categories?.filter(cat => cat.parentId === category.id) || [];
+    const hasChildren = childMemos.length > 0 || childCategories.length > 0;
 
-    if (area && hasChildren) {
-      // 펼쳐진 경우에만 영역 배경 표시
-      if (category.isExpanded) {
-        areas.push(
-          <div
-            key={`area-${category.id}`}
-            style={{
-              position: 'absolute',
-              left: `${area.x}px`,
-              top: `${area.y}px`,
-              width: `${area.width}px`,
-              height: `${area.height}px`,
-              backgroundColor: area.color,
-              border: '2px dashed rgba(139, 92, 246, 0.3)',
-              borderRadius: '12px',
-              pointerEvents: 'auto',
-              zIndex: -1,
-              transition: 'all 0.1s ease'
-            }}
-            onDrop={(e) => handleDropOnCategoryArea(e, category.id)}
-            onDragOver={handleCategoryAreaDragOver}
-          />
-        );
-      }
+    if (hasChildren) {
+    }
 
-      // 카테고리 이름 라벨은 항상 표시 (접어도 보임) - 마우스 드래그 사용
+    // 확장 가능한 영역 배경 (메모-카테고리 변환용)
+    if (area && hasChildren && category.isExpanded) {
+      areas.push(
+        <div
+          key={`area-${category.id}`}
+          style={{
+            position: 'absolute',
+            left: `${area.x}px`,
+            top: `${area.y}px`,
+            width: `${area.width}px`,
+            height: `${area.height}px`,
+            backgroundColor: area.color,
+            border: '2px dashed rgba(139, 92, 246, 0.3)',
+            borderRadius: '12px',
+            pointerEvents: 'auto',
+            zIndex: -1,
+            transition: 'all 0.1s ease'
+          }}
+          onDrop={(e) => handleDropOnCategoryArea(e, category.id)}
+          onDragOver={handleCategoryAreaDragOver}
+        />
+      );
+    }
+
+
+    // 카테고리 이름 라벨은 항상 표시 (접어도 보임) - 마우스 드래그 사용
+    if (hasChildren) {
       areas.push(
         <div
           key={`label-${category.id}`}
           draggable={false}
           style={{
             position: 'absolute',
-            top: `${area.y + 8}px`,
-            left: `${area.x + 12}px`,
+            top: `${(area?.y || category.position.y) + 8}px`,
+            left: `${(area?.x || category.position.x) + 12}px`,
             backgroundColor: '#8b5cf6',
             color: 'white',
             padding: '4px 12px',
@@ -667,7 +703,7 @@ const Canvas: React.FC<CanvasProps> = ({
               // 카테고리 전체를 이동하는 마우스 드래그 구현
               let startX = e.clientX;
               let startY = e.clientY;
-              const originalPosition = { x: area.x, y: area.y };
+              const originalPosition = { x: area?.x || category.position.x, y: area?.y || category.position.y };
 
               const handleMouseMove = (moveEvent: MouseEvent) => {
                 const deltaX = (moveEvent.clientX - startX) / canvasScale;
@@ -694,6 +730,7 @@ const Canvas: React.FC<CanvasProps> = ({
               document.addEventListener('mousemove', handleMouseMove);
               document.addEventListener('mouseup', handleMouseUp);
               e.preventDefault();
+              e.stopPropagation();
             }
           }}
         >
@@ -807,7 +844,14 @@ const Canvas: React.FC<CanvasProps> = ({
             onStartConnection={onStartConnection}
             onConnectItems={onConnectMemos}
             onRemoveConnection={onRemoveConnection}
-            onPositionChange={onCategoryPositionChange}
+            onPositionChange={(categoryId, position) => {
+              // 첫 번째 위치 변경 시 드래그 시작으로 간주하고 영역 캐시
+              if (!draggedCategoryAreas[categoryId]) {
+                handleCategoryPositionStart(categoryId);
+              }
+              onCategoryPositionChange(categoryId, position);
+            }}
+            onPositionDragEnd={handleCategoryPositionEnd}
             onSizeChange={onCategorySizeChange}
             onMoveToCategory={onMoveToCategory}
             canvasScale={canvasScale}
@@ -825,13 +869,44 @@ const Canvas: React.FC<CanvasProps> = ({
     );
   };
 
-  // 카테고리 드래그 핸들러들
+  // 카테고리 위치 변경 시작 (드래그 시작)
+  const handleCategoryPositionStart = (categoryId: string) => {
+    const category = currentPage?.categories?.find(cat => cat.id === categoryId);
+    if (category) {
+      // 드래그 시작 시 현재 영역과 원래 위치를 캐시 (크기 고정)
+      const currentArea = calculateCategoryArea(category);
+      if (currentArea) {
+        setDraggedCategoryAreas(prev => ({
+          ...prev,
+          [categoryId]: {
+            area: currentArea,
+            originalPosition: { x: category.position.x, y: category.position.y }
+          }
+        }));
+      }
+    }
+  };
+
+  // 카테고리 위치 변경 종료 (드래그 종료)
+  const handleCategoryPositionEnd = (categoryId: string) => {
+    // 드래그 종료 시 캐시된 영역 제거 (다시 동적 계산)
+    setDraggedCategoryAreas(prev => {
+      const newAreas = { ...prev };
+      delete newAreas[categoryId];
+      return newAreas;
+    });
+
+    // App의 캐시도 제거하도록 콜백 호출
+    onCategoryPositionDragEnd?.(categoryId);
+  };
+
+  // 기존 카테고리 드래그 핸들러들 (실제로는 사용되지 않음 - 마우스 이벤트로 처리)
   const handleCategoryDragStart = (e: React.DragEvent) => {
-    // 드래그 시작 로직 (현재는 기본)
+    onCategoryDragStart?.();
   };
 
   const handleCategoryDragEnd = (e: React.DragEvent) => {
-    // 드래그 종료 로직 (현재는 기본)
+    onCategoryDragEnd?.();
   };
 
   const handleCategoryDragOver = (e: React.DragEvent) => {
@@ -840,7 +915,7 @@ const Canvas: React.FC<CanvasProps> = ({
 
   const handleDropOnCategory = (e: React.DragEvent, categoryId: string) => {
     e.preventDefault();
-    console.log('드롭 이벤트 발생 - 카테고리 블록:', categoryId);
+    console.log('🎯 드롭 이벤트 발생 - 카테고리 블록:', categoryId);
 
     try {
       const dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
@@ -849,6 +924,15 @@ const Canvas: React.FC<CanvasProps> = ({
       if (dragData.type === 'memo' || dragData.type === 'category') {
         console.log('카테고리로 이동:', dragData.id, '->', categoryId);
         onMoveToCategory(dragData.id, categoryId);
+
+        // 메모를 카테고리에 추가한 후 해당 카테고리의 캐시 제거 (영역 재계산을 위해)
+        if (categoryId) {
+          setDraggedCategoryAreas(prev => {
+            const newAreas = { ...prev };
+            delete newAreas[categoryId];
+            return newAreas;
+          });
+        }
       }
     } catch (error) {
       console.error('드롭 처리 중 오류:', error);
@@ -866,7 +950,7 @@ const Canvas: React.FC<CanvasProps> = ({
   const handleDropOnCategoryArea = (e: React.DragEvent, categoryId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('드롭 이벤트 발생 - 카테고리 영역:', categoryId);
+    console.log('🎯 드롭 이벤트 발생 - 카테고리 영역:', categoryId);
 
     try {
       const dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
@@ -875,6 +959,15 @@ const Canvas: React.FC<CanvasProps> = ({
       if (dragData.type === 'memo' || dragData.type === 'category') {
         console.log('카테고리 영역으로 이동:', dragData.id, '->', categoryId);
         onMoveToCategory(dragData.id, categoryId);
+
+        // 메모를 카테고리 영역에 추가한 후 해당 카테고리의 캐시 제거 (영역 재계산을 위해)
+        if (categoryId) {
+          setDraggedCategoryAreas(prev => {
+            const newAreas = { ...prev };
+            delete newAreas[categoryId];
+            return newAreas;
+          });
+        }
       }
     } catch (error) {
       console.error('카테고리 영역 드롭 처리 중 오류:', error);

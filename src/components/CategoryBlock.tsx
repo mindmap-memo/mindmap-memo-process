@@ -23,6 +23,7 @@ interface CategoryBlockProps {
   onConnectItems?: (fromId: string, toId: string) => void;
   onRemoveConnection?: (fromId: string, toId: string) => void;
   onPositionChange?: (categoryId: string, position: { x: number; y: number }) => void;
+  onPositionDragEnd?: (categoryId: string) => void;
   onSizeChange?: (id: string, size: { width: number; height: number }) => void;
   onMoveToCategory?: (itemId: string, categoryId: string | null) => void;
   canvasScale?: number;
@@ -51,6 +52,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   onConnectItems,
   onRemoveConnection,
   onPositionChange,
+  onPositionDragEnd,
   onSizeChange,
   onMoveToCategory,
   canvasScale = 1,
@@ -183,12 +185,15 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         onPositionChange(category.id, pendingPosition.current);
       }
 
+      // 드래그 종료 콜백 호출
+      onPositionDragEnd?.(category.id);
+
       // 상태 초기화
       pendingPosition.current = null;
       lastUpdateTime.current = 0;
     }
     setIsDraggingPosition(false);
-  }, [isDraggingPosition, onPositionChange, category.id]);
+  }, [isDraggingPosition, onPositionChange, onPositionDragEnd, category.id]);
 
   React.useEffect(() => {
     if (isDraggingPosition) {
@@ -281,14 +286,21 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     setIsDragOver(false);
 
     // 드래그된 아이템의 ID 가져오기
-    const draggedItemId = e.dataTransfer.getData('text/plain');
-    console.log('🔗 Dragged item ID:', draggedItemId);
+    try {
+      const dragDataStr = e.dataTransfer.getData('text/plain');
+      console.log('🔗 Drag data:', dragDataStr);
 
-    if (draggedItemId && onMoveToCategory) {
-      console.log('✅ Calling onMoveToCategory:', draggedItemId, '->', category.id);
-      onMoveToCategory(draggedItemId, category.id);
-    } else {
-      console.log('❌ Cannot move to category:', { draggedItemId, hasOnMoveToCategory: !!onMoveToCategory });
+      const dragData = JSON.parse(dragDataStr);
+      console.log('🔗 Parsed drag data:', dragData);
+
+      if (dragData.id && onMoveToCategory) {
+        console.log('✅ Calling onMoveToCategory:', dragData.id, '->', category.id);
+        onMoveToCategory(dragData.id, category.id);
+      } else {
+        console.log('❌ Cannot move to category:', { dragData, hasOnMoveToCategory: !!onMoveToCategory });
+      }
+    } catch (error) {
+      console.error('❌ Error parsing drag data:', error);
     }
 
     onDrop?.(e);
@@ -404,6 +416,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
       <div
         ref={categoryRef}
         data-category-block="true"
+        data-category-id={category.id}
         draggable={false}
         style={categoryStyle}
         onDragOver={handleDragOver}

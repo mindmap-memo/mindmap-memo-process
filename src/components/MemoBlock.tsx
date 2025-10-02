@@ -497,7 +497,12 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         onScroll={handleScroll}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
-        draggable={false}
+        draggable={true}
+        onDragStart={(e) => {
+          console.log('🚀 메모 드래그 시작:', memo.id);
+          e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'memo', id: memo.id }));
+          onDragStart?.();
+        }}
         style={{
           backgroundColor,
           border: isDragHovered ? '2px solid #3b82f6' : (isSelected ? '2px solid #8b5cf6' : '1px solid #e5e7eb'),
