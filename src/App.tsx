@@ -99,15 +99,19 @@ const App: React.FC = () => {
   // 드래그 시작 시 메모들의 원래 위치 저장
   const dragStartMemoPositions = React.useRef<Map<string, Map<string, {x: number, y: number}>>>(new Map());
 
-  // 카테고리 드래그 종료 시 캐시 제거
-  const handleCategoryPositionDragEnd = (categoryId: string) => {
+  // 메모 위치 변경 시 캐시 제거 (Canvas.tsx와 동기화)
+  const clearCategoryCache = React.useCallback((categoryId: string) => {
     setDraggedCategoryAreas(prev => {
       const newAreas = { ...prev };
       delete newAreas[categoryId];
       return newAreas;
     });
-    // 메모 원본 위치도 제거
     dragStartMemoPositions.current.delete(categoryId);
+  }, []);
+
+  // 카테고리 드래그 종료 시 캐시 유지 (크기 고정)
+  const handleCategoryPositionDragEnd = (categoryId: string) => {
+    // 캐시 유지 - 메모 이동 시에만 제거됨
   };
 
   // Canvas history for undo/redo functionality
@@ -2275,6 +2279,7 @@ const App: React.FC = () => {
           // }, 100);
         }}
         onCategoryPositionDragEnd={handleCategoryPositionDragEnd}
+        onClearCategoryCache={clearCategoryCache}
       />
 
       {/* 접기/펼치기 버튼 (오른쪽) */}

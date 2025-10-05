@@ -58,6 +58,7 @@ interface CanvasProps {
   onCategoryDragStart?: () => void;
   onCategoryDragEnd?: () => void;
   onCategoryPositionDragEnd?: (categoryId: string) => void;
+  onClearCategoryCache?: (categoryId: string) => void;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -113,7 +114,8 @@ const Canvas: React.FC<CanvasProps> = ({
   isDraggingCategory = false,
   onCategoryDragStart,
   onCategoryDragEnd,
-  onCategoryPositionDragEnd
+  onCategoryPositionDragEnd,
+  onClearCategoryCache
 }) => {
   const [isPanning, setIsPanning] = React.useState(false);
   const [panStart, setPanStart] = React.useState({ x: 0, y: 0 });
@@ -134,15 +136,53 @@ const Canvas: React.FC<CanvasProps> = ({
   // 드래그 중 상태 추적
   const [isDraggingCategoryArea, setIsDraggingCategoryArea] = React.useState<string | null>(null);
 
-  // 메모와 카테고리 위치 변경 시 영역 업데이트 (더 정밀한 감지)
+  // 메모 위치 변경 시 영역 업데이트 (카테고리 위치는 제외)
   React.useEffect(() => {
     if (currentPage) {
-      // 모든 메모의 위치와 크기를 포함한 상세한 의존성
+      // 메모가 속한 카테고리의 캐시 제거 (영역 크기 재계산)
+      // 단, 드래그 중인 카테고리는 제외 (크기 고정 유지)
+      const affectedCategoryIds = new Set<string>();
+      currentPage.memos.forEach(memo => {
+        if (memo.parentId && memo.parentId !== isDraggingCategoryArea) {
+          affectedCategoryIds.add(memo.parentId);
+        }
+      });
+
+      if (affectedCategoryIds.size > 0) {
+        console.log('🔄 메모 위치 변경으로 카테고리 캐시 제거:', Array.from(affectedCategoryIds), '드래그 중:', isDraggingCategoryArea);
+        setDraggedCategoryAreas(prev => {
+          const newAreas = { ...prev };
+          const removedCaches: string[] = [];
+          affectedCategoryIds.forEach(catId => {
+            // 드래그 중인 카테고리의 캐시는 제거하지 않음
+            if (catId !== isDraggingCategoryArea) {
+              if (newAreas[catId]) {
+                removedCaches.push(catId);
+              }
+              delete newAreas[catId];
+              // App.tsx의 메모 위치 캐시도 동기화하여 제거
+              onClearCategoryCache?.(catId);
+            }
+          });
+          if (removedCaches.length > 0) {
+            console.log('  🗑️ 실제 제거된 캐시:', removedCaches);
+          }
+          return newAreas;
+        });
+      }
+    }
+  }, [
+    // 메모 위치만 감지 (카테고리 위치는 제외)
+    currentPage?.memos?.map(m => `${m.id}:${m.position.x}:${m.position.y}:${m.size?.width}:${m.size?.height}:${m.parentId}`).join('|')
+  ]);
+
+  // 카테고리 상태 변경 시 영역 업데이트 트리거만 실행 (캐시 제거 안 함)
+  React.useEffect(() => {
+    if (currentPage) {
       setAreaUpdateTrigger(prev => prev + 1);
     }
   }, [
-    currentPage?.memos?.map(m => `${m.id}:${m.position.x}:${m.position.y}:${m.size?.width}:${m.size?.height}:${m.parentId}`).join('|'),
-    currentPage?.categories?.map(c => `${c.id}:${c.position.x}:${c.position.y}:${c.size?.width}:${c.size?.height}:${c.isExpanded}`).join('|')
+    currentPage?.categories?.map(c => `${c.id}:${c.size?.width}:${c.size?.height}:${c.isExpanded}`).join('|')
   ]);
 
   // 추가적으로 실시간 업데이트를 위한 효과
@@ -700,17 +740,22 @@ const Canvas: React.FC<CanvasProps> = ({
               // 카테고리 라벨 드래그를 위한 임시 상태 설정
               console.log('🚀 CategoryLabel mouse drag start:', category.id);
 
-              // 드래그 시작 - 현재 영역 크기 저장
-              const currentArea = area || calculateCategoryArea(category);
+              // 드래그 시작 - 캐시가 없을 때만 영역 크기 저장
               setIsDraggingCategoryArea(category.id);
-              if (currentArea) {
-                setDraggedCategoryAreas(prev => ({
-                  ...prev,
-                  [category.id]: {
-                    area: currentArea,
-                    originalPosition: { x: category.position.x, y: category.position.y }
-                  }
-                }));
+              if (!draggedCategoryAreas[category.id]) {
+                console.log('  💾 캐시 없음 - 새로 계산');
+                const currentArea = area || calculateCategoryArea(category);
+                if (currentArea) {
+                  setDraggedCategoryAreas(prev => ({
+                    ...prev,
+                    [category.id]: {
+                      area: currentArea,
+                      originalPosition: { x: category.position.x, y: category.position.y }
+                    }
+                  }));
+                }
+              } else {
+                console.log('  ✅ 기존 캐시 유지');
               }
 
               // 카테고리 전체를 이동하는 마우스 드래그 구현
@@ -737,13 +782,11 @@ const Canvas: React.FC<CanvasProps> = ({
                 document.removeEventListener('mouseup', handleMouseUp);
                 console.log('🏁 CategoryLabel mouse drag end:', category.id);
 
-                // 드래그 종료 - 캐시 제거
-                setIsDraggingCategoryArea(null);
-                setDraggedCategoryAreas(prev => {
-                  const newAreas = { ...prev };
-                  delete newAreas[category.id];
-                  return newAreas;
-                });
+                // 드래그 종료 - 약간의 지연 후 isDraggingCategoryArea 해제
+                // (useEffect가 즉시 실행되어 캐시를 제거하는 것을 방지)
+                setTimeout(() => {
+                  setIsDraggingCategoryArea(null);
+                }, 100);
               };
 
               document.addEventListener('mousemove', handleMouseMove);
@@ -893,37 +936,32 @@ const Canvas: React.FC<CanvasProps> = ({
     console.log('🚀 카테고리 드래그 시작 - 영역 캐시:', categoryId);
     const category = currentPage?.categories?.find(cat => cat.id === categoryId);
     if (category) {
-      // 드래그 시작 시 현재 영역과 원래 위치를 캐시 (크기 고정)
-      const currentArea = calculateCategoryArea(category);
-      console.log('  📦 캐시할 영역:', currentArea);
-      if (currentArea) {
-        setDraggedCategoryAreas(prev => {
-          const newCache = {
+      // 캐시가 없을 때만 새로 계산 (있으면 기존 캐시 유지)
+      if (!draggedCategoryAreas[categoryId]) {
+        console.log('  💾 캐시 없음 - 새로 계산');
+        const currentArea = calculateCategoryArea(category);
+        if (currentArea) {
+          setDraggedCategoryAreas(prev => ({
             ...prev,
             [categoryId]: {
               area: currentArea,
               originalPosition: { x: category.position.x, y: category.position.y }
             }
-          };
-          console.log('  ✅ 영역 캐시 저장 완료:', newCache);
-          return newCache;
-        });
+          }));
+        }
+      } else {
+        console.log('  ✅ 기존 캐시 유지');
       }
     }
   };
 
   // 카테고리 위치 변경 종료 (드래그 종료)
   const handleCategoryPositionEnd = (categoryId: string) => {
-    console.log('🏁 카테고리 드래그 종료 - 캐시 제거:', categoryId);
-    // 드래그 종료 시 캐시된 영역 제거 (다시 동적 계산)
-    setDraggedCategoryAreas(prev => {
-      const newAreas = { ...prev };
-      delete newAreas[categoryId];
-      console.log('  🗑️ 캐시 제거 완료, 남은 캐시:', newAreas);
-      return newAreas;
-    });
+    console.log('🏁 카테고리 드래그 종료 - 캐시 유지 (크기 고정)');
+    // 드래그 종료 후에도 캐시 유지 (크기를 고정하기 위해)
+    // 캐시는 다음 드래그 시작 시점에 새로 계산됨
 
-    // App의 캐시도 제거하도록 콜백 호출
+    // App의 메모 위치 캐시만 제거
     onCategoryPositionDragEnd?.(categoryId);
   };
 

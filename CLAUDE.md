@@ -44,7 +44,8 @@ Core types in `src/types/index.ts`:
 
 - **MemoBlock**: Individual memo with title, content, tags, connections array, position, and optional size. Contains both legacy `content` field and new `blocks` array for rich content
 - **ContentBlock**: Notion-style content blocks with 10 types: text, callout, checklist, image, file, bookmark, quote, code, table, sheets
-- **Page**: Contains array of memos with id and name
+- **CategoryBlock**: Hierarchical container for organizing memos and other categories with title, position, size, children array, parentId, and isExpanded state
+- **Page**: Contains arrays of memos and categories with id and name
 - **AppState**: Global application state interface
 
 ### Block-Based Content System
@@ -59,11 +60,25 @@ The application implements a Notion-inspired block-based content editor:
 - **Slash Commands**: Type "/" to open BlockSelector for inserting new blocks
 - **Seamless Editing**: Auto-save with 300ms debounce, Enter key splits blocks, backspace merges blocks
 
+### Category System
+
+The application implements a hierarchical category system for organizing memos and categories:
+
+- **Category Blocks**: Visual blocks that can contain memos and other categories as children
+- **Category Areas**: Semi-transparent colored regions that appear when a category has children and is expanded
+- **Drag and Drop**: Drag memos or categories onto category blocks/areas to establish parent-child relationships
+- **Hierarchical Structure**: Categories can be nested infinitely with parentId references and children arrays
+- **Area Calculation**: Dynamic bounding box calculation (`calculateCategoryArea`) that encompasses all child memos and categories with padding
+- **Position Management**: When dragging categories, all child memos and categories move together maintaining relative positions
+- **Expand/Collapse**: Categories can be expanded to show area or collapsed to show only the block
+- **Area Caching**: During drag operations, category areas are cached to maintain fixed size and prevent recalculation
+
 ### Key Interaction Patterns
 
 - **Memo Connections**: Click connection points on memo blocks to create bidirectional links between memos
 - **Connection Modes**: Toggle between normal mode and disconnect mode for removing connections
 - **Drag Operations**: Separate handling for memo dragging vs connection dragging, plus canvas-style drag selection for both memos and content blocks
+- **Category Operations**: Drag memos/categories onto category blocks to add as children; categories auto-expand and show semi-transparent areas
 - **Panel Management**: Collapsible panels with resize handles, fullscreen mode for right panel
 - **Multi-Selection**: Shift+click for memo selection, drag selection for content blocks, unified selection UI
 
@@ -107,6 +122,17 @@ The application includes a sophisticated table system designed for business proc
 - **Drag Selection**: Works across entire right panel, uses collision detection with block boundaries
 - **Panel Fullscreen**: Right panel can overlay entire screen, hides resizer and changes positioning to fixed
 
+### Category System Implementation Details
+
+- **Area Rendering**: Category areas only render when `hasChildren && isExpanded` (Canvas.tsx:645)
+- **Position Synchronization**: Category drag uses absolute positioning with stored original positions to prevent cumulative movement errors
+- **Memo Position Cache**: `dragStartMemoPositions` ref stores original memo positions on drag start, cleared on drag end
+- **Children Movement**: When category moves, children calculate new position as `originalPosition + totalDelta` (not cumulative)
+- **Drop Positioning**: When memos are dropped onto categories, they are positioned at `category.position.y + 200px`
+- **Collision Detection**: Disabled during drag operations and in `moveToCategory` to prevent infinite loops
+- **Area Colors**: Semi-transparent colors assigned based on category ID hash using predefined color palette
+- **Cache System**: `draggedCategoryAreas` state caches area size and original position during drag to maintain fixed dimensions
+
 ### Table System Architecture
 
 - **Column-Based Type System**: TableColumn interface defines column properties including type, options, validation
@@ -128,6 +154,9 @@ The application includes a sophisticated table system designed for business proc
 - **Context Menus**: Position context menus using getBoundingClientRect() and pass position props for proper placement
 - **Google Sheets Safety**: Always validate array data before using .map() - check `Array.isArray()` and filter non-arrays to prevent runtime errors
 - **Range Detection**: Use clipboard-based detection for Google Sheets ranges; implement fallback UI for manual range input when automatic detection fails
+- **Category Drag Operations**: Always use absolute positioning (originalPosition + totalDelta) rather than cumulative deltas to prevent position drift
+- **Collision Detection**: Avoid enabling collision detection during drag operations or in state update functions to prevent infinite loops
+- **Logging**: NEVER add console.log statements in render functions, useEffect callbacks, or frequently-called functions (e.g., calculateCategoryArea, renderSingleCategoryArea) as they cause infinite log spam and make debugging impossible. Only log in event handlers (onClick, onMouseDown, etc.) or one-time initialization code
 
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
