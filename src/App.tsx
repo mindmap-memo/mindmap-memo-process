@@ -96,6 +96,9 @@ const App: React.FC = () => {
   // 드래그 중인 카테고리의 영역 캐시 (Canvas와 동일한 시스템)
   const [draggedCategoryAreas, setDraggedCategoryAreas] = useState<{[categoryId: string]: {area: any, originalPosition: {x: number, y: number}}}>({});
 
+  // 드래그 시작 시 메모들의 원래 위치 저장
+  const dragStartMemoPositions = React.useRef<Map<string, Map<string, {x: number, y: number}>>>(new Map());
+
   // 카테고리 드래그 종료 시 캐시 제거
   const handleCategoryPositionDragEnd = (categoryId: string) => {
     setDraggedCategoryAreas(prev => {
@@ -103,6 +106,8 @@ const App: React.FC = () => {
       delete newAreas[categoryId];
       return newAreas;
     });
+    // 메모 원본 위치도 제거
+    dragStartMemoPositions.current.delete(categoryId);
   };
 
   // Canvas history for undo/redo functionality
@@ -1608,7 +1613,7 @@ const App: React.FC = () => {
       deltaX = position.x - targetCategory.position.x;
       deltaY = position.y - targetCategory.position.y;
 
-      // 첫 번째 위치 변경 시 드래그 시작으로 간주하고 영역 캐시
+      // 첫 번째 위치 변경 시 드래그 시작으로 간주하고 영역 캐시 및 메모 원본 위치 저장
       if (!draggedCategoryAreas[categoryId] && currentPage) {
         const currentArea = calculateCategoryArea(targetCategory, currentPage);
         if (currentArea) {
@@ -1620,6 +1625,15 @@ const App: React.FC = () => {
             }
           }));
         }
+
+        // 메모들의 원본 위치 저장
+        const memoPositions = new Map<string, {x: number, y: number}>();
+        currentPage.memos.forEach(memo => {
+          if (memo.parentId === categoryId) {
+            memoPositions.set(memo.id, { x: memo.position.x, y: memo.position.y });
+          }
+        });
+        dragStartMemoPositions.current.set(categoryId, memoPositions);
       }
     }
 
@@ -1629,18 +1643,27 @@ const App: React.FC = () => {
       const pageTargetCategory = (page.categories || []).find(cat => cat.id === categoryId);
       if (!pageTargetCategory) return page;
 
-      // 하위 메모들도 함께 이동 (상대적 위치 유지)
-      const updatedMemos = page.memos.map(memo =>
-        memo.parentId === categoryId
-          ? {
+      // 원본 카테고리 위치와 새 위치의 총 델타 계산
+      const cachedData = draggedCategoryAreas[categoryId];
+      const totalDeltaX = cachedData ? position.x - cachedData.originalPosition.x : deltaX;
+      const totalDeltaY = cachedData ? position.y - cachedData.originalPosition.y : deltaY;
+
+      // 하위 메모들도 함께 이동 (절대 위치 계산)
+      const updatedMemos = page.memos.map(memo => {
+        if (memo.parentId === categoryId) {
+          const originalPos = dragStartMemoPositions.current.get(categoryId)?.get(memo.id);
+          if (originalPos) {
+            return {
               ...memo,
               position: {
-                x: memo.position.x + deltaX,
-                y: memo.position.y + deltaY
+                x: originalPos.x + totalDeltaX,
+                y: originalPos.y + totalDeltaY
               }
-            }
-          : memo
-      );
+            };
+          }
+        }
+        return memo;
+      });
 
       // 하위 카테고리들도 함께 이동
       const updatedCategories = (page.categories || []).map(category =>
@@ -1664,8 +1687,8 @@ const App: React.FC = () => {
       };
     }));
 
-    // 실시간 면접촉 기반 고정 크기 충돌 검사
-    if (Math.abs(deltaX) > 0.1 || Math.abs(deltaY) > 0.1) {
+    // 실시간 면접촉 기반 고정 크기 충돌 검사 - 드래그 중에는 스킵
+    if ((Math.abs(deltaX) > 0.1 || Math.abs(deltaY) > 0.1) && !draggedCategoryAreas[categoryId]) {
       // 델타 값을 로컬 변수로 캡처하여 클로저 내에서 안전하게 사용
       const capturedDeltaX = deltaX;
       const capturedDeltaY = deltaY;
@@ -1793,9 +1816,39 @@ const App: React.FC = () => {
 
         if (hasCollision) {
           console.log('✅ 면 기반 충돌 처리 완료 - 충돌당한 영역이 같은 픽셀만큼 이동함');
+
+          // 충돌당한 카테고리들의 내부 메모들도 함께 이동
+          const movedCategoryIds = new Set<string>();
+          updatedCategories.forEach((cat, idx) => {
+            const originalCat = (currentPage.categories || [])[idx];
+            if (originalCat && (cat.position.x !== originalCat.position.x || cat.position.y !== originalCat.position.y)) {
+              movedCategoryIds.add(cat.id);
+            }
+          });
+
+          const updatedMemos = currentPage.memos.map(memo => {
+            // 충돌당한 카테고리의 메모들만 이동 (충돌을 일으킨 카테고리 제외)
+            if (memo.parentId && movedCategoryIds.has(memo.parentId) && memo.parentId !== categoryId) {
+              const movedCategory = updatedCategories.find(c => c.id === memo.parentId);
+              const originalCategory = (currentPage.categories || []).find(c => c.id === memo.parentId);
+              if (movedCategory && originalCategory) {
+                const memoDeltaX = movedCategory.position.x - originalCategory.position.x;
+                const memoDeltaY = movedCategory.position.y - originalCategory.position.y;
+                return {
+                  ...memo,
+                  position: {
+                    x: memo.position.x + memoDeltaX,
+                    y: memo.position.y + memoDeltaY
+                  }
+                };
+              }
+            }
+            return memo;
+          });
+
           return prevPages.map(page =>
             page.id === currentPageId
-              ? { ...page, categories: updatedCategories }
+              ? { ...page, categories: updatedCategories, memos: updatedMemos }
               : page
           );
         }
@@ -2240,22 +2293,22 @@ const App: React.FC = () => {
         onCategoryDragEnd={() => {
           setIsDraggingCategory(false);
           console.log('🏁 카테고리 드래그 종료');
-          // 드래그 완료 후 충돌 검사 수행
-          setTimeout(() => {
-            const currentPage = pages.find(p => p.id === currentPageId);
-            if (currentPage) {
-              // 모든 카테고리에 대해 충돌 검사 수행
-              currentPage.categories?.forEach(category => {
-                const categoryArea = calculateCategoryArea(category, currentPage);
-                if (categoryArea) {
-                  // 카운터 리셋
-                  collisionCheckCount.current.set(category.id, 0);
-                  console.log('🔄 카테고리 드래그 완료 후 충돌 검사 시작:', category.id);
-                  pushAwayConflictingBlocks(categoryArea, category.id, currentPage);
-                }
-              });
-            }
-          }, 100);
+          // 드래그 완료 후 충돌 검사 - 일단 주석 처리 (영역 크기 변경 문제 해결)
+          // setTimeout(() => {
+          //   const currentPage = pages.find(p => p.id === currentPageId);
+          //   if (currentPage) {
+          //     // 모든 카테고리에 대해 충돌 검사 수행
+          //     currentPage.categories?.forEach(category => {
+          //       const categoryArea = calculateCategoryArea(category, currentPage);
+          //       if (categoryArea) {
+          //         // 카운터 리셋
+          //         collisionCheckCount.current.set(category.id, 0);
+          //         console.log('🔄 카테고리 드래그 완료 후 충돌 검사 시작:', category.id);
+          //         pushAwayConflictingBlocks(categoryArea, category.id, currentPage);
+          //       }
+          //     });
+          //   }
+          // }, 100);
         }}
         onCategoryPositionDragEnd={handleCategoryPositionDragEnd}
       />
