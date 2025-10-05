@@ -54,7 +54,7 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
   return (
     <div style={{
       position: 'absolute',
-      top: '20px',
+      top: '70px',
       left: '20px',
       backgroundColor: 'white',
       border: '1px solid #e5e7eb',

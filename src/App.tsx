@@ -112,6 +112,8 @@ const App: React.FC = () => {
   // 카테고리 드래그 종료 시 캐시 유지 (크기 고정)
   const handleCategoryPositionDragEnd = (categoryId: string) => {
     // 캐시 유지 - 메모 이동 시에만 제거됨
+    // 이전 프레임 위치도 제거
+    previousFramePosition.current.delete(categoryId);
   };
 
   // Canvas history for undo/redo functionality
@@ -1569,6 +1571,9 @@ const App: React.FC = () => {
   // 카테고리 위치 업데이트 히스토리 타이머 관리
   const categoryPositionTimers = React.useRef<Map<string, NodeJS.Timeout>>(new Map());
 
+  // 이전 프레임 위치 저장 (프레임 간 delta 계산용)
+  const previousFramePosition = React.useRef<Map<string, {x: number, y: number}>>(new Map());
+
   const updateCategoryPosition = (categoryId: string, position: { x: number; y: number }) => {
     // 먼저 현재 카테고리 위치를 찾아서 델타 값 계산
     const currentPage = pages.find(p => p.id === currentPageId);
@@ -1576,10 +1581,26 @@ const App: React.FC = () => {
 
     let deltaX = 0;
     let deltaY = 0;
+    let frameDeltaX = 0;
+    let frameDeltaY = 0;
 
     if (targetCategory) {
       deltaX = position.x - targetCategory.position.x;
       deltaY = position.y - targetCategory.position.y;
+
+      // 이전 프레임 위치와 비교하여 프레임 간 delta 계산
+      const prevPos = previousFramePosition.current.get(categoryId);
+      if (prevPos) {
+        frameDeltaX = position.x - prevPos.x;
+        frameDeltaY = position.y - prevPos.y;
+      } else {
+        // 첫 프레임이면 전체 delta 사용
+        frameDeltaX = deltaX;
+        frameDeltaY = deltaY;
+      }
+
+      // 현재 위치를 이전 프레임으로 저장
+      previousFramePosition.current.set(categoryId, { x: position.x, y: position.y });
 
       // 첫 번째 위치 변경 시 드래그 시작으로 간주하고 영역 캐시 및 메모 원본 위치 저장
       if (!draggedCategoryAreas[categoryId] && currentPage) {
@@ -1655,13 +1676,20 @@ const App: React.FC = () => {
       };
     }));
 
-    // 실시간 면접촉 기반 고정 크기 충돌 검사 - 드래그 중에는 스킵
-    if ((Math.abs(deltaX) > 0.1 || Math.abs(deltaY) > 0.1) && !draggedCategoryAreas[categoryId]) {
-      // 델타 값을 로컬 변수로 캡처하여 클로저 내에서 안전하게 사용
+    // 실시간 면접촉 기반 고정 크기 충돌 검사 - 드래그 중에 작동
+    if (Math.abs(deltaX) > 0.1 || Math.abs(deltaY) > 0.1) {
+      // 프레임 간 delta를 사용하여 실제 이동 방향 파악
       const capturedDeltaX = deltaX;
       const capturedDeltaY = deltaY;
+      const capturedFrameDeltaX = frameDeltaX;
+      const capturedFrameDeltaY = frameDeltaY;
+      const isMainlyHorizontal = Math.abs(capturedFrameDeltaX) > Math.abs(capturedFrameDeltaY);
 
-      console.log('⚡ 실시간 면 기반 충돌 검사 시작:', categoryId, { deltaX: capturedDeltaX, deltaY: capturedDeltaY });
+      console.log('⚡ 실시간 면 기반 충돌 검사 시작:', categoryId, {
+        totalDelta: { x: capturedDeltaX, y: capturedDeltaY },
+        frameDelta: { x: capturedFrameDeltaX, y: capturedFrameDeltaY },
+        주방향: isMainlyHorizontal ? 'X축' : 'Y축'
+      });
 
       setPages(prevPages => {
         const currentPage = prevPages.find(p => p.id === currentPageId);
@@ -1692,7 +1720,6 @@ const App: React.FC = () => {
           movingArea = calculateCategoryArea(movingCategory, currentPage);
         }
 
-        console.log('📏 이동 중인 카테고리 실제 영역 (캐시됨):', movingArea, '캐시 여부:', !!draggedCategoryAreas[movingCategory.id]);
 
         // 실제 영역이 없으면 충돌 검사 생략
         if (!movingArea) {
@@ -1701,6 +1728,7 @@ const App: React.FC = () => {
 
         // 다른 카테고리들과의 실제 면 충돌 검사
         let hasCollision = false;
+        const pushedMemoIds = new Set<string>(); // 밀려난 메모 추적
 
         const updatedCategories = (currentPage.categories || []).map(otherCategory => {
           if (otherCategory.id === categoryId) return otherCategory;
@@ -1724,6 +1752,9 @@ const App: React.FC = () => {
           let pushX = 0;
           let pushY = 0;
 
+          // 주 이동 방향 결정 (프레임 간 delta 사용)
+          const isMainlyHorizontal = Math.abs(capturedFrameDeltaX) > Math.abs(capturedFrameDeltaY);
+
           // 이동 중인 영역의 경계
           const movingLeft = movingArea.x;
           const movingRight = movingArea.x + movingArea.width;
@@ -1736,32 +1767,35 @@ const App: React.FC = () => {
           const otherTop = otherArea.y;
           const otherBottom = otherArea.y + otherArea.height;
 
-          // 이동 중인 영역의 오른쪽 면이 충돌한 경우 (x+ 방향 이동 시)
-          if (capturedDeltaX > 0 && movingRight > otherLeft && movingLeft < otherLeft) {
-            pushX = capturedDeltaX; // 충돌당한 영역을 x+ 방향으로 같이 이동
-            hasCollision = true;
-            console.log('➡️ 오른쪽 면 충돌 - 충돌당한 영역을 x+ 방향으로 이동:', pushX);
-          }
-
-          // 이동 중인 영역의 왼쪽 면이 충돌한 경우 (x- 방향 이동 시)
-          else if (capturedDeltaX < 0 && movingLeft < otherRight && movingRight > otherRight) {
-            pushX = capturedDeltaX; // 충돌당한 영역을 x- 방향으로 같이 이동
-            hasCollision = true;
-            console.log('⬅️ 왼쪽 면 충돌 - 충돌당한 영역을 x- 방향으로 이동:', pushX);
-          }
-
-          // 이동 중인 영역의 아래쪽 면이 충돌한 경우 (y+ 방향 이동 시)
-          if (capturedDeltaY > 0 && movingBottom > otherTop && movingTop < otherTop) {
-            pushY = capturedDeltaY; // 충돌당한 영역을 y+ 방향으로 같이 이동
-            hasCollision = true;
-            console.log('⬇️ 아래쪽 면 충돌 - 충돌당한 영역을 y+ 방향으로 이동:', pushY);
-          }
-
-          // 이동 중인 영역의 위쪽 면이 충돌한 경우 (y- 방향 이동 시)
-          else if (capturedDeltaY < 0 && movingTop < otherBottom && movingBottom > otherBottom) {
-            pushY = capturedDeltaY; // 충돌당한 영역을 y- 방향으로 같이 이동
-            hasCollision = true;
-            console.log('⬆️ 위쪽 면 충돌 - 충돌당한 영역을 y- 방향으로 이동:', pushY);
+          // 주 이동 방향에 따라 해당 축만 충돌 검사
+          if (isMainlyHorizontal) {
+            // X축 충돌 검사
+            const overlapRight = movingRight - otherLeft;
+            if (overlapRight > 0 && movingLeft < otherLeft && movingRight < otherRight) {
+              pushX = overlapRight;
+              hasCollision = true;
+              console.log('➡️ 오른쪽 면 충돌 - 겹친 거리만큼 밀기:', overlapRight);
+            }
+            const overlapLeft = otherRight - movingLeft;
+            if (overlapLeft > 0 && movingRight > otherRight && movingLeft > otherLeft) {
+              pushX = -overlapLeft;
+              hasCollision = true;
+              console.log('⬅️ 왼쪽 면 충돌 - 겹친 거리만큼 밀기:', -overlapLeft);
+            }
+          } else {
+            // Y축 충돌 검사
+            const overlapBottom = movingBottom - otherTop;
+            if (overlapBottom > 0 && movingTop < otherTop && movingBottom < otherBottom) {
+              pushY = overlapBottom;
+              hasCollision = true;
+              console.log('⬇️ 아래쪽 면 충돌:', overlapBottom);
+            }
+            const overlapTop = otherBottom - movingTop;
+            if (overlapTop > 0 && movingBottom > otherBottom && movingTop > otherTop) {
+              pushY = -overlapTop;
+              hasCollision = true;
+              console.log('⬆️ 위쪽 면 충돌:', -overlapTop);
+            }
           }
 
           // 충돌이 감지되면 위치만 조정 (크기는 유지)
@@ -1794,6 +1828,7 @@ const App: React.FC = () => {
             }
           });
 
+          // 메모 충돌 처리: 영역과 메모 간 충돌 검사 (주 이동 방향 재사용)
           const updatedMemos = currentPage.memos.map(memo => {
             // 충돌당한 카테고리의 메모들만 이동 (충돌을 일으킨 카테고리 제외)
             if (memo.parentId && movedCategoryIds.has(memo.parentId) && memo.parentId !== categoryId) {
@@ -1811,6 +1846,74 @@ const App: React.FC = () => {
                 };
               }
             }
+
+            // 영역에 속하지 않은 독립 메모와의 충돌 처리
+            if (!memo.parentId && memo.id !== categoryId) {
+              const memoWidth = memo.size?.width || 200;
+              const memoHeight = memo.size?.height || 150;
+              const memoLeft = memo.position.x;
+              const memoRight = memo.position.x + memoWidth;
+              const memoTop = memo.position.y;
+              const memoBottom = memo.position.y + memoHeight;
+
+              // 영역과 메모의 충돌 검사
+              const isOverlapping = !(
+                movingArea.x + movingArea.width <= memoLeft ||
+                movingArea.x >= memoRight ||
+                movingArea.y + movingArea.height <= memoTop ||
+                movingArea.y >= memoBottom
+              );
+
+              if (isOverlapping) {
+                let pushX = 0;
+                let pushY = 0;
+
+                const movingAreaRight = movingArea.x + movingArea.width;
+                const movingAreaBottom = movingArea.y + movingArea.height;
+
+                // 주 이동 방향 결정 (프레임 간 delta 사용)
+                const isMainlyHorizontal = Math.abs(capturedFrameDeltaX) > Math.abs(capturedFrameDeltaY);
+
+                // 주 이동 방향에 따라 해당 축만 충돌 검사
+                if (isMainlyHorizontal) {
+                  // X축 충돌 검사
+                  const overlapRight = movingAreaRight - memoLeft;
+                  if (overlapRight > 0 && movingArea.x < memoLeft && movingAreaRight < memoRight) {
+                    pushX = overlapRight;
+                    console.log('➡️ 메모 오른쪽으로 밀기:', memo.id, overlapRight);
+                  }
+                  const overlapLeft = memoRight - movingArea.x;
+                  if (overlapLeft > 0 && movingAreaRight > memoRight && movingArea.x > memoLeft) {
+                    pushX = -overlapLeft;
+                    console.log('⬅️ 메모 왼쪽으로 밀기:', memo.id, -overlapLeft);
+                  }
+                } else {
+                  // Y축 충돌 검사
+                  const overlapBottom = movingAreaBottom - memoTop;
+                  if (overlapBottom > 0 && movingArea.y < memoTop && movingAreaBottom < memoBottom) {
+                    pushY = overlapBottom;
+                    console.log('⬇️ 메모 아래쪽으로 밀기:', memo.id, overlapBottom);
+                  }
+                  const overlapTop = memoBottom - movingArea.y;
+                  if (overlapTop > 0 && movingAreaBottom > memoBottom && movingArea.y > memoTop) {
+                    pushY = -overlapTop;
+                    console.log('⬆️ 메모 위쪽으로 밀기:', memo.id, -overlapTop);
+                  }
+                }
+
+                if (pushX !== 0 || pushY !== 0) {
+                  pushedMemoIds.add(memo.id);
+                  return {
+                    ...memo,
+                    position: {
+                      x: memo.position.x + pushX,
+                      y: memo.position.y + pushY
+                    }
+                  };
+                }
+              }
+            }
+
             return memo;
           });
 
@@ -1917,7 +2020,32 @@ const App: React.FC = () => {
 
   // 통합 삭제 함수 - 현재 선택된 아이템(메모 또는 카테고리) 삭제
   const deleteSelectedItem = () => {
-    if (selectedMemoId) {
+    // 다중 선택된 항목들 삭제
+    if (selectedMemoIds.length > 0 || selectedCategoryIds.length > 0) {
+      setPages(prev => prev.map(page => {
+        if (page.id !== currentPageId) return page;
+
+        return {
+          ...page,
+          memos: page.memos.filter(memo => !selectedMemoIds.includes(memo.id)),
+          categories: (page.categories || []).filter(cat => !selectedCategoryIds.includes(cat.id))
+        };
+      }));
+
+      // 선택 상태 초기화
+      setSelectedMemoIds([]);
+      setSelectedCategoryIds([]);
+
+      // 단일 선택도 초기화
+      if (selectedMemoIds.includes(selectedMemoId || '')) {
+        setSelectedMemoId(null);
+      }
+      if (selectedCategoryIds.includes(selectedCategoryId || '')) {
+        setSelectedCategoryId(null);
+      }
+    }
+    // 단일 선택 삭제
+    else if (selectedMemoId) {
       deleteMemoBlock();
     } else if (selectedCategoryId) {
       deleteCategory(selectedCategoryId);

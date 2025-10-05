@@ -149,24 +149,16 @@ const Canvas: React.FC<CanvasProps> = ({
       });
 
       if (affectedCategoryIds.size > 0) {
-        console.log('🔄 메모 위치 변경으로 카테고리 캐시 제거:', Array.from(affectedCategoryIds), '드래그 중:', isDraggingCategoryArea);
         setDraggedCategoryAreas(prev => {
           const newAreas = { ...prev };
-          const removedCaches: string[] = [];
           affectedCategoryIds.forEach(catId => {
             // 드래그 중인 카테고리의 캐시는 제거하지 않음
             if (catId !== isDraggingCategoryArea) {
-              if (newAreas[catId]) {
-                removedCaches.push(catId);
-              }
               delete newAreas[catId];
               // App.tsx의 메모 위치 캐시도 동기화하여 제거
               onClearCategoryCache?.(catId);
             }
           });
-          if (removedCaches.length > 0) {
-            console.log('  🗑️ 실제 제거된 캐시:', removedCaches);
-          }
           return newAreas;
         });
       }
@@ -1120,7 +1112,7 @@ const Canvas: React.FC<CanvasProps> = ({
       
       // 줌 델타 계산 (휠 방향에 따라)
       const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-      const newScale = Math.max(0.1, Math.min(5, canvasScale * zoomFactor));
+      const newScale = Math.max(0.01, Math.min(5, canvasScale * zoomFactor));
       
       if (newScale !== canvasScale) {
         // 마우스 위치를 기준으로 줌
@@ -1665,20 +1657,20 @@ const Canvas: React.FC<CanvasProps> = ({
         </button>
         <button
           onClick={onDeleteSelected}
-          disabled={!selectedMemoId && !selectedCategoryId}
+          disabled={!selectedMemoId && !selectedCategoryId && selectedMemoIds.length === 0 && selectedCategoryIds.length === 0}
           style={{
             backgroundColor: 'white',
-            color: (selectedMemoId || selectedCategoryId) ? '#ef4444' : '#9ca3af',
+            color: (selectedMemoId || selectedCategoryId || selectedMemoIds.length > 0 || selectedCategoryIds.length > 0) ? '#ef4444' : '#9ca3af',
             border: '1px solid #d1d5db',
             padding: '12px 16px',
             borderRadius: '8px',
-            cursor: (selectedMemoId || selectedCategoryId) ? 'pointer' : 'not-allowed',
+            cursor: (selectedMemoId || selectedCategoryId || selectedMemoIds.length > 0 || selectedCategoryIds.length > 0) ? 'pointer' : 'not-allowed',
             fontSize: '14px',
             fontWeight: '500',
             transition: 'all 0.2s ease'
           }}
         >
-          삭제
+          삭제 {(selectedMemoIds.length > 0 || selectedCategoryIds.length > 0) && `(${selectedMemoIds.length + selectedCategoryIds.length})`}
         </button>
       </div>
 
