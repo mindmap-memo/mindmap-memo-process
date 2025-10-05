@@ -959,13 +959,9 @@ const App: React.FC = () => {
         y: category.position.y + offsetY
       };
 
-      console.log('🔄 카테고리 밀어내기:', category.id, '새 위치:', newCategoryPosition);
-
       // 카테고리와 하위 요소들을 함께 이동 (즉시 상태 업데이트)
       setPages(prevPages => prevPages.map(page => {
         if (page.id !== currentPageId) return page;
-
-        console.log('🔧 카테고리 영역 위치 조정:', category.id, '새 위치:', newCategoryPosition);
 
         // 하위 메모들도 함께 이동
         const updatedMemos = page.memos.map(memo =>
@@ -994,8 +990,6 @@ const App: React.FC = () => {
               }
             : cat
         );
-
-        console.log('✅ 카테고리 상태 업데이트 완료:', category.id, '새 카테고리 수:', updatedCategories.length);
 
         return {
           ...page,
@@ -1272,19 +1266,15 @@ const App: React.FC = () => {
             if (memo.id === itemId) {
               let newPosition = memo.position;
 
-              // 카테고리에 종속시킬 때 위치를 카테고리 내부로 조정
+              // 카테고리에 종속시킬 때 위치를 카테고리 블록 아래로 조정
               if (categoryId && targetCategory) {
-                const categoryWidth = targetCategory.size?.width || 200;
-                const categoryHeight = targetCategory.size?.height || 80;
-
                 newPosition = {
-                  x: targetCategory.position.x + 30, // 카테고리 내부로 30px 들여쓰기
-                  y: targetCategory.position.y + categoryHeight + 20 // 카테고리 블록 바로 아래 20px
+                  x: targetCategory.position.x + 30,
+                  y: targetCategory.position.y + 200
                 };
 
                 console.log('📍 종속 메모 위치 조정:', {
                   카테고리위치: targetCategory.position,
-                  카테고리크기: { width: categoryWidth, height: categoryHeight },
                   새위치: newPosition
                 });
               }
@@ -1295,11 +1285,18 @@ const App: React.FC = () => {
           });
           const updatedCategories = (page.categories || []).map(category => {
             if (categoryId && category.id === categoryId) {
+              const newChildren = category.children.includes(itemId)
+                ? category.children
+                : [...category.children, itemId];
+              console.log('✅ 메모를 카테고리에 추가:', {
+                categoryId: category.id,
+                memoId: itemId,
+                children: newChildren,
+                isExpanded: true
+              });
               return {
                 ...category,
-                children: category.children.includes(itemId)
-                  ? category.children
-                  : [...category.children, itemId],
+                children: newChildren,
                 isExpanded: true // 메모 추가 시 자동으로 확장 상태로 변경
               };
             }
@@ -1354,41 +1351,8 @@ const App: React.FC = () => {
       });
     }
 
-    // 카테고리에 메모를 추가한 경우 충돌 검사 수행 (5번 제한)
-    if (categoryId) {
-      console.log('🎯 moveToCategory에서 충돌 검사 예약:', categoryId);
-      setTimeout(() => {
-        console.log('⏰ 충돌 검사 타이머 실행:', categoryId);
-        // 최신 상태를 가져오기 위해 setPages 콜백 사용
-        setPages(prevPages => {
-          const currentPage = prevPages.find(p => p.id === currentPageId);
-          const targetCategory = currentPage?.categories?.find(cat => cat.id === categoryId);
-
-          console.log('🔍 충돌 검사 대상:', {
-            currentPageId,
-            categoryId,
-            hasCurrentPage: !!currentPage,
-            hasTargetCategory: !!targetCategory
-          });
-
-          if (currentPage && targetCategory) {
-            const categoryArea = calculateCategoryArea(targetCategory, currentPage);
-            console.log('📐 계산된 카테고리 영역:', categoryArea);
-            if (categoryArea) {
-              console.log('🔧 카테고리 영역 충돌 검사 수행:', categoryId);
-              pushAwayConflictingBlocks(categoryArea, categoryId, currentPage);
-            } else {
-              console.log('❌ 카테고리 영역 계산 실패');
-            }
-          } else {
-            console.log('❌ 필요한 데이터 없음');
-          }
-          return prevPages; // 상태는 변경하지 않고 최신 값만 확인
-        });
-      }, 100); // 짧은 지연으로 더 빠른 반응
-    } else {
-      console.log('❌ categoryId가 없어서 충돌 검사 스킵');
-    }
+    // moveToCategory에서는 충돌 검사를 하지 않음 (무한 루프 방지)
+    // 충돌 검사는 드래그 완료 시에만 수행됨
 
     // Save canvas state for undo/redo
     const targetName = categoryId ? `카테고리 ${categoryId}` : '최상위';
@@ -2268,22 +2232,22 @@ const App: React.FC = () => {
         onMemoDragStart={() => setIsDraggingMemo(true)}
         onMemoDragEnd={() => {
           setIsDraggingMemo(false);
-          // 드래그 완료 후 충돌 검사 수행
-          setTimeout(() => {
-            const currentPage = pages.find(p => p.id === currentPageId);
-            if (currentPage) {
-              // 모든 카테고리에 대해 충돌 검사 수행
-              currentPage.categories?.forEach(category => {
-                const categoryArea = calculateCategoryArea(category, currentPage);
-                if (categoryArea) {
-                  // 카운터 리셋
-                  collisionCheckCount.current.set(category.id, 0);
-                  console.log('🔄 메모 드래그 완료 후 충돌 검사 시작:', category.id);
-                  pushAwayConflictingBlocks(categoryArea, category.id, currentPage);
-                }
-              });
-            }
-          }, 100);
+          // 드래그 완료 후 충돌 검사 - 주석 처리 (무한 반복 문제)
+          // setTimeout(() => {
+          //   const currentPage = pages.find(p => p.id === currentPageId);
+          //   if (currentPage) {
+          //     // 모든 카테고리에 대해 충돌 검사 수행
+          //     currentPage.categories?.forEach(category => {
+          //       const categoryArea = calculateCategoryArea(category, currentPage);
+          //       if (categoryArea) {
+          //         // 카운터 리셋
+          //         collisionCheckCount.current.set(category.id, 0);
+          //         console.log('🔄 메모 드래그 완료 후 충돌 검사 시작:', category.id);
+          //         pushAwayConflictingBlocks(categoryArea, category.id, currentPage);
+          //       }
+          //     });
+          //   }
+          // }, 100);
         }}
         isDraggingCategory={isDraggingCategory}
         onCategoryDragStart={() => {

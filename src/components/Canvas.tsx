@@ -641,9 +641,6 @@ const Canvas: React.FC<CanvasProps> = ({
     const childCategories = currentPage?.categories?.filter(cat => cat.parentId === category.id) || [];
     const hasChildren = childMemos.length > 0 || childCategories.length > 0;
 
-    if (hasChildren) {
-    }
-
     // 확장 가능한 영역 배경 (메모-카테고리 변환용)
     if (area && hasChildren && category.isExpanded) {
       areas.push(
