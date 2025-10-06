@@ -2101,13 +2101,21 @@ const App: React.FC = () => {
       }
 
       // 부모 카테고리가 없으면: 메모-메모 충돌 검사
-      const updatedMemos = resolveMemoCollisions(memoId, updatedPage);
+      const collisionResult = resolveMemoCollisions(memoId, updatedPage);
+
+      // 영역에 막혔으면 원래 위치로 복원
+      let finalMemos = collisionResult.memos;
+      if (collisionResult.blockedByArea) {
+        finalMemos = finalMemos.map(memo =>
+          memo.id === memoId ? { ...memo, position: movedMemo.position } : memo
+        );
+      }
 
       return prev.map(page =>
         page.id === currentPageId
           ? {
               ...page,
-              memos: updatedMemos
+              memos: finalMemos
             }
           : page
       );

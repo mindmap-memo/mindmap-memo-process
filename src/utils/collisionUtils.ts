@@ -189,27 +189,33 @@ export function resolveAreaCollisions(
   };
 }
 
+export interface MemoCollisionResult {
+  memos: MemoBlock[];
+  blockedByArea: boolean; // 이동 중인 메모가 영역에 막혔는지
+}
+
 /**
  * 메모블록-메모블록 충돌 검사 및 밀어내기 (영역-영역 충돌 로직과 동일)
  *
  * @param movingMemoId - 이동 중인 메모 ID (최고 우선순위)
  * @param page - 현재 페이지
  * @param maxIterations - 최대 반복 횟수 (기본 10)
- * @returns 충돌 처리 후 업데이트된 메모
+ * @returns 충돌 처리 후 업데이트된 메모와 영역 차단 여부
  */
 export function resolveMemoCollisions(
   movingMemoId: string,
   page: Page,
   maxIterations: number = 10
-): MemoBlock[] {
+): MemoCollisionResult {
   let updatedMemos = [...page.memos];
 
   // 우선순위 맵: 이동 중인 메모가 최고 우선순위 (0)
   const priorityMap = new Map<string, number>();
   priorityMap.set(movingMemoId, 0);
 
-  // 각 메모의 밀림 방향 고정 (처음 결정된 방향 유지)
-  const pushDirections = new Map<string, 'horizontal' | 'vertical'>();
+  // 영역에 막혀서 이동 불가능한 메모 추적
+  const blockedMemos = new Set<string>();
+  let movingMemoBlocked = false; // 이동 중인 메모가 영역에 막혔는지
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     let hasCollision = false;
@@ -219,17 +225,87 @@ export function resolveMemoCollisions(
     const originalMemos = [...updatedMemos];
     const newMemos = [...updatedMemos];
 
+    // 우선순위를 가진 모든 메모가 영역에 막힌 메모와 충돌하는지 확인
+    // 연쇄 충돌 확인: A가 B를 밀고, B가 C를 밀고, C가 영역에 막히면 A, B, C 모두 막힘
+    const blockedMemoIds = Array.from(blockedMemos);
+    const newlyBlockedMemos = new Set<string>();
+
+    for (const memo of updatedMemos) {
+      if (memo.parentId) continue;
+
+      // 우선순위가 있는 메모만 확인 (밀리는 체인에 속한 메모)
+      const memoPriority = priorityMap.get(memo.id);
+      if (memoPriority === undefined) continue;
+
+      // 이 메모가 영역에 막힌 메모와 충돌하는지 확인
+      for (const blockedMemoId of blockedMemoIds) {
+        const blockedMemo = updatedMemos.find(m => m.id === blockedMemoId);
+        if (!blockedMemo) continue;
+
+        const memoWidth = memo.size?.width || 200;
+        const memoHeight = memo.size?.height || 95;
+        const blockedWidth = blockedMemo.size?.width || 200;
+        const blockedHeight = blockedMemo.size?.height || 95;
+
+        const memoBounds = {
+          left: memo.position.x,
+          top: memo.position.y,
+          right: memo.position.x + memoWidth,
+          bottom: memo.position.y + memoHeight
+        };
+
+        const blockedBounds = {
+          left: blockedMemo.position.x,
+          top: blockedMemo.position.y,
+          right: blockedMemo.position.x + blockedWidth,
+          bottom: blockedMemo.position.y + blockedHeight
+        };
+
+        // 겹침 계산
+        const overlapLeft = Math.max(memoBounds.left, blockedBounds.left);
+        const overlapTop = Math.max(memoBounds.top, blockedBounds.top);
+        const overlapRight = Math.min(memoBounds.right, blockedBounds.right);
+        const overlapBottom = Math.min(memoBounds.bottom, blockedBounds.bottom);
+
+        // 겹치면 이 메모도 막힘
+        if (overlapLeft < overlapRight && overlapTop < overlapBottom) {
+          newlyBlockedMemos.add(memo.id);
+
+          // 이동 중인 메모가 막힌 경우
+          if (memo.id === movingMemoId) {
+            movingMemoBlocked = true;
+
+            // 이동 중인 메모가 막혔으면, 이 메모가 밀고 있던 모든 메모(우선순위가 더 낮은)도 막아야 함
+            for (const otherMemo of updatedMemos) {
+              if (otherMemo.parentId) continue;
+              const otherPriority = priorityMap.get(otherMemo.id);
+              if (otherPriority !== undefined && otherPriority > memoPriority) {
+                // 이동 중인 메모가 밀고 있던 메모들
+                newlyBlockedMemos.add(otherMemo.id);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 새로 막힌 메모들을 blockedMemos에 추가하고 우선순위 설정
+    for (const memoId of Array.from(newlyBlockedMemos)) {
+      blockedMemos.add(memoId);
+      priorityMap.set(memoId, 0);
+    }
+
     for (let i = 0; i < newMemos.length; i++) {
       const currentMemo = newMemos[i];
 
       // 부모가 있는 메모는 제외
       if (currentMemo.parentId) continue;
 
-      // 이동 중인 메모는 밀리지 않음
-      if (currentMemo.id === movingMemoId) continue;
-
       // 이미 이번 iteration에서 처리된 메모는 스킵
       if (processedInThisIteration.has(currentMemo.id)) continue;
+
+      // 영역에 막힌 메모는 밀리지 않음
+      if (blockedMemos.has(currentMemo.id)) continue;
 
       let totalPushX = 0;
       let totalPushY = 0;
@@ -244,8 +320,11 @@ export function resolveMemoCollisions(
         const currentPriority = priorityMap.get(currentMemo.id) ?? Infinity;
         const otherPriority = priorityMap.get(otherMemo.id) ?? Infinity;
 
-        // 우선순위가 같거나 높으면 밀리지 않음
-        if (currentPriority <= otherPriority) continue;
+        // 영역에 막힌 메모는 우선순위를 무시하고 항상 장애물처럼 작동
+        const isOtherBlocked = blockedMemos.has(otherMemo.id);
+
+        // 우선순위가 같거나 높으면 밀리지 않음 (단, blocked 메모는 예외)
+        if (!isOtherBlocked && currentPriority <= otherPriority) continue;
 
         // 메모 바운드 계산
         const currentWidth = currentMemo.size?.width || 200;
@@ -293,6 +372,13 @@ export function resolveMemoCollisions(
         if (pushX !== 0 || pushY !== 0) {
           hasCollision = true;
 
+          // blocked 메모와 충돌하면 밀지 않음 (더 이상 진행 불가)
+          if (isOtherBlocked) {
+            // blocked 메모를 만났으므로 이 메모도 막힘 표시 (다음 iteration에서 차단됨)
+            // 하지만 이번 iteration에서는 아직 밀어내기 시도
+            continue;
+          }
+
           // 가장 우선순위가 높은 밀어내는 메모만 적용
           if (otherPriority < highestPusherPriority) {
             totalPushX = pushX;
@@ -322,8 +408,19 @@ export function resolveMemoCollisions(
 
         const areaCollision = checkMemoAreaCollision(currentMemo.id, testPage);
 
-        // 영역과 충돌하지 않을 때만 밀어내기 적용
-        if (!areaCollision.blocked) {
+        // 영역과 충돌하면 밀어내기 중단 (연쇄 차단)
+        if (areaCollision.blocked) {
+          // 영역에 막혔으므로 밀지 않음
+          blockedMemos.add(currentMemo.id);
+          // 우선순위를 0으로 설정하여 다른 메모가 이 메모를 밀지 못하게 함
+          priorityMap.set(currentMemo.id, 0);
+
+          // 이동 중인 메모가 막힌 경우 표시
+          if (currentMemo.id === movingMemoId) {
+            movingMemoBlocked = true;
+          }
+        } else {
+          // 영역과 충돌하지 않으면 밀어내기 적용
           newMemos[i] = {
             ...currentMemo,
             position: newPosition
@@ -331,7 +428,6 @@ export function resolveMemoCollisions(
 
           processedInThisIteration.add(currentMemo.id);
         }
-        // 영역에 막히면 밀지 않음 (그대로 유지)
       }
     }
 
@@ -341,7 +437,10 @@ export function resolveMemoCollisions(
     if (!hasCollision) break;
   }
 
-  return updatedMemos;
+  return {
+    memos: updatedMemos,
+    blockedByArea: movingMemoBlocked
+  };
 }
 
 /**
