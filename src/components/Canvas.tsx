@@ -1,5 +1,6 @@
 import React from 'react';
 import { Page, MemoDisplaySize, ImportanceLevel, CategoryBlock, MemoBlock as MemoBlockType, isMemoBlock, isCategoryBlock } from '../types';
+import { calculateCategoryArea } from '../utils/categoryAreaUtils';
 import MemoBlock from './MemoBlock';
 import CategoryBlockComponent from './CategoryBlock';
 import ImportanceFilter from './ImportanceFilter';
@@ -774,11 +775,14 @@ const Canvas: React.FC<CanvasProps> = ({
                 document.removeEventListener('mouseup', handleMouseUp);
                 console.log('🏁 CategoryLabel mouse drag end:', category.id);
 
-                // 드래그 종료 - 약간의 지연 후 isDraggingCategoryArea 해제
-                // (useEffect가 즉시 실행되어 캐시를 제거하는 것을 방지)
-                setTimeout(() => {
-                  setIsDraggingCategoryArea(null);
-                }, 100);
+                // 드래그 종료 - 캐시 제거
+                setIsDraggingCategoryArea(null);
+                setDraggedCategoryAreas(prev => {
+                  const newAreas = { ...prev };
+                  delete newAreas[category.id];
+                  return newAreas;
+                });
+                onClearCategoryCache?.(category.id);
               };
 
               document.addEventListener('mousemove', handleMouseMove);
@@ -949,11 +953,16 @@ const Canvas: React.FC<CanvasProps> = ({
 
   // 카테고리 위치 변경 종료 (드래그 종료)
   const handleCategoryPositionEnd = (categoryId: string) => {
-    console.log('🏁 카테고리 드래그 종료 - 캐시 유지 (크기 고정)');
-    // 드래그 종료 후에도 캐시 유지 (크기를 고정하기 위해)
-    // 캐시는 다음 드래그 시작 시점에 새로 계산됨
+    console.log('🏁 카테고리 드래그 종료 - 캐시 제거 (자연스러운 크기 조정)');
 
-    // App의 메모 위치 캐시만 제거
+    // 드래그 종료 시 캐시 제거 (메모 위치에 따라 자연스럽게 크기 조정)
+    setDraggedCategoryAreas(prev => {
+      const newAreas = { ...prev };
+      delete newAreas[categoryId];
+      return newAreas;
+    });
+
+    // App의 캐시도 제거
     onCategoryPositionDragEnd?.(categoryId);
   };
 

@@ -129,9 +129,21 @@ The application includes a sophisticated table system designed for business proc
 - **Memo Position Cache**: `dragStartMemoPositions` ref stores original memo positions on drag start, cleared on drag end
 - **Children Movement**: When category moves, children calculate new position as `originalPosition + totalDelta` (not cumulative)
 - **Drop Positioning**: When memos are dropped onto categories, they are positioned at `category.position.y + 200px`
-- **Collision Detection**: Disabled during drag operations and in `moveToCategory` to prevent infinite loops
 - **Area Colors**: Semi-transparent colors assigned based on category ID hash using predefined color palette
-- **Cache System**: `draggedCategoryAreas` state caches area size and original position during drag to maintain fixed dimensions
+- **Cache System**: `draggedCategoryAreas` state caches area size and original position during drag to maintain fixed dimensions; cache is cleared on drag end to allow natural area resizing based on memo positions
+
+### Collision Detection System
+
+The application implements a sophisticated collision detection system for category areas:
+
+- **Real-time Collision**: During category drag, collisions are detected and resolved in real-time using priority-based iterative collision resolution
+- **Priority System**: Dragged category has highest priority (0); collided categories get pushed away based on priority hierarchy
+- **Iterative Resolution**: Collision loop runs up to 10 iterations to handle chain reactions when one category pushes another
+- **Memo Position Tracking**: Critical fix (App.tsx:1735, 1870-1882) - when a category is pushed during collision, its child memos are also updated in the same iteration to prevent infinite loops
+- **Area Calculation**: `calculateCategoryArea` uses a temporary page object with updated memo positions during collision iterations (App.tsx:1776-1779)
+- **Directional Pushing**: Uses frame delta to determine main movement direction (horizontal/vertical) and pushes categories in that direction only
+- **Overlap-Based Movement**: Categories are pushed by exactly the overlapping distance, no more, no less
+- **Cache Clearing**: Category area cache is cleared on drag end (App.tsx:115, Canvas.tsx:779-783, 955-961) to allow areas to naturally shrink/expand based on current memo positions
 
 ### Table System Architecture
 
@@ -146,6 +158,48 @@ The application includes a sophisticated table system designed for business proc
 
 ## Development Guidelines
 
+### Code Quality and Maintenance (CRITICAL - 항상 준수)
+
+**코드가 복잡해지면서 문제가 반복되는 것을 방지하기 위한 핵심 원칙:**
+
+1. **중복 코드 즉시 제거**
+   - 같은 로직이 2곳 이상에 있으면 즉시 유틸 함수로 분리
+   - 예: `calculateCategoryArea`가 App.tsx와 Canvas.tsx에 중복 → `utils/categoryAreaUtils.ts`로 통합
+   - 중복 코드는 한 곳을 수정하면 다른 곳에서 문제가 발생하는 원인
+
+2. **기능 세분화 및 함수화**
+   - 하나의 함수는 하나의 책임만 수행 (Single Responsibility Principle)
+   - 복잡한 로직은 작은 함수들로 분리
+   - 예: 충돌 검사 로직을 `resolveAreaCollisions` 함수로 독립
+   - 각 함수는 명확한 input/output을 가져야 함
+
+3. **함수 호출 정돈화**
+   - 불필요한 함수 호출 제거 (성능 및 무한 루프 방지)
+   - 함수 호출 흐름을 명확하게 유지
+   - 상태 업데이트는 한 번에 하나의 `setPages` 호출로 처리
+   - 예: 메모 위치 업데이트와 충돌 검사를 단일 `setPages` 내에서 처리
+
+4. **미사용 코드 즉시 제거**
+   - 주석 처리된 코드는 git history에 있으니 과감히 삭제
+   - 사용하지 않는 import, 변수, 함수 즉시 제거
+   - ESLint 경고를 무시하지 말고 해결
+
+5. **유틸 함수 분리 원칙**
+   - 같은 로직을 2곳 이상에서 사용하면 `src/utils/`에 분리
+   - 순수 함수로 작성 (side effect 최소화)
+   - 적절한 TypeScript 타입 정의
+   - 예시:
+     - `categoryAreaUtils.ts` - 영역 계산 관련
+     - `collisionUtils.ts` - 충돌 검사 관련
+
+6. **문제 해결 후 재발 방지**
+   - 버그를 고친 후, 왜 발생했는지 분석
+   - 근본 원인을 제거하는 방향으로 리팩토링
+   - 같은 패턴의 문제가 다른 곳에 없는지 확인
+   - 해결 방법을 이 문서에 기록
+
+### Specific Implementation Guidelines
+
 - **File Management**: Always prefer editing existing files to creating new ones; never create files unless absolutely necessary
 - **Table System**: When working with tables, remember the dual data structure - maintain both legacy arrays and enhanced objects
 - **Error Handling**: Use proper TypeScript error handling with `error instanceof Error ? error.message : 'Unknown error'` pattern
@@ -155,7 +209,7 @@ The application includes a sophisticated table system designed for business proc
 - **Google Sheets Safety**: Always validate array data before using .map() - check `Array.isArray()` and filter non-arrays to prevent runtime errors
 - **Range Detection**: Use clipboard-based detection for Google Sheets ranges; implement fallback UI for manual range input when automatic detection fails
 - **Category Drag Operations**: Always use absolute positioning (originalPosition + totalDelta) rather than cumulative deltas to prevent position drift
-- **Collision Detection**: Avoid enabling collision detection during drag operations or in state update functions to prevent infinite loops
+- **Collision Detection**: Use unified collision resolution function (`resolveAreaCollisions`) to prevent duplicate logic and infinite loops
 - **Logging**: NEVER add console.log statements in render functions, useEffect callbacks, or frequently-called functions (e.g., calculateCategoryArea, renderSingleCategoryArea) as they cause infinite log spam and make debugging impossible. Only log in event handlers (onClick, onMouseDown, etc.) or one-time initialization code
 
 # important-instruction-reminders
