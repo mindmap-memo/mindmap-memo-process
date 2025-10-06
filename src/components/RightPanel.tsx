@@ -72,6 +72,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const [menuPosition, setMenuPosition] = React.useState({ x: 0, y: 0 });
   const [isGoogleSignedIn, setIsGoogleSignedIn] = React.useState(false);
   const [showConnectedMemos, setShowConnectedMemos] = React.useState(false);
+  const [isTitleFocused, setIsTitleFocused] = React.useState(false);
 
   // 공백 크기를 계산하는 함수 (최대 1블록 높이로 제한)
   const getSpacerHeight = (consecutiveHiddenBlocks: number): string => {
@@ -1382,9 +1383,11 @@ const RightPanel: React.FC<RightPanelProps> = ({
                 }}
                 onFocus={(e) => {
                   e.target.style.borderBottomColor = '#3b82f6';
+                  setIsTitleFocused(true);
                 }}
                 onBlur={(e) => {
                   e.target.style.borderBottomColor = 'transparent';
+                  setIsTitleFocused(false);
                 }}
               />
             </div>
@@ -1764,7 +1767,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                         <div data-block-id={block.id} style={{ position: 'relative', marginBottom: '0px' }}>
                           <ContentBlockComponent
                             block={block}
-                            isEditing={true}
+                            isEditing={!isTitleFocused}
                             isSelected={isSelected}
                             isDragSelected={dragSelectedBlocks.includes(block.id)}
                             isDragHovered={dragHoveredBlocks.includes(block.id)}

@@ -166,6 +166,7 @@ interface MemoBlockProps {
   onDragEnd?: () => void;
   enableImportanceBackground?: boolean;
   currentPage?: Page;
+  isDraggingAnyMemo?: boolean;
 }
 
 const MemoBlock: React.FC<MemoBlockProps> = ({
@@ -188,7 +189,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   enableImportanceBackground = false,
   onDragStart,
   onDragEnd,
-  currentPage
+  currentPage,
+  isDraggingAnyMemo = false
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isConnectionDragging, setIsConnectionDragging] = useState(false);
@@ -327,6 +329,12 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   }, []); // 의존성 배열을 빈 배열로 변경
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    // 다른 메모가 이미 드래그 중이면 무시 (단, 현재 메모가 드래그 중이면 허용)
+    if (isDraggingAnyMemo && !isDragging) {
+      e.stopPropagation();
+      return;
+    }
+
     // 연결 모드가 아닐 때만 드래그 준비
     if (e.button === 0 && !isConnecting) {
       setIsDragging(true);

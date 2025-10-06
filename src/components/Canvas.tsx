@@ -909,6 +909,7 @@ const Canvas: React.FC<CanvasProps> = ({
             onDragStart={onMemoDragStart}
             onDragEnd={onMemoDragEnd}
             currentPage={currentPage}
+            isDraggingAnyMemo={isDraggingMemo}
           />
         ))}
         {childCategories.map(childCategory => (
@@ -1470,6 +1471,7 @@ const Canvas: React.FC<CanvasProps> = ({
             onDragStart={onMemoDragStart}
             onDragEnd={onMemoDragEnd}
             currentPage={currentPage}
+            isDraggingAnyMemo={isDraggingMemo}
           />
         ))}
 
