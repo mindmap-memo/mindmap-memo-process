@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Page, MemoBlock, DataRegistry, MemoDisplaySize, ImportanceLevel, CategoryBlock, CanvasItem, CanvasHistory, CanvasAction, CanvasActionType } from './types';
+import { Page, MemoBlock, DataRegistry, MemoDisplaySize, ImportanceLevel, CategoryBlock, CanvasHistory, CanvasAction, CanvasActionType } from './types';
 import { globalDataRegistry } from './utils/dataRegistry';
 import { calculateCategoryArea, CategoryArea } from './utils/categoryAreaUtils';
 import { resolveAreaCollisions } from './utils/collisionUtils';
@@ -256,7 +256,6 @@ const App: React.FC = () => {
       future: prev.present ? [prev.present, ...prev.future] : prev.future
     }));
 
-    console.log(`🔄 Undo: ${previousAction.description}`);
   }, [canUndo, canvasHistory, currentPageId]);
 
   const redoCanvasAction = React.useCallback(() => {
@@ -283,7 +282,6 @@ const App: React.FC = () => {
       future: prev.future.slice(1)
     }));
 
-    console.log(`🔄 Redo: ${nextAction.description}`);
   }, [canRedo, canvasHistory, currentPageId]);
 
   // Canvas keyboard shortcuts for undo/redo
@@ -310,13 +308,11 @@ const App: React.FC = () => {
 
   // localStorage 자동 저장 - 페이지 데이터
   useEffect(() => {
-    console.log('💾 페이지 데이터 저장 중...');
     saveToStorage(STORAGE_KEYS.PAGES, pages);
   }, [pages]);
 
   // localStorage 자동 저장 - 현재 페이지 ID
   useEffect(() => {
-    console.log('💾 현재 페이지 ID 저장 중:', currentPageId);
     saveToStorage(STORAGE_KEYS.CURRENT_PAGE_ID, currentPageId);
   }, [currentPageId]);
 
@@ -328,14 +324,12 @@ const App: React.FC = () => {
       leftPanelWidth,
       rightPanelWidth
     };
-    console.log('💾 패널 설정 저장 중:', settings);
     saveToStorage(STORAGE_KEYS.PANEL_SETTINGS, settings);
   }, [leftPanelOpen, rightPanelOpen, leftPanelWidth, rightPanelWidth]);
 
   // 현재 페이지 ID가 유효한지 확인하고 수정
   useEffect(() => {
     if (pages.length > 0 && !pages.find(page => page.id === currentPageId)) {
-      console.log('⚠️ 현재 페이지 ID가 유효하지 않음. 첫 번째 페이지로 변경:', pages[0].id);
       setCurrentPageId(pages[0].id);
     }
   }, [pages, currentPageId]);
@@ -475,14 +469,6 @@ const App: React.FC = () => {
       const minY = Math.min(dragSelectStart.y, dragSelectEnd.y);
       const maxY = Math.max(dragSelectStart.y, dragSelectEnd.y);
 
-      console.log('Drag selection area:', { minX, maxX, minY, maxY });
-      console.log('Available memos:');
-      currentPage.memos.forEach(memo => {
-        console.log(`Memo ${memo.id}:`, {
-          position: memo.position,
-          size: memo.size || { width: 200, height: 95 }
-        });
-      });
 
       const memosInSelection = currentPage.memos.filter(memo => {
         const memoWidth = memo.size?.width || 200;
@@ -495,15 +481,7 @@ const App: React.FC = () => {
         const memoBottom = memo.position.y + memoHeight;
 
         // 사각형 교집합 확인
-        const intersects = (memoLeft < maxX && memoRight > minX && memoTop < maxY && memoBottom > minY);
-
-        console.log(`Checking memo ${memo.id}:`, {
-          memoBounds: { left: memoLeft, right: memoRight, top: memoTop, bottom: memoBottom },
-          selectionBounds: { minX, maxX, minY, maxY },
-          intersects: intersects
-        });
-
-        return intersects;
+        return (memoLeft < maxX && memoRight > minX && memoTop < maxY && memoBottom > minY);
       });
 
       // 카테고리 선택 확인 (블록 또는 라벨)
@@ -515,8 +493,6 @@ const App: React.FC = () => {
 
         if (hasChildren) {
           // 하위 아이템이 있는 경우: 일단 제외하고 하위 메모들만 선택하도록 함
-          // (카테고리 라벨 선택은 복잡하므로 향후 개선)
-          console.log(`Skipping category ${category.id} - has children, will be selected via child memos`);
           intersects = false;
         } else {
           // 하위 아이템이 없는 경우: 카테고리 블록과 교집합 확인
@@ -529,24 +505,12 @@ const App: React.FC = () => {
           const categoryBottom = category.position.y + categoryHeight;
 
           intersects = (categoryLeft < maxX && categoryRight > minX && categoryTop < maxY && categoryBottom > minY);
-
-          console.log(`Checking category block ${category.id}:`, {
-            categoryBounds: { left: categoryLeft, right: categoryRight, top: categoryTop, bottom: categoryBottom },
-            selectionBounds: { minX, maxX, minY, maxY },
-            intersects: intersects,
-            hasChildren: false,
-            type: 'block'
-          });
         }
 
         return intersects;
       });
 
-      console.log('Memos in selection:', memosInSelection.length);
-      console.log('Categories in selection:', categoriesInSelection.length);
       if (memosInSelection.length > 0 || categoriesInSelection.length > 0) {
-        console.log('Setting selected memo IDs:', memosInSelection.map(memo => memo.id));
-        console.log('Setting selected category IDs:', categoriesInSelection.map(category => category.id));
         if (isDragSelectingWithShift) {
           // Shift + 드래그: 기존 선택 유지하면서 드래그 영역 아이템들 토글
           const currentMemoSelection = selectedMemoId ? [selectedMemoId, ...selectedMemoIds] : selectedMemoIds;
@@ -586,7 +550,6 @@ const App: React.FC = () => {
           setSelectedCategoryId(null);
         }
       } else if (!isDragSelectingWithShift) {
-        console.log('No items in selection - clearing selection');
         // 일반 드래그로 아무것도 선택하지 않았으면 기존 선택 해제
         setSelectedMemoIds([]);
         setSelectedMemoId(null);
@@ -626,10 +589,6 @@ const App: React.FC = () => {
   const focusOnMemo = (memoId: string) => {
     const memo = currentPage?.memos.find(m => m.id === memoId);
     if (memo) {
-      // 메모를 중앙으로 이동시키는 offset 계산
-      const targetX = -(memo.position.x - window.innerWidth / 2 / 1 + (memo.size?.width || 200) / 2);
-      const targetY = -(memo.position.y - window.innerHeight / 2 / 1 + (memo.size?.height || 95) / 2);
-      
       // Canvas offset 업데이트는 Canvas 컴포넌트에서 처리하도록 함
       // 여기서는 단일 선택으로 변경
       setSelectedMemoId(memoId);
@@ -637,81 +596,13 @@ const App: React.FC = () => {
     }
   };
 
-  // 실시간 충돌 처리 함수 - 메모와 카테고리 충돌
-  const performRealTimeCollisionPushAway = React.useCallback((memoBounds: any, areaBounds: any, categoryId: string, page: Page) => {
-    // 겹치는 영역 계산
-    const overlapLeft = Math.max(memoBounds.left, areaBounds.left);
-    const overlapTop = Math.max(memoBounds.top, areaBounds.top);
-    const overlapRight = Math.min(memoBounds.right, areaBounds.right);
-    const overlapBottom = Math.min(memoBounds.bottom, areaBounds.bottom);
-
-    if (overlapLeft >= overlapRight || overlapTop >= overlapBottom) {
-      return; // 겹침 없음
-    }
-
-    const overlapWidth = overlapRight - overlapLeft;
-    const overlapHeight = overlapBottom - overlapTop;
-
-    // 최소 이동 거리로 밀어내기 (더 작은 겹침 방향으로)
-    let pushX = 0;
-    let pushY = 0;
-
-    if (overlapWidth < overlapHeight) {
-      // 가로로 밀어내기
-      const memoCenterX = (memoBounds.left + memoBounds.right) / 2;
-      const areaCenterX = (areaBounds.left + areaBounds.right) / 2;
-      pushX = memoCenterX < areaCenterX ? -overlapWidth : overlapWidth;
-    } else {
-      // 세로로 밀어내기
-      const memoCenterY = (memoBounds.top + memoBounds.bottom) / 2;
-      const areaCenterY = (areaBounds.top + areaBounds.bottom) / 2;
-      pushY = memoCenterY < areaCenterY ? -overlapHeight : overlapHeight;
-    }
-
-    console.log('⚡ 실시간 밀어내기 적용:', { categoryId, pushX, pushY });
-
-    // 카테고리 즉시 이동
-    setPages(prev => prev.map(p =>
-      p.id === currentPageId
-        ? {
-            ...p,
-            categories: (p.categories || []).map(cat =>
-              cat.id === categoryId
-                ? {
-                    ...cat,
-                    position: {
-                      x: cat.position.x + pushX,
-                      y: cat.position.y + pushY
-                    }
-                  }
-                : cat
-            ),
-            // 카테고리의 하위 메모들도 함께 이동
-            memos: p.memos.map(memo =>
-              memo.parentId === categoryId
-                ? {
-                    ...memo,
-                    position: {
-                      x: memo.position.x + pushX,
-                      y: memo.position.y + pushY
-                    }
-                  }
-                : memo
-            )
-          }
-        : p
-    ));
-  }, [currentPageId]);
-
 
   // 충돌하는 메모블록 밀어내기 함수
   const pushAwayConflictingMemos = React.useCallback((categoryArea: { x: number; y: number; width: number; height: number }, categoryId: string, page: Page) => {
-    console.log('📝 메모블록 밀어내기 시작:', categoryId);
 
     const conflictingMemos = page.memos.filter(memo => {
       // 현재 카테고리에 속한 메모는 제외 (이미 올바른 위치에 있음)
       if (memo.parentId === categoryId) {
-        console.log('✅ 자식 메모 제외:', memo.id);
         return false;
       }
 
@@ -739,16 +630,11 @@ const App: React.FC = () => {
                               memoBounds.top >= areaBounds.bottom);
 
       if (isOverlapping) {
-        console.log('🚨 메모블록 충돌 감지:', memo.id, '(부모:', memo.parentId || '없음', ') vs 카테고리', categoryId, {
-          memoBounds,
-          areaBounds
-        });
       }
 
       return isOverlapping;
     });
 
-    console.log('🎯 충돌 메모 수:', conflictingMemos.length);
 
     // 충돌하는 메모들을 영역 밖으로 밀어내기 (겹침 영역 기반)
     conflictingMemos.forEach(memo => {
@@ -778,12 +664,6 @@ const App: React.FC = () => {
       const overlapWidth = overlapRight - overlapLeft;
       const overlapHeight = overlapBottom - overlapTop;
 
-      console.log('📏 겹침 영역 계산:', {
-        memo: memo.id,
-        overlapWidth,
-        overlapHeight,
-        overlapArea: overlapWidth * overlapHeight
-      });
 
       let newX = memo.position.x;
       let newY = memo.position.y;
@@ -798,11 +678,9 @@ const App: React.FC = () => {
         if (memoCenterX > areaCenterX) {
           // 오른쪽으로 밀어내기: 겹치는 폭만큼
           newX = memo.position.x + overlapWidth + safetyMargin;
-          console.log('➡️ 메모 정확히 오른쪽으로 밀어내기:', overlapWidth + safetyMargin, 'px');
         } else {
           // 왼쪽으로 밀어내기: 겹치는 폭만큼
           newX = memo.position.x - overlapWidth - safetyMargin;
-          console.log('⬅️ 메모 정확히 왼쪽으로 밀어내기:', overlapWidth + safetyMargin, 'px');
         }
       } else {
         // 세로 방향으로 밀어내기 (겹치는 픽셀만큼만)
@@ -812,16 +690,13 @@ const App: React.FC = () => {
         if (memoCenterY > areaCenterY) {
           // 아래쪽으로 밀어내기: 겹치는 높이만큼
           newY = memo.position.y + overlapHeight + safetyMargin;
-          console.log('⬇️ 메모 정확히 아래쪽으로 밀어내기:', overlapHeight + safetyMargin, 'px');
         } else {
           // 위쪽으로 밀어내기: 겹치는 높이만큼
           newY = memo.position.y - overlapHeight - safetyMargin;
-          console.log('⬆️ 메모 정확히 위쪽으로 밀어내기:', overlapHeight + safetyMargin, 'px');
         }
       }
 
       const newPosition = { x: newX, y: newY };
-      console.log('🔄 메모블록 밀어내기:', memo.id, '새 위치:', newPosition);
 
       // 즉시 상태 업데이트
       setPages(prevPages => prevPages.map(p =>
@@ -841,12 +716,10 @@ const App: React.FC = () => {
 
   // 충돌하는 카테고리 영역 밀어내기 함수
   const pushAwayConflictingCategories = React.useCallback((movingCategoryId: string, movingCategoryArea: { x: number; y: number; width: number; height: number }, page: Page) => {
-    console.log('🏗️ 카테고리 영역 밀어내기 시작:', movingCategoryId);
 
     // 카테고리 배열이 없으면 빈 배열로 초기화
     const categories = page.categories || [];
     if (categories.length === 0) {
-      console.log('📭 카테고리가 없어서 충돌 검사 스킵');
       return;
     }
 
@@ -856,7 +729,6 @@ const App: React.FC = () => {
 
       const otherArea = calculateCategoryArea(category, page);
       if (!otherArea) {
-        console.log('⚠️ 카테고리 영역 계산 실패:', category.id);
         return false;
       }
 
@@ -867,16 +739,11 @@ const App: React.FC = () => {
                               movingCategoryArea.y >= otherArea.y + otherArea.height);
 
       if (isOverlapping) {
-        console.log('🚨 카테고리 영역 충돌 감지:', movingCategoryId, 'vs', category.id, {
-          movingArea: movingCategoryArea,
-          otherArea: otherArea
-        });
       }
 
       return isOverlapping;
     });
 
-    console.log('🎯 충돌 카테고리 수:', conflictingCategories.length);
 
     // 충돌하는 카테고리들과 그 하위 요소들을 밀어내기
     conflictingCategories.forEach(category => {
@@ -918,11 +785,6 @@ const App: React.FC = () => {
       const overlapWidth = overlapRight - overlapLeft;
       const overlapHeight = overlapBottom - overlapTop;
 
-      console.log('📏 카테고리 겹침 영역:', {
-        overlapWidth,
-        overlapHeight,
-        overlapArea: overlapWidth * overlapHeight
-      });
 
       const safetyMargin = 10; // 최소 여백
 
@@ -930,7 +792,6 @@ const App: React.FC = () => {
         // 중심이 같은 경우 오른쪽으로 밀어내기
         offsetX = movingCategoryArea.width + safetyMargin;
         offsetY = 0;
-        console.log('⚡ 동일 위치 카테고리 오른쪽으로 밀어내기');
       } else {
         // 정확한 픽셀 단위 밀어내기: 겹치는 만큼만 이동
         if (overlapWidth <= overlapHeight) {
@@ -939,12 +800,10 @@ const App: React.FC = () => {
             // 오른쪽으로 밀어내기: 겹치는 폭 + 최소 여백
             offsetX = overlapWidth + safetyMargin;
             offsetY = 0;
-            console.log('➡️ 카테고리 정확히 오른쪽으로 밀어내기:', overlapWidth + safetyMargin, 'px');
           } else {
             // 왼쪽으로 밀어내기: 겹치는 폭 + 최소 여백
             offsetX = -(overlapWidth + safetyMargin);
             offsetY = 0;
-            console.log('⬅️ 카테고리 정확히 왼쪽으로 밀어내기:', overlapWidth + safetyMargin, 'px');
           }
         } else {
           // 세로 방향으로 밀어내기 (겹치는 픽셀만큼만)
@@ -952,12 +811,10 @@ const App: React.FC = () => {
             // 아래쪽으로 밀어내기: 겹치는 높이 + 최소 여백
             offsetX = 0;
             offsetY = overlapHeight + safetyMargin;
-            console.log('⬇️ 카테고리 정확히 아래쪽으로 밀어내기:', overlapHeight + safetyMargin, 'px');
           } else {
             // 위쪽으로 밀어내기: 겹치는 높이 + 최소 여백
             offsetX = 0;
             offsetY = -(overlapHeight + safetyMargin);
-            console.log('⬆️ 카테고리 정확히 위쪽으로 밀어내기:', overlapHeight + safetyMargin, 'px');
           }
         }
       }
@@ -1013,7 +870,6 @@ const App: React.FC = () => {
     // 10번 제한 안전장치
     const currentCount = collisionCheckCount.current.get(categoryId) || 0;
     if (currentCount >= 10) {
-      console.log('🛑 충돌 검사 10번 제한 도달:', categoryId);
       return;
     }
     collisionCheckCount.current.set(categoryId, currentCount + 1);
@@ -1022,7 +878,6 @@ const App: React.FC = () => {
     const now = Date.now();
     const lastCheck = lastCollisionCheck.current.get(categoryId) || 0;
     if (now - lastCheck < 1000) {
-      console.log('⏸️ 충돌 검사 스킵 (디바운스):', categoryId);
       return;
     }
     lastCollisionCheck.current.set(categoryId, now);
@@ -1030,14 +885,8 @@ const App: React.FC = () => {
     // 10초 후 카운터 리셋
     setTimeout(() => {
       collisionCheckCount.current.set(categoryId, 0);
-      console.log('🔄 충돌 검사 카운터 리셋:', categoryId);
     }, 10000);
 
-    console.log(`🔍 통합 충돌 검사 시작 (${currentCount + 1}/5):`, {
-      categoryId,
-      categoryArea,
-      totalMemos: page.memos.length
-    });
 
     // 1. 먼저 다른 카테고리 영역과의 충돌 검사 및 해결
     pushAwayConflictingCategories(categoryId, categoryArea, page);
@@ -1045,24 +894,8 @@ const App: React.FC = () => {
     // 2. 그 다음 메모블록과의 충돌 검사 및 해결
     pushAwayConflictingMemos(categoryArea, categoryId, page);
 
-    console.log('✅ 모든 충돌 유형 처리 완료:', categoryId);
   }, [currentPageId, pushAwayConflictingCategories, pushAwayConflictingMemos, collisionCheckCount, lastCollisionCheck]);
 
-
-  // 카테고리 영역 계산 헬퍼 함수
-  // 고정 크기 카테고리 영역 계산 (충돌 전용)
-  const getFixedCategoryArea = (category: CategoryBlock) => {
-    // 카테고리 블록의 현재 크기를 그대로 사용 (확장 안함)
-    const categoryWidth = category.size?.width || 200;
-    const categoryHeight = category.size?.height || 80;
-
-    return {
-      x: category.position.x,
-      y: category.position.y,
-      width: categoryWidth,
-      height: categoryHeight
-    };
-  };
 
   // calculateCategoryArea는 이제 utils/categoryAreaUtils.ts에서 import
 
@@ -1198,7 +1031,6 @@ const App: React.FC = () => {
   };
 
   const moveToCategory = (itemId: string, categoryId: string | null) => {
-    console.log('📦 moveToCategory 호출됨:', { itemId, categoryId });
 
     setPages(prev => prev.map(page => {
       if (page.id === currentPageId) {
@@ -1206,7 +1038,6 @@ const App: React.FC = () => {
         const isMemo = page.memos.some(memo => memo.id === itemId);
         const isCategory = (page.categories || []).some(cat => cat.id === itemId);
 
-        console.log('아이템 타입 확인:', { isMemo, isCategory });
 
         if (isMemo) {
           const targetCategory = categoryId ? (page.categories || []).find(cat => cat.id === categoryId) : null;
@@ -1222,10 +1053,6 @@ const App: React.FC = () => {
                   y: targetCategory.position.y + 200
                 };
 
-                console.log('📍 종속 메모 위치 조정:', {
-                  카테고리위치: targetCategory.position,
-                  새위치: newPosition
-                });
               }
 
               return { ...memo, parentId: categoryId || undefined, position: newPosition };
@@ -1237,12 +1064,6 @@ const App: React.FC = () => {
               const newChildren = category.children.includes(itemId)
                 ? category.children
                 : [...category.children, itemId];
-              console.log('✅ 메모를 카테고리에 추가:', {
-                categoryId: category.id,
-                memoId: itemId,
-                children: newChildren,
-                isExpanded: true
-              });
               return {
                 ...category,
                 children: newChildren,
@@ -1257,17 +1078,14 @@ const App: React.FC = () => {
           });
           return { ...page, memos: updatedMemos, categories: updatedCategories };
         } else if (isCategory) {
-          console.log('카테고리를 이동 중:', itemId, '->', categoryId);
           const updatedCategories = (page.categories || []).map(category => {
             if (category.id === itemId) {
-              console.log('카테고리의 parentId 업데이트:', category.id, '->', categoryId);
               return { ...category, parentId: categoryId || undefined };
             }
             if (categoryId && category.id === categoryId) {
               const newChildren = category.children.includes(itemId)
                 ? category.children
                 : [...category.children, itemId];
-              console.log('부모 카테고리의 children 업데이트:', category.id, newChildren);
               return {
                 ...category,
                 children: newChildren,
@@ -1277,14 +1095,12 @@ const App: React.FC = () => {
             // Remove from other categories
             const filteredChildren = category.children.filter(childId => childId !== itemId);
             if (filteredChildren.length !== category.children.length) {
-              console.log('다른 카테고리에서 제거:', category.id, filteredChildren);
             }
             return {
               ...category,
               children: filteredChildren
             };
           });
-          console.log('업데이트된 카테고리들:', updatedCategories);
           return { ...page, categories: updatedCategories };
         }
       }
@@ -1310,17 +1126,14 @@ const App: React.FC = () => {
 
   // 드래그 완료 시 카테고리 블록 겹침 감지
   const detectCategoryOnDrop = (memoId: string, position: { x: number; y: number }) => {
-    console.log('🔍 블록 겹침 감지 시작:', memoId, position);
 
     const currentPage = pages.find(p => p.id === currentPageId);
     if (!currentPage || !currentPage.categories) {
-      console.log('❌ 현재 페이지 또는 카테고리 없음');
       return;
     }
 
     const draggedMemo = currentPage.memos.find(m => m.id === memoId);
     if (!draggedMemo) {
-      console.log('❌ 드래그된 메모 없음');
       return;
     }
 
@@ -1338,7 +1151,6 @@ const App: React.FC = () => {
     lastDragTime.current.set(memoId, now);
     lastDragPosition.current.set(memoId, position);
 
-    console.log('🚀 드래그 속도:', velocity.toFixed(2), 'px/ms');
 
 
     // 드래그된 메모의 경계 박스 계산
@@ -1351,7 +1163,6 @@ const App: React.FC = () => {
       bottom: position.y + memoHeight
     };
 
-    console.log('📦 드래그된 메모 경계:', memoBounds);
 
     // 겹침 감지 함수 (여백 포함)
     const isOverlapping = (bounds1: any, bounds2: any, margin = 20) => {
@@ -1372,10 +1183,8 @@ const App: React.FC = () => {
         bottom: category.position.y + categoryHeight
       };
 
-      console.log(`🔸 카테고리 ${category.id} (${category.title}) 경계:`, categoryBounds);
 
       const overlapping = isOverlapping(memoBounds, categoryBounds, 20);
-      console.log(`🔸 겹침 여부: ${overlapping}`);
 
       return overlapping;
     });
@@ -1383,24 +1192,20 @@ const App: React.FC = () => {
     if (targetCategory) {
       // 같은 카테고리로 이동하려는 경우 - 실제 겹침이므로 정상적인 카테고리 내 이동
       if (draggedMemo.parentId === targetCategory.id) {
-        console.log('📍 같은 카테고리 내에서 이동:', memoId, '카테고리:', targetCategory.id);
         return;
       }
 
       // 다른 카테고리로 이동하는 경우 - 방지 (자식 메모는 자동 이동 금지)
       if (draggedMemo.parentId && draggedMemo.parentId !== targetCategory.id) {
-        console.log('🚫 자식 메모의 다른 카테고리 자동 이동 방지:', memoId, '현재 카테고리:', draggedMemo.parentId, '→ 충돌 카테고리:', targetCategory.id);
         // 자식 메모가 다른 카테고리와 겹치면 밀어내기만 수행하고 이동은 금지
         const categoryArea = calculateCategoryArea(targetCategory, currentPage);
         if (categoryArea) {
-          console.log('🔧 자식 메모 충돌로 밀어내기 수행:', memoId);
           pushAwayConflictingMemos(categoryArea, targetCategory.id, currentPage);
         }
         return; // 이동 중단
       }
 
       // 메모를 카테고리에 자동으로 추가
-      console.log('✅ 메모를 카테고리에 자동 추가:', memoId, '→ 카테고리:', targetCategory.id);
       moveToCategory(memoId, targetCategory.id);
       return;
     } else {
@@ -1448,7 +1253,6 @@ const App: React.FC = () => {
             const velocityThreshold = 1.0; // px/ms
             const exitDelay = velocity > velocityThreshold ? 300 : 100; // ms
 
-            console.log('🚀 빠른 드래그 감지 (속도:', velocity.toFixed(2), 'px/ms), 지연 시간:', exitDelay, 'ms');
 
             // 기존 타이머가 있으면 취소
             const existingTimer = categoryExitTimers.current.get(memoId);
@@ -1485,10 +1289,8 @@ const App: React.FC = () => {
               const finalStillInArea = isOverlapping(currentMemoBounds, categoryAreaBounds, 0);
 
               if (!finalStillInArea) {
-                console.log('⏰ 지연 후 최종 확인: 카테고리 영역 밖으로 이동 - 자동 빼내기:', memoId);
                 moveToCategory(memoId, null);
               } else {
-                console.log('⏰ 지연 후 최종 확인: 카테고리 영역 내에 있음 - 유지:', memoId);
               }
 
               categoryExitTimers.current.delete(memoId);
@@ -1502,11 +1304,9 @@ const App: React.FC = () => {
               clearTimeout(existingTimer);
               categoryExitTimers.current.delete(memoId);
             }
-            console.log('📍 카테고리 영역 내에서 이동:', memoId, '카테고리:', draggedMemo.parentId);
           }
         }
       } else {
-        console.log('❌ 겹치는 카테고리 없음 (이미 최상위)');
       }
     }
   };
@@ -1612,13 +1412,24 @@ const App: React.FC = () => {
           : category
       );
 
-      return {
+      // 충돌 검사 수행
+      const pageWithUpdates = {
         ...page,
         memos: updatedMemos,
         categories: updatedCategories
       };
+
+      const collisionResult = resolveAreaCollisions(categoryId, pageWithUpdates);
+
+      return {
+        ...page,
+        memos: collisionResult.updatedMemos,
+        categories: collisionResult.updatedCategories
+      };
     }));
 
+    // 기존 실시간 충돌 검사 로직 제거됨 (resolveAreaCollisions로 통합)
+    /*
     // 실시간 면접촉 기반 고정 크기 충돌 검사 - 드래그 중에 작동
     if (Math.abs(deltaX) > 0.1 || Math.abs(deltaY) > 0.1) {
       // 프레임 간 delta를 사용하여 실제 이동 방향 파악
@@ -1628,11 +1439,6 @@ const App: React.FC = () => {
       const capturedFrameDeltaY = frameDeltaY;
       const isMainlyHorizontal = Math.abs(capturedFrameDeltaX) > Math.abs(capturedFrameDeltaY);
 
-      console.log('⚡ 실시간 면 기반 충돌 검사 시작:', categoryId, {
-        totalDelta: { x: capturedDeltaX, y: capturedDeltaY },
-        frameDelta: { x: capturedFrameDeltaX, y: capturedFrameDeltaY },
-        주방향: isMainlyHorizontal ? 'X축' : 'Y축'
-      });
 
       setPages(prevPages => {
         const currentPage = prevPages.find(p => p.id === currentPageId);
@@ -1755,24 +1561,20 @@ const App: React.FC = () => {
                 const overlapRight = otherRight - currentLeft;
                 if (overlapRight > 0 && otherLeft < currentLeft && otherRight < currentRight) {
                   pushX = overlapRight;
-                  console.log(`  ➡️ X+ 충돌: overlap=${overlapRight}, otherLeft=${otherLeft}, currentLeft=${currentLeft}`);
                 }
                 const overlapLeft = currentRight - otherLeft;
                 if (overlapLeft > 0 && otherRight > currentRight && otherLeft > currentLeft) {
                   pushX = -overlapLeft;
-                  console.log(`  ⬅️ X- 충돌: overlap=${overlapLeft}, otherRight=${otherRight}, currentRight=${currentRight}`);
                 }
               } else {
                 // Y축 충돌 검사
                 const overlapBottom = otherBottom - currentTop;
                 if (overlapBottom > 0 && otherTop < currentTop && otherBottom < currentBottom) {
                   pushY = overlapBottom;
-                  console.log(`  ⬇️ Y+ 충돌: overlap=${overlapBottom}, otherTop=${otherTop}, currentTop=${currentTop}`);
                 }
                 const overlapTop = currentBottom - otherTop;
                 if (overlapTop > 0 && otherBottom > currentBottom && otherTop > currentTop) {
                   pushY = -overlapTop;
-                  console.log(`  ⬆️ Y- 충돌: overlap=${overlapTop}, otherBottom=${otherBottom}, currentBottom=${currentBottom}`);
                 }
               }
 
@@ -1784,7 +1586,6 @@ const App: React.FC = () => {
                   totalPushY = pushY;
                   highestPusherPriority = otherPriority;
 
-                  console.log(`🔄 반복 ${iteration}: ${currentCat.id} 밀림 by ${otherCategory.id}, push: (${pushX}, ${pushY}), 우선순위: ${currentPriority} vs ${otherPriority}`);
 
                   // 우선순위 업데이트: 밀린 카테고리는 밀어낸 카테고리보다 1 낮은 우선순위
                   if (!priorityMap.has(currentCat.id)) {
@@ -1829,7 +1630,6 @@ const App: React.FC = () => {
           });
         }
 
-        console.log(`✅ 연쇄 충돌 처리 완료 - ${iteration}회 반복`);
 
         if (hasCollision) {
 
@@ -1894,24 +1694,20 @@ const App: React.FC = () => {
                   const overlapRight = movingAreaRight - memoLeft;
                   if (overlapRight > 0 && movingArea.x < memoLeft && movingAreaRight < memoRight) {
                     pushX = overlapRight;
-                    console.log('➡️ 메모 오른쪽으로 밀기:', memo.id, overlapRight);
                   }
                   const overlapLeft = memoRight - movingArea.x;
                   if (overlapLeft > 0 && movingAreaRight > memoRight && movingArea.x > memoLeft) {
                     pushX = -overlapLeft;
-                    console.log('⬅️ 메모 왼쪽으로 밀기:', memo.id, -overlapLeft);
                   }
                 } else {
                   // Y축 충돌 검사
                   const overlapBottom = movingAreaBottom - memoTop;
                   if (overlapBottom > 0 && movingArea.y < memoTop && movingAreaBottom < memoBottom) {
                     pushY = overlapBottom;
-                    console.log('⬇️ 메모 아래쪽으로 밀기:', memo.id, overlapBottom);
                   }
                   const overlapTop = memoBottom - movingArea.y;
                   if (overlapTop > 0 && movingAreaBottom > memoBottom && movingArea.y > memoTop) {
                     pushY = -overlapTop;
-                    console.log('⬆️ 메모 위쪽으로 밀기:', memo.id, -overlapTop);
                   }
                 }
 
@@ -1941,6 +1737,7 @@ const App: React.FC = () => {
         return prevPages;
       });
     }
+    */
 
     // 이동 완료 후 200ms 후에 히스토리 저장 (연속 이동을 하나로 묶기 위해)
     const existingTimer = categoryPositionTimers.current.get(categoryId);
@@ -2089,7 +1886,6 @@ const App: React.FC = () => {
       (fromCategory && toCategory); // 카테고리-카테고리 연결
 
     if (!isValidConnection) {
-      console.log('❌ 연결 불가: 같은 타입끼리만 연결 가능합니다');
       setIsConnecting(false);
       setConnectingFromId(null);
       return;
@@ -2333,7 +2129,6 @@ const App: React.FC = () => {
           width={leftPanelWidth}
           onResize={handleLeftPanelResize}
           onSearch={(query, category, results) => {
-            console.log('🔍 Search:', query, category, results.length, 'results');
             // 검색 결과 처리 로직은 필요에 따라 추가
           }}
         />
@@ -2433,11 +2228,9 @@ const App: React.FC = () => {
         isDraggingCategory={isDraggingCategory}
         onCategoryDragStart={() => {
           setIsDraggingCategory(true);
-          console.log('🚀 카테고리 드래그 시작');
         }}
         onCategoryDragEnd={() => {
           setIsDraggingCategory(false);
-          console.log('🏁 카테고리 드래그 종료');
           // 드래그 완료 후 충돌 검사 - 일단 주석 처리 (영역 크기 변경 문제 해결)
           // setTimeout(() => {
           //   const currentPage = pages.find(p => p.id === currentPageId);

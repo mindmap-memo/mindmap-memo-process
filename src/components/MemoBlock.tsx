@@ -388,7 +388,6 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
 
       // 카테고리 감지
       if (dragMoved && onDetectCategoryOnDrop) {
-        console.log('🎯 드래그 완료 - 카테고리 감지 시도:', memo.id, finalPosition);
         onDetectCategoryOnDrop(memo.id, finalPosition);
       }
 
@@ -499,7 +498,6 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         onMouseLeave={() => setIsHovering(false)}
         draggable={true}
         onDragStart={(e) => {
-          console.log('🚀 메모 드래그 시작:', memo.id);
           e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'memo', id: memo.id }));
           onDragStart?.();
         }}

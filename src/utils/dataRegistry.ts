@@ -130,7 +130,6 @@ export class DataRegistryManager {
     // For now, we'll just mark that dependents need update
     // In a full implementation, this would trigger re-calculation of dependent formulas
     dependents.forEach(dependentName => {
-      console.log(`Data ${dependentName} needs update due to change in ${dataName}`);
     });
   }
 

@@ -156,17 +156,24 @@ const Canvas: React.FC<CanvasProps> = ({
             // 드래그 중인 카테고리의 캐시는 제거하지 않음
             if (catId !== isDraggingCategoryArea) {
               delete newAreas[catId];
-              // App.tsx의 메모 위치 캐시도 동기화하여 제거
-              onClearCategoryCache?.(catId);
             }
           });
           return newAreas;
+        });
+
+        // App.tsx의 메모 위치 캐시도 동기화하여 제거 (별도 effect로 분리)
+        affectedCategoryIds.forEach(catId => {
+          if (catId !== isDraggingCategoryArea) {
+            onClearCategoryCache?.(catId);
+          }
         });
       }
     }
   }, [
     // 메모 위치만 감지 (카테고리 위치는 제외)
-    currentPage?.memos?.map(m => `${m.id}:${m.position.x}:${m.position.y}:${m.size?.width}:${m.size?.height}:${m.parentId}`).join('|')
+    currentPage?.memos?.map(m => `${m.id}:${m.position.x}:${m.position.y}:${m.size?.width}:${m.size?.height}:${m.parentId}`).join('|'),
+    isDraggingCategoryArea,
+    onClearCategoryCache
   ]);
 
   // 카테고리 상태 변경 시 영역 업데이트 트리거만 실행 (캐시 제거 안 함)
@@ -186,6 +193,39 @@ const Canvas: React.FC<CanvasProps> = ({
 
     return () => clearInterval(interval);
   }, []);
+
+  // Wheel 이벤트를 네이티브로 등록 (passive 경고 방지)
+  React.useEffect(() => {
+    const canvasElement = document.getElementById('main-canvas');
+    if (!canvasElement) return;
+
+    const wheelHandler = (e: WheelEvent) => {
+      // Alt + 휠 또는 줌 도구 선택 시 확대/축소
+      if (e.altKey || currentTool === 'zoom') {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const rect = canvasElement.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+        const newScale = Math.max(0.01, Math.min(5, canvasScale * zoomFactor));
+
+        if (newScale !== canvasScale) {
+          const scaleDiff = newScale - canvasScale;
+          const newOffsetX = canvasOffset.x - (mouseX - canvasOffset.x) * (scaleDiff / canvasScale);
+          const newOffsetY = canvasOffset.y - (mouseY - canvasOffset.y) * (scaleDiff / canvasScale);
+
+          setCanvasScale(newScale);
+          setCanvasOffset({ x: newOffsetX, y: newOffsetY });
+        }
+      }
+    };
+
+    canvasElement.addEventListener('wheel', wheelHandler, { passive: false });
+    return () => canvasElement.removeEventListener('wheel', wheelHandler);
+  }, [currentTool, canvasScale, canvasOffset]);
 
   // 캔버스 최대 영역 (15000x15000px, SVG와 동일)
   const CANVAS_BOUNDS = { width: 15000, height: 15000, offsetX: -5000, offsetY: -5000 };
@@ -726,17 +766,14 @@ const Canvas: React.FC<CanvasProps> = ({
           onClick={() => onCategorySelect(category.id)}
           onDoubleClick={() => {
             // 더블클릭 시 편집 모드로 전환하는 함수 호출
-            console.log('카테고리 편집:', category.id);
           }}
           onMouseDown={(e) => {
             if (e.button === 0) {
               // 카테고리 라벨 드래그를 위한 임시 상태 설정
-              console.log('🚀 CategoryLabel mouse drag start:', category.id);
 
               // 드래그 시작 - 캐시가 없을 때만 영역 크기 저장
               setIsDraggingCategoryArea(category.id);
               if (!draggedCategoryAreas[category.id]) {
-                console.log('  💾 캐시 없음 - 새로 계산');
                 const currentArea = area || calculateCategoryArea(category);
                 if (currentArea) {
                   setDraggedCategoryAreas(prev => ({
@@ -748,7 +785,6 @@ const Canvas: React.FC<CanvasProps> = ({
                   }));
                 }
               } else {
-                console.log('  ✅ 기존 캐시 유지');
               }
 
               // 카테고리 전체를 이동하는 마우스 드래그 구현
@@ -773,7 +809,6 @@ const Canvas: React.FC<CanvasProps> = ({
               const handleMouseUp = () => {
                 document.removeEventListener('mousemove', handleMouseMove);
                 document.removeEventListener('mouseup', handleMouseUp);
-                console.log('🏁 CategoryLabel mouse drag end:', category.id);
 
                 // 드래그 종료 - 캐시 제거
                 setIsDraggingCategoryArea(null);
@@ -875,9 +910,11 @@ const Canvas: React.FC<CanvasProps> = ({
             onDragEnd={onMemoDragEnd}
           />
         ))}
-        {childCategories.map(childCategory =>
-          renderCategoryWithChildren(childCategory)
-        )}
+        {childCategories.map(childCategory => (
+          <React.Fragment key={childCategory.id}>
+            {renderCategoryWithChildren(childCategory)}
+          </React.Fragment>
+        ))}
       </>
     ) : null;
 
@@ -929,12 +966,10 @@ const Canvas: React.FC<CanvasProps> = ({
 
   // 카테고리 위치 변경 시작 (드래그 시작)
   const handleCategoryPositionStart = (categoryId: string) => {
-    console.log('🚀 카테고리 드래그 시작 - 영역 캐시:', categoryId);
     const category = currentPage?.categories?.find(cat => cat.id === categoryId);
     if (category) {
       // 캐시가 없을 때만 새로 계산 (있으면 기존 캐시 유지)
       if (!draggedCategoryAreas[categoryId]) {
-        console.log('  💾 캐시 없음 - 새로 계산');
         const currentArea = calculateCategoryArea(category);
         if (currentArea) {
           setDraggedCategoryAreas(prev => ({
@@ -946,14 +981,12 @@ const Canvas: React.FC<CanvasProps> = ({
           }));
         }
       } else {
-        console.log('  ✅ 기존 캐시 유지');
       }
     }
   };
 
   // 카테고리 위치 변경 종료 (드래그 종료)
   const handleCategoryPositionEnd = (categoryId: string) => {
-    console.log('🏁 카테고리 드래그 종료 - 캐시 제거 (자연스러운 크기 조정)');
 
     // 드래그 종료 시 캐시 제거 (메모 위치에 따라 자연스럽게 크기 조정)
     setDraggedCategoryAreas(prev => {
@@ -981,14 +1014,11 @@ const Canvas: React.FC<CanvasProps> = ({
 
   const handleDropOnCategory = (e: React.DragEvent, categoryId: string) => {
     e.preventDefault();
-    console.log('🎯 드롭 이벤트 발생 - 카테고리 블록:', categoryId);
 
     try {
       const dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
-      console.log('드래그 데이터:', dragData);
 
       if (dragData.type === 'memo' || dragData.type === 'category') {
-        console.log('카테고리로 이동:', dragData.id, '->', categoryId);
         onMoveToCategory(dragData.id, categoryId);
 
         // 메모를 카테고리에 추가한 후 해당 카테고리의 캐시 제거 (영역 재계산을 위해)
@@ -1016,14 +1046,11 @@ const Canvas: React.FC<CanvasProps> = ({
   const handleDropOnCategoryArea = (e: React.DragEvent, categoryId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('🎯 드롭 이벤트 발생 - 카테고리 영역:', categoryId);
 
     try {
       const dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
-      console.log('드래그 데이터 (영역):', dragData);
 
       if (dragData.type === 'memo' || dragData.type === 'category') {
-        console.log('카테고리 영역으로 이동:', dragData.id, '->', categoryId);
         onMoveToCategory(dragData.id, categoryId);
 
         // 메모를 카테고리 영역에 추가한 후 해당 카테고리의 캐시 제거 (영역 재계산을 위해)
@@ -1049,20 +1076,11 @@ const Canvas: React.FC<CanvasProps> = ({
   const [justFinishedDragSelection, setJustFinishedDragSelection] = React.useState(false);
 
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
-    console.log('Canvas mouse down:', {
-      isSpacePressed,
-      currentTool,
-      target: e.target,
-      currentTarget: e.currentTarget,
-      targetTagName: (e.target as Element).tagName,
-      isConnecting
-    });
 
     const target = e.target as Element;
     
     // 스페이스바가 눌린 상태에서는 항상 팬 모드 (메모 블록 위에서도)
     if (isSpacePressed && !isConnecting) {
-      console.log('Starting pan mode (space key priority)');
       setIsPanning(true);
       setPanStart({
         x: e.clientX - canvasOffset.x,
@@ -1084,7 +1102,6 @@ const Canvas: React.FC<CanvasProps> = ({
     
     if (isCanvasBackground && !isConnecting) {
       if (currentTool === 'pan') {
-        console.log('Starting pan mode (tool selected)');
         setIsPanning(true);
         setPanStart({
           x: e.clientX - canvasOffset.x,
@@ -1098,7 +1115,6 @@ const Canvas: React.FC<CanvasProps> = ({
     
     // 선택 도구이고 연결 모드가 아닐 때 전역 드래그 선택 시작 준비 (캔버스 배경에서만)
     if (currentTool === 'select' && !isConnecting && !isPanning && isCanvasBackground) {
-      console.log('Setting up global drag selection');
       setGlobalDragSelecting(true);
       setGlobalDragStart({ x: e.clientX, y: e.clientY });
       setGlobalDragWithShift(e.shiftKey);
@@ -1107,11 +1123,9 @@ const Canvas: React.FC<CanvasProps> = ({
   };
 
   const handleWheel = (e: React.WheelEvent) => {
-    console.log('Wheel event:', { altKey: e.altKey, currentTool, deltaY: e.deltaY });
     
     // Alt + 휠 또는 줌 도구 선택 시 확대/축소
     if (e.altKey || currentTool === 'zoom') {
-      console.log('Zooming...', { canvasScale, deltaY: e.deltaY });
       e.preventDefault();
       e.stopPropagation();
       
@@ -1129,8 +1143,6 @@ const Canvas: React.FC<CanvasProps> = ({
         const newOffsetX = canvasOffset.x - (mouseX - canvasOffset.x) * (scaleDiff / canvasScale);
         const newOffsetY = canvasOffset.y - (mouseY - canvasOffset.y) * (scaleDiff / canvasScale);
         
-        console.log('Scale changing from', canvasScale, 'to', newScale);
-        console.log('Offset changing from', canvasOffset, 'to', { x: newOffsetX, y: newOffsetY });
         
         setCanvasScale(newScale);
         setCanvasOffset({ x: newOffsetX, y: newOffsetY });
@@ -1171,11 +1183,9 @@ const Canvas: React.FC<CanvasProps> = ({
         const x = (e.clientX - rect.left - canvasOffset.x) / canvasScale;
         const y = (e.clientY - rect.top - canvasOffset.y) / canvasScale;
 
-        console.log('🎯 Canvas category drop:', dragData.id, 'at', { x, y });
         onCategoryPositionChange(dragData.id, { x, y });
       }
     } catch (error) {
-      console.log('Canvas drop - not JSON data, might be memo drag');
     }
   };
 
@@ -1194,19 +1204,16 @@ const Canvas: React.FC<CanvasProps> = ({
       };
 
       const handleGlobalMouseUp = () => {
-        console.log('Pan ended');
         setIsPanning(false);
       };
 
       // 마우스가 윈도우를 벗어났을 때도 팬 종료
       const handleMouseLeave = () => {
-        console.log('Mouse left window, ending pan');
         setIsPanning(false);
       };
 
       // 윈도우 포커스를 잃었을 때도 팬 종료
       const handleBlur = () => {
-        console.log('Window lost focus, ending pan');
         setIsPanning(false);
       };
 
@@ -1233,7 +1240,6 @@ const Canvas: React.FC<CanvasProps> = ({
         
         // 충분히 드래그되었고 아직 드래그 선택이 시작되지 않았다면 시작
         if ((deltaX > 5 || deltaY > 5) && !isDragSelecting && !dragThresholdMet) {
-          console.log('Starting global drag selection - threshold met');
           setDragThresholdMet(true);
           const canvasElement = document.querySelector('[data-canvas="true"]');
           if (canvasElement) {
@@ -1242,7 +1248,6 @@ const Canvas: React.FC<CanvasProps> = ({
             const localStartY = globalDragStart.y - rect.top;
             const worldStartX = (localStartX - canvasOffset.x) / canvasScale;
             const worldStartY = (localStartY - canvasOffset.y) / canvasScale;
-            console.log('Global drag start coords:', { worldStartX, worldStartY });
             onDragSelectStart({ x: worldStartX, y: worldStartY }, globalDragWithShift);
           }
         }
@@ -1262,7 +1267,6 @@ const Canvas: React.FC<CanvasProps> = ({
       };
 
       const handleGlobalMouseUp = () => {
-        console.log('Global mouse up - ending drag selection');
         const wasSelecting = isDragSelecting && dragThresholdMet;
         setGlobalDragSelecting(false);
         setGlobalDragWithShift(false);
@@ -1277,13 +1281,11 @@ const Canvas: React.FC<CanvasProps> = ({
 
       // 마우스가 윈도우를 벗어났을 때도 드래그 선택 종료
       const handleMouseLeave = () => {
-        console.log('Mouse left window, ending drag selection');
         handleGlobalMouseUp();
       };
 
       // 윈도우 포커스를 잃었을 때도 드래그 선택 종료
       const handleBlur = () => {
-        console.log('Window lost focus, ending drag selection');
         handleGlobalMouseUp();
       };
 
@@ -1305,18 +1307,15 @@ const Canvas: React.FC<CanvasProps> = ({
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' && !e.repeat && !isSpacePressed) {
-        console.log('Space pressed, base tool:', baseTool);
         setIsSpacePressed(true);
         setCurrentTool('pan');
         e.preventDefault();
       }
       if ((e.code === 'AltLeft' || e.code === 'AltRight') && !isAltPressed) {
-        console.log('Alt pressed, base tool:', baseTool);
         setIsAltPressed(true);
         setCurrentTool('zoom');
       }
       if (e.code === 'Escape') {
-        console.log('Escape pressed - clearing selection and resetting drag states');
         // 모든 선택 해제
         onMemoSelect('', false); // 빈 문자열로 호출해서 선택 해제
         // 모든 드래그 상태 리셋
@@ -1330,7 +1329,6 @@ const Canvas: React.FC<CanvasProps> = ({
 
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.code === 'Space' && isSpacePressed) {
-        console.log('Space released, restoring to base tool:', baseTool);
         setIsSpacePressed(false);
         // Alt가 눌려있으면 zoom, 아니면 baseTool로
         if (isAltPressed) {
@@ -1341,7 +1339,6 @@ const Canvas: React.FC<CanvasProps> = ({
         e.preventDefault();
       }
       if ((e.code === 'AltLeft' || e.code === 'AltRight') && isAltPressed) {
-        console.log('Alt released, restoring to base tool:', baseTool);
         e.preventDefault();
         e.stopImmediatePropagation();
         setIsAltPressed(false);
@@ -1397,6 +1394,7 @@ const Canvas: React.FC<CanvasProps> = ({
       onMouseDown={handleCanvasMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
+      id="main-canvas"
       onMouseEnter={() => setIsMouseOverCanvas(true)}
       onMouseLeave={() => setIsMouseOverCanvas(false)}
       onWheel={handleWheel}

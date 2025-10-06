@@ -28,32 +28,43 @@ export function resolveAreaCollisions(
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     let hasCollision = false;
+    const processedInThisIteration = new Set<string>();
 
-    updatedCategories = updatedCategories.map(currentCat => {
+    // 원본 카테고리 배열 (이번 iteration 시작 시점)
+    const originalCategories = [...updatedCategories];
+    const newCategories = [...updatedCategories];
+
+    for (let i = 0; i < newCategories.length; i++) {
+      const currentCat = newCategories[i];
+
       // 이동 중인 카테고리는 밀리지 않음
-      if (currentCat.id === movingCategoryId) return currentCat;
+      if (currentCat.id === movingCategoryId) continue;
 
-      let resultCategory = { ...currentCat };
+      // 이미 이번 iteration에서 처리된 카테고리는 스킵
+      if (processedInThisIteration.has(currentCat.id)) continue;
+
       let totalPushX = 0;
       let totalPushY = 0;
       let highestPusherPriority = Infinity;
 
-      updatedCategories.forEach(otherCategory => {
-        if (currentCat.id === otherCategory.id) return;
+      // 충돌 검사는 원본 위치 기준 (중복 방지)
+      for (const otherCategory of originalCategories) {
+        if (currentCat.id === otherCategory.id) continue;
 
         // 우선순위 확인
         const currentPriority = priorityMap.get(currentCat.id) ?? Infinity;
         const otherPriority = priorityMap.get(otherCategory.id) ?? Infinity;
 
         // 우선순위가 같거나 높으면 밀리지 않음
-        if (currentPriority <= otherPriority) return;
+        if (currentPriority <= otherPriority) continue;
 
-        // 영역 계산 (업데이트된 위치 기준)
-        const tempPage = { ...page, memos: updatedMemos, categories: updatedCategories };
-        const currentArea = calculateCategoryArea(currentCat, tempPage);
-        const otherArea = calculateCategoryArea(otherCategory, tempPage);
+        // 영역 계산 (currentCat는 최신, otherCategory는 원본 위치)
+        const tempPageCurrent = { ...page, memos: updatedMemos, categories: newCategories };
+        const tempPageOther = { ...page, memos: updatedMemos, categories: originalCategories };
+        const currentArea = calculateCategoryArea(currentCat, tempPageCurrent);
+        const otherArea = calculateCategoryArea(otherCategory, tempPageOther);
 
-        if (!currentArea || !otherArea) return;
+        if (!currentArea || !otherArea) continue;
 
         // 밀어낼 방향과 거리 계산
         const pushDirection = calculatePushDirection(currentArea, otherArea);
@@ -73,15 +84,15 @@ export function resolveAreaCollisions(
             }
           }
         }
-      });
+      }
 
-      // 밀어내기 적용
+      // 밀어내기 적용 (즉시 배열 업데이트)
       if (totalPushX !== 0 || totalPushY !== 0) {
-        resultCategory = {
-          ...resultCategory,
+        newCategories[i] = {
+          ...currentCat,
           position: {
-            x: resultCategory.position.x + totalPushX,
-            y: resultCategory.position.y + totalPushY
+            x: currentCat.position.x + totalPushX,
+            y: currentCat.position.y + totalPushY
           }
         };
 
@@ -97,10 +108,13 @@ export function resolveAreaCollisions(
               }
             : memo
         );
-      }
 
-      return resultCategory;
-    });
+        // 이번 iteration에서 처리 완료 표시
+        processedInThisIteration.add(currentCat.id);
+      }
+    }
+
+    updatedCategories = newCategories;
 
     // 충돌이 없으면 종료
     if (!hasCollision) break;

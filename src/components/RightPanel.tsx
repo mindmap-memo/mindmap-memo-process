@@ -181,25 +181,19 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
   // 블록 관련 핸들러들
   const handleBlockUpdate = (updatedBlock: ContentBlock) => {
-    console.log('🔄 RightPanel handleBlockUpdate called with:', updatedBlock);
     if (selectedMemo) {
-      console.log('📝 Selected memo before update:', selectedMemo);
       const updatedBlocks = selectedMemo.blocks?.map(block => {
         if (block.id === updatedBlock.id) {
-          console.log('🎯 Updating block:', block.id, 'type:', block.type);
           // TextBlock의 경우 importanceRanges를 확실히 보존
           if (block.type === 'text' && updatedBlock.type === 'text') {
             const textBlock = block as TextBlock;
             const updatedTextBlock = updatedBlock as TextBlock;
-            console.log('💾 Original importanceRanges:', textBlock.importanceRanges);
-            console.log('📨 Updated importanceRanges:', updatedTextBlock.importanceRanges);
 
             // 업데이트된 블록에 importanceRanges가 있으면 사용, 없으면 원본 보존
             const finalImportanceRanges = updatedTextBlock.importanceRanges !== undefined
               ? updatedTextBlock.importanceRanges
               : (textBlock.importanceRanges || []);
 
-            console.log('✅ Final importanceRanges:', finalImportanceRanges);
 
             return {
               ...updatedTextBlock,
@@ -210,10 +204,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
         }
         return block;
       }) || [];
-      console.log('📤 Updated blocks array:', updatedBlocks);
       onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
     } else {
-      console.log('❌ No selected memo found');
     }
   };
 
@@ -329,7 +321,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
   };
 
   const handleCreateNewBlock = (afterBlockId: string, content: string) => {
-    console.log('handleCreateNewBlock called:', afterBlockId, content);
     if (selectedMemo && selectedMemo.blocks) {
       saveToHistory(); // Enter 키로 새 블록 생성 시 히스토리 저장
       const blockIndex = selectedMemo.blocks.findIndex(block => block.id === afterBlockId);
@@ -557,15 +548,9 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
   const handleMouseUp = React.useCallback(() => {
     if (isDragSelecting) {
-      console.log('🖱️ Mouse up - drag selecting:', {
-        isDragMoved,
-        dragHoveredBlocks,
-        dragHoveredCount: dragHoveredBlocks.length
-      });
 
       if (isDragMoved) {
         // 실제 드래그가 일어난 경우에만 선택 적용
-        console.log('✅ Setting selected blocks:', dragHoveredBlocks);
         const selectedIds = [...dragHoveredBlocks]; // 복사본 생성
         setSelectedBlocks(selectedIds);
         setDragSelectedBlocks(selectedIds); // 드래그로 선택된 블록들 저장
@@ -576,7 +561,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
           setDragJustCompleted(false);
         }, 200); // 200ms 후 해제
       } else {
-        console.log('❌ No drag movement detected');
       }
 
       // 드래그 상태 초기화는 선택 설정 후에
@@ -600,33 +584,27 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
   // selectedBlocks 변경 감지
   React.useEffect(() => {
-    console.log('🎯 Selected blocks changed:', selectedBlocks);
   }, [selectedBlocks]);
 
   // 히스토리에 현재 상태 저장 (즉시 실행)
   const saveToHistory = React.useCallback(() => {
     if (!selectedMemo || isUndoRedoAction) {
-      console.log('🚫 Not saving to history:', { selectedMemo: !!selectedMemo, isUndoRedoAction });
       return;
     }
 
-    console.log('💾 saveToHistory called');
     const currentState = {
       blocks: selectedMemo.blocks ? JSON.parse(JSON.stringify(selectedMemo.blocks)) : [],
       timestamp: Date.now()
     };
 
-    console.log('📝 Current blocks being saved:', currentState.blocks.map((b: any) => ({ id: b.id, type: b.type, content: b.content?.substring(0, 50) })));
 
     // 마지막 상태와 동일하면 저장하지 않음
     setUndoHistory(prev => {
       const lastState = prev[prev.length - 1];
       if (lastState && JSON.stringify(lastState.blocks) === JSON.stringify(currentState.blocks)) {
-        console.log('⏭️ Skipping duplicate history state');
         return prev;
       }
 
-      console.log('✅ Saving new history state, total blocks:', currentState.blocks.length);
       const newHistory = [...prev, currentState];
       // 히스토리 크기 제한 (최대 50개)
       return newHistory.length > 50 ? newHistory.slice(-50) : newHistory;
@@ -642,13 +620,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const handleUndo = React.useCallback(() => {
     if (undoHistory.length === 0 || !selectedMemo) return;
 
-    console.log('↩️ Performing undo');
-    console.log('📊 Current undo history length:', undoHistory.length);
-    console.log('📊 Undo history items (newest to oldest):', undoHistory.slice().reverse().map((h, i) => ({
-      index: undoHistory.length - 1 - i,
-      timestamp: new Date(h.timestamp).toLocaleTimeString(),
-      blocks: h.blocks.map((b: any) => ({ id: b.id, type: b.type, content: b.content?.substring(0, 30) }))
-    })));
 
     setIsUndoRedoAction(true);
 
@@ -661,10 +632,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
     // undo 히스토리에서 이전 상태 복원
     const previousState = undoHistory[undoHistory.length - 1];
-    console.log('🔄 Restoring to state:', {
-      timestamp: new Date(previousState.timestamp).toLocaleTimeString(),
-      blocks: previousState.blocks.map((b: any) => ({ id: b.id, type: b.type, content: b.content?.substring(0, 30) }))
-    });
     setUndoHistory(prev => prev.slice(0, -1));
 
     onMemoUpdate(selectedMemo.id, { blocks: previousState.blocks });
@@ -678,7 +645,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const handleRedo = React.useCallback(() => {
     if (redoHistory.length === 0 || !selectedMemo) return;
 
-    console.log('↪️ Performing redo');
     setIsUndoRedoAction(true);
 
     // 현재 상태를 undo 히스토리에 저장
@@ -726,21 +692,13 @@ const RightPanel: React.FC<RightPanelProps> = ({
         else if ((event.key === 'Delete' || event.key === 'Backspace') && selectedBlocks.length > 0) {
           // 텍스트가 선택되어 있거나 커서가 중간에 있으면 일반 편집 동작
           const textarea = activeElement as HTMLTextAreaElement;
-          console.log('📝 Textarea info:', {
-            selectionStart: textarea.selectionStart,
-            selectionEnd: textarea.selectionEnd,
-            valueLength: textarea.value.length,
-            value: textarea.value
-          });
 
           if (textarea.selectionStart !== textarea.selectionEnd ||
               (textarea.selectionStart > 0 && textarea.selectionStart < textarea.value.length)) {
-            console.log('🔤 Text editing in progress - allowing normal behavior');
             return;
           }
 
           // 빈 입력 필드이거나 커서가 맨 앞/뒤에 있으면 블록 삭제 허용
-          console.log('🎯 Input field focused but allowing block deletion');
         } else {
           return;
         }
@@ -787,11 +745,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
   }, [selectedBlocks, selectedMemo, onMemoUpdate, handleUndo, handleRedo]);
 
   const handleBlocksDelete = () => {
-    console.log('🗑️ handleBlocksDelete called', {
-      selectedMemo: selectedMemo?.id,
-      selectedBlocks,
-      blocksLength: selectedMemo?.blocks?.length
-    });
 
     if (selectedMemo && selectedBlocks.length > 0) {
       // 삭제 전에 현재 상태를 히스토리에 저장
@@ -800,25 +753,16 @@ const RightPanel: React.FC<RightPanelProps> = ({
         !selectedBlocks.includes(block.id)
       ) || [];
 
-      console.log('🔄 Filtered blocks:', {
-        originalLength: selectedMemo.blocks?.length,
-        filteredLength: updatedBlocks.length,
-        deletedBlocks: selectedBlocks
-      });
 
       // 최소 하나의 블록은 유지
       if (updatedBlocks.length === 0) {
         const newBlock = createNewBlock('text');
         updatedBlocks.push(newBlock);
-        console.log('➕ Added new empty text block');
       }
 
-      console.log('💾 Calling onMemoUpdate with updatedBlocks');
       onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
       setSelectedBlocks([]);
-      console.log('✅ Blocks deleted successfully');
     } else {
-      console.log('❌ Cannot delete: no memo or no selected blocks');
     }
   };
 
@@ -862,12 +806,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
   // 스마트 클릭 핸들러: 빈 공간 클릭 시 가장 가까운 블록에 포커스하거나 선택 해제
   const handleMemoAreaClick = (event: React.MouseEvent) => {
     const target = event.target as HTMLElement;
-    console.log('🖱️ Memo area clicked:', {
-      tagName: target.tagName,
-      className: target.className,
-      selectedBlocks: selectedBlocks.length,
-      dragSelectedBlocks: dragSelectedBlocks.length
-    });
 
     // 버튼이나 중요한 인터랙티브 요소만 제외
     const isButton = target.tagName === 'BUTTON' || target.closest('button') !== null;
@@ -876,16 +814,9 @@ const RightPanel: React.FC<RightPanelProps> = ({
     // 텍스트 입력 중인 textarea는 제외 (클릭된 것이 textarea인 경우만)
     const isClickedTextarea = target.tagName === 'TEXTAREA';
 
-    console.log('🔍 Memo area click analysis:', {
-      isButton,
-      isImportanceMenu,
-      isClickedTextarea,
-      dragJustCompleted
-    });
 
     // 드래그 완료 직후에는 클릭 이벤트 무시
     if (dragJustCompleted) {
-      console.log('⏱️ Ignoring click - drag just completed');
       return;
     }
 
@@ -897,12 +828,10 @@ const RightPanel: React.FC<RightPanelProps> = ({
       if (selectedBlocks.length > 0) {
         // 선택된 블록 중 하나를 클릭한 경우 - 선택 유지
         if (clickedBlockId && selectedBlocks.includes(clickedBlockId)) {
-          console.log('💡 Clicked on selected block - maintaining selection');
           return;
         }
 
         // 다른 블록을 클릭하거나 빈 공간을 클릭한 경우 - 선택 해제
-        console.log('🔄 Clearing selection - clicked elsewhere');
         setSelectedBlocks([]);
         setDragSelectedBlocks([]);
 

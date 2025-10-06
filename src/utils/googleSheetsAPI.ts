@@ -226,7 +226,6 @@ const numberToColumnName = (num: number): string => {
 export const detectRangeFromClipboard = async (): Promise<{range: string, data: string} | null> => {
   try {
     if (!navigator.clipboard || !navigator.clipboard.readText) {
-      console.log('클립보드 API를 사용할 수 없습니다');
       return null;
     }
 
@@ -238,7 +237,6 @@ export const detectRangeFromClipboard = async (): Promise<{range: string, data: 
     
     // 구글 시트에서 복사한 데이터 감지 (탭으로 구분)
     if (clipboardText.includes('\t')) {
-      console.log('클립보드에서 시트 데이터 감지:', clipboardText.substring(0, 100) + '...');
       
       // 데이터 크기로 범위 추정
       const lines = clipboardText.split('\n').filter(line => line.trim());
@@ -248,7 +246,6 @@ export const detectRangeFromClipboard = async (): Promise<{range: string, data: 
         const endCol = numberToColumnName(maxCols);
         const endRow = lines.length;
         const estimatedRange = `A1:${endCol}${endRow}`;
-        console.log('추정된 범위:', estimatedRange);
         return { range: estimatedRange, data: clipboardText };
       }
     }
@@ -263,14 +260,12 @@ export const detectRangeFromClipboard = async (): Promise<{range: string, data: 
         const endCol = numberToColumnName(maxCols);
         const endRow = lines.length;
         const estimatedRange = `A1:${endCol}${endRow}`;
-        console.log('줄바꿈 구분 데이터 감지, 추정된 범위:', estimatedRange);
         return { range: estimatedRange, data: clipboardText };
       }
     }
     
     // 단일 값인 경우 A1 범위로 처리
     if (clipboardText.trim().length > 0) {
-      console.log('단일 값 감지:', clipboardText.substring(0, 50));
       return { range: 'A1:A1', data: clipboardText };
     }
     

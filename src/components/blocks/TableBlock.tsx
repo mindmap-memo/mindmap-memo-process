@@ -73,14 +73,8 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
   const initializeColumnsFromBlock = useCallback((tableBlock: TableBlock): TableColumn[] => {
     const { headers, columns: existingColumns } = tableBlock;
     
-    console.log('TableBlock - initializeColumnsFromBlock:', {
-      headers,
-      existingColumns,
-      existingColumnsLength: existingColumns?.length
-    });
     
     if (existingColumns && existingColumns.length > 0) {
-      console.log('Using existing columns:', existingColumns);
       // Google Sheets에서 온 columns 데이터를 TableColumn 형태로 변환
       return existingColumns.map((col, index) => ({
         id: col.id || `col-${index}`,
@@ -97,7 +91,6 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
       type: 'text' as CellType
     }));
     
-    console.log('Created default columns:', defaultColumns);
     return defaultColumns;
   }, []);
 
@@ -275,7 +268,6 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
     e.preventDefault();
     e.stopPropagation();
     
-    console.log('Starting resize for column:', columnIndex);
     
     const startX = e.clientX;
     const startWidth = columnWidths[columnIndex] || 150;
@@ -295,7 +287,6 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
     };
     
     handleResizeEnd.current = () => {
-      console.log('Ending resize');
       document.removeEventListener('mousemove', handleResizeMove.current!);
       document.removeEventListener('mouseup', handleResizeEnd.current!);
       setIsResizing(false);
@@ -906,8 +897,6 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
                 {index < headers.length - 1 && ( // 마지막 컬럼은 리사이즈 핸들 없음
                   <div
                     onMouseDown={(e) => {
-                      console.log('Resize handle clicked for column:', index); // 디버깅용
-                      handleResizeStart(e, index);
                     }}
                     style={{
                       position: 'absolute',

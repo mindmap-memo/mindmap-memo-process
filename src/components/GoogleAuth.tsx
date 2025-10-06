@@ -32,8 +32,6 @@ const GoogleAuth: React.FC<GoogleAuthProps> = ({ onAuthSuccess }) => {
       const storedProfile = localStorage.getItem('google_user_profile');
       const tokenExpiry = localStorage.getItem('google_token_expiry');
       
-      console.log('저장된 토큰 확인:', storedToken ? '있음' : '없음');
-      console.log('토큰 만료 시간:', tokenExpiry);
       
       if (storedToken && tokenExpiry) {
         const now = new Date().getTime();
@@ -41,7 +39,6 @@ const GoogleAuth: React.FC<GoogleAuthProps> = ({ onAuthSuccess }) => {
         
         if (now < expiryTime) {
           // 토큰이 아직 유효함
-          console.log('기존 토큰이 유효함, 로그인 상태 복원');
           setAccessToken(storedToken);
           setIsSignedIn(true);
           
@@ -60,7 +57,6 @@ const GoogleAuth: React.FC<GoogleAuthProps> = ({ onAuthSuccess }) => {
           return true;
         } else {
           // 토큰이 만료됨
-          console.log('저장된 토큰이 만료됨, 삭제');
           localStorage.removeItem('google_access_token');
           localStorage.removeItem('google_user_profile');
           localStorage.removeItem('google_token_expiry');
@@ -76,11 +72,9 @@ const GoogleAuth: React.FC<GoogleAuthProps> = ({ onAuthSuccess }) => {
   useEffect(() => {
     const initializeGoogleServices = async () => {
       try {
-        console.log('=== Google Services 초기화 시작 ===');
         
         // 먼저 기존 인증 정보 확인
         if (checkExistingAuth()) {
-          console.log('기존 로그인 상태 복원됨');
         }
         
         // Google API와 GIS 로드 확인
@@ -89,10 +83,8 @@ const GoogleAuth: React.FC<GoogleAuthProps> = ({ onAuthSuccess }) => {
           setIsLoading(false);
           return;
         }
-        console.log('✓ Google API와 GIS 로드됨');
 
         // Google API Client 초기화 (Sheets API용)
-        console.log('Google API Client 초기화 중...');
         await new Promise<void>((resolve, reject) => {
           gapi.load('client', {
             callback: resolve,
@@ -104,19 +96,14 @@ const GoogleAuth: React.FC<GoogleAuthProps> = ({ onAuthSuccess }) => {
           apiKey: '', // API Key는 필요없음 (OAuth만 사용)
           discoveryDocs: GOOGLE_CONFIG.DISCOVERY_DOCS,
         });
-        console.log('✓ Google API Client 초기화 완료');
 
         // 설정 유효성 검증
         if (!GOOGLE_CONFIG.CLIENT_ID || GOOGLE_CONFIG.CLIENT_ID.includes('your-client-id')) {
           throw new Error('유효한 Google Client ID가 설정되지 않았습니다');
         }
 
-        console.log('사용 중인 CLIENT_ID:', GOOGLE_CONFIG.CLIENT_ID);
-        console.log('SCOPES:', GOOGLE_CONFIG.SCOPES);
-        console.log('현재 도메인:', window.location.origin);
         
         setIsLoading(false);
-        console.log('=== Google Services 초기화 성공 ===');
       } catch (error) {
         console.error('=== Google Services 초기화 실패 ===');
         console.error('오류 상세:', error);
@@ -125,22 +112,14 @@ const GoogleAuth: React.FC<GoogleAuthProps> = ({ onAuthSuccess }) => {
     };
 
     const waitForGoogleServices = () => {
-      console.log('Google Services 로드 상태 확인 중...');
-      console.log('window.gapi:', !!window.gapi);
-      console.log('window.google:', !!window.google);
-      console.log('window.googleServicesLoaded:', window.googleServicesLoaded);
       
       if (window.googleServicesLoaded) {
-        console.log('Google 서비스 이미 준비됨, 초기화 시작');
         initializeGoogleServices();
       } else if (window.gapi && window.google) {
-        console.log('서비스는 로드되었지만 플래그가 false, 직접 초기화');
         initializeGoogleServices();
       } else {
-        console.log('googleReady 이벤트 대기 중...');
         
         const handleGoogleReady = () => {
-          console.log('googleReady 이벤트 수신됨');
           window.removeEventListener('googleReady', handleGoogleReady);
           initializeGoogleServices();
         };
@@ -154,7 +133,6 @@ const GoogleAuth: React.FC<GoogleAuthProps> = ({ onAuthSuccess }) => {
             window.removeEventListener('googleReady', handleGoogleReady);
             setIsLoading(false);
           } else {
-            console.log('타임아웃이지만 서비스는 로드됨, 강제 초기화');
             window.removeEventListener('googleReady', handleGoogleReady);
             initializeGoogleServices();
           }
@@ -166,7 +144,6 @@ const GoogleAuth: React.FC<GoogleAuthProps> = ({ onAuthSuccess }) => {
   }, [onAuthSuccess]);
 
   const handleSignIn = async () => {
-    console.log('=== 구글 로그인 시작 (GIS) ===');
     
     if (!window.google) {
       console.error('Google Identity Services가 로드되지 않았습니다');
@@ -175,13 +152,11 @@ const GoogleAuth: React.FC<GoogleAuthProps> = ({ onAuthSuccess }) => {
     }
 
     try {
-      console.log('Google Identity Services로 토큰 요청 중...');
       
       const client = window.google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_CONFIG.CLIENT_ID,
         scope: GOOGLE_CONFIG.SCOPES,
         callback: (tokenResponse: any) => {
-          console.log('✓ 토큰 수신 성공!', tokenResponse);
           
           if (tokenResponse.access_token) {
             // 토큰을 localStorage에 저장 (1시간 유효기간)
@@ -202,7 +177,6 @@ const GoogleAuth: React.FC<GoogleAuthProps> = ({ onAuthSuccess }) => {
             // 사용자 정보 가져오기
             fetchUserProfile(tokenResponse.access_token);
             
-            console.log('로그인 완료!');
           } else {
             console.error('액세스 토큰을 받지 못했습니다');
             alert('로그인에 실패했습니다.');
@@ -234,7 +208,6 @@ const GoogleAuth: React.FC<GoogleAuthProps> = ({ onAuthSuccess }) => {
       
       if (response.ok) {
         const profile = await response.json();
-        console.log('사용자 프로필:', profile);
         
         // 프로필을 localStorage에 저장
         localStorage.setItem('google_user_profile', JSON.stringify(profile));
@@ -255,7 +228,6 @@ const GoogleAuth: React.FC<GoogleAuthProps> = ({ onAuthSuccess }) => {
 
   const handleSignOut = async () => {
     try {
-      console.log('로그아웃 중...');
       
       // 토큰 해제
       if (accessToken && window.google) {
@@ -280,7 +252,6 @@ const GoogleAuth: React.FC<GoogleAuthProps> = ({ onAuthSuccess }) => {
         userProfile: null
       });
       
-      console.log('로그아웃 완료');
     } catch (error) {
       console.error('로그아웃 실패:', error);
     }

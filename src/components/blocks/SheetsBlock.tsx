@@ -119,8 +119,6 @@ const SheetsBlock: React.FC<SheetsBlockProps> = ({
         const stopFunction = await startRangeDetection(
           sheetId,
           (detectedRange: string, detectedData?: string) => {
-            console.log('감지된 범위:', detectedRange);
-            console.log('감지된 데이터 미리보기:', detectedData?.substring(0, 100) + '...');
             setExtractRange(detectedRange);
             // 자동으로 감지 중지하지 않고 계속 감지
           },
@@ -132,7 +130,6 @@ const SheetsBlock: React.FC<SheetsBlockProps> = ({
         // 사용자에게 안내 메시지
         setTimeout(() => {
           if (isListeningForRange) {
-            console.log('범위 감지가 활성화되었습니다. 구글 시트에서 범위를 선택해주세요.');
           }
         }, 500);
         

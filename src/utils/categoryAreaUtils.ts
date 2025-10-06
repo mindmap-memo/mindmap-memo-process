@@ -1,4 +1,5 @@
 import { CategoryBlock, MemoBlock, Page } from '../types';
+import { DEFAULT_MEMO_WIDTH, DEFAULT_MEMO_HEIGHT, DEFAULT_CATEGORY_WIDTH, DEFAULT_CATEGORY_HEIGHT } from './constants';
 
 export interface CategoryArea {
   x: number;
@@ -37,8 +38,8 @@ export function calculateCategoryArea(
   }
 
   // 카테고리 블록 자체의 위치와 크기
-  const categoryWidth = category.size?.width || 200;
-  const categoryHeight = category.size?.height || 80;
+  const categoryWidth = category.size?.width || DEFAULT_CATEGORY_WIDTH;
+  const categoryHeight = category.size?.height || DEFAULT_CATEGORY_HEIGHT;
 
   let minX = category.position.x;
   let minY = category.position.y;
@@ -47,8 +48,8 @@ export function calculateCategoryArea(
 
   // 하위 메모들의 경계 포함
   childMemos.forEach(memo => {
-    const memoWidth = memo.size?.width || 200;
-    const memoHeight = memo.size?.height || 95;
+    const memoWidth = memo.size?.width || DEFAULT_MEMO_WIDTH;
+    const memoHeight = memo.size?.height || DEFAULT_MEMO_HEIGHT;
     minX = Math.min(minX, memo.position.x);
     minY = Math.min(minY, memo.position.y);
     maxX = Math.max(maxX, memo.position.x + memoWidth);
@@ -122,7 +123,7 @@ export function calculatePushDirection(
     return { x: 0, y: 0 };
   }
 
-  // 짧은 쪽 방향으로 밀기
+  // 짧은 쪽 방향으로만 밀기
   if (overlap.x < overlap.y) {
     const pushX = pushedArea.x < pusherArea.x ? -overlap.x : overlap.x;
     return { x: pushX, y: 0 };

@@ -267,7 +267,6 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   // 드래그 앤 드롭 핸들러 (하위 아이템을 받기 위한 용도만)
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    console.log('🎯 CategoryBlock dragOver:', category.id, category.title);
     setIsDragOver(true);
     onDragOver?.(e);
   };
@@ -282,22 +281,17 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('📥 CategoryBlock drop event:', { categoryId: category.id, categoryTitle: category.title });
     setIsDragOver(false);
 
     // 드래그된 아이템의 ID 가져오기
     try {
       const dragDataStr = e.dataTransfer.getData('text/plain');
-      console.log('🔗 Drag data:', dragDataStr);
 
       const dragData = JSON.parse(dragDataStr);
-      console.log('🔗 Parsed drag data:', dragData);
 
       if (dragData.id && onMoveToCategory) {
-        console.log('✅ Calling onMoveToCategory:', dragData.id, '->', category.id);
         onMoveToCategory(dragData.id, category.id);
       } else {
-        console.log('❌ Cannot move to category:', { dragData, hasOnMoveToCategory: !!onMoveToCategory });
       }
     } catch (error) {
       console.error('❌ Error parsing drag data:', error);
@@ -433,11 +427,9 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         }}
         onMouseEnter={() => {
           setIsHovered(true);
-          console.log('🖱️ CategoryBlock mouse enter:', category.id, category.title);
         }}
         onMouseLeave={() => {
           setIsHovered(false);
-          console.log('🖱️ CategoryBlock mouse leave:', category.id, category.title);
         }}
       >
       <div style={headerStyle}>

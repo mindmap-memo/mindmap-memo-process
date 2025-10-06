@@ -144,7 +144,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     // importanceRanges가 있는데 렌더링이 안되는 경우를 위한 추가 체크
     if (block.importanceRanges && block.importanceRanges.length > 0) {
       setTimeout(() => {
-        console.log('🎨 Block has importance ranges, forcing additional update');
         forceUpdate({});
       }, 50);
     }
@@ -153,7 +152,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   // importanceRanges 전용 감지
   useEffect(() => {
     if (block.importanceRanges && block.importanceRanges.length > 0) {
-      console.log('🎨 ImportanceRanges changed, forcing update:', block.importanceRanges.length);
       forceUpdate({});
       setTimeout(() => forceUpdate({}), 10);
     }
@@ -291,19 +289,15 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
 
         // 현재 블록의 내용을 이전 블록과 합치기 시도
         if (onMergeWithPrevious) {
-          console.log('🔧 Merging with previous block, content:', currentContent);
           onMergeWithPrevious(block.id, currentContent);
         } else {
           // 합치기가 불가능한 경우 (첫 번째 블록이거나 이전 블록이 텍스트가 아닌 경우)
-          console.log('🔧 Cannot merge - first block or previous not text');
           // 내용이 없는 경우에만 블록 삭제
           if (currentContent === '') {
             if (onDeleteBlock) {
-              console.log('🔧 Deleting empty block');
               onDeleteBlock(block.id);
             }
           } else {
-            console.log('🔧 Block has content but cannot merge - keeping block');
             // 내용이 있지만 합칠 수 없으면 아무것도 하지 않음 (블록 유지)
           }
         }
@@ -311,7 +305,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
       }
 
       // 커서가 중간에 있는 경우 - 기본 백스페이스 동작
-      console.log('🔧 Cursor in middle - allowing normal backspace');
       e.stopPropagation();
     }
   };
@@ -445,7 +438,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   // 중요도 적용
   const applyImportance = (level: ImportanceLevel) => {
     if (!selectedRange) {
-      console.log('No selected range');
       return;
     }
     
@@ -560,7 +552,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
         const backgroundDiv = textareaRef.current.parentElement.querySelector('div[style*="position: absolute"]');
         if (backgroundDiv && !backgroundDiv.textContent) {
           // 배경 div가 존재하지만 내용이 없다면 강제로 다시 렌더링
-          console.log('🎨 Force updating background div');
           forceUpdate({});
         }
       }
@@ -916,7 +907,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     // 배열 내용 자세히 확인
     if (ranges && ranges.length > 0) {
       ranges.forEach((range, index) => {
-        console.log(`🎨 ReadMode Range ${index}:`, range);
       });
     }
 
