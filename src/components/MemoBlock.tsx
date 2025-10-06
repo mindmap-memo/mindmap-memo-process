@@ -167,6 +167,7 @@ interface MemoBlockProps {
   enableImportanceBackground?: boolean;
   currentPage?: Page;
   isDraggingAnyMemo?: boolean;
+  isShiftPressed?: boolean;
 }
 
 const MemoBlock: React.FC<MemoBlockProps> = ({
@@ -190,7 +191,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   onDragStart,
   onDragEnd,
   currentPage,
-  isDraggingAnyMemo = false
+  isDraggingAnyMemo = false,
+  isShiftPressed = false
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isConnectionDragging, setIsConnectionDragging] = useState(false);
@@ -199,6 +201,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   const [isScrolling, setIsScrolling] = useState(false);
   const [scrollTimeout, setScrollTimeout] = useState<NodeJS.Timeout | null>(null);
   const [isHovering, setIsHovering] = useState(false);
+  const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
 
   // 빠른 드래그 최적화를 위한 상태
   const lastUpdateTime = React.useRef<number>(0);
@@ -368,6 +371,9 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
 
   const handleMouseMove = React.useCallback((e: MouseEvent) => {
     if (isDragging) {
+      // 커서 위치 저장 (힌트 UI용)
+      setCursorPosition({ x: e.clientX, y: e.clientY });
+
       if (!dragMoved) {
         setDragMoved(true);
       }
@@ -378,8 +384,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         y: (e.clientY - dragStart.y - canvasOffset.y) / canvasScale
       };
 
-      // 영역과 충돌 시 이동 제한 적용
-      if (currentPage && !memo.parentId) {
+      // 영역과 충돌 시 이동 제한 적용 (Shift 드래그 시에는 충돌 검사 안 함)
+      if (currentPage && !memo.parentId && !isShiftPressed) {
         // 이동 시도 전에 충돌 검사
         const testPage = {
           ...currentPage,
@@ -421,7 +427,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         lastUpdateTime.current = now;
       }
     }
-  }, [isDragging, dragMoved, dragStart, canvasOffset, canvasScale, onPositionChange, memo.id, memo.position, memo.parentId, currentPage]);
+  }, [isDragging, dragMoved, dragStart, canvasOffset, canvasScale, onPositionChange, memo.id, memo.position, memo.parentId, currentPage, isShiftPressed]);
 
   const handleMouseUp = React.useCallback((e: MouseEvent) => {
     if (isDragging) {
@@ -443,6 +449,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       pendingPosition.current = null;
       lastUpdateTime.current = 0;
       setRestrictedDirections(null); // 이동 제한 해제
+      setCursorPosition(null); // 커서 위치 리셋
     }
     setIsDragging(false);
     onDragEnd?.();
@@ -552,7 +559,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         }}
         style={{
           backgroundColor,
-          border: isDragHovered ? '2px solid #3b82f6' : (isSelected ? '2px solid #8b5cf6' : '1px solid #e5e7eb'),
+          border: (isDragging && isShiftPressed) ? '2px solid #10b981' : (isDragHovered ? '2px solid #3b82f6' : (isSelected ? '2px solid #8b5cf6' : '1px solid #e5e7eb')),
           borderRadius: '12px',
           padding: '16px',
           width: `${sizeConfig.width}px`,
@@ -580,6 +587,9 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
             gap: '8px',
             flex: 1
           }}>
+            {isDragging && isShiftPressed && (
+              <span style={{ color: '#10b981', fontSize: '18px', fontWeight: 'bold' }}>+</span>
+            )}
             📝 {memo.title || '제목을 입력해주세요'}
           </div>
           {isSelected && (
@@ -878,6 +888,29 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
           boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
         }} />
       </div>
+
+      {/* 드래그 중 힌트 UI */}
+      {isDragging && !isShiftPressed && cursorPosition && (
+        <div
+          style={{
+            position: 'fixed',
+            left: cursorPosition.x + 20,
+            top: cursorPosition.y - 10,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            color: 'white',
+            padding: '6px 12px',
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: '500',
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+            zIndex: 10000,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+          }}
+        >
+          💡 Shift를 누르면 카테고리에 추가
+        </div>
+      )}
     </div>
   );
 };

@@ -145,6 +145,20 @@ The application implements a sophisticated collision detection system for catego
 - **Overlap-Based Movement**: Categories are pushed by exactly the overlapping distance, no more, no less
 - **Cache Clearing**: Category area cache is cleared on drag end (App.tsx:115, Canvas.tsx:779-783, 955-961) to allow areas to naturally shrink/expand based on current memo positions
 
+### Shift+Drag Parent-Child System
+
+The application implements Shift+drag functionality for adding/removing memos and categories to/from category hierarchies:
+
+- **Shift Key Detection**: Global keyboard event listeners track Shift key state (App.tsx:197-220)
+- **Collision Bypass**: When Shift is pressed, both memo-area collision (`MemoBlock.tsx:388`) and category-area collision (`App.tsx:1560-1580`) are disabled
+- **Visual Hints**: Shows "💡 Shift를 누르면 카테고리에 추가" hint when dragging without Shift; green border and "+" icon when Shift is pressed
+- **Area Freezing**: During Shift+drag, category areas are cached (`shiftDragAreaCache`) to prevent size changes as dragged items move
+- **Memo Parent-Child**: `handleShiftDrop` (App.tsx:1266-1377) handles adding/removing memos to/from categories based on overlap with frozen area bounds
+- **Category Parent-Child**: `handleShiftDropCategory` (App.tsx:1152-1263) handles adding/removing categories to/from other categories
+- **Frozen Area Overlap**: Uses cached area bounds to ensure accurate overlap detection when area is frozen
+- **Auto-Expand**: Target categories automatically expand when items are added to them
+- **Excluding Dragged Item**: Area calculations exclude the currently dragged item to prevent false overlaps (`pageWithoutDraggingMemo`, `pageWithoutDraggingCategory`)
+
 ### Table System Architecture
 
 - **Column-Based Type System**: TableColumn interface defines column properties including type, options, validation
@@ -210,6 +224,7 @@ The application implements a sophisticated collision detection system for catego
 - **Range Detection**: Use clipboard-based detection for Google Sheets ranges; implement fallback UI for manual range input when automatic detection fails
 - **Category Drag Operations**: Always use absolute positioning (originalPosition + totalDelta) rather than cumulative deltas to prevent position drift
 - **Collision Detection**: Use unified collision resolution function (`resolveAreaCollisions`) to prevent duplicate logic and infinite loops
+- **Shift+Drag Operations**: When implementing Shift+drag features, remember to: (1) disable collision detection, (2) freeze area bounds using cache, (3) exclude dragged item from area calculations, (4) use frozen cached bounds for overlap detection
 - **Logging**: NEVER add console.log statements in render functions, useEffect callbacks, or frequently-called functions (e.g., calculateCategoryArea, renderSingleCategoryArea) as they cause infinite log spam and make debugging impossible. Only log in event handlers (onClick, onMouseDown, etc.) or one-time initialization code
 
 # important-instruction-reminders

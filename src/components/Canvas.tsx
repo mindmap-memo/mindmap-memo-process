@@ -27,6 +27,7 @@ interface CanvasProps {
   onCategoryToggleExpanded: (categoryId: string) => void; // 카테고리 펼침/접기
   onMoveToCategory: (itemId: string, categoryId: string | null) => void; // 아이템을 카테고리로 이동
   onDetectCategoryOnDrop: (memoId: string, position: { x: number; y: number }) => void; // 드래그 완료 시 카테고리 감지
+  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }) => void; // 카테고리 드래그 완료 시 처리
   onMemoDisplaySizeChange?: (memoId: string, size: MemoDisplaySize) => void;
   isConnecting: boolean;
   isDisconnectMode: boolean;
@@ -60,6 +61,8 @@ interface CanvasProps {
   onCategoryDragEnd?: () => void;
   onCategoryPositionDragEnd?: (categoryId: string) => void;
   onClearCategoryCache?: (categoryId: string) => void;
+  isShiftPressed?: boolean;
+  shiftDragAreaCacheRef?: React.MutableRefObject<{[categoryId: string]: any}>;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -84,6 +87,7 @@ const Canvas: React.FC<CanvasProps> = ({
   onCategoryToggleExpanded,
   onMoveToCategory,
   onDetectCategoryOnDrop,
+  onDetectCategoryDropForCategory,
   onMemoDisplaySizeChange,
   isConnecting,
   isDisconnectMode,
@@ -116,7 +120,9 @@ const Canvas: React.FC<CanvasProps> = ({
   onCategoryDragStart,
   onCategoryDragEnd,
   onCategoryPositionDragEnd,
-  onClearCategoryCache
+  onClearCategoryCache,
+  isShiftPressed = false,
+  shiftDragAreaCacheRef
 }) => {
   const [isPanning, setIsPanning] = React.useState(false);
   const [panStart, setPanStart] = React.useState({ x: 0, y: 0 });
@@ -130,6 +136,18 @@ const Canvas: React.FC<CanvasProps> = ({
   const [baseTool, setBaseTool] = React.useState<'select' | 'pan' | 'zoom'>('select');
   const [isMouseOverCanvas, setIsMouseOverCanvas] = React.useState(false);
   const [areaUpdateTrigger, setAreaUpdateTrigger] = React.useState(0);
+
+  // Shift 드래그 중 영역 캐시 (영역 크기가 변하지 않도록)
+  // App.tsx에서 전달된 ref 사용하거나 로컬 ref 사용
+  const localShiftDragAreaCache = React.useRef<{[categoryId: string]: any}>({});
+  const shiftDragAreaCache = shiftDragAreaCacheRef || localShiftDragAreaCache;
+
+  // Shift 드래그가 끝나면 캐시 클리어
+  React.useEffect(() => {
+    if (!isDraggingMemo || !isShiftPressed) {
+      shiftDragAreaCache.current = {};
+    }
+  }, [isDraggingMemo, isShiftPressed, shiftDragAreaCache]);
 
   // 드래그 중인 카테고리의 영역 캐시 (드래그 중에 크기가 변하지 않도록)
   const [draggedCategoryAreas, setDraggedCategoryAreas] = React.useState<{[categoryId: string]: {area: any, originalPosition: {x: number, y: number}}}>({});
@@ -692,7 +710,7 @@ const Canvas: React.FC<CanvasProps> = ({
     let area: any = null;
 
     if (draggedCategoryAreas[category.id]) {
-      // 캐시된 영역이 있다면 현재 카테고리 위치에 맞게 좌표 조정
+      // 카테고리 드래그: 캐시된 영역 사용
       const cached = draggedCategoryAreas[category.id];
       const deltaX = category.position.x - cached.originalPosition.x;
       const deltaY = category.position.y - cached.originalPosition.y;
@@ -704,9 +722,17 @@ const Canvas: React.FC<CanvasProps> = ({
         height: cached.area.height, // 캐시된 크기 유지
         color: cached.area.color
       };
+    } else if (isDraggingMemo && isShiftPressed && shiftDragAreaCache.current[category.id]) {
+      // Shift + 메모 드래그: 캐시된 영역 사용 (영역 크기 고정)
+      area = shiftDragAreaCache.current[category.id];
     } else {
       // 캐시된 영역이 없으면 동적 계산
       area = calculateCategoryArea(category);
+
+      // Shift 드래그 중이면 계산된 영역을 캐시에 저장
+      if (isDraggingMemo && isShiftPressed) {
+        shiftDragAreaCache.current[category.id] = area;
+      }
     }
 
     // 하위 아이템이 있으면 항상 카테고리 라벨 표시 (펼침/접기 상관없이)
@@ -910,6 +936,7 @@ const Canvas: React.FC<CanvasProps> = ({
             onDragEnd={onMemoDragEnd}
             currentPage={currentPage}
             isDraggingAnyMemo={isDraggingMemo}
+            isShiftPressed={isShiftPressed}
           />
         ))}
         {childCategories.map(childCategory => (
@@ -1186,6 +1213,11 @@ const Canvas: React.FC<CanvasProps> = ({
         const y = (e.clientY - rect.top - canvasOffset.y) / canvasScale;
 
         onCategoryPositionChange(dragData.id, { x, y });
+
+        // Shift 드래그면 카테고리-카테고리 종속 감지
+        if (onDetectCategoryDropForCategory) {
+          onDetectCategoryDropForCategory(dragData.id, { x, y });
+        }
       }
     } catch (error) {
     }
@@ -1472,6 +1504,7 @@ const Canvas: React.FC<CanvasProps> = ({
             onDragEnd={onMemoDragEnd}
             currentPage={currentPage}
             isDraggingAnyMemo={isDraggingMemo}
+            isShiftPressed={isShiftPressed}
           />
         ))}
 

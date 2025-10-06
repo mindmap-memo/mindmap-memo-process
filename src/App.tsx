@@ -94,6 +94,10 @@ const App: React.FC = () => {
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [isDisconnectMode, setIsDisconnectMode] = useState<boolean>(false);
   const [connectingFromId, setConnectingFromId] = useState<string | null>(null);
+  const [isShiftPressed, setIsShiftPressed] = useState<boolean>(false);
+
+  // Shift 드래그 중 영역 캐시 (영역 크기가 변하지 않도록)
+  const shiftDragAreaCache = React.useRef<{[categoryId: string]: any}>({});
 
   // 드래그 중인 카테고리의 영역 캐시 (Canvas와 동일한 시스템)
   const [draggedCategoryAreas, setDraggedCategoryAreas] = useState<{[categoryId: string]: {area: any, originalPosition: {x: number, y: number}}}>({});
@@ -195,7 +199,28 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // Shift 키 상태 감지
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') {
+        setIsShiftPressed(true);
+      }
+    };
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') {
+        setIsShiftPressed(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   // Canvas History Management Functions
   const saveCanvasState = React.useCallback((actionType: CanvasActionType, description: string) => {
@@ -1124,6 +1149,250 @@ const App: React.FC = () => {
     setTimeout(() => saveCanvasState('move_to_category', `종속 변경: ${itemId} → ${targetName}`), 0);
   };
 
+  // Shift 드래그로 카테고리에 카테고리 추가
+  const handleShiftDropCategory = (draggedCategory: CategoryBlock, position: { x: number; y: number }, currentPage: Page, cachedAreas?: {[categoryId: string]: any}) => {
+    // 카테고리 찾기
+    const categoryWidth = draggedCategory.size?.width || 200;
+    const categoryHeight = draggedCategory.size?.height || 80;
+    const categoryBounds = {
+      left: position.x,
+      top: position.y,
+      right: position.x + categoryWidth,
+      bottom: position.y + categoryHeight
+    };
+
+    const isOverlapping = (bounds1: any, bounds2: any, margin = 20) => {
+      return !(bounds1.right + margin < bounds2.left ||
+               bounds1.left - margin > bounds2.right ||
+               bounds1.bottom + margin < bounds2.top ||
+               bounds1.top - margin > bounds2.bottom);
+    };
+
+    // 드래그 중인 카테고리를 제외한 페이지 데이터 생성
+    const pageWithoutDraggingCategory = {
+      ...currentPage,
+      categories: (currentPage.categories || []).filter(c => c.id !== draggedCategory.id)
+    };
+
+    // 타겟 카테고리 찾기 (자기 자신과 자신의 하위는 제외)
+    const targetCategory = pageWithoutDraggingCategory.categories?.find(category => {
+      // 1. 카테고리 블록과의 겹침 체크
+      const catWidth = category.size?.width || 200;
+      const catHeight = category.size?.height || 80;
+      const catBounds = {
+        left: category.position.x,
+        top: category.position.y,
+        right: category.position.x + catWidth,
+        bottom: category.position.y + catHeight
+      };
+
+      if (isOverlapping(categoryBounds, catBounds, 20)) {
+        return true;
+      }
+
+      // 2. 카테고리 영역과의 겹침 체크
+      if (category.isExpanded) {
+        let categoryArea;
+
+        // 캐시된 영역이 있으면 사용
+        if (cachedAreas && cachedAreas[category.id]) {
+          categoryArea = cachedAreas[category.id];
+        } else {
+          // 캐시 없으면 드래그 중인 카테고리를 제외하고 계산
+          categoryArea = calculateCategoryArea(category, pageWithoutDraggingCategory);
+        }
+
+        if (categoryArea) {
+          const areaBounds = {
+            left: categoryArea.x,
+            top: categoryArea.y,
+            right: categoryArea.x + categoryArea.width,
+            bottom: categoryArea.y + categoryArea.height
+          };
+          if (isOverlapping(categoryBounds, areaBounds, 20)) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    });
+
+    // 카테고리 변경 처리
+    const newParentId = targetCategory ? targetCategory.id : undefined;
+    const parentChanged = draggedCategory.parentId !== newParentId;
+
+    if (parentChanged) {
+      setPages(pages.map(p => {
+        if (p.id === currentPageId) {
+          return {
+            ...p,
+            categories: (p.categories || []).map(category =>
+              category.id === draggedCategory.id
+                ? { ...category, position, parentId: newParentId }
+                : category
+            )
+          };
+        }
+        return p;
+      }));
+
+      // 카테고리로 들어갈 때만 펼침
+      if (targetCategory && !targetCategory.isExpanded) {
+        toggleCategoryExpanded(targetCategory.id);
+      }
+
+      const targetName = targetCategory ? `카테고리 ${targetCategory.title}` : '최상위';
+      saveCanvasState('move_to_category', `Shift 드래그로 카테고리 이동: ${draggedCategory.title} → ${targetName}`);
+    } else {
+      // 같은 카테고리 내에서 위치만 변경
+      setPages(pages.map(p => {
+        if (p.id === currentPageId) {
+          return {
+            ...p,
+            categories: (p.categories || []).map(category =>
+              category.id === draggedCategory.id
+                ? { ...category, position }
+                : category
+            )
+          };
+        }
+        return p;
+      }));
+    }
+  };
+
+  // Shift 드래그로 카테고리에 새 메모 추가
+  const handleShiftDrop = (draggedMemo: MemoBlock, position: { x: number; y: number }, currentPage: Page, cachedAreas?: {[categoryId: string]: any}) => {
+    // 카테고리 찾기
+    const memoWidth = draggedMemo.size?.width || 200;
+    const memoHeight = draggedMemo.size?.height || 95;
+    const memoBounds = {
+      left: position.x,
+      top: position.y,
+      right: position.x + memoWidth,
+      bottom: position.y + memoHeight
+    };
+
+    const isOverlapping = (bounds1: any, bounds2: any, margin = 20) => {
+      return !(bounds1.right + margin < bounds2.left ||
+               bounds1.left - margin > bounds2.right ||
+               bounds1.bottom + margin < bounds2.top ||
+               bounds1.top - margin > bounds2.bottom);
+    };
+
+    // 드래그 중인 메모를 제외한 페이지 데이터 생성
+    const pageWithoutDraggingMemo = {
+      ...currentPage,
+      memos: currentPage.memos.filter(m => m.id !== draggedMemo.id)
+    };
+
+    // 카테고리 블록과 영역 모두 체크
+    const targetCategory = currentPage.categories?.find(category => {
+      // 1. 카테고리 블록과의 겹침 체크
+      const categoryWidth = category.size?.width || 200;
+      const categoryHeight = category.size?.height || 80;
+      const categoryBounds = {
+        left: category.position.x,
+        top: category.position.y,
+        right: category.position.x + categoryWidth,
+        bottom: category.position.y + categoryHeight
+      };
+
+      if (isOverlapping(memoBounds, categoryBounds, 20)) {
+        return true;
+      }
+
+      // 2. 카테고리 영역과의 겹침 체크
+      if (category.isExpanded) {
+        let categoryArea;
+
+        // 캐시된 영역이 있으면 사용 (드래그 중인 메모 제외된 고정 영역)
+        if (cachedAreas && cachedAreas[category.id]) {
+          categoryArea = cachedAreas[category.id];
+        } else {
+          // 캐시 없으면 드래그 중인 메모를 제외하고 계산
+          categoryArea = calculateCategoryArea(category, pageWithoutDraggingMemo);
+        }
+
+        if (categoryArea) {
+          const areaBounds = {
+            left: categoryArea.x,
+            top: categoryArea.y,
+            right: categoryArea.x + categoryArea.width,
+            bottom: categoryArea.y + categoryArea.height
+          };
+          if (isOverlapping(memoBounds, areaBounds, 20)) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    });
+
+    // 카테고리 변경 처리
+    const newParentId = targetCategory ? targetCategory.id : null;
+    const parentChanged = draggedMemo.parentId !== newParentId;
+
+    if (parentChanged) {
+      setPages(pages.map(p => {
+        if (p.id === currentPageId) {
+          return {
+            ...p,
+            memos: p.memos.map(memo =>
+              memo.id === draggedMemo.id
+                ? { ...memo, position, parentId: newParentId }
+                : memo
+            )
+          };
+        }
+        return p;
+      }));
+
+      // 카테고리로 들어갈 때만 펼침
+      if (targetCategory && !targetCategory.isExpanded) {
+        toggleCategoryExpanded(targetCategory.id);
+      }
+
+      const targetName = targetCategory ? `카테고리 ${targetCategory.title}` : '최상위';
+      saveCanvasState('move_to_category', `Shift 드래그로 메모 이동: ${draggedMemo.title} → ${targetName}`);
+    } else {
+      // 같은 카테고리 내에서 위치만 변경
+      setPages(pages.map(p => {
+        if (p.id === currentPageId) {
+          return {
+            ...p,
+            memos: p.memos.map(memo =>
+              memo.id === draggedMemo.id
+                ? { ...memo, position }
+                : memo
+            )
+          };
+        }
+        return p;
+      }));
+    }
+  };
+
+  // 카테고리 드래그 완료 시 카테고리 블록 겹침 감지 (Shift 드래그)
+  const detectCategoryDropForCategory = (categoryId: string, position: { x: number; y: number }) => {
+    const currentPage = pages.find(p => p.id === currentPageId);
+    if (!currentPage || !currentPage.categories) {
+      return;
+    }
+
+    const draggedCategory = currentPage.categories.find(c => c.id === categoryId);
+    if (!draggedCategory) {
+      return;
+    }
+
+    // Shift 키가 눌려있으면 카테고리-카테고리 종속 모드
+    if (isShiftPressed) {
+      handleShiftDropCategory(draggedCategory, position, currentPage, shiftDragAreaCache.current);
+    }
+  };
+
   // 드래그 완료 시 카테고리 블록 겹침 감지
   const detectCategoryOnDrop = (memoId: string, position: { x: number; y: number }) => {
 
@@ -1134,6 +1403,12 @@ const App: React.FC = () => {
 
     const draggedMemo = currentPage.memos.find(m => m.id === memoId);
     if (!draggedMemo) {
+      return;
+    }
+
+    // Shift 키가 눌려있으면 새 메모 복사 모드
+    if (isShiftPressed) {
+      handleShiftDrop(draggedMemo, position, currentPage, shiftDragAreaCache.current);
       return;
     }
 
@@ -1412,19 +1687,27 @@ const App: React.FC = () => {
           : category
       );
 
-      // 충돌 검사 수행
-      const pageWithUpdates = {
-        ...page,
-        memos: updatedMemos,
-        categories: updatedCategories
-      };
+      // 충돌 검사 수행 (Shift 누르면 충돌 검사 건너뛰기)
+      if (!isShiftPressed) {
+        const pageWithUpdates = {
+          ...page,
+          memos: updatedMemos,
+          categories: updatedCategories
+        };
 
-      const collisionResult = resolveAreaCollisions(categoryId, pageWithUpdates);
+        const collisionResult = resolveAreaCollisions(categoryId, pageWithUpdates);
+
+        return {
+          ...page,
+          memos: collisionResult.updatedMemos,
+          categories: collisionResult.updatedCategories
+        };
+      }
 
       return {
         ...page,
-        memos: collisionResult.updatedMemos,
-        categories: collisionResult.updatedCategories
+        memos: updatedMemos,
+        categories: updatedCategories
       };
     }));
 
@@ -2031,8 +2314,8 @@ const App: React.FC = () => {
       let restrictedX = false;
       let restrictedY = false;
 
-      // 부모가 없는 메모만 영역 충돌 검사
-      if (!movedMemo.parentId) {
+      // 부모가 없는 메모만 영역 충돌 검사 (Shift 누르면 스킵)
+      if (!movedMemo.parentId && !isShiftPressed) {
         for (const category of categories) {
           const categoryArea = calculateCategoryArea(category, currentPage);
           if (!categoryArea) continue;
@@ -2100,7 +2383,16 @@ const App: React.FC = () => {
         );
       }
 
-      // 부모 카테고리가 없으면: 메모-메모 충돌 검사
+      // 부모 카테고리가 없으면: 메모-메모 충돌 검사 (Shift 누르면 스킵)
+      if (isShiftPressed) {
+        // Shift 드래그 중에는 충돌 검사 안 함
+        return prev.map(page =>
+          page.id === currentPageId
+            ? updatedPage
+            : page
+        );
+      }
+
       const collisionResult = resolveMemoCollisions(memoId, updatedPage);
 
       // 영역에 막혔으면 원래 위치로 복원
@@ -2244,6 +2536,7 @@ const App: React.FC = () => {
         onCategoryToggleExpanded={toggleCategoryExpanded}
         onMoveToCategory={moveToCategory}
         onDetectCategoryOnDrop={detectCategoryOnDrop}
+        onDetectCategoryDropForCategory={detectCategoryDropForCategory}
         isConnecting={isConnecting}
         isDisconnectMode={isDisconnectMode}
         connectingFromId={connectingFromId}
@@ -2289,6 +2582,8 @@ const App: React.FC = () => {
           //   }
           // }, 100);
         }}
+        isShiftPressed={isShiftPressed}
+        shiftDragAreaCacheRef={shiftDragAreaCache}
         isDraggingCategory={isDraggingCategory}
         onCategoryDragStart={() => {
           setIsDraggingCategory(true);
