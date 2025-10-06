@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { MemoBlock as MemoBlockType, MemoDisplaySize, ImportanceLevel, ImportanceRange } from '../types';
+import { MemoBlock as MemoBlockType, MemoDisplaySize, ImportanceLevel, ImportanceRange, Page } from '../types';
+import { checkMemoAreaCollision } from '../utils/collisionUtils';
 
 // 중요도 레벨별 형광펜 스타일 정의 (TextBlock과 동일)
 const getImportanceStyle = (level: ImportanceLevel) => {
@@ -164,6 +165,7 @@ interface MemoBlockProps {
   onDragStart?: () => void;
   onDragEnd?: () => void;
   enableImportanceBackground?: boolean;
+  currentPage?: Page;
 }
 
 const MemoBlock: React.FC<MemoBlockProps> = ({
@@ -185,7 +187,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   showGeneralContent,
   enableImportanceBackground = false,
   onDragStart,
-  onDragEnd
+  onDragEnd,
+  currentPage
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isConnectionDragging, setIsConnectionDragging] = useState(false);
@@ -199,6 +202,9 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   const lastUpdateTime = React.useRef<number>(0);
   const pendingPosition = React.useRef<{ x: number; y: number } | null>(null);
   const memoRef = React.useRef<HTMLDivElement>(null);
+
+  // 이동 제한 상태 (영역과 충돌 시)
+  const [restrictedDirections, setRestrictedDirections] = useState<{ left: boolean; right: boolean; up: boolean; down: boolean } | null>(null);
 
   // 크기별 스타일 정의
   const getSizeConfig = (size: MemoDisplaySize) => {
@@ -359,10 +365,44 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       }
 
       // 마우스 현재 위치에서 드래그 시작 오프셋을 빼고 캔버스 좌표계로 변환
-      const newPosition = {
+      let newPosition = {
         x: (e.clientX - dragStart.x - canvasOffset.x) / canvasScale,
         y: (e.clientY - dragStart.y - canvasOffset.y) / canvasScale
       };
+
+      // 영역과 충돌 시 이동 제한 적용
+      if (currentPage && !memo.parentId) {
+        // 이동 시도 전에 충돌 검사
+        const testPage = {
+          ...currentPage,
+          memos: currentPage.memos.map(m => m.id === memo.id ? { ...m, position: newPosition } : m)
+        };
+
+        const collisionResult = checkMemoAreaCollision(memo.id, testPage);
+
+        if (collisionResult.blocked && collisionResult.restrictedDirections) {
+          // 제한된 방향으로 이동 차단
+          const deltaX = newPosition.x - memo.position.x;
+          const deltaY = newPosition.y - memo.position.y;
+
+          if (collisionResult.restrictedDirections.left && deltaX < 0) {
+            newPosition.x = memo.position.x; // 왼쪽 이동 차단
+          }
+          if (collisionResult.restrictedDirections.right && deltaX > 0) {
+            newPosition.x = memo.position.x; // 오른쪽 이동 차단
+          }
+          if (collisionResult.restrictedDirections.up && deltaY < 0) {
+            newPosition.y = memo.position.y; // 위 이동 차단
+          }
+          if (collisionResult.restrictedDirections.down && deltaY > 0) {
+            newPosition.y = memo.position.y; // 아래 이동 차단
+          }
+
+          setRestrictedDirections(collisionResult.restrictedDirections);
+        } else {
+          setRestrictedDirections(null);
+        }
+      }
 
       // 빠른 드래그 시 업데이트 빈도 조절 (50ms마다만 업데이트)
       const now = Date.now();
@@ -373,7 +413,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         lastUpdateTime.current = now;
       }
     }
-  }, [isDragging, dragMoved, dragStart, canvasOffset, canvasScale, onPositionChange, memo.id]);
+  }, [isDragging, dragMoved, dragStart, canvasOffset, canvasScale, onPositionChange, memo.id, memo.position, memo.parentId, currentPage]);
 
   const handleMouseUp = React.useCallback((e: MouseEvent) => {
     if (isDragging) {
@@ -394,6 +434,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       // 상태 초기화
       pendingPosition.current = null;
       lastUpdateTime.current = 0;
+      setRestrictedDirections(null); // 이동 제한 해제
     }
     setIsDragging(false);
     onDragEnd?.();

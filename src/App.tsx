@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Page, MemoBlock, DataRegistry, MemoDisplaySize, ImportanceLevel, CategoryBlock, CanvasHistory, CanvasAction, CanvasActionType } from './types';
 import { globalDataRegistry } from './utils/dataRegistry';
 import { calculateCategoryArea, CategoryArea } from './utils/categoryAreaUtils';
-import { resolveAreaCollisions } from './utils/collisionUtils';
+import { resolveAreaCollisions, resolveMemoCollisions } from './utils/collisionUtils';
 import LeftPanel from './components/LeftPanel';
 import RightPanel from './components/RightPanel';
 import Canvas from './components/Canvas';
@@ -2021,37 +2021,93 @@ const App: React.FC = () => {
       }
 
       const movedMemo = currentPage.memos.find(m => m.id === memoId);
+      if (!movedMemo) return prev;
 
-      // 부모 카테고리가 없으면 충돌 검사 없이 위치만 업데이트
-      if (!movedMemo?.parentId) {
+      // 영역과의 충돌 체크 (방향별)
+      const categories = currentPage.categories || [];
+      const memoWidth = movedMemo.size?.width || 200;
+      const memoHeight = movedMemo.size?.height || 95;
+
+      let restrictedX = false;
+      let restrictedY = false;
+
+      // 부모가 없는 메모만 영역 충돌 검사
+      if (!movedMemo.parentId) {
+        for (const category of categories) {
+          const categoryArea = calculateCategoryArea(category, currentPage);
+          if (!categoryArea) continue;
+
+          // 새 위치에서의 메모 영역
+          const newMemoBounds = {
+            left: position.x,
+            top: position.y,
+            right: position.x + memoWidth,
+            bottom: position.y + memoHeight
+          };
+
+          const areaBounds = {
+            left: categoryArea.x,
+            top: categoryArea.y,
+            right: categoryArea.x + categoryArea.width,
+            bottom: categoryArea.y + categoryArea.height
+          };
+
+          // 겹침 계산
+          const overlapLeft = Math.max(newMemoBounds.left, areaBounds.left);
+          const overlapTop = Math.max(newMemoBounds.top, areaBounds.top);
+          const overlapRight = Math.min(newMemoBounds.right, areaBounds.right);
+          const overlapBottom = Math.min(newMemoBounds.bottom, areaBounds.bottom);
+
+          // 겹침이 있으면
+          if (overlapLeft < overlapRight && overlapTop < overlapBottom) {
+            // X 방향 이동 체크
+            const deltaX = position.x - movedMemo.position.x;
+            if (deltaX !== 0) restrictedX = true;
+
+            // Y 방향 이동 체크
+            const deltaY = position.y - movedMemo.position.y;
+            if (deltaY !== 0) restrictedY = true;
+          }
+        }
+      }
+
+      // 제한된 방향은 원래 위치 유지
+      const finalPosition = {
+        x: restrictedX ? movedMemo.position.x : position.x,
+        y: restrictedY ? movedMemo.position.y : position.y
+      };
+
+      // 메모 위치 업데이트
+      const updatedPage = {
+        ...currentPage,
+        memos: currentPage.memos.map(memo =>
+          memo.id === memoId ? { ...memo, position: finalPosition } : memo
+        )
+      };
+
+      // 부모 카테고리가 있으면: 영역 충돌 검사 (영역끼리 밀어냄)
+      if (movedMemo?.parentId) {
+        const collisionResult = resolveAreaCollisions(movedMemo.parentId, updatedPage);
+
         return prev.map(page =>
           page.id === currentPageId
             ? {
                 ...page,
-                memos: page.memos.map(memo =>
-                  memo.id === memoId ? { ...memo, position } : memo
-                )
+                categories: collisionResult.updatedCategories,
+                memos: collisionResult.updatedMemos
               }
             : page
         );
       }
 
-      // 메모 위치 업데이트 후 통합 충돌 검사
-      const updatedPage = {
-        ...currentPage,
-        memos: currentPage.memos.map(memo =>
-          memo.id === memoId ? { ...memo, position } : memo
-        )
-      };
-
-      const collisionResult = resolveAreaCollisions(movedMemo.parentId, updatedPage);
+      // 부모 카테고리가 없으면: 메모-메모 충돌 검사
+      const updatedMemos = resolveMemoCollisions(memoId, updatedPage);
 
       return prev.map(page =>
         page.id === currentPageId
           ? {
               ...page,
-              categories: collisionResult.updatedCategories,
-              memos: collisionResult.updatedMemos
+              memos: updatedMemos
             }
           : page
       );
