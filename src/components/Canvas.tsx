@@ -64,6 +64,12 @@ interface CanvasProps {
   isShiftPressed?: boolean;
   shiftDragAreaCacheRef?: React.MutableRefObject<{[categoryId: string]: any}>;
   onShiftDropCategory?: (category: CategoryBlock, position: { x: number; y: number }) => void;
+  canvasOffset?: { x: number; y: number };
+  setCanvasOffset?: (offset: { x: number; y: number }) => void;
+  canvasScale?: number;
+  setCanvasScale?: (scale: number) => void;
+  onDeleteMemoById?: (id: string) => void;
+  onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -124,13 +130,25 @@ const Canvas: React.FC<CanvasProps> = ({
   onClearCategoryCache,
   isShiftPressed = false,
   shiftDragAreaCacheRef,
-  onShiftDropCategory
+  onShiftDropCategory,
+  canvasOffset: externalCanvasOffset,
+  setCanvasOffset: externalSetCanvasOffset,
+  canvasScale: externalCanvasScale,
+  setCanvasScale: externalSetCanvasScale,
+  onDeleteMemoById,
+  onAddQuickNav
 }) => {
   const [isPanning, setIsPanning] = React.useState(false);
   const [panStart, setPanStart] = React.useState({ x: 0, y: 0 });
-  const [canvasOffset, setCanvasOffset] = React.useState({ x: 0, y: 0 });
-  const [canvasScale, setCanvasScale] = React.useState(1);
+  const [localCanvasOffset, setLocalCanvasOffset] = React.useState({ x: 0, y: 0 });
+  const [localCanvasScale, setLocalCanvasScale] = React.useState(1);
   const [currentTool, setCurrentTool] = React.useState<'select' | 'pan' | 'zoom'>('select');
+
+  // Use external state if provided, otherwise use local state
+  const canvasOffset = externalCanvasOffset !== undefined ? externalCanvasOffset : localCanvasOffset;
+  const setCanvasOffset = externalSetCanvasOffset || setLocalCanvasOffset;
+  const canvasScale = externalCanvasScale !== undefined ? externalCanvasScale : localCanvasScale;
+  const setCanvasScale = externalSetCanvasScale || setLocalCanvasScale;
 
   // 메모 블럭은 항상 표시하고, 내용 필터링은 MemoBlock 내부에서 처리
   const [isSpacePressed, setIsSpacePressed] = React.useState(false);
@@ -1034,6 +1052,8 @@ const Canvas: React.FC<CanvasProps> = ({
             currentPage={currentPage}
             isDraggingAnyMemo={isDraggingMemo}
             isShiftPressed={isShiftPressed}
+            onDelete={onDeleteMemoById}
+            onAddQuickNav={onAddQuickNav}
           />
         ))}
         {childCategories.map(childCategory => (
@@ -1603,6 +1623,8 @@ const Canvas: React.FC<CanvasProps> = ({
             currentPage={currentPage}
             isDraggingAnyMemo={isDraggingMemo}
             isShiftPressed={isShiftPressed}
+            onDelete={onDeleteMemoById}
+            onAddQuickNav={onAddQuickNav}
           />
         ))}
 

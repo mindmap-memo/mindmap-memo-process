@@ -142,3 +142,46 @@ export function calculatePushDirection(
     return { x: 0, y: pushY };
   }
 }
+
+/**
+ * 하위 카테고리 영역이 상위 카테고리 영역 내에 있는지 확인
+ */
+export function isAreaContained(childArea: CategoryArea, parentArea: CategoryArea): boolean {
+  return (
+    childArea.x >= parentArea.x &&
+    childArea.y >= parentArea.y &&
+    childArea.x + childArea.width <= parentArea.x + parentArea.width &&
+    childArea.y + childArea.height <= parentArea.y + parentArea.height
+  );
+}
+
+/**
+ * 하위 카테고리 영역을 상위 카테고리 영역 내부로 제한
+ * @returns 제한된 영역의 좌상단 좌표
+ */
+export function constrainAreaWithinParent(
+  childArea: CategoryArea,
+  parentArea: CategoryArea
+): { x: number; y: number } {
+  let constrainedX = childArea.x;
+  let constrainedY = childArea.y;
+
+  // 왼쪽 경계
+  if (childArea.x < parentArea.x) {
+    constrainedX = parentArea.x;
+  }
+  // 오른쪽 경계
+  if (childArea.x + childArea.width > parentArea.x + parentArea.width) {
+    constrainedX = parentArea.x + parentArea.width - childArea.width;
+  }
+  // 상단 경계
+  if (childArea.y < parentArea.y) {
+    constrainedY = parentArea.y;
+  }
+  // 하단 경계
+  if (childArea.y + childArea.height > parentArea.y + parentArea.height) {
+    constrainedY = parentArea.y + parentArea.height - childArea.height;
+  }
+
+  return { x: constrainedX, y: constrainedY };
+}

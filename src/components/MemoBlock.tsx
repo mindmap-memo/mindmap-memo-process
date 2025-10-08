@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { MemoBlock as MemoBlockType, MemoDisplaySize, ImportanceLevel, ImportanceRange, Page } from '../types';
 import { checkMemoAreaCollision } from '../utils/collisionUtils';
+import ContextMenu from './ContextMenu';
+import QuickNavModal from './QuickNavModal';
 
 // 중요도 레벨별 형광펜 스타일 정의 (TextBlock과 동일)
 const getImportanceStyle = (level: ImportanceLevel) => {
@@ -168,6 +170,8 @@ interface MemoBlockProps {
   currentPage?: Page;
   isDraggingAnyMemo?: boolean;
   isShiftPressed?: boolean;
+  onDelete?: (id: string) => void;
+  onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
 }
 
 const MemoBlock: React.FC<MemoBlockProps> = ({
@@ -192,9 +196,14 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   onDragEnd,
   currentPage,
   isDraggingAnyMemo = false,
-  isShiftPressed = false
+  isShiftPressed = false,
+  onDelete,
+  onAddQuickNav
 }) => {
   const [isDragging, setIsDragging] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [showQuickNavModal, setShowQuickNavModal] = useState(false);
+  const [quickNavName, setQuickNavName] = useState('');
   const [isConnectionDragging, setIsConnectionDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragMoved, setDragMoved] = useState(false);
@@ -250,6 +259,41 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   };
 
   const sizeConfig = getSizeConfig(memo.displaySize || 'small');
+
+  // 우클릭 메뉴 핸들러
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault(); // 크롬 기본 우클릭 메뉴 막기
+    e.stopPropagation(); // 이벤트 전파 중단
+
+    // 컨텍스트 메뉴 표시
+    setContextMenu({ x: e.clientX, y: e.clientY });
+
+    // 추가 보험: 네이티브 이벤트에도 preventDefault 적용
+    if (e.nativeEvent) {
+      e.nativeEvent.preventDefault();
+      e.nativeEvent.stopImmediatePropagation();
+    }
+
+    return false; // 추가 보험
+  };
+
+  // 컨텍스트 메뉴 닫기
+  React.useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    if (contextMenu) {
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+    }
+  }, [contextMenu]);
+
+  // 단축 이동 추가 확인
+  const handleQuickNavConfirm = () => {
+    if (quickNavName.trim() && onAddQuickNav) {
+      onAddQuickNav(quickNavName.trim(), memo.id, 'memo');
+      setQuickNavName('');
+      setShowQuickNavModal(false);
+    }
+  };
 
   // 배경색을 메모이제이션하여 memo.blocks 변경 시 재계산
   const backgroundColor = React.useMemo(() => {
@@ -332,13 +376,18 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   }, []); // 의존성 배열을 빈 배열로 변경
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    // 우클릭은 컨텍스트 메뉴용으로 무시
+    if (e.button === 2) {
+      return;
+    }
+
     // 다른 메모가 이미 드래그 중이면 무시 (단, 현재 메모가 드래그 중이면 허용)
     if (isDraggingAnyMemo && !isDragging) {
       e.stopPropagation();
       return;
     }
 
-    // 연결 모드가 아닐 때만 드래그 준비
+    // 연결 모드가 아닐 때만 드래그 준비 (왼쪽 클릭만)
     if (e.button === 0 && !isConnecting) {
       setIsDragging(true);
       setDragMoved(false);
@@ -541,6 +590,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
             onClick(e.shiftKey);
           }
         }}
+        onContextMenu={handleContextMenu}
         onMouseDown={handleMouseDown}
         onMouseUp={(e) => {
           // 연결 모드일 때 메모 블록 전체에서 연결 처리
@@ -552,11 +602,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         onScroll={handleScroll}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
-        draggable={true}
-        onDragStart={(e) => {
-          e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'memo', id: memo.id }));
-          onDragStart?.();
-        }}
+        draggable={false}
         style={{
           backgroundColor,
           border: (isDragging && isShiftPressed) ? '2px solid #10b981' : (isDragHovered ? '2px solid #3b82f6' : (isSelected ? '2px solid #8b5cf6' : '1px solid #e5e7eb')),
@@ -566,7 +612,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
           maxHeight: `${sizeConfig.maxHeight}px`,
           overflowY: 'auto',
           overflowX: 'hidden',
-          cursor: isDragging ? 'grabbing' : 'grab',
+          cursor: isDragging ? 'grabbing' : 'default',
           boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
           userSelect: 'none',
           zIndex: 10
@@ -911,6 +957,31 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
           💡 Shift를 누르면 카테고리에 추가
         </div>
       )}
+
+      {/* 컨텍스트 메뉴 */}
+      <ContextMenu
+        position={contextMenu}
+        onClose={() => setContextMenu(null)}
+        onDelete={() => {
+          if (onDelete) {
+            onDelete(memo.id);
+          }
+        }}
+        onSetQuickNav={() => {
+          setShowQuickNavModal(true);
+        }}
+      />
+
+      {/* 단축 이동 이름 입력 모달 */}
+      <QuickNavModal
+        isOpen={showQuickNavModal}
+        onClose={() => {
+          setShowQuickNavModal(false);
+          setQuickNavName('');
+        }}
+        onConfirm={handleQuickNavConfirm}
+        initialName={quickNavName}
+      />
     </div>
   );
 };

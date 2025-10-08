@@ -264,6 +264,18 @@ export function isParentChild(
 }
 
 /**
+ * 카테고리의 부모 카테고리 찾기
+ */
+export function getParentCategory(
+  categoryId: string,
+  categories: CategoryBlock[]
+): CategoryBlock | undefined {
+  const category = categories.find(c => c.id === categoryId);
+  if (!category || !category.parentId) return undefined;
+  return categories.find(c => c.id === category.parentId);
+}
+
+/**
  * 카테고리의 직접 하위 메모들만 가져오기
  */
 export function getDirectChildMemos(

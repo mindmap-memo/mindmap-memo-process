@@ -1,12 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(taskkill:*)",
-      "Bash(git add:*)",
-      "Bash(git commit -m \"$(cat <<''EOF''\n카테고리 영역 드래그 시 메모 이동 속도 문제 수정\n\n- 메모 블록이 카테고리 영역보다 빠르게 이동하는 문제 해결\n- 절대 위치 기반 계산으로 변경하여 누적 오차 제거\n- 드래그 시작 시 메모 원본 위치 저장 및 종료 시 캐시 제거\n- 충돌 검사 로직에서 드래그 중인 카테고리의 내부 메모 제외\n- 드래그 중 영역 크기 고정을 위한 캐시 시스템 개선\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(git commit -m \"$(cat <<''EOF''\n카테고리-메모 캐시 동기화 및 영역 이탈 문제 해결\n\n- Canvas와 App 간 캐시 동기화 시스템 구현\n- onClearCategoryCache 콜백으로 양쪽 캐시 동시 제거\n- 메모 이동 시 영역 밖으로 튀어나가는 문제 해결\n- 드래그 중 캐시는 보존, 메모 위치 변경 시만 동기화 제거\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(git commit -m \"$(cat <<''EOF''\n영역 충돌 처리 시스템 완성 및 UI 개선\n\n- 영역-영역, 영역-메모 충돌 처리 구현\n- 겹친 거리만큼만 밀어내는 물리적 충돌 시스템\n- 프레임 간 delta 계산으로 실시간 방향 전환 지원\n- 드래그 선택된 메모 다중 삭제 기능 추가\n- 줌아웃 한계치 0.01로 확대 (10배 증가)\n- 중요도 필터 위치 조정으로 Undo/Redo 버튼 노출\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(npx tsc:*)"
+      "Bash(Stop-Process -Force)",
+      "Bash(Start-Sleep -Seconds 2)",
+      "Bash(npx kill-port:*)",
+      "Bash(npm start)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

@@ -258,6 +258,17 @@ export interface CanvasHistory {
   maxHistorySize: number;
 }
 
+// Quick Navigation
+export type QuickNavTargetType = 'memo' | 'category';
+
+export interface QuickNavItem {
+  id: string;
+  name: string;
+  targetId: string;
+  targetType: QuickNavTargetType;
+  pageId: string; // 어느 페이지에 있는지
+}
+
 export interface AppState {
   pages: Page[];
   currentPageId: string;
@@ -266,4 +277,5 @@ export interface AppState {
   rightPanelOpen: boolean;
   dataRegistry: DataRegistry; // Global data registry for named data
   canvasHistory: CanvasHistory; // Canvas-specific undo/redo history
+  quickNavItems?: QuickNavItem[]; // Quick navigation shortcuts
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Page, MemoBlock, DataRegistry, MemoDisplaySize, ImportanceLevel, CategoryBlock, CanvasHistory, CanvasAction, CanvasActionType } from './types';
+import { Page, MemoBlock, DataRegistry, MemoDisplaySize, ImportanceLevel, CategoryBlock, CanvasHistory, CanvasAction, CanvasActionType, QuickNavItem } from './types';
 import { globalDataRegistry } from './utils/dataRegistry';
 
 import { calculateCategoryArea, CategoryArea } from './utils/categoryAreaUtils';
@@ -20,7 +20,8 @@ import Canvas from './components/Canvas';
 const STORAGE_KEYS = {
   PAGES: 'mindmap-memo-pages',
   CURRENT_PAGE_ID: 'mindmap-memo-current-page-id',
-  PANEL_SETTINGS: 'mindmap-memo-panel-settings'
+  PANEL_SETTINGS: 'mindmap-memo-panel-settings',
+  QUICK_NAV_ITEMS: 'mindmap-memo-quick-nav-items'
 };
 
 // 기본 데이터
@@ -110,6 +111,15 @@ const App: React.FC = () => {
 
   // 드래그 중인 카테고리의 영역 캐시 (Canvas와 동일한 시스템)
   const [draggedCategoryAreas, setDraggedCategoryAreas] = useState<{[categoryId: string]: {area: any, originalPosition: {x: number, y: number}}}>({});
+
+  // 캔버스 뷰포트 상태 (Canvas에서 App으로 이동)
+  const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
+  const [canvasScale, setCanvasScale] = useState(1);
+
+  // 단축 이동 (Quick Navigation)
+  const [quickNavItems, setQuickNavItems] = useState<QuickNavItem[]>(() =>
+    loadFromStorage(STORAGE_KEYS.QUICK_NAV_ITEMS, [])
+  );
 
   // 드래그 시작 시 메모들의 원래 위치 저장
   const dragStartMemoPositions = React.useRef<Map<string, Map<string, {x: number, y: number}>>>(new Map());
@@ -451,6 +461,11 @@ const App: React.FC = () => {
     };
     saveToStorage(STORAGE_KEYS.PANEL_SETTINGS, settings);
   }, [leftPanelOpen, rightPanelOpen, leftPanelWidth, rightPanelWidth]);
+
+  // localStorage 자동 저장 - 단축 이동 항목
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.QUICK_NAV_ITEMS, quickNavItems);
+  }, [quickNavItems]);
 
   // 현재 페이지 ID가 유효한지 확인하고 수정
   useEffect(() => {
@@ -2336,6 +2351,28 @@ const App: React.FC = () => {
     setSelectedMemoId(null);
   };
 
+  // 특정 메모를 ID로 삭제하는 함수 (검색 결과에서 사용)
+  const deleteMemoById = (memoId: string) => {
+    setPages(prev => prev.map(page => ({
+      ...page,
+      memos: page.memos
+        .filter(memo => memo.id !== memoId) // 해당 메모 삭제
+        .map(memo => ({
+          ...memo,
+          connections: memo.connections.filter(connId => connId !== memoId) // 다른 메모들에서 삭제된 메모로의 연결 제거
+        })),
+      categories: (page.categories || []).map(category => ({
+        ...category,
+        connections: category.connections.filter(connId => connId !== memoId), // 카테고리에서도 삭제된 메모로의 연결 제거
+        children: category.children.filter(childId => childId !== memoId) // 자식 목록에서도 제거
+      }))
+    })));
+    // 삭제한 메모가 현재 선택된 메모였다면 선택 해제
+    if (selectedMemoId === memoId) {
+      setSelectedMemoId(null);
+    }
+  };
+
   // 통합 삭제 함수 - 현재 선택된 아이템(메모 또는 카테고리) 삭제
   const deleteSelectedItem = () => {
     // 다중 선택된 항목들 삭제
@@ -2689,6 +2726,106 @@ const App: React.FC = () => {
     setRightPanelWidth(prev => Math.max(250, Math.min(1200, prev + deltaX)));
   };
 
+  // 검색 결과 메모로 이동 - 캔버스 뷰를 메모 중심으로 이동하고 초기 줌 레벨로 설정
+  const handleNavigateToMemo = (memoId: string) => {
+    const currentPage = pages.find(p => p.id === currentPageId);
+    if (!currentPage) return;
+
+    const memo = currentPage.memos.find(m => m.id === memoId);
+    if (!memo) return;
+
+    // 화면 크기 계산 (패널 제외)
+    const leftOffset = leftPanelOpen ? leftPanelWidth : 0;
+    const rightOffset = rightPanelOpen ? rightPanelWidth : 0;
+    const availableWidth = window.innerWidth - leftOffset - rightOffset;
+    const availableHeight = window.innerHeight;
+
+    // 메모 크기
+    const memoWidth = memo.size?.width || 200;
+    const memoHeight = memo.size?.height || 150;
+
+    // 메모 중심 좌표
+    const memoCenterX = memo.position.x + memoWidth / 2;
+    const memoCenterY = memo.position.y + memoHeight / 2;
+
+    // 화면 중앙에 메모가 오도록 offset 계산
+    const newOffsetX = availableWidth / 2 - memoCenterX;
+    const newOffsetY = availableHeight / 2 - memoCenterY;
+
+    setCanvasOffset({ x: newOffsetX, y: newOffsetY });
+    setCanvasScale(1); // 초기 줌 레벨로 리셋
+  };
+
+  // 카테고리로 이동 - 캔버스 뷰를 카테고리 중심으로 이동
+  const handleNavigateToCategory = (categoryId: string) => {
+    const currentPage = pages.find(p => p.id === currentPageId);
+    if (!currentPage) return;
+
+    const category = currentPage.categories?.find(c => c.id === categoryId);
+    if (!category) return;
+
+    // 화면 크기 계산 (패널 제외)
+    const leftOffset = leftPanelOpen ? leftPanelWidth : 0;
+    const rightOffset = rightPanelOpen ? rightPanelWidth : 0;
+    const availableWidth = window.innerWidth - leftOffset - rightOffset;
+    const availableHeight = window.innerHeight;
+
+    // 카테고리 크기
+    const categoryWidth = category.size?.width || 200;
+    const categoryHeight = category.size?.height || 80;
+
+    // 카테고리 중심 좌표
+    const categoryCenterX = category.position.x + categoryWidth / 2;
+    const categoryCenterY = category.position.y + categoryHeight / 2;
+
+    // 화면 중앙에 카테고리가 오도록 offset 계산
+    const newOffsetX = availableWidth / 2 - categoryCenterX;
+    const newOffsetY = availableHeight / 2 - categoryCenterY;
+
+    setCanvasOffset({ x: newOffsetX, y: newOffsetY });
+    setCanvasScale(1); // 초기 줌 레벨로 리셋
+  };
+
+  // 단축 이동 항목 추가
+  const addQuickNavItem = (name: string, targetId: string, targetType: 'memo' | 'category') => {
+    const newItem: QuickNavItem = {
+      id: Date.now().toString(),
+      name,
+      targetId,
+      targetType,
+      pageId: currentPageId
+    };
+    setQuickNavItems(prev => [...prev, newItem]);
+  };
+
+  // 단축 이동 항목 삭제
+  const deleteQuickNavItem = (itemId: string) => {
+    setQuickNavItems(prev => prev.filter(item => item.id !== itemId));
+  };
+
+  // 단축 이동 실행 - 대상으로 이동하고 필요 시 페이지도 전환
+  const executeQuickNav = (item: QuickNavItem) => {
+    // 페이지가 다르면 페이지 전환
+    if (item.pageId !== currentPageId) {
+      setCurrentPageId(item.pageId);
+      // 페이지 전환 후 약간의 딜레이를 두고 이동 (상태 업데이트 대기)
+      setTimeout(() => {
+        if (item.targetType === 'memo') {
+          handleNavigateToMemo(item.targetId);
+        } else {
+          handleNavigateToCategory(item.targetId);
+        }
+      }, 100);
+    } else {
+      // 같은 페이지면 바로 이동
+      if (item.targetType === 'memo') {
+        handleNavigateToMemo(item.targetId);
+      } else {
+        handleNavigateToCategory(item.targetId);
+      }
+    }
+  };
+
   return (
     <div style={{
       display: 'flex',
@@ -2834,6 +2971,12 @@ const App: React.FC = () => {
         }}
         onCategoryPositionDragEnd={handleCategoryPositionDragEnd}
         onClearCategoryCache={clearCategoryCache}
+        canvasOffset={canvasOffset}
+        setCanvasOffset={setCanvasOffset}
+        canvasScale={canvasScale}
+        setCanvasScale={setCanvasScale}
+        onDeleteMemoById={deleteMemoById}
+        onAddQuickNav={addQuickNavItem}
       />
 
       {/* 접기/펼치기 버튼 (오른쪽) */}

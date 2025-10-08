@@ -1303,33 +1303,25 @@ const RightPanel: React.FC<RightPanelProps> = ({
               </h4>
 
               <div style={{ paddingLeft: '20px' }}>
-                {selectedCategory.children && selectedCategory.children.length > 0 ? (
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px'
-                  }}>
-                    {selectedCategory.children.map(childId => {
-                      const childCategory = currentPage?.categories?.find(c => c.id === childId);
-                      const childMemo = currentPage?.memos.find(m => m.id === childId);
-                      const childItem = childCategory || childMemo;
+                {(() => {
+                  const childCategories = selectedCategory.children
+                    ?.map(childId => currentPage?.categories?.find(c => c.id === childId))
+                    .filter(Boolean) as CategoryBlock[] | undefined;
 
-                      if (!childItem) return null;
-
-                      return (
+                  return childCategories && childCategories.length > 0 ? (
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}>
+                      {childCategories.map(childCategory => (
                         <div
-                          key={childId}
-                          onClick={() => {
-                            if (childMemo) {
-                              onFocusMemo(childId);
-                            } else if (childCategory) {
-                              onCategorySelect(childId);
-                            }
-                          }}
+                          key={childCategory.id}
+                          onClick={() => onCategorySelect(childCategory.id)}
                           style={{
                             padding: '8px 12px',
-                            backgroundColor: childMemo ? '#f0f9ff' : '#fff3e0',
-                            border: `1px solid ${childMemo ? '#bae6fd' : '#ffcc02'}`,
+                            backgroundColor: '#fff3e0',
+                            border: '1px solid #ffcc02',
                             borderRadius: '6px',
                             cursor: 'pointer',
                             fontSize: '14px',
@@ -1337,24 +1329,84 @@ const RightPanel: React.FC<RightPanelProps> = ({
                           }}
                         >
                           <div style={{ fontWeight: '500' }}>
-                            {childMemo ? '📝 ' : ''}{childItem.title}
+                            📁 {childCategory.title}
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div style={{
-                    padding: '16px',
-                    textAlign: 'center',
-                    color: '#6b7280',
-                    fontSize: '14px',
-                    border: '1px dashed #d1d5db',
-                    borderRadius: '6px'
-                  }}>
-                    하위 아이템이 없습니다
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{
+                      padding: '16px',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '14px',
+                      border: '1px dashed #d1d5db',
+                      borderRadius: '6px'
+                    }}>
+                      하위 카테고리가 없습니다
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* 하위 메모 */}
+            <div style={{ marginBottom: '16px' }}>
+              <h4 style={{
+                fontSize: '16px',
+                fontWeight: '600',
+                color: '#1f2937',
+                marginBottom: '12px',
+                paddingLeft: '20px'
+              }}>
+                하위 메모
+              </h4>
+
+              <div style={{ paddingLeft: '20px' }}>
+                {(() => {
+                  const childMemos = selectedCategory.children
+                    ?.map(childId => currentPage?.memos.find(m => m.id === childId))
+                    .filter(Boolean) as MemoBlock[] | undefined;
+
+                  return childMemos && childMemos.length > 0 ? (
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}>
+                      {childMemos.map(childMemo => (
+                        <div
+                          key={childMemo.id}
+                          onClick={() => onFocusMemo(childMemo.id)}
+                          style={{
+                            padding: '8px 12px',
+                            backgroundColor: '#f0f9ff',
+                            border: '1px solid #bae6fd',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <div style={{ fontWeight: '500' }}>
+                            📝 {childMemo.title}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{
+                      padding: '16px',
+                      textAlign: 'center',
+                      color: '#6b7280',
+                      fontSize: '14px',
+                      border: '1px dashed #d1d5db',
+                      borderRadius: '6px'
+                    }}>
+                      하위 메모가 없습니다
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>
