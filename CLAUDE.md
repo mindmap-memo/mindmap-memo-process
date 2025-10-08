@@ -134,29 +134,35 @@ The application includes a sophisticated table system designed for business proc
 
 ### Collision Detection System
 
-The application implements a sophisticated collision detection system for category areas:
+The application implements a sophisticated collision detection system using unified collision utility functions:
 
-- **Real-time Collision**: During category drag, collisions are detected and resolved in real-time using priority-based iterative collision resolution
-- **Priority System**: Dragged category has highest priority (0); collided categories get pushed away based on priority hierarchy
-- **Iterative Resolution**: Collision loop runs up to 10 iterations to handle chain reactions when one category pushes another
-- **Memo Position Tracking**: Critical fix (App.tsx:1735, 1870-1882) - when a category is pushed during collision, its child memos are also updated in the same iteration to prevent infinite loops
-- **Area Calculation**: `calculateCategoryArea` uses a temporary page object with updated memo positions during collision iterations (App.tsx:1776-1779)
-- **Directional Pushing**: Uses frame delta to determine main movement direction (horizontal/vertical) and pushes categories in that direction only
-- **Overlap-Based Movement**: Categories are pushed by exactly the overlapping distance, no more, no less
-- **Cache Clearing**: Category area cache is cleared on drag end (App.tsx:115, Canvas.tsx:779-783, 955-961) to allow areas to naturally shrink/expand based on current memo positions
+- **Unified Collision Logic**: `resolveAreaCollisions` in `utils/collisionUtils.ts` handles all category-category collision detection
+- **Priority-Based System**: Moving category has highest priority (0); other categories pushed based on priority hierarchy
+- **Iterative Resolution**: Runs up to 10 iterations to handle chain reactions when one category pushes another
+- **Child Element Movement**: When category is pushed, all child memos AND child categories move together recursively (collisionUtils.ts:127-143)
+- **Parent Exclusion**: Categories with `parentId` are never pushed (move with parent only)
+- **Overlap-Based Pushing**: Categories pushed by exactly the overlapping distance in shortest direction
+- **Cache Management**:
+  - `draggedCategoryAreas` caches area size during normal drag to prevent recalculation
+  - `dragStartMemoPositions` and `dragStartCategoryPositions` store original positions for Shift drag restoration
+  - All caches cleared on drag end via `clearCategoryCache` (App.tsx:121-129)
+- **Memo-Area Collision**: Moving category areas also push parentless memo blocks (collisionUtils.ts:132-193)
 
 ### Shift+Drag Parent-Child System
 
 The application implements Shift+drag functionality for adding/removing memos and categories to/from category hierarchies:
 
 - **Shift Key Detection**: Global keyboard event listeners track Shift key state (App.tsx:197-220)
-- **Collision Bypass**: When Shift is pressed, both memo-area collision (`MemoBlock.tsx:388`) and category-area collision (`App.tsx:1560-1580`) are disabled
+- **Dynamic Mode Switching**: Shift key can be pressed before or during drag; mode switches dynamically (Canvas.tsx:843-886)
+- **Visual Movement During Drag**: During Shift+drag, categories and all child elements move together visually through actual position updates
+- **Position Restoration on Drop**: On drop, all positions are restored to original locations using `dragStartMemoPositions` and `dragStartCategoryPositions` refs (App.tsx:1340-1402)
+- **Parent-Child Update Only**: Shift drop only changes `parentId` relationships, not positions (App.tsx:1344)
+- **Cache Management**: All caches (`draggedCategoryAreas`, `dragStartMemoPositions`, `dragStartCategoryPositions`) are cleared after Shift drop (App.tsx:1416, Canvas.tsx:935)
 - **Visual Hints**: Shows "💡 Shift를 누르면 카테고리에 추가" hint when dragging without Shift; green border and "+" icon when Shift is pressed
 - **Area Freezing**: During Shift+drag, category areas are cached (`shiftDragAreaCache`) to prevent size changes as dragged items move
-- **Memo Parent-Child**: `handleShiftDrop` (App.tsx:1266-1377) handles adding/removing memos to/from categories based on overlap with frozen area bounds
-- **Category Parent-Child**: `handleShiftDropCategory` (App.tsx:1152-1263) handles adding/removing categories to/from other categories
-- **Frozen Area Overlap**: Uses cached area bounds to ensure accurate overlap detection when area is frozen
-- **Auto-Expand**: Target categories automatically expand when items are added to them
+- **Memo Parent-Child**: `handleShiftDrop` handles adding/removing memos to/from categories based on overlap with frozen area bounds
+- **Category Parent-Child**: `handleShiftDropCategory` handles adding/removing categories to/from other categories
+- **Auto-Expand**: Target categories automatically expand when items are added to them (only on add, not on remove)
 - **Excluding Dragged Item**: Area calculations exclude the currently dragged item to prevent false overlaps (`pageWithoutDraggingMemo`, `pageWithoutDraggingCategory`)
 
 ### Table System Architecture

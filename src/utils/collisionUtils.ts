@@ -118,6 +118,24 @@ export function resolveAreaCollisions(
             : memo
         );
 
+        // 하위 카테고리들도 함께 이동 (재귀적으로 모든 하위 카테고리 이동)
+        const moveChildCategories = (parentId: string, pushX: number, pushY: number) => {
+          for (let j = 0; j < newCategories.length; j++) {
+            if (newCategories[j].parentId === parentId) {
+              newCategories[j] = {
+                ...newCategories[j],
+                position: {
+                  x: newCategories[j].position.x + pushX,
+                  y: newCategories[j].position.y + pushY
+                }
+              };
+              // 재귀적으로 하위의 하위 카테고리도 이동
+              moveChildCategories(newCategories[j].id, pushX, pushY);
+            }
+          }
+        };
+        moveChildCategories(currentCat.id, totalPushX, totalPushY);
+
         // 이번 iteration에서 처리 완료 표시
         processedInThisIteration.add(currentCat.id);
       }

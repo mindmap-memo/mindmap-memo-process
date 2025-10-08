@@ -63,6 +63,7 @@ interface CanvasProps {
   onClearCategoryCache?: (categoryId: string) => void;
   isShiftPressed?: boolean;
   shiftDragAreaCacheRef?: React.MutableRefObject<{[categoryId: string]: any}>;
+  onShiftDropCategory?: (category: CategoryBlock, position: { x: number; y: number }) => void;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -122,7 +123,8 @@ const Canvas: React.FC<CanvasProps> = ({
   onCategoryPositionDragEnd,
   onClearCategoryCache,
   isShiftPressed = false,
-  shiftDragAreaCacheRef
+  shiftDragAreaCacheRef,
+  onShiftDropCategory
 }) => {
   const [isPanning, setIsPanning] = React.useState(false);
   const [panStart, setPanStart] = React.useState({ x: 0, y: 0 });
@@ -154,6 +156,21 @@ const Canvas: React.FC<CanvasProps> = ({
 
   // 드래그 중 상태 추적
   const [isDraggingCategoryArea, setIsDraggingCategoryArea] = React.useState<string | null>(null);
+
+  // Shift 드래그 중 드래그되는 카테고리 ID와 오프셋
+  const [shiftDragInfo, setShiftDragInfo] = React.useState<{categoryId: string, offset: {x: number, y: number}} | null>(null);
+
+  // 카테고리가 다른 카테고리의 하위인지 확인
+  const isDescendantOf = (categoryId: string, ancestorId: string): boolean => {
+    if (!currentPage?.categories) return false;
+
+    let current = currentPage.categories.find(c => c.id === categoryId);
+    while (current?.parentId) {
+      if (current.parentId === ancestorId) return true;
+      current = currentPage.categories.find(c => c.id === current!.parentId);
+    }
+    return false;
+  };
 
   // 메모 위치 변경 시 영역 업데이트 (카테고리 위치는 제외)
   React.useEffect(() => {
@@ -665,9 +682,30 @@ const Canvas: React.FC<CanvasProps> = ({
         height: cached.area.height, // 캐시된 크기 유지
         color: cached.area.color
       };
-    } else if (isDraggingMemo && isShiftPressed && shiftDragAreaCache.current[category.id]) {
-      // Shift + 메모 드래그: 캐시된 영역 사용 (영역 크기 고정)
-      area = shiftDragAreaCache.current[category.id];
+    } else if (isShiftPressed && shiftDragAreaCache.current[category.id]) {
+      // Shift 드래그 중: 캐시된 영역의 크기 사용, 위치는 임시 오프셋 적용
+      const cachedArea = shiftDragAreaCache.current[category.id];
+
+      // Shift 드래그 중이고 현재 카테고리가 드래그 중이거나 그 하위 항목이면 오프셋 적용
+      let currentPosition = category.position;
+      if (shiftDragInfo && (shiftDragInfo.categoryId === category.id || isDescendantOf(category.id, shiftDragInfo.categoryId))) {
+        currentPosition = {
+          x: category.position.x + shiftDragInfo.offset.x,
+          y: category.position.y + shiftDragInfo.offset.y
+        };
+      }
+
+      // 캐시된 영역이 카테고리 블록 기준으로 얼마나 떨어져 있는지 계산
+      const offsetX = cachedArea.x - (category.position.x - 20); // padding 20 고려
+      const offsetY = cachedArea.y - (category.position.y - 20);
+
+      area = {
+        x: currentPosition.x - 20 + offsetX,
+        y: currentPosition.y - 20 + offsetY,
+        width: cachedArea.width,   // 캐시된 크기 유지
+        height: cachedArea.height, // 캐시된 크기 유지
+        color: cachedArea.color
+      };
     } else {
       // 캐시된 영역이 없으면 동적 계산
       area = calculateCategoryAreaWithColor(category);
@@ -686,8 +724,8 @@ const Canvas: React.FC<CanvasProps> = ({
         };
       }
 
-      // Shift 드래그 중이면 계산된 영역을 캐시에 저장
-      if (isDraggingMemo && isShiftPressed) {
+      // Shift 드래그 중이면 계산된 영역을 캐시에 저장 (메모 또는 카테고리 드래그)
+      if (isShiftPressed && (isDraggingMemo || isDraggingCategory)) {
         shiftDragAreaCache.current[category.id] = area;
       }
     }
@@ -732,14 +770,18 @@ const Canvas: React.FC<CanvasProps> = ({
     // 카테고리 이름 라벨은 항상 표시 (접어도 보임) - 마우스 드래그 사용
     // 하위 카테고리는 항상 라벨 표시, 최상위 카테고리는 자식 있을 때만
     if (hasChildren || isChildCategory) {
+      // 라벨 위치는 영역 위치 또는 카테고리 위치 사용 (영역에 이미 offset이 적용되어 있음)
+      const labelX = area?.x || category.position.x;
+      const labelY = area?.y || category.position.y;
+
       areas.push(
         <div
           key={`label-${category.id}`}
           draggable={false}
           style={{
             position: 'absolute',
-            top: `${area?.y || category.position.y}px`,
-            left: `${area?.x || category.position.x}px`,
+            top: `${labelY}px`,
+            left: `${labelX}px`,
             backgroundColor: '#8b5cf6',
             color: 'white',
             padding: '6px 12px',
@@ -760,55 +802,145 @@ const Canvas: React.FC<CanvasProps> = ({
           }}
           onMouseDown={(e) => {
             if (e.button === 0) {
-              // 카테고리 라벨 드래그를 위한 임시 상태 설정
-
-              // 드래그 시작 - 캐시가 없을 때만 영역 크기 저장
+              // 드래그 시작
               setIsDraggingCategoryArea(category.id);
-              if (!draggedCategoryAreas[category.id]) {
-                const currentArea = area || calculateCategoryAreaWithColor(category);
-                if (currentArea) {
-                  setDraggedCategoryAreas(prev => ({
-                    ...prev,
-                    [category.id]: {
-                      area: currentArea,
-                      originalPosition: { x: category.position.x, y: category.position.y }
-                    }
-                  }));
-                }
-              } else {
-              }
 
-              // 카테고리 전체를 이동하는 마우스 드래그 구현
               let startX = e.clientX;
               let startY = e.clientY;
               const originalCategoryPosition = { x: category.position.x, y: category.position.y };
+              let hasMoved = false;
+              let isShiftMode = isShiftPressed; // 초기 Shift 상태
+
+              // 초기 Shift 상태에 따라 캐시 설정
+              if (isShiftMode) {
+                // 모든 카테고리 영역 크기 캐싱 (Shift+드래그 중엔 모든 영역이 고정됨)
+                if (currentPage && shiftDragAreaCacheRef?.current && Object.keys(shiftDragAreaCacheRef.current).length === 0) {
+                  currentPage.categories?.forEach(cat => {
+                    if (cat.isExpanded) {
+                      const catArea = calculateCategoryAreaWithColor(cat);
+                      if (catArea) {
+                        shiftDragAreaCacheRef.current[cat.id] = catArea;
+                      }
+                    }
+                  });
+                }
+              } else {
+                // 일반 드래그: 캐시가 없을 때만 영역 크기 저장
+                if (!draggedCategoryAreas[category.id]) {
+                  const currentArea = area || calculateCategoryAreaWithColor(category);
+                  if (currentArea) {
+                    setDraggedCategoryAreas(prev => ({
+                      ...prev,
+                      [category.id]: {
+                        area: currentArea,
+                        originalPosition: { x: category.position.x, y: category.position.y }
+                      }
+                    }));
+                  }
+                }
+              }
 
               const handleMouseMove = (moveEvent: MouseEvent) => {
+                hasMoved = true;
+
+                // 드래그 중 Shift 키 상태 확인 (실시간으로 변경 가능)
+                const currentShiftState = moveEvent.shiftKey;
+
+                // Shift 모드가 변경되었을 때
+                if (currentShiftState !== isShiftMode) {
+                  isShiftMode = currentShiftState;
+
+                  if (isShiftMode) {
+                    // Shift 모드로 전환: 모든 영역 캐싱
+                    if (currentPage && shiftDragAreaCacheRef?.current && Object.keys(shiftDragAreaCacheRef.current).length === 0) {
+                      currentPage.categories?.forEach(cat => {
+                        if (cat.isExpanded) {
+                          const catArea = calculateCategoryAreaWithColor(cat);
+                          if (catArea) {
+                            shiftDragAreaCacheRef.current[cat.id] = catArea;
+                          }
+                        }
+                      });
+                    }
+                    // 일반 모드 캐시 제거
+                    setDraggedCategoryAreas(prev => {
+                      const newAreas = { ...prev };
+                      delete newAreas[category.id];
+                      return newAreas;
+                    });
+                  } else {
+                    // 일반 모드로 전환: 영역 캐싱
+                    if (!draggedCategoryAreas[category.id]) {
+                      const currentArea = area || calculateCategoryAreaWithColor(category);
+                      if (currentArea) {
+                        setDraggedCategoryAreas(prev => ({
+                          ...prev,
+                          [category.id]: {
+                            area: currentArea,
+                            originalPosition: { x: category.position.x, y: category.position.y }
+                          }
+                        }));
+                      }
+                    }
+                    // Shift 모드 캐시 제거
+                    if (shiftDragAreaCacheRef?.current) {
+                      shiftDragAreaCacheRef.current = {};
+                    }
+                  }
+                }
+
                 const deltaX = (moveEvent.clientX - startX) / canvasScale;
                 const deltaY = (moveEvent.clientY - startY) / canvasScale;
 
-                // 원래 카테고리 위치에서 delta만큼 이동
                 const newPosition = {
                   x: originalCategoryPosition.x + deltaX,
                   y: originalCategoryPosition.y + deltaY
                 };
 
-                // 카테고리 위치 업데이트 (누적이 아닌 절대 위치)
+                // Shift 모드든 일반 모드든 항상 위치 업데이트 (하위 요소들도 함께 이동)
                 onCategoryPositionChange(category.id, newPosition);
+
+                // Shift 모드일 때는 추가로 오프셋 저장
+                if (isShiftMode) {
+                  setShiftDragInfo({
+                    categoryId: category.id,
+                    offset: { x: deltaX, y: deltaY }
+                  });
+                } else {
+                  setShiftDragInfo(null);
+                }
               };
 
-              const handleMouseUp = () => {
+              const handleMouseUp = (upEvent: MouseEvent) => {
                 document.removeEventListener('mousemove', handleMouseMove);
                 document.removeEventListener('mouseup', handleMouseUp);
 
-                // 드래그 종료 - 캐시 제거
+                if (hasMoved && isShiftMode) {
+                  // Shift 모드였으면: drop 처리 (부모-자식 관계 변경)
+                  const deltaX = (upEvent.clientX - startX) / canvasScale;
+                  const deltaY = (upEvent.clientY - startY) / canvasScale;
+                  const finalPosition = {
+                    x: originalCategoryPosition.x + deltaX,
+                    y: originalCategoryPosition.y + deltaY
+                  };
+                  onShiftDropCategory?.(category, finalPosition);
+                }
+
+                // 드래그 종료 - 캐시 및 임시 위치 제거
                 setIsDraggingCategoryArea(null);
-                setDraggedCategoryAreas(prev => {
-                  const newAreas = { ...prev };
-                  delete newAreas[category.id];
-                  return newAreas;
-                });
-                onClearCategoryCache?.(category.id);
+                setShiftDragInfo(null); // Shift 드래그 정보 클리어
+                if (isShiftMode && shiftDragAreaCacheRef?.current) {
+                  shiftDragAreaCacheRef.current = {};
+                  // Shift 모드에서도 캐시 클리어 필요
+                  onClearCategoryCache?.(category.id);
+                } else {
+                  setDraggedCategoryAreas(prev => {
+                    const newAreas = { ...prev };
+                    delete newAreas[category.id];
+                    return newAreas;
+                  });
+                  onClearCategoryCache?.(category.id);
+                }
               };
 
               document.addEventListener('mousemove', handleMouseMove);
@@ -955,8 +1087,6 @@ const Canvas: React.FC<CanvasProps> = ({
             {childrenElements}
           </CategoryBlockComponent>
         )}
-        {/* 하위 메모와 카테고리 렌더링 */}
-        {childrenElements}
       </>
     );
   };

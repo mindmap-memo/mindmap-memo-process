@@ -1268,14 +1268,26 @@ const App: React.FC = () => {
                bounds1.top - margin > bounds2.bottom);
     };
 
-    // 드래그 중인 카테고리를 제외한 페이지 데이터 생성
-    const pageWithoutDraggingCategory = {
-      ...currentPage,
-      categories: (currentPage.categories || []).filter(c => c.id !== draggedCategory.id)
+    // 드래그 중인 카테고리와 그 모든 하위 카테고리들을 제외한 페이지 데이터 생성
+    const getAllDescendantIds = (categoryId: string): string[] => {
+      const descendants: string[] = [categoryId];
+      const children = (currentPage.categories || []).filter(c => c.parentId === categoryId);
+      children.forEach(child => {
+        descendants.push(...getAllDescendantIds(child.id));
+      });
+      return descendants;
     };
 
-    // 타겟 카테고리 찾기 (자기 자신과 자신의 하위는 제외)
+    const excludedIds = getAllDescendantIds(draggedCategory.id);
+    const pageWithoutDraggingCategory = {
+      ...currentPage,
+      categories: (currentPage.categories || []).filter(c => !excludedIds.includes(c.id)),
+      memos: currentPage.memos.filter(m => !excludedIds.includes(m.parentId || ''))
+    };
+
+    // 타겟 카테고리 찾기 (자기 자신과 자신의 하위는 이미 pageWithoutDraggingCategory에서 제외됨)
     const targetCategory = pageWithoutDraggingCategory.categories?.find(category => {
+
       // 1. 카테고리 블록과의 겹침 체크
       const catWidth = category.size?.width || 200;
       const catHeight = category.size?.height || 80;
@@ -1325,25 +1337,83 @@ const App: React.FC = () => {
     if (parentChanged) {
       setPages(pages.map(p => {
         if (p.id === currentPageId) {
+          // 원래 위치 정보 가져오기 (드래그 시작 시 저장된 위치)
+          const originalMemoPositions = dragStartMemoPositions.current.get(draggedCategory.id);
+          const originalCategoryPositions = dragStartCategoryPositions.current.get(draggedCategory.id);
+
+          // 부모 카테고리의 children 업데이트
+          let updatedCategories = (p.categories || []).map(category => {
+            // 드래그된 카테고리의 parentId만 변경하고 위치는 원래대로
+            if (category.id === draggedCategory.id) {
+              const originalPos = draggedCategoryAreas[draggedCategory.id]?.originalPosition;
+              return {
+                ...category,
+                parentId: newParentId,
+                position: originalPos || category.position  // 원래 위치로 복원
+              };
+            }
+
+            // 하위 카테고리들도 원래 위치로 복원
+            if (originalCategoryPositions) {
+              const originalPos = originalCategoryPositions.get(category.id);
+              if (originalPos) {
+                category = { ...category, position: originalPos };
+              }
+            }
+
+            // 이전 부모에서 제거
+            if (category.id === draggedCategory.parentId) {
+              return {
+                ...category,
+                children: (category.children || []).filter(id => id !== draggedCategory.id)
+              };
+            }
+
+            // 새 부모에 추가
+            if (category.id === newParentId) {
+              const currentChildren = category.children || [];
+              if (!currentChildren.includes(draggedCategory.id)) {
+                return {
+                  ...category,
+                  children: [...currentChildren, draggedCategory.id]
+                };
+              }
+            }
+
+            return category;
+          });
+
+          // 하위 메모들도 원래 위치로 복원
+          let updatedMemos = p.memos;
+          if (originalMemoPositions) {
+            updatedMemos = p.memos.map(memo => {
+              const originalPos = originalMemoPositions.get(memo.id);
+              if (originalPos) {
+                return { ...memo, position: originalPos };
+              }
+              return memo;
+            });
+          }
+
           return {
             ...p,
-            categories: (p.categories || []).map(category =>
-              category.id === draggedCategory.id
-                ? { ...category, position, parentId: newParentId }
-                : category
-            )
+            categories: updatedCategories,
+            memos: updatedMemos
           };
         }
         return p;
       }));
 
-      // 카테고리로 들어갈 때만 펼침
-      if (targetCategory && !targetCategory.isExpanded) {
+      // Shift 드래그로 카테고리에 넣을 때만 펼침 (빼낼 때는 펼치지 않음)
+      if (targetCategory && newParentId && !targetCategory.isExpanded) {
         toggleCategoryExpanded(targetCategory.id);
       }
 
       const targetName = targetCategory ? `카테고리 ${targetCategory.title}` : '최상위';
-      saveCanvasState('move_to_category', `Shift 드래그로 카테고리 이동: ${draggedCategory.title} → ${targetName}`);
+      saveCanvasState('move_to_category', `Shift 드래그로 카테고리 이동: ${draggedCategory.title} → ${targetName} (모든 하위 항목 포함)`);
+
+      // 드롭 후 캐시 클리어 (중요!)
+      clearCategoryCache(draggedCategory.id);
     } else {
       // 같은 카테고리 내에서 위치만 변경
       setPages(pages.map(p => {
@@ -1438,20 +1508,46 @@ const App: React.FC = () => {
     if (parentChanged) {
       setPages(pages.map(p => {
         if (p.id === currentPageId) {
+          // 메모의 parentId 업데이트
+          const updatedMemos = p.memos.map(memo =>
+            memo.id === draggedMemo.id
+              ? { ...memo, position, parentId: newParentId }
+              : memo
+          );
+
+          // 카테고리의 children 배열 업데이트
+          const updatedCategories = (p.categories || []).map(category => {
+            // 이전 부모에서 제거
+            if (category.id === draggedMemo.parentId) {
+              return {
+                ...category,
+                children: (category.children || []).filter(id => id !== draggedMemo.id)
+              };
+            }
+            // 새 부모에 추가
+            if (category.id === newParentId) {
+              const currentChildren = category.children || [];
+              if (!currentChildren.includes(draggedMemo.id)) {
+                return {
+                  ...category,
+                  children: [...currentChildren, draggedMemo.id]
+                };
+              }
+            }
+            return category;
+          });
+
           return {
             ...p,
-            memos: p.memos.map(memo =>
-              memo.id === draggedMemo.id
-                ? { ...memo, position, parentId: newParentId }
-                : memo
-            )
+            memos: updatedMemos,
+            categories: updatedCategories
           };
         }
         return p;
       }));
 
-      // 카테고리로 들어갈 때만 펼침
-      if (targetCategory && !targetCategory.isExpanded) {
+      // Shift 드래그로 카테고리에 넣을 때만 펼침 (빼낼 때는 펼치지 않음)
+      if (targetCategory && newParentId && !targetCategory.isExpanded) {
         toggleCategoryExpanded(targetCategory.id);
       }
 
@@ -1473,6 +1569,18 @@ const App: React.FC = () => {
         return p;
       }));
     }
+  };
+
+  // 카테고리 영역 Shift+드래그 drop 처리 (Canvas에서 호출)
+  const handleCategoryAreaShiftDrop = (category: CategoryBlock, position: { x: number; y: number }) => {
+    const currentPage = pages.find(p => p.id === currentPageId);
+    if (!currentPage) return;
+
+    // 캐시된 영역이 있으면 사용
+    const cachedAreas = shiftDragAreaCache.current;
+
+    // handleShiftDropCategory 재사용
+    handleShiftDropCategory(category, position, currentPage, cachedAreas);
   };
 
   // 카테고리 드래그 완료 시 카테고리 블록 겹침 감지 (Shift 드래그)
@@ -2700,6 +2808,7 @@ const App: React.FC = () => {
         }}
         isShiftPressed={isShiftPressed}
         shiftDragAreaCacheRef={shiftDragAreaCache}
+        onShiftDropCategory={handleCategoryAreaShiftDrop}
         isDraggingCategory={isDraggingCategory}
         onCategoryDragStart={() => {
           setIsDraggingCategory(true);
