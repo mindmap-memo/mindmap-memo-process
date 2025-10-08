@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { CategoryBlock } from '../types';
+import ContextMenu from './ContextMenu';
+import QuickNavModal from './QuickNavModal';
 
 interface CategoryBlockProps {
   category: CategoryBlock;
@@ -28,6 +30,7 @@ interface CategoryBlockProps {
   onMoveToCategory?: (itemId: string, categoryId: string | null) => void;
   canvasScale?: number;
   canvasOffset?: { x: number; y: number };
+  onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
 }
 
 const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
@@ -56,12 +59,15 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   onSizeChange,
   onMoveToCategory,
   canvasScale = 1,
-  canvasOffset = { x: 0, y: 0 }
+  canvasOffset = { x: 0, y: 0 },
+  onAddQuickNav
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(category.title);
   const [isHovered, setIsHovered] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [showQuickNavModal, setShowQuickNavModal] = useState(false);
 
   // MemoBlock과 동일한 드래그 시스템 사용
   const [isDraggingPosition, setIsDraggingPosition] = useState(false);

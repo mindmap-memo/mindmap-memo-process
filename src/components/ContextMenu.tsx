@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 
 interface ContextMenuProps {
   position: { x: number; y: number } | null;
@@ -21,7 +22,8 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
     y: Math.min(position.y, window.innerHeight - 100)
   };
 
-  return (
+  // Portal을 사용하여 document.body에 직접 렌더링 (캔버스 transform 영향 제거)
+  return ReactDOM.createPortal(
     <>
       {/* 배경 클릭 시 닫기 */}
       <div
@@ -115,7 +117,8 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
           <span>삭제</span>
         </button>
       </div>
-    </>
+    </>,
+    document.body
   );
 };
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 
 interface QuickNavModalProps {
   isOpen: boolean;
@@ -32,7 +33,8 @@ const QuickNavModal: React.FC<QuickNavModalProps> = ({
     }
   };
 
-  return (
+  // Portal을 사용하여 document.body에 직접 렌더링
+  return ReactDOM.createPortal(
     <div
       style={{
         position: 'fixed',
@@ -130,7 +132,8 @@ const QuickNavModal: React.FC<QuickNavModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

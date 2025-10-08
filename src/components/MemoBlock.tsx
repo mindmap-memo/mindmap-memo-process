@@ -203,7 +203,6 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [showQuickNavModal, setShowQuickNavModal] = useState(false);
-  const [quickNavName, setQuickNavName] = useState('');
   const [isConnectionDragging, setIsConnectionDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragMoved, setDragMoved] = useState(false);
@@ -287,10 +286,9 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   }, [contextMenu]);
 
   // 단축 이동 추가 확인
-  const handleQuickNavConfirm = () => {
-    if (quickNavName.trim() && onAddQuickNav) {
-      onAddQuickNav(quickNavName.trim(), memo.id, 'memo');
-      setQuickNavName('');
+  const handleQuickNavConfirm = (name: string) => {
+    if (name.trim() && onAddQuickNav) {
+      onAddQuickNav(name.trim(), memo.id, 'memo');
       setShowQuickNavModal(false);
     }
   };
@@ -977,10 +975,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         isOpen={showQuickNavModal}
         onClose={() => {
           setShowQuickNavModal(false);
-          setQuickNavName('');
         }}
         onConfirm={handleQuickNavConfirm}
-        initialName={quickNavName}
       />
     </div>
   );

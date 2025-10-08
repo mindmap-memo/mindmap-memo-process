@@ -120,6 +120,7 @@ const App: React.FC = () => {
   const [quickNavItems, setQuickNavItems] = useState<QuickNavItem[]>(() =>
     loadFromStorage(STORAGE_KEYS.QUICK_NAV_ITEMS, [])
   );
+  const [showQuickNavPanel, setShowQuickNavPanel] = useState(false);
 
   // 드래그 시작 시 메모들의 원래 위치 저장
   const dragStartMemoPositions = React.useRef<Map<string, Map<string, {x: number, y: number}>>>(new Map());
@@ -3000,6 +3001,228 @@ const App: React.FC = () => {
       >
         {rightPanelOpen ? '▶' : '◀'}
       </button>
+
+      {/* 단축 이동 버튼 */}
+      <button
+        onClick={() => setShowQuickNavPanel(!showQuickNavPanel)}
+        style={{
+          position: 'fixed',
+          top: '20px',
+          right: rightPanelOpen ? `${rightPanelWidth + 20}px` : '20px',
+          zIndex: 1001,
+          backgroundColor: '#8b5cf6',
+          color: 'white',
+          border: 'none',
+          borderRadius: '8px',
+          padding: '10px 16px',
+          cursor: 'pointer',
+          boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)',
+          fontSize: '14px',
+          fontWeight: '600',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          transition: 'all 0.2s ease'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = '#7c3aed';
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.boxShadow = '0 6px 16px rgba(139, 92, 246, 0.4)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = '#8b5cf6';
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
+        }}
+      >
+        <span>⭐</span>
+        <span>단축 이동</span>
+        {quickNavItems.length > 0 && (
+          <span style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.3)',
+            borderRadius: '10px',
+            padding: '2px 8px',
+            fontSize: '12px',
+            fontWeight: '700'
+          }}>
+            {quickNavItems.length}
+          </span>
+        )}
+      </button>
+
+      {/* 단축 이동 패널 */}
+      {showQuickNavPanel && (
+        <>
+          {/* 배경 클릭 시 닫기 */}
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 1000
+            }}
+            onClick={() => setShowQuickNavPanel(false)}
+          />
+
+          {/* 패널 */}
+          <div
+            style={{
+              position: 'fixed',
+              top: '70px',
+              right: rightPanelOpen ? `${rightPanelWidth + 20}px` : '20px',
+              backgroundColor: 'white',
+              border: '1px solid #e5e7eb',
+              borderRadius: '12px',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+              zIndex: 1001,
+              minWidth: '320px',
+              maxWidth: '400px',
+              maxHeight: '60vh',
+              overflowY: 'auto',
+              padding: '16px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              fontSize: '16px',
+              fontWeight: '700',
+              color: '#1f2937',
+              marginBottom: '16px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <span>단축 이동 목록</span>
+              <button
+                onClick={() => setShowQuickNavPanel(false)}
+                style={{
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  color: '#9ca3af',
+                  cursor: 'pointer',
+                  fontSize: '20px',
+                  padding: '0',
+                  width: '24px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {quickNavItems.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '32px 16px',
+                color: '#9ca3af',
+                fontSize: '14px'
+              }}>
+                등록된 단축 이동이 없습니다.<br />
+                메모나 카테고리를 우클릭하여<br />
+                단축 이동을 추가하세요.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {quickNavItems.map(item => {
+                  const isMemo = item.targetType === 'memo';
+                  const targetPage = pages.find(p => p.id === item.pageId);
+                  const isCurrentPage = item.pageId === currentPageId;
+
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '12px',
+                        backgroundColor: isMemo ? '#ffffff' : '#8b5cf6',
+                        border: isMemo ? '2px solid #8b5cf6' : 'none',
+                        color: isMemo ? '#1f2937' : '#ffffff',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        position: 'relative'
+                      }}
+                      onClick={() => {
+                        executeQuickNav(item);
+                        setShowQuickNavPanel(false);
+                      }}
+                      onMouseEnter={(e) => {
+                        if (isMemo) {
+                          e.currentTarget.style.backgroundColor = '#f3f4f6';
+                        } else {
+                          e.currentTarget.style.backgroundColor = '#7c3aed';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (isMemo) {
+                          e.currentTarget.style.backgroundColor = '#ffffff';
+                        } else {
+                          e.currentTarget.style.backgroundColor = '#8b5cf6';
+                        }
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                          {item.name}
+                        </div>
+                        <div style={{
+                          fontSize: '12px',
+                          opacity: 0.7,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          <span>{isMemo ? '📝 메모' : '📁 카테고리'}</span>
+                          {!isCurrentPage && targetPage && (
+                            <span>• {targetPage.name}</span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteQuickNavItem(item.id);
+                        }}
+                        style={{
+                          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                          color: '#ef4444',
+                          border: 'none',
+                          borderRadius: '6px',
+                          width: '28px',
+                          height: '28px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '16px',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#ef4444';
+                          e.currentTarget.style.color = 'white';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                          e.currentTarget.style.color = '#ef4444';
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* 오른쪽 패널 */}
       {rightPanelOpen && (
