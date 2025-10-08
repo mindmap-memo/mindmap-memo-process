@@ -682,8 +682,13 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         <ContextMenu
           position={contextMenu}
           onClose={() => setContextMenu(null)}
-          onAddQuickNav={handleAddQuickNav}
-          onDelete={handleDelete}
+          onSetQuickNav={handleAddQuickNav}
+          onDelete={() => {
+            setContextMenu(null);
+            if (window.confirm(`카테고리 "${category.title}"를 삭제하시겠습니까? 하위 아이템들은 최상위로 이동됩니다.`)) {
+              onDelete(category.id);
+            }
+          }}
         />
       )}
 

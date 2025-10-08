@@ -727,14 +727,25 @@ const RightPanel: React.FC<RightPanelProps> = ({
           handleBlocksMove('down');
         }
       } else if ((event.key === 'z' || event.key === 'Z') && (event.ctrlKey || event.metaKey)) {
-        if (event.shiftKey) {
-          // Ctrl+Shift+Z: Redo
-          event.preventDefault();
-          handleRedo();
+        // RightPanel이 포커스되어 있을 때만 블록 Undo/Redo 처리
+        // 그렇지 않으면 Canvas의 Undo/Redo가 작동하도록 통과
+        const target = event.target as HTMLElement;
+        const isInRightPanel = target.closest('[data-right-panel="true"]');
+
+        if (isInRightPanel) {
+          console.log('RightPanel: Handling Ctrl+Z in RightPanel');
+          if (event.shiftKey) {
+            // Ctrl+Shift+Z: Redo
+            event.preventDefault();
+            handleRedo();
+          } else {
+            // Ctrl+Z: Undo
+            event.preventDefault();
+            handleUndo();
+          }
         } else {
-          // Ctrl+Z: Undo
-          event.preventDefault();
-          handleUndo();
+          console.log('RightPanel: Not in RightPanel, letting Ctrl+Z pass through');
+          // RightPanel 밖에서 발생한 이벤트는 통과
         }
       }
     };
@@ -913,8 +924,9 @@ const RightPanel: React.FC<RightPanelProps> = ({
   ];
 
   return (
-    <div 
+    <div
       ref={rightPanelRef}
+      data-right-panel="true"
       onClick={handleMemoAreaClick}
       style={{
         display: 'flex',

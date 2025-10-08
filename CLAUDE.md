@@ -81,6 +81,19 @@ The application implements a hierarchical category system for organizing memos a
 - **Category Operations**: Drag memos/categories onto category blocks to add as children; categories auto-expand and show semi-transparent areas
 - **Panel Management**: Collapsible panels with resize handles, fullscreen mode for right panel
 - **Multi-Selection**: Shift+click for memo selection, drag selection for content blocks, unified selection UI
+- **Quick Navigation**: Right-click memos/categories or category areas/labels to add to quick navigation list; floating button provides instant access to bookmarked items across pages
+
+### Undo/Redo System
+
+The application implements a comprehensive undo/redo system for canvas operations:
+
+- **Canvas History Tracking**: Tracks all memo and category operations including create, delete, move, resize, and relationship changes
+- **Keyboard Shortcuts**: Ctrl+Z (Undo) and Ctrl+Shift+Z (Redo) work throughout the application
+- **Scope Separation**: Canvas-level undo/redo (App.tsx) for memos/categories vs. block-level undo/redo (RightPanel.tsx) for content editing
+- **Smart Event Handling**: Canvas captures Ctrl+Z in capture phase but delegates to appropriate handler based on focus context
+- **Visual Feedback**: Undo/Redo buttons in Canvas toolbar show availability and provide one-click access
+- **History Storage**: Canvas actions stored with snapshots of page state for reliable restoration
+- **Auto-cleanup**: Deleted memos/categories automatically removed from quick navigation list
 
 ### Advanced Table System
 

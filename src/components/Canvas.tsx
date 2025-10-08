@@ -4,6 +4,8 @@ import { calculateCategoryArea } from '../utils/categoryAreaUtils';
 import MemoBlock from './MemoBlock';
 import CategoryBlockComponent from './CategoryBlock';
 import ImportanceFilter from './ImportanceFilter';
+import ContextMenu from './ContextMenu';
+import QuickNavModal from './QuickNavModal';
 
 interface CanvasProps {
   currentPage: Page | undefined;
@@ -177,6 +179,19 @@ const Canvas: React.FC<CanvasProps> = ({
 
   // Shift 드래그 중 드래그되는 카테고리 ID와 오프셋
   const [shiftDragInfo, setShiftDragInfo] = React.useState<{categoryId: string, offset: {x: number, y: number}} | null>(null);
+
+  // 카테고리 영역/라벨 컨텍스트 메뉴
+  const [areaContextMenu, setAreaContextMenu] = React.useState<{x: number, y: number, categoryId: string} | null>(null);
+  const [showAreaQuickNavModal, setShowAreaQuickNavModal] = React.useState<{categoryId: string, categoryName: string} | null>(null);
+
+  // 컨텍스트 메뉴 외부 클릭 시 닫기
+  React.useEffect(() => {
+    if (areaContextMenu) {
+      const handleClickOutside = () => setAreaContextMenu(null);
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [areaContextMenu]);
 
   // 카테고리가 다른 카테고리의 하위인지 확인
   const isDescendantOf = (categoryId: string, ancestorId: string): boolean => {
@@ -783,19 +798,8 @@ const Canvas: React.FC<CanvasProps> = ({
           onContextMenu={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            // 카테고리 영역 우클릭 시 해당 카테고리를 선택하고 컨텍스트 메뉴 표시
             onCategorySelect(category.id);
-            // CategoryBlock 컴포넌트에서 컨텍스트 메뉴를 표시하도록 이벤트 전달
-            const categoryElement = document.querySelector(`[data-category-id="${category.id}"]`);
-            if (categoryElement) {
-              const contextMenuEvent = new MouseEvent('contextmenu', {
-                bubbles: true,
-                cancelable: true,
-                clientX: e.clientX,
-                clientY: e.clientY
-              });
-              categoryElement.dispatchEvent(contextMenuEvent);
-            }
+            setAreaContextMenu({ x: e.clientX, y: e.clientY, categoryId: category.id });
           }}
         />
       );
@@ -838,19 +842,8 @@ const Canvas: React.FC<CanvasProps> = ({
           onContextMenu={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            // 카테고리 라벨 우클릭 시 해당 카테고리를 선택하고 컨텍스트 메뉴 표시
             onCategorySelect(category.id);
-            // CategoryBlock 컴포넌트에서 컨텍스트 메뉴를 표시하도록 이벤트 전달
-            const categoryElement = document.querySelector(`[data-category-id="${category.id}"]`);
-            if (categoryElement) {
-              const contextMenuEvent = new MouseEvent('contextmenu', {
-                bubbles: true,
-                cancelable: true,
-                clientX: e.clientX,
-                clientY: e.clientY
-              });
-              categoryElement.dispatchEvent(contextMenuEvent);
-            }
+            setAreaContextMenu({ x: e.clientX, y: e.clientY, categoryId: category.id });
           }}
           onMouseDown={(e) => {
             if (e.button === 0) {
@@ -1492,6 +1485,28 @@ const Canvas: React.FC<CanvasProps> = ({
   // 키보드 이벤트 처리
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      console.log('Canvas keydown:', e.key, e.code, e.ctrlKey, e.shiftKey);
+
+      // Ctrl+Z (Undo) / Ctrl+Shift+Z (Redo)
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+
+        if (e.shiftKey) {
+          // Ctrl+Shift+Z: Redo
+          console.log('Canvas: Calling onRedo');
+          if (canRedo) {
+            onRedo();
+          }
+        } else {
+          // Ctrl+Z: Undo
+          console.log('Canvas: Calling onUndo');
+          if (canUndo) {
+            onUndo();
+          }
+        }
+        return;
+      }
+
       if (e.code === 'Space' && !e.repeat && !isSpacePressed) {
         setIsSpacePressed(true);
         setCurrentTool('pan');
@@ -1544,10 +1559,10 @@ const Canvas: React.FC<CanvasProps> = ({
       document.removeEventListener('keydown', handleKeyDown, { capture: true } as any);
       document.removeEventListener('keyup', handleKeyUp, { capture: true } as any);
     };
-  }, [baseTool, isSpacePressed, isAltPressed, isMouseOverCanvas]);
+  }, [baseTool, isSpacePressed, isAltPressed, isMouseOverCanvas, isConnecting, onCancelConnection, onMemoSelect, canUndo, canRedo, onUndo, onRedo]);
 
   return (
-    <div 
+    <div
       data-canvas="true"
       tabIndex={0}
       style={{
@@ -1557,9 +1572,20 @@ const Canvas: React.FC<CanvasProps> = ({
         backgroundImage: 'radial-gradient(circle, #d1d5db 1px, transparent 1px)',
         backgroundSize: '20px 20px',
         backgroundColor: '#ffffff',
-        cursor: isPanning ? 'grabbing' : 
+        cursor: isPanning ? 'grabbing' :
                 (isSpacePressed || currentTool === 'pan') ? 'grab' :
                 currentTool === 'zoom' ? 'crosshair' : 'default'
+      }}
+      onContextMenu={(e) => {
+        // 캔버스 배경에서 우클릭 방지
+        const target = e.target as Element;
+        const isCanvasBackground = target.hasAttribute('data-canvas') ||
+                                  target.tagName === 'svg' ||
+                                  (target.tagName === 'DIV' && !target.closest('[data-memo-block="true"]') && !target.closest('[data-category-block="true"]'));
+
+        if (isCanvasBackground) {
+          e.preventDefault();
+        }
       }}
       onClick={(e) => {
         const target = e.target as Element;
@@ -1937,6 +1963,42 @@ const Canvas: React.FC<CanvasProps> = ({
         showGeneralContent={showGeneralContent}
         onToggleGeneralContent={onToggleGeneralContent}
       />
+
+      {/* 카테고리 영역/라벨 컨텍스트 메뉴 */}
+      {areaContextMenu && (
+        <ContextMenu
+          position={{ x: areaContextMenu.x, y: areaContextMenu.y }}
+          onClose={() => setAreaContextMenu(null)}
+          onSetQuickNav={() => {
+            const category = currentPage?.categories?.find(c => c.id === areaContextMenu.categoryId);
+            if (category) {
+              setShowAreaQuickNavModal({ categoryId: category.id, categoryName: category.title });
+            }
+            setAreaContextMenu(null);
+          }}
+          onDelete={() => {
+            if (window.confirm('카테고리를 삭제하시겠습니까?')) {
+              onDeleteCategory(areaContextMenu.categoryId);
+            }
+            setAreaContextMenu(null);
+          }}
+        />
+      )}
+
+      {/* 카테고리 영역/라벨 단축 이동 모달 */}
+      {showAreaQuickNavModal && (
+        <QuickNavModal
+          isOpen={true}
+          onClose={() => setShowAreaQuickNavModal(null)}
+          onConfirm={(name) => {
+            if (name.trim() && onAddQuickNav) {
+              onAddQuickNav(name.trim(), showAreaQuickNavModal.categoryId, 'category');
+            }
+            setShowAreaQuickNavModal(null);
+          }}
+          initialName={showAreaQuickNavModal.categoryName}
+        />
+      )}
     </div>
   );
 };

@@ -369,6 +369,7 @@ const App: React.FC = () => {
   const canRedo = canvasHistory.future.length > 0;
 
   const undoCanvasAction = React.useCallback(() => {
+    console.log('⬅️ undoCanvasAction called', { canUndo, historyLength: canvasHistory.past.length });
     if (!canUndo || !canvasHistory.present) return;
 
     const previousAction = canvasHistory.past[canvasHistory.past.length - 1];
@@ -395,6 +396,7 @@ const App: React.FC = () => {
   }, [canUndo, canvasHistory, currentPageId]);
 
   const redoCanvasAction = React.useCallback(() => {
+    console.log('➡️ redoCanvasAction called', { canRedo, futureLength: canvasHistory.future.length });
     if (!canRedo) return;
 
     const nextAction = canvasHistory.future[0];
@@ -430,9 +432,11 @@ const App: React.FC = () => {
 
       // Canvas undo/redo shortcuts
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        console.log('🔄 Undo triggered from keyboard');
         e.preventDefault();
         undoCanvasAction();
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
+        console.log('🔄 Redo triggered from keyboard');
         e.preventDefault();
         redoCanvasAction();
       }
@@ -1130,6 +1134,10 @@ const App: React.FC = () => {
   };
 
   const deleteCategory = (categoryId: string) => {
+    // 삭제된 카테고리의 제목 가져오기
+    const deletedCategory = pages.find(p => p.id === currentPageId)?.categories?.find(c => c.id === categoryId);
+    const categoryTitle = deletedCategory?.title || '카테고리';
+
     setPages(prev => prev.map(page => {
       if (page.id === currentPageId) {
         const categoryToDelete = (page.categories || []).find(c => c.id === categoryId);
@@ -1157,6 +1165,9 @@ const App: React.FC = () => {
 
     // 단축 이동 목록에서 삭제된 카테고리 제거
     setQuickNavItems(prev => prev.filter(item => item.targetId !== categoryId));
+
+    // 실행 취소를 위한 상태 저장
+    setTimeout(() => saveCanvasState('category_delete', `카테고리 삭제: ${categoryTitle}`), 0);
   };
 
   const toggleCategoryExpanded = (categoryId: string) => {
@@ -2334,6 +2345,10 @@ const App: React.FC = () => {
   const deleteMemoBlock = () => {
     if (!selectedMemoId) return;
 
+    // 삭제된 메모의 제목 가져오기
+    const deletedMemo = pages.find(p => p.id === currentPageId)?.memos.find(m => m.id === selectedMemoId);
+    const memoTitle = deletedMemo?.title || '메모';
+
     setPages(prev => prev.map(page =>
       page.id === currentPageId
         ? {
@@ -2357,10 +2372,23 @@ const App: React.FC = () => {
     setQuickNavItems(prev => prev.filter(item => item.targetId !== selectedMemoId));
 
     setSelectedMemoId(null);
+
+    // 실행 취소를 위한 상태 저장
+    setTimeout(() => saveCanvasState('memo_delete', `메모 삭제: ${memoTitle}`), 0);
   };
 
   // 특정 메모를 ID로 삭제하는 함수 (검색 결과에서 사용)
   const deleteMemoById = (memoId: string) => {
+    // 삭제된 메모의 제목 가져오기
+    let deletedMemoTitle = '메모';
+    for (const page of pages) {
+      const memo = page.memos.find(m => m.id === memoId);
+      if (memo) {
+        deletedMemoTitle = memo.title || '메모';
+        break;
+      }
+    }
+
     setPages(prev => prev.map(page => ({
       ...page,
       memos: page.memos
@@ -2383,12 +2411,18 @@ const App: React.FC = () => {
     if (selectedMemoId === memoId) {
       setSelectedMemoId(null);
     }
+
+    // 실행 취소를 위한 상태 저장
+    setTimeout(() => saveCanvasState('memo_delete', `메모 삭제: ${deletedMemoTitle}`), 0);
   };
 
   // 통합 삭제 함수 - 현재 선택된 아이템(메모 또는 카테고리) 삭제
   const deleteSelectedItem = () => {
     // 다중 선택된 항목들 삭제
     if (selectedMemoIds.length > 0 || selectedCategoryIds.length > 0) {
+      const memoCount = selectedMemoIds.length;
+      const categoryCount = selectedCategoryIds.length;
+
       setPages(prev => prev.map(page => {
         if (page.id !== currentPageId) return page;
 
@@ -2415,6 +2449,10 @@ const App: React.FC = () => {
       if (selectedCategoryIds.includes(selectedCategoryId || '')) {
         setSelectedCategoryId(null);
       }
+
+      // 실행 취소를 위한 상태 저장
+      const description = `다중 삭제: 메모 ${memoCount}개, 카테고리 ${categoryCount}개`;
+      setTimeout(() => saveCanvasState('bulk_delete', description), 0);
     }
     // 단일 선택 삭제
     else if (selectedMemoId) {
