@@ -300,16 +300,18 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     onDrop?.(e);
   };
 
-  // 카테고리 블록 스타일 - 보라색 테마 + 메모 드래그 시 시각적 피드백
+  // 카테고리 블록 스타일 - 하위 아이템이 있으면 태그 스타일로 표시
   const isHighlighted = isDragOver || (isMemoBeingDragged && isHovered);
+  const isTagMode = hasChildren && !isHighlighted; // 하위 아이템이 있으면 태그로 표시 (하이라이트 시 제외)
+
   const categoryStyle: React.CSSProperties = {
-    width: '100%', // 부모 컨테이너에 맞춤
-    minWidth: '200px',
-    minHeight: '80px',
+    width: isTagMode ? 'auto' : '100%', // 태그 모드면 auto, 아니면 전체 너비
+    minWidth: isTagMode ? '80px' : '200px', // 태그 모드면 작게
+    minHeight: isTagMode ? '32px' : '80px', // 태그 모드면 작게
     backgroundColor: isHighlighted ? '#581c87' : (isSelected ? '#7c3aed' : '#8b5cf6'),
     border: isHighlighted ? '3px solid #4c1d95' : (isSelected ? '2px solid #6d28d9' : '1px solid #7c3aed'),
-    borderRadius: '8px',
-    padding: '16px',
+    borderRadius: isTagMode ? '16px' : '8px', // 태그 모드면 더 둥글게
+    padding: isTagMode ? '6px 12px' : '16px', // 태그 모드면 작게
     boxShadow: isDragging ? '0 8px 16px rgba(0,0,0,0.3)' : (isHighlighted ? '0 6px 20px rgba(139, 92, 246, 0.6)' : '0 2px 8px rgba(0,0,0,0.1)'),
     cursor: isDraggingPosition ? 'grabbing' : 'grab',
     opacity: isDragging ? 0.7 : (isHighlighted ? 0.8 : 1),
@@ -324,8 +326,8 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   const headerStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    marginBottom: category.isExpanded && children ? '12px' : '0',
-    minHeight: '24px',
+    marginBottom: category.isExpanded && children && !isTagMode ? '12px' : '0',
+    minHeight: isTagMode ? '20px' : '24px',
     width: '100%', // 전체 너비 사용
     overflow: 'hidden' // 내용이 넘치면 숨김
   };
@@ -334,9 +336,9 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     background: 'none',
     border: 'none',
     cursor: 'pointer',
-    padding: '4px',
-    marginRight: '8px',
-    fontSize: '14px',
+    padding: isTagMode ? '0' : '4px',
+    marginRight: isTagMode ? '4px' : '8px',
+    fontSize: isTagMode ? '10px' : '14px',
     color: 'white',
     display: hasChildren ? 'flex' : 'none',
     alignItems: 'center',
@@ -346,17 +348,20 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
 
   const titleStyle: React.CSSProperties = {
     flex: 1,
-    fontSize: '16px',
-    fontWeight: 600,
+    fontSize: isTagMode ? '13px' : '16px',
+    fontWeight: isTagMode ? 500 : 600,
     color: 'white',
     backgroundColor: 'transparent',
     border: isEditing ? '1px solid #1976d2' : 'none',
     borderRadius: '4px',
-    padding: '4px 8px',
+    padding: isTagMode ? '2px 4px' : '4px 8px',
     outline: 'none',
     minWidth: 0, // flex 아이템이 축소될 수 있도록
     maxWidth: '100%', // 부모 컨테이너를 넘지 않도록
-    boxSizing: 'border-box' // 패딩 포함한 전체 크기 계산
+    boxSizing: 'border-box', // 패딩 포함한 전체 크기 계산
+    whiteSpace: isTagMode ? 'nowrap' : 'normal', // 태그 모드에서는 한 줄로
+    overflow: isTagMode ? 'hidden' : 'visible',
+    textOverflow: isTagMode ? 'ellipsis' : 'clip'
   };
 
   const controlsStyle: React.CSSProperties = {
@@ -473,8 +478,8 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         </div>
       </div>
 
-      {/* 태그 표시 */}
-      {category.tags.length > 0 && (
+      {/* 태그 표시 - 태그 모드에서는 숨김 */}
+      {!isTagMode && category.tags.length > 0 && (
         <div style={tagsStyle}>
           {category.tags.map((tag, index) => (
             <span key={index} style={tagStyle}>
@@ -484,14 +489,15 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         </div>
       )}
 
-      {/* 하위 블록들 */}
-      {category.isExpanded && children && (
+      {/* 하위 블록들 - 태그 모드에서는 숨김 */}
+      {!isTagMode && category.isExpanded && children && (
         <div style={childrenContainerStyle}>
           {children}
         </div>
       )}
 
-      {/* MemoBlock과 동일한 4면 연결점들 */}
+      {/* MemoBlock과 동일한 4면 연결점들 - 태그 모드에서는 숨김 */}
+      {!isTagMode && (<>
       <div
         onMouseDown={handleConnectionPointMouseDown}
         onMouseUp={handleConnectionPointMouseUp}
@@ -612,9 +618,10 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
           boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
         }} />
       </div>
+      </>)}
 
-      {/* 드롭 존 표시 */}
-      {category.isExpanded && (
+      {/* 드롭 존 표시 - 태그 모드에서는 숨김 */}
+      {!isTagMode && category.isExpanded && (
         <div
           style={{
             minHeight: '20px',

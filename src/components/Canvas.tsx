@@ -631,75 +631,18 @@ const Canvas: React.FC<CanvasProps> = ({
   };
 
 
-  // 카테고리의 경계 영역 계산 (memoized) - 확장 가능한 영역 (메모-카테고리 변환용)
-  const calculateCategoryArea = React.useCallback((category: CategoryBlock, visited: Set<string> = new Set()) => {
+  // 카테고리 영역 계산 wrapper - utils 함수 사용 + 색상 추가
+  const calculateCategoryAreaWithColor = React.useCallback((category: CategoryBlock, visited: Set<string> = new Set()) => {
     if (!currentPage) return null;
 
-    // 순환 참조 방지
-    if (visited.has(category.id)) {
-      return null;
-    }
-    visited.add(category.id);
+    const area = calculateCategoryArea(category, currentPage, visited);
+    if (!area) return null;
 
-    const childMemos = currentPage.memos.filter(memo => memo.parentId === category.id);
-    const childCategories = currentPage.categories?.filter(cat => cat.parentId === category.id) || [];
-
-    // 하위 아이템이 없으면 영역 표시 안함
-    if (childMemos.length === 0 && childCategories.length === 0) {
-      visited.delete(category.id);
-      return null;
-    }
-
-    // 카테고리 블록 자체의 위치와 크기
-    const categoryWidth = category.size?.width || 200;
-    const categoryHeight = category.size?.height || 80;
-
-    let minX = category.position.x;
-    let minY = category.position.y;
-    let maxX = category.position.x + categoryWidth;
-    let maxY = category.position.y + categoryHeight;
-
-    // 하위 메모들의 경계 포함
-    childMemos.forEach(memo => {
-      const memoWidth = memo.size?.width || 200;
-      const memoHeight = memo.size?.height || 95;
-      minX = Math.min(minX, memo.position.x);
-      minY = Math.min(minY, memo.position.y);
-      maxX = Math.max(maxX, memo.position.x + memoWidth);
-      maxY = Math.max(maxY, memo.position.y + memoHeight);
-    });
-
-    // 하위 카테고리들의 경계도 포함 (재귀적으로, 방문 집합 전달)
-    childCategories.forEach(childCategory => {
-      const childArea = calculateCategoryArea(childCategory, visited);
-      if (childArea) {
-        minX = Math.min(minX, childArea.x);
-        minY = Math.min(minY, childArea.y);
-        maxX = Math.max(maxX, childArea.x + childArea.width);
-        maxY = Math.max(maxY, childArea.y + childArea.height);
-      }
-    });
-
-    // 방문 완료 후 제거 (다른 브랜치에서 재방문 가능하도록)
-    visited.delete(category.id);
-
-    // 여백 추가 (적절한 간격 유지)
-    const padding = 20;
     return {
-      x: minX - padding,
-      y: minY - padding,
-      width: maxX - minX + padding * 2,
-      height: maxY - minY + padding * 2,
+      ...area,
       color: getCategoryAreaColor(category.id)
     };
-  }, [
-    // 더 효율적인 의존성 관리 - 드래그 중에는 과도한 계산 방지
-    currentPage?.memos?.length,
-    currentPage?.categories?.length,
-    // areaUpdateTrigger를 사용하여 수동 업데이트 제어
-    areaUpdateTrigger
-    // Math.floor(Date.now() / 200) 제거 - 이게 200ms마다 재계산을 유발함
-  ]);
+  }, [currentPage, areaUpdateTrigger]);
 
   // 단일 카테고리 영역 렌더링 (재귀적으로 하위 카테고리도 포함)
   const renderSingleCategoryArea = (category: CategoryBlock): React.ReactNode[] => {
@@ -727,7 +670,21 @@ const Canvas: React.FC<CanvasProps> = ({
       area = shiftDragAreaCache.current[category.id];
     } else {
       // 캐시된 영역이 없으면 동적 계산
-      area = calculateCategoryArea(category);
+      area = calculateCategoryAreaWithColor(category);
+
+      // 하위 카테고리인데 자식이 없어서 area가 null인 경우, 기본 영역 생성
+      if (!area && category.parentId) {
+        const categoryWidth = category.size?.width || 200;
+        const categoryHeight = category.size?.height || 80;
+        const padding = 20;
+        area = {
+          x: category.position.x - padding,
+          y: category.position.y - padding,
+          width: categoryWidth + padding * 2,
+          height: categoryHeight + padding * 2,
+          color: `rgba(${Math.abs(category.id.split('').reduce((a,c)=>a+c.charCodeAt(0),0)) % 200 + 50}, ${Math.abs(category.id.split('').reduce((a,c)=>a+c.charCodeAt(0),0) * 7) % 200 + 50}, 255, 0.1)`
+        };
+      }
 
       // Shift 드래그 중이면 계산된 영역을 캐시에 저장
       if (isDraggingMemo && isShiftPressed) {
@@ -741,7 +698,14 @@ const Canvas: React.FC<CanvasProps> = ({
     const hasChildren = childMemos.length > 0 || childCategories.length > 0;
 
     // 확장 가능한 영역 배경 (메모-카테고리 변환용)
-    if (area && hasChildren && category.isExpanded) {
+    // 하위 카테고리인 경우: 자식이 없어도 항상 영역 표시 (부모 안에서 태그형 영역으로)
+    // 최상위 카테고리인 경우: 자식이 있고 펼쳐졌을 때만 영역 표시
+    const isChildCategory = !!category.parentId;
+    const shouldShowArea = isChildCategory
+      ? category.isExpanded  // 하위 카테고리는 펼쳐졌을 때만
+      : (hasChildren && category.isExpanded); // 최상위는 자식 있고 펼쳐졌을 때
+
+    if (area && shouldShowArea) {
       areas.push(
         <div
           key={`area-${category.id}`}
@@ -766,23 +730,24 @@ const Canvas: React.FC<CanvasProps> = ({
 
 
     // 카테고리 이름 라벨은 항상 표시 (접어도 보임) - 마우스 드래그 사용
-    if (hasChildren) {
+    // 하위 카테고리는 항상 라벨 표시, 최상위 카테고리는 자식 있을 때만
+    if (hasChildren || isChildCategory) {
       areas.push(
         <div
           key={`label-${category.id}`}
           draggable={false}
           style={{
             position: 'absolute',
-            top: `${(area?.y || category.position.y) + 8}px`,
-            left: `${(area?.x || category.position.x) + 12}px`,
+            top: `${area?.y || category.position.y}px`,
+            left: `${area?.x || category.position.x}px`,
             backgroundColor: '#8b5cf6',
             color: 'white',
-            padding: '4px 12px',
-            borderRadius: '6px',
-            fontSize: '12px',
+            padding: '6px 12px',
+            borderRadius: '8px',
+            fontSize: '13px',
             fontWeight: '600',
             pointerEvents: 'auto',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
             cursor: 'grab',
             display: 'flex',
             alignItems: 'center',
@@ -800,7 +765,7 @@ const Canvas: React.FC<CanvasProps> = ({
               // 드래그 시작 - 캐시가 없을 때만 영역 크기 저장
               setIsDraggingCategoryArea(category.id);
               if (!draggedCategoryAreas[category.id]) {
-                const currentArea = area || calculateCategoryArea(category);
+                const currentArea = area || calculateCategoryAreaWithColor(category);
                 if (currentArea) {
                   setDraggedCategoryAreas(prev => ({
                     ...prev,
@@ -947,11 +912,12 @@ const Canvas: React.FC<CanvasProps> = ({
       </>
     ) : null;
 
-    // 하위 아이템이 있으면 카테고리 블록 숨기기
+    // 하위 아이템 여부 계산
     const hasChildren = childMemos.length > 0 || childCategories.length > 0;
 
     return (
       <>
+        {/* 하위 아이템이 없을 때만 CategoryBlock 렌더링, 있으면 라벨만 표시 */}
         {!hasChildren && (
           <CategoryBlockComponent
             key={category.id}
@@ -989,6 +955,8 @@ const Canvas: React.FC<CanvasProps> = ({
             {childrenElements}
           </CategoryBlockComponent>
         )}
+        {/* 하위 메모와 카테고리 렌더링 */}
+        {childrenElements}
       </>
     );
   };
@@ -999,7 +967,7 @@ const Canvas: React.FC<CanvasProps> = ({
     if (category) {
       // 캐시가 없을 때만 새로 계산 (있으면 기존 캐시 유지)
       if (!draggedCategoryAreas[categoryId]) {
-        const currentArea = calculateCategoryArea(category);
+        const currentArea = calculateCategoryAreaWithColor(category);
         if (currentArea) {
           setDraggedCategoryAreas(prev => ({
             ...prev,

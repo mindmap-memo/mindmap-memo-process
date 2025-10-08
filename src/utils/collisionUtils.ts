@@ -1,5 +1,6 @@
 import { CategoryBlock, MemoBlock, Page } from '../types';
 import { calculateCategoryArea, CategoryArea, calculatePushDirection } from './categoryAreaUtils';
+import { isParentChild } from './categoryHierarchyUtils';
 
 export interface CollisionResult {
   updatedCategories: CategoryBlock[];
@@ -40,6 +41,9 @@ export function resolveAreaCollisions(
       // 이동 중인 카테고리는 밀리지 않음
       if (currentCat.id === movingCategoryId) continue;
 
+      // 부모가 있는 카테고리는 충돌 시 밀리지 않음 (부모와 함께 이동)
+      if (currentCat.parentId) continue;
+
       // 이미 이번 iteration에서 처리된 카테고리는 스킵
       if (processedInThisIteration.has(currentCat.id)) continue;
 
@@ -50,6 +54,11 @@ export function resolveAreaCollisions(
       // 충돌 검사는 원본 위치 기준 (중복 방지)
       for (const otherCategory of originalCategories) {
         if (currentCat.id === otherCategory.id) continue;
+
+        // 부모-자식 관계인 경우 충돌 무시 (예외 처리)
+        if (isParentChild(currentCat.id, otherCategory.id, originalCategories)) {
+          continue;
+        }
 
         // 우선순위 확인
         const currentPriority = priorityMap.get(currentCat.id) ?? Infinity;

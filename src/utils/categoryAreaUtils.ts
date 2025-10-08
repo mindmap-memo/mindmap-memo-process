@@ -60,10 +60,20 @@ export function calculateCategoryArea(
   childCategories.forEach(childCategory => {
     const childArea = calculateCategoryArea(childCategory, page, visited);
     if (childArea) {
+      // 하위 카테고리가 자식을 가지고 있어서 영역이 계산된 경우
       minX = Math.min(minX, childArea.x);
       minY = Math.min(minY, childArea.y);
       maxX = Math.max(maxX, childArea.x + childArea.width);
       maxY = Math.max(maxY, childArea.y + childArea.height);
+    } else {
+      // 하위 카테고리에 자식이 없어서 영역이 null인 경우
+      // 하위 카테고리 블록 자체의 위치와 크기를 포함
+      const childCategoryWidth = childCategory.size?.width || DEFAULT_CATEGORY_WIDTH;
+      const childCategoryHeight = childCategory.size?.height || DEFAULT_CATEGORY_HEIGHT;
+      minX = Math.min(minX, childCategory.position.x);
+      minY = Math.min(minY, childCategory.position.y);
+      maxX = Math.max(maxX, childCategory.position.x + childCategoryWidth);
+      maxY = Math.max(maxY, childCategory.position.y + childCategoryHeight);
     }
   });
 

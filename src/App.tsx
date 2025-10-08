@@ -1,8 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Page, MemoBlock, DataRegistry, MemoDisplaySize, ImportanceLevel, CategoryBlock, CanvasHistory, CanvasAction, CanvasActionType } from './types';
 import { globalDataRegistry } from './utils/dataRegistry';
+
 import { calculateCategoryArea, CategoryArea } from './utils/categoryAreaUtils';
 import { resolveAreaCollisions, resolveMemoCollisions } from './utils/collisionUtils';
+import {
+  canAddCategoryAsChild,
+  addCategoryToParent,
+  addMemoToCategory,
+  isParentChild,
+  getDirectChildMemos,
+  getDirectChildCategories
+} from './utils/categoryHierarchyUtils';
 import LeftPanel from './components/LeftPanel';
 import RightPanel from './components/RightPanel';
 import Canvas from './components/Canvas';
@@ -105,6 +114,9 @@ const App: React.FC = () => {
   // 드래그 시작 시 메모들의 원래 위치 저장
   const dragStartMemoPositions = React.useRef<Map<string, Map<string, {x: number, y: number}>>>(new Map());
 
+  // 드래그 시작 시 하위 카테고리들의 원래 위치 저장
+  const dragStartCategoryPositions = React.useRef<Map<string, Map<string, {x: number, y: number}>>>(new Map());
+
   // 메모 위치 변경 시 캐시 제거 (Canvas.tsx와 동기화)
   const clearCategoryCache = React.useCallback((categoryId: string) => {
     setDraggedCategoryAreas(prev => {
@@ -113,13 +125,101 @@ const App: React.FC = () => {
       return newAreas;
     });
     dragStartMemoPositions.current.delete(categoryId);
+    dragStartCategoryPositions.current.delete(categoryId);
   }, []);
 
-  // 카테고리 드래그 종료 시 캐시 제거 (자연스러운 크기 조정)
+  // 카테고리-카테고리 드롭 감지 (일반 드롭)
+  const handleCategoryOnCategoryDrop = React.useCallback((draggedCategory: CategoryBlock, currentPage: Page) => {
+    const categoryWidth = draggedCategory.size?.width || 200;
+    const categoryHeight = draggedCategory.size?.height || 80;
+    const draggedBounds = {
+      left: draggedCategory.position.x,
+      top: draggedCategory.position.y,
+      right: draggedCategory.position.x + categoryWidth,
+      bottom: draggedCategory.position.y + categoryHeight
+    };
+
+    // 겹침 감지 함수
+    const isOverlapping = (bounds1: any, bounds2: any, margin = 20) => {
+      return !(bounds1.right + margin < bounds2.left ||
+               bounds1.left - margin > bounds2.right ||
+               bounds1.bottom + margin < bounds2.top ||
+               bounds1.top - margin > bounds2.bottom);
+    };
+
+    // 드롭 대상 카테고리 찾기
+    const targetCategory = currentPage.categories?.find(category => {
+      // 자기 자신은 제외
+      if (category.id === draggedCategory.id) return false;
+
+      const targetWidth = category.size?.width || 200;
+      const targetHeight = category.size?.height || 80;
+      const targetBounds = {
+        left: category.position.x,
+        top: category.position.y,
+        right: category.position.x + targetWidth,
+        bottom: category.position.y + targetHeight
+      };
+
+      return isOverlapping(draggedBounds, targetBounds, 20);
+    });
+
+    if (targetCategory) {
+      // 카테고리를 다른 카테고리에 드롭
+      // 순환 참조 체크
+      if (!canAddCategoryAsChild(targetCategory.id, draggedCategory.id, currentPage.categories || [])) {
+        return;
+      }
+
+      // 이미 같은 부모의 자식이면 무시
+      if (draggedCategory.parentId === targetCategory.id) {
+        return;
+      }
+
+      // 카테고리를 하위로 추가
+      setPages(prev => prev.map(page => {
+        if (page.id !== currentPageId) return page;
+
+        const updatedCategories = addCategoryToParent(
+          draggedCategory.id,
+          targetCategory.id,
+          page.categories || []
+        );
+
+        return {
+          ...page,
+          categories: updatedCategories
+        };
+      }));
+    }
+  }, [currentPageId]);
+
+  // 카테고리 드래그 종료 시 드롭 감지 및 캐시 제거
   const handleCategoryPositionDragEnd = (categoryId: string) => {
+    const currentPage = pages.find(p => p.id === currentPageId);
+    if (!currentPage || !currentPage.categories) {
+      clearCategoryCache(categoryId);
+      previousFramePosition.current.delete(categoryId);
+      return;
+    }
+
+    const draggedCategory = currentPage.categories.find(c => c.id === categoryId);
+    if (!draggedCategory) {
+      clearCategoryCache(categoryId);
+      previousFramePosition.current.delete(categoryId);
+      return;
+    }
+
+    // Shift 드래그는 별도 처리 (이미 handleShiftDropCategory에서 처리됨)
+    if (!isShiftPressed) {
+      // 일반 드롭: 카테고리 블록끼리 겹침 감지
+      handleCategoryOnCategoryDrop(draggedCategory, currentPage);
+    }
+
     // 드래그 종료 후 캐시 제거 - 메모 위치에 따라 자연스럽게 크기 조정
     clearCategoryCache(categoryId);
     previousFramePosition.current.delete(categoryId);
+    shiftDragAreaCache.current = {}; // Shift 드래그 캐시도 클리어
   };
 
   // Canvas history for undo/redo functionality
@@ -1641,6 +1741,15 @@ const App: React.FC = () => {
           }
         });
         dragStartMemoPositions.current.set(categoryId, memoPositions);
+
+        // 하위 카테고리들의 원본 위치 저장
+        const categoryPositions = new Map<string, {x: number, y: number}>();
+        currentPage.categories?.forEach(cat => {
+          if (cat.parentId === categoryId) {
+            categoryPositions.set(cat.id, { x: cat.position.x, y: cat.position.y });
+          }
+        });
+        dragStartCategoryPositions.current.set(categoryId, categoryPositions);
       }
     }
 
@@ -1672,20 +1781,27 @@ const App: React.FC = () => {
         return memo;
       });
 
-      // 하위 카테고리들도 함께 이동
-      const updatedCategories = (page.categories || []).map(category =>
-        category.id === categoryId
-          ? { ...category, position }
-          : category.parentId === categoryId
-          ? {
+      // 하위 카테고리들도 함께 이동 (절대 위치 계산)
+      const updatedCategories = (page.categories || []).map(category => {
+        if (category.id === categoryId) {
+          return { ...category, position };
+        }
+
+        if (category.parentId === categoryId) {
+          const originalPos = dragStartCategoryPositions.current.get(categoryId)?.get(category.id);
+          if (originalPos) {
+            return {
               ...category,
               position: {
-                x: category.position.x + deltaX,
-                y: category.position.y + deltaY
+                x: originalPos.x + totalDeltaX,
+                y: originalPos.y + totalDeltaY
               }
-            }
-          : category
-      );
+            };
+          }
+        }
+
+        return category;
+      });
 
       // 충돌 검사 수행 (Shift 누르면 충돌 검사 건너뛰기)
       if (!isShiftPressed) {
