@@ -780,6 +780,23 @@ const Canvas: React.FC<CanvasProps> = ({
           }}
           onDrop={(e) => handleDropOnCategoryArea(e, category.id)}
           onDragOver={handleCategoryAreaDragOver}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // 카테고리 영역 우클릭 시 해당 카테고리를 선택하고 컨텍스트 메뉴 표시
+            onCategorySelect(category.id);
+            // CategoryBlock 컴포넌트에서 컨텍스트 메뉴를 표시하도록 이벤트 전달
+            const categoryElement = document.querySelector(`[data-category-id="${category.id}"]`);
+            if (categoryElement) {
+              const contextMenuEvent = new MouseEvent('contextmenu', {
+                bubbles: true,
+                cancelable: true,
+                clientX: e.clientX,
+                clientY: e.clientY
+              });
+              categoryElement.dispatchEvent(contextMenuEvent);
+            }
+          }}
         />
       );
     }
@@ -817,6 +834,23 @@ const Canvas: React.FC<CanvasProps> = ({
           onClick={() => onCategorySelect(category.id)}
           onDoubleClick={() => {
             // 더블클릭 시 편집 모드로 전환하는 함수 호출
+          }}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // 카테고리 라벨 우클릭 시 해당 카테고리를 선택하고 컨텍스트 메뉴 표시
+            onCategorySelect(category.id);
+            // CategoryBlock 컴포넌트에서 컨텍스트 메뉴를 표시하도록 이벤트 전달
+            const categoryElement = document.querySelector(`[data-category-id="${category.id}"]`);
+            if (categoryElement) {
+              const contextMenuEvent = new MouseEvent('contextmenu', {
+                bubbles: true,
+                cancelable: true,
+                clientX: e.clientX,
+                clientY: e.clientY
+              });
+              categoryElement.dispatchEvent(contextMenuEvent);
+            }
           }}
           onMouseDown={(e) => {
             if (e.button === 0) {

@@ -123,10 +123,41 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
+    setContextMenu(null);
     if (window.confirm(`카테고리 "${category.title}"를 삭제하시겠습니까? 하위 아이템들은 최상위로 이동됩니다.`)) {
       onDelete(category.id);
     }
   };
+
+  // 단축 이동 추가 핸들러
+  const handleAddQuickNav = () => {
+    setContextMenu(null);
+    setShowQuickNavModal(true);
+  };
+
+  // 단축 이동 추가 확인
+  const handleQuickNavConfirm = (name: string) => {
+    if (name.trim() && onAddQuickNav) {
+      onAddQuickNav(name.trim(), category.id, 'category');
+      setShowQuickNavModal(false);
+    }
+  };
+
+  // 우클릭 컨텍스트 메뉴
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  // 컨텍스트 메뉴 외부 클릭 시 닫기
+  React.useEffect(() => {
+    if (contextMenu) {
+      const handleClickOutside = () => setContextMenu(null);
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [contextMenu]);
 
   // MemoBlock과 동일한 드래그 핸들러들
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -429,6 +460,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         onDrop={handleDrop}
         onClick={handleClick}
         onMouseDown={handleMouseDown}
+        onContextMenu={handleContextMenu}
         onMouseUp={(e) => {
           // 연결 모드일 때 카테고리 블록 전체에서 연결 처리
           if (isConnecting && connectingFromId && connectingFromId !== category.id) {
@@ -644,6 +676,26 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         </div>
       )}
       </div>
+
+      {/* 컨텍스트 메뉴 */}
+      {contextMenu && (
+        <ContextMenu
+          position={contextMenu}
+          onClose={() => setContextMenu(null)}
+          onAddQuickNav={handleAddQuickNav}
+          onDelete={handleDelete}
+        />
+      )}
+
+      {/* 단축 이동 추가 모달 */}
+      <QuickNavModal
+        isOpen={showQuickNavModal}
+        onClose={() => {
+          setShowQuickNavModal(false);
+        }}
+        onConfirm={handleQuickNavConfirm}
+        initialName={category.title}
+      />
     </div>
   );
 };

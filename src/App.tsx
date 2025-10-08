@@ -1154,6 +1154,9 @@ const App: React.FC = () => {
       }
       return page;
     }));
+
+    // 단축 이동 목록에서 삭제된 카테고리 제거
+    setQuickNavItems(prev => prev.filter(item => item.targetId !== categoryId));
   };
 
   const toggleCategoryExpanded = (categoryId: string) => {
@@ -2349,6 +2352,10 @@ const App: React.FC = () => {
           }
         : page
     ));
+
+    // 단축 이동 목록에서 삭제된 메모 제거
+    setQuickNavItems(prev => prev.filter(item => item.targetId !== selectedMemoId));
+
     setSelectedMemoId(null);
   };
 
@@ -2368,6 +2375,10 @@ const App: React.FC = () => {
         children: category.children.filter(childId => childId !== memoId) // 자식 목록에서도 제거
       }))
     })));
+
+    // 단축 이동 목록에서 삭제된 메모 제거
+    setQuickNavItems(prev => prev.filter(item => item.targetId !== memoId));
+
     // 삭제한 메모가 현재 선택된 메모였다면 선택 해제
     if (selectedMemoId === memoId) {
       setSelectedMemoId(null);
@@ -2387,6 +2398,11 @@ const App: React.FC = () => {
           categories: (page.categories || []).filter(cat => !selectedCategoryIds.includes(cat.id))
         };
       }));
+
+      // 단축 이동 목록에서 삭제된 메모/카테고리 제거
+      setQuickNavItems(prev => prev.filter(item =>
+        !selectedMemoIds.includes(item.targetId) && !selectedCategoryIds.includes(item.targetId)
+      ));
 
       // 선택 상태 초기화
       setSelectedMemoIds([]);
