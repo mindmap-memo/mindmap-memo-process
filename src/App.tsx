@@ -108,6 +108,7 @@ const App: React.FC = () => {
 
   // Shift 드래그 중 영역 캐시 (영역 크기가 변하지 않도록)
   const shiftDragAreaCache = React.useRef<{[categoryId: string]: any}>({});
+  const shiftDropProcessedMemos = React.useRef<Set<string>>(new Set()); // Shift 드래그로 처리된 메모 추적
 
   // 드래그 중인 카테고리의 영역 캐시 (Canvas와 동일한 시스템)
   const [draggedCategoryAreas, setDraggedCategoryAreas] = useState<{[categoryId: string]: {area: any, originalPosition: {x: number, y: number}}}>({});
@@ -1260,6 +1261,7 @@ const App: React.FC = () => {
 
               }
 
+              console.log('[moveToCategory] parentId 변경:', itemId, '이전:', memo.parentId, '→ 새로운:', categoryId || undefined);
               return { ...memo, parentId: categoryId || undefined, position: newPosition };
             }
             return memo;
@@ -1582,60 +1584,91 @@ const App: React.FC = () => {
     });
 
     // 카테고리 변경 처리
-    const newParentId = targetCategory ? targetCategory.id : null;
+    const newParentId = targetCategory ? targetCategory.id : undefined;
     const parentChanged = draggedMemo.parentId !== newParentId;
 
-    if (parentChanged) {
-      setPages(pages.map(p => {
-        if (p.id === currentPageId) {
-          // 메모의 parentId 업데이트
-          const updatedMemos = p.memos.map(memo =>
-            memo.id === draggedMemo.id
-              ? { ...memo, position, parentId: newParentId }
-              : memo
-          );
+    console.log('[handleShiftDrop] 함수 호출됨 - draggedMemo:', draggedMemo.id, 'draggedMemo.parentId:', draggedMemo.parentId, 'newParentId:', newParentId, 'parentChanged:', parentChanged);
 
-          // 카테고리의 children 배열 업데이트
+    if (parentChanged) {
+      // 원래 위치 가져오기 (드래그 시작 시 저장된 위치)
+      const originalMemoPositions = dragStartMemoPositions.current.get(draggedMemo.id);
+
+      console.log('[handleShiftDrop] setPages 호출 시작');
+      setPages(prev => {
+        console.log('[handleShiftDrop] setPages 콜백 실행');
+        return prev.map(p => {
+          if (p.id === currentPageId) {
+          // 메모의 parentId만 변경하고 위치는 원래대로 복원
+          const updatedMemos = p.memos.map(memo => {
+            if (memo.id === draggedMemo.id) {
+              const originalPos = originalMemoPositions?.get(draggedMemo.id);
+              console.log('[handleShiftDrop] parentId 변경:', memo.id, '이전:', memo.parentId, '→ 새로운:', newParentId);
+              return {
+                ...memo,
+                parentId: newParentId,
+                position: originalPos || memo.position  // 원래 위치로 복원
+              };
+            }
+            return memo;
+          });
+
+          // 카테고리의 children 배열 업데이트 (그리고 필요시 expand)
           const updatedCategories = (p.categories || []).map(category => {
             // 이전 부모에서 제거
             if (category.id === draggedMemo.parentId) {
+              console.log('[handleShiftDrop] 이전 부모 children 업데이트:', category.id, 'before:', category.children, 'after:', category.children.filter(id => id !== draggedMemo.id));
               return {
                 ...category,
                 children: (category.children || []).filter(id => id !== draggedMemo.id)
               };
             }
-            // 새 부모에 추가
+            // 새 부모에 추가 + expand
             if (category.id === newParentId) {
               const currentChildren = category.children || [];
               if (!currentChildren.includes(draggedMemo.id)) {
+                console.log('[handleShiftDrop] 새 부모 children 업데이트:', category.id, 'before:', currentChildren, 'after:', [...currentChildren, draggedMemo.id]);
                 return {
                   ...category,
-                  children: [...currentChildren, draggedMemo.id]
+                  children: [...currentChildren, draggedMemo.id],
+                  isExpanded: true  // 여기서 expand 처리
                 };
               }
             }
             return category;
           });
 
-          return {
-            ...p,
-            memos: updatedMemos,
-            categories: updatedCategories
-          };
-        }
-        return p;
-      }));
-
-      // Shift 드래그로 카테고리에 넣을 때만 펼침 (빼낼 때는 펼치지 않음)
-      if (targetCategory && newParentId && !targetCategory.isExpanded) {
-        toggleCategoryExpanded(targetCategory.id);
-      }
+            return {
+              ...p,
+              memos: updatedMemos,
+              categories: updatedCategories
+            };
+          }
+          return p;
+        });
+      });
 
       const targetName = targetCategory ? `카테고리 ${targetCategory.title}` : '최상위';
       saveCanvasState('move_to_category', `Shift 드래그로 메모 이동: ${draggedMemo.title} → ${targetName}`);
+
+      // Shift 드래그로 처리된 메모 플래그 설정 (detectCategoryOnDrop에서 중복 처리 방지)
+      shiftDropProcessedMemos.current.add(draggedMemo.id);
+      // 잠시 후 플래그 제거 (다음 드래그를 위해)
+      setTimeout(() => {
+        shiftDropProcessedMemos.current.delete(draggedMemo.id);
+      }, 100);
+
+      // Shift 드래그 후 타이머 클리어 (일반 드래그 타이머와 충돌 방지)
+      const existingTimer = categoryExitTimers.current.get(draggedMemo.id);
+      if (existingTimer) {
+        console.log('[handleShiftDrop] 기존 타이머 클리어:', draggedMemo.id);
+        clearTimeout(existingTimer);
+        categoryExitTimers.current.delete(draggedMemo.id);
+      } else {
+        console.log('[handleShiftDrop] 클리어할 타이머 없음:', draggedMemo.id);
+      }
     } else {
       // 같은 카테고리 내에서 위치만 변경
-      setPages(pages.map(p => {
+      setPages(prev => prev.map(p => {
         if (p.id === currentPageId) {
           return {
             ...p,
@@ -1683,6 +1716,13 @@ const App: React.FC = () => {
 
   // 드래그 완료 시 카테고리 블록 겹침 감지
   const detectCategoryOnDrop = (memoId: string, position: { x: number; y: number }) => {
+    console.log('[detectCategoryOnDrop] 호출됨 - memoId:', memoId, 'isShiftPressed:', isShiftPressed, 'processed:', shiftDropProcessedMemos.current.has(memoId));
+
+    // Shift 드래그로 이미 처리된 메모면 중복 처리 방지
+    if (shiftDropProcessedMemos.current.has(memoId)) {
+      console.log('[detectCategoryOnDrop] Shift 드래그로 이미 처리됨, 스킵:', memoId);
+      return;
+    }
 
     const currentPage = pages.find(p => p.id === currentPageId);
     if (!currentPage || !currentPage.categories) {
@@ -1852,8 +1892,10 @@ const App: React.FC = () => {
               const finalStillInArea = isOverlapping(currentMemoBounds, categoryAreaBounds, 0);
 
               if (!finalStillInArea) {
+                console.log('[categoryExitTimer] 타이머 실행 - 영역 이탈 확인, moveToCategory 호출:', memoId);
                 moveToCategory(memoId, null);
               } else {
+                console.log('[categoryExitTimer] 타이머 실행 - 여전히 영역 안에 있음, 유지:', memoId);
               }
 
               categoryExitTimers.current.delete(memoId);

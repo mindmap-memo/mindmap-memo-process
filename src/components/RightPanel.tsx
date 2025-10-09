@@ -1377,7 +1377,10 @@ const RightPanel: React.FC<RightPanelProps> = ({
               <div style={{ paddingLeft: '20px' }}>
                 {(() => {
                   const childMemos = selectedCategory.children
-                    ?.map(childId => currentPage?.memos.find(m => m.id === childId))
+                    ?.map(childId => {
+                      const memo = currentPage?.memos.find(m => m.id === childId);
+                      return memo;
+                    })
                     .filter(Boolean) as MemoBlock[] | undefined;
 
                   return childMemos && childMemos.length > 0 ? (

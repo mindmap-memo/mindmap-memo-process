@@ -486,8 +486,10 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         y: (e.clientY - dragStart.y - canvasOffset.y) / canvasScale
       };
 
-      // 최종 위치 업데이트
-      onPositionChange(memo.id, finalPosition);
+      // Shift 모드가 아닐 때만 최종 위치 업데이트 (Shift 모드는 handleShiftDrop에서 위치 복원)
+      if (!isShiftPressed) {
+        onPositionChange(memo.id, finalPosition);
+      }
 
       // 카테고리 감지
       if (dragMoved && onDetectCategoryOnDrop) {

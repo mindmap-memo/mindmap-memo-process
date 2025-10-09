@@ -782,25 +782,35 @@ const Canvas: React.FC<CanvasProps> = ({
       : (hasChildren && category.isExpanded); // 최상위는 자식 있고 펼쳐졌을 때
 
     if (area && shouldShowArea) {
-      // Shift 드래그 시 현재 드래그 중인 아이템의 부모 카테고리인지 확인
-      let isParentOfDraggingItem = false;
+      // Shift 드래그 시 UI 상태 확인
+      let draggingItemParentId: string | null = null;
+      let isCurrentParent = false;
+      let isParentBeingLeftBehind = false;
 
       if (isShiftPressed && (isDraggingMemo || isDraggingCategory)) {
+        // 드래그 중인 아이템의 현재 부모 ID 확인
         if (isDraggingMemo && selectedMemoId) {
           const draggingMemo = currentPage?.memos.find(m => m.id === selectedMemoId);
-          if (draggingMemo && draggingMemo.parentId === category.id) {
-            isParentOfDraggingItem = true;
-          }
+          draggingItemParentId = draggingMemo?.parentId || null;
         } else if (isDraggingCategory && selectedCategoryId) {
           const draggingCategory = currentPage?.categories?.find(c => c.id === selectedCategoryId);
-          if (draggingCategory && draggingCategory.parentId === category.id) {
-            isParentOfDraggingItem = true;
-          }
+          draggingItemParentId = draggingCategory?.parentId || null;
+        }
+
+        // 이 카테고리가 드래그 중인 아이템의 현재 부모인지 확인
+        isCurrentParent = draggingItemParentId === category.id;
+
+        // 부모 영역을 벗어났는지 확인 (빼기 UI)
+        // 조건: 현재 부모이면서, 현재 타겟이 아님 (= 마우스가 해당 영역을 벗어남)
+        // dragTargetCategoryId가 null이거나 다른 영역이면 부모를 벗어난 것
+        if (isCurrentParent && dragTargetCategoryId !== category.id) {
+          isParentBeingLeftBehind = true;
         }
       }
 
-      // 타겟 영역 확인: 마우스가 올라간 영역 (부모가 아닌 경우)
-      const isShiftDragTarget = isShiftPressed && dragTargetCategoryId === category.id && (isDraggingMemo || isDraggingCategory) && !isParentOfDraggingItem;
+      // 타겟 영역 확인 (추가 UI)
+      // 조건: 마우스가 올라간 영역이면서, 현재 부모가 아님
+      const isShiftDragTarget = isShiftPressed && dragTargetCategoryId === category.id && (isDraggingMemo || isDraggingCategory);
 
       areas.push(
         <div
@@ -811,16 +821,16 @@ const Canvas: React.FC<CanvasProps> = ({
             top: `${area.y}px`,
             width: `${area.width}px`,
             height: `${area.height}px`,
-            backgroundColor: isParentOfDraggingItem
+            backgroundColor: isParentBeingLeftBehind
               ? 'rgba(239, 68, 68, 0.2)'  // 빨간색 (하위 요소 빼기)
               : (isShiftDragTarget ? 'rgba(16, 185, 129, 0.2)' : area.color),  // 녹색 (하위 요소 추가)
-            border: isParentOfDraggingItem
+            border: isParentBeingLeftBehind
               ? '3px solid rgba(239, 68, 68, 0.6)'
               : (isShiftDragTarget ? '3px solid rgba(16, 185, 129, 0.6)' : '2px dashed rgba(139, 92, 246, 0.3)'),
             borderRadius: '12px',
             pointerEvents: 'auto',
             zIndex: -1,
-            transform: (isShiftDragTarget || isParentOfDraggingItem) ? 'scale(1.02)' : 'scale(1)',
+            transform: (isShiftDragTarget || isParentBeingLeftBehind) ? 'scale(1.02)' : 'scale(1)',
             transition: 'all 0.2s ease',
             display: 'flex',
             alignItems: 'center',
@@ -850,7 +860,7 @@ const Canvas: React.FC<CanvasProps> = ({
               하위 요소 추가
             </div>
           )}
-          {isParentOfDraggingItem && (
+          {isParentBeingLeftBehind && (
             <div style={{
               backgroundColor: 'rgba(255, 255, 255, 0.95)',
               padding: '12px 24px',
@@ -1642,6 +1652,17 @@ const Canvas: React.FC<CanvasProps> = ({
         const mouseX = (e.clientX - rect.left - (canvasOffset?.x || 0)) / (canvasScale || 1);
         const mouseY = (e.clientY - rect.top - (canvasOffset?.y || 0)) / (canvasScale || 1);
 
+        // 드래그 중인 아이템의 현재 부모 ID 확인
+        let draggingItemParentId: string | null = null;
+
+        if (isDraggingMemo && selectedMemoId) {
+          const draggingMemo = currentPage.memos.find(m => m.id === selectedMemoId);
+          draggingItemParentId = draggingMemo?.parentId || null;
+        } else if (isDraggingCategory && selectedCategoryId) {
+          const draggingCategory = currentPage.categories?.find(c => c.id === selectedCategoryId);
+          draggingItemParentId = draggingCategory?.parentId || null;
+        }
+
         // 모든 카테고리 영역과 충돌 검사
         let foundTarget: string | null = null;
 
@@ -1654,7 +1675,13 @@ const Canvas: React.FC<CanvasProps> = ({
           // 마우스가 영역 안에 있는지 확인
           if (mouseX >= area.x && mouseX <= area.x + area.width &&
               mouseY >= area.y && mouseY <= area.y + area.height) {
-            foundTarget = category.id;
+            // 부모 영역이 아닌 경우만 타겟으로 설정 (추가 UI)
+            if (category.id !== draggingItemParentId) {
+              foundTarget = category.id;
+            }
+            // 부모 영역과 충돌: foundTarget을 설정하지 않음 (null 유지)
+            // 이렇게 하면 부모 영역에서는 dragTargetCategoryId가 null이 되어
+            // isParentBeingLeftBehind 조건에서 빼기 UI가 표시됨
             break;
           }
         }
