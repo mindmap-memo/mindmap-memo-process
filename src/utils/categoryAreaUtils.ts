@@ -136,12 +136,14 @@ export function calculateOverlap(area1: CategoryArea, area2: CategoryArea): { x:
 /**
  * 겹침에 따라 밀어낼 방향과 거리 계산
  * 겹침이 적은 방향으로 밀어냄
+ * @param movingArea - 이동 중인 영역 (밀어내는 영역)
+ * @param targetArea - 밀릴 영역
  */
 export function calculatePushDirection(
-  pushedArea: CategoryArea,
-  pusherArea: CategoryArea
+  movingArea: CategoryArea,
+  targetArea: CategoryArea
 ): { x: number; y: number } {
-  const overlap = calculateOverlap(pushedArea, pusherArea);
+  const overlap = calculateOverlap(movingArea, targetArea);
 
   if (overlap.x === 0 || overlap.y === 0) {
     return { x: 0, y: 0 };
@@ -150,11 +152,11 @@ export function calculatePushDirection(
   // 겹침이 적은 쪽으로 밀어냄
   if (overlap.x < overlap.y) {
     // X축 겹침이 적음 - X 방향으로 밀기
-    const direction = pushedArea.x < pusherArea.x ? -1 : 1;
+    const direction = movingArea.x < targetArea.x ? 1 : -1;
     return { x: overlap.x * direction, y: 0 };
   } else {
     // Y축 겹침이 적음 - Y 방향으로 밀기
-    const direction = pushedArea.y < pusherArea.y ? -1 : 1;
+    const direction = movingArea.y < targetArea.y ? 1 : -1;
     return { x: 0, y: overlap.y * direction };
   }
 }

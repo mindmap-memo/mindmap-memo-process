@@ -56,9 +56,11 @@ interface CanvasProps {
   onUndo: () => void;
   onRedo: () => void;
   isDraggingMemo?: boolean;
-  onMemoDragStart?: () => void;
+  draggingMemoId?: string | null;
+  onMemoDragStart?: (memoId: string) => void;
   onMemoDragEnd?: () => void;
   isDraggingCategory?: boolean;
+  draggingCategoryId?: string | null;
   onCategoryDragStart?: () => void;
   onCategoryDragEnd?: () => void;
   onCategoryPositionDragEnd?: (categoryId: string) => void;
@@ -124,9 +126,11 @@ const Canvas: React.FC<CanvasProps> = ({
   onUndo,
   onRedo,
   isDraggingMemo = false,
+  draggingMemoId = null,
   onMemoDragStart,
   onMemoDragEnd,
   isDraggingCategory = false,
+  draggingCategoryId = null,
   onCategoryDragStart,
   onCategoryDragEnd,
   onCategoryPositionDragEnd,
@@ -789,28 +793,27 @@ const Canvas: React.FC<CanvasProps> = ({
 
       if (isShiftPressed && (isDraggingMemo || isDraggingCategory)) {
         // 드래그 중인 아이템의 현재 부모 ID 확인
-        if (isDraggingMemo && selectedMemoId) {
-          const draggingMemo = currentPage?.memos.find(m => m.id === selectedMemoId);
+        if (isDraggingMemo && draggingMemoId) {
+          const draggingMemo = currentPage?.memos.find(m => m.id === draggingMemoId);
           draggingItemParentId = draggingMemo?.parentId || null;
-        } else if (isDraggingCategory && selectedCategoryId) {
-          const draggingCategory = currentPage?.categories?.find(c => c.id === selectedCategoryId);
+        } else if (isDraggingCategory && draggingCategoryId) {
+          const draggingCategory = currentPage?.categories?.find(c => c.id === draggingCategoryId);
           draggingItemParentId = draggingCategory?.parentId || null;
         }
 
         // 이 카테고리가 드래그 중인 아이템의 현재 부모인지 확인
         isCurrentParent = draggingItemParentId === category.id;
 
-        // 부모 영역을 벗어났는지 확인 (빼기 UI)
-        // 조건: 현재 부모이면서, 현재 타겟이 아님 (= 마우스가 해당 영역을 벗어남)
-        // dragTargetCategoryId가 null이거나 다른 영역이면 부모를 벗어난 것
-        if (isCurrentParent && dragTargetCategoryId !== category.id) {
+        // 부모 영역 UI (빼기)
+        // 조건: 현재 부모이면 항상 빼기 UI 표시
+        if (isCurrentParent) {
           isParentBeingLeftBehind = true;
         }
       }
 
       // 타겟 영역 확인 (추가 UI)
       // 조건: 마우스가 올라간 영역이면서, 현재 부모가 아님
-      const isShiftDragTarget = isShiftPressed && dragTargetCategoryId === category.id && (isDraggingMemo || isDraggingCategory);
+      const isShiftDragTarget = isShiftPressed && dragTargetCategoryId === category.id && (isDraggingMemo || isDraggingCategory) && !isCurrentParent;
 
       areas.push(
         <div
@@ -1644,7 +1647,16 @@ const Canvas: React.FC<CanvasProps> = ({
   // Shift 드래그 중 마우스 위치로 영역 충돌 감지
   React.useEffect(() => {
     if (isShiftPressed && (isDraggingMemo || isDraggingCategory) && currentPage) {
+      let lastUpdateTime = 0;
+      const throttleDelay = 50; // 50ms마다 한 번만 업데이트
+
       const handleMouseMove = (e: MouseEvent) => {
+        const now = Date.now();
+        if (now - lastUpdateTime < throttleDelay) {
+          return; // 너무 자주 업데이트하지 않음
+        }
+        lastUpdateTime = now;
+
         const canvasElement = document.querySelector('[data-canvas="true"]');
         if (!canvasElement) return;
 
@@ -1655,19 +1667,22 @@ const Canvas: React.FC<CanvasProps> = ({
         // 드래그 중인 아이템의 현재 부모 ID 확인
         let draggingItemParentId: string | null = null;
 
-        if (isDraggingMemo && selectedMemoId) {
-          const draggingMemo = currentPage.memos.find(m => m.id === selectedMemoId);
+        if (isDraggingMemo && draggingMemoId) {
+          const draggingMemo = currentPage.memos.find(m => m.id === draggingMemoId);
           draggingItemParentId = draggingMemo?.parentId || null;
-        } else if (isDraggingCategory && selectedCategoryId) {
-          const draggingCategory = currentPage.categories?.find(c => c.id === selectedCategoryId);
+        } else if (isDraggingCategory && draggingCategoryId) {
+          const draggingCategory = currentPage.categories?.find(c => c.id === draggingCategoryId);
           draggingItemParentId = draggingCategory?.parentId || null;
         }
 
-        // 모든 카테고리 영역과 충돌 검사
-        let foundTarget: string | null = null;
+        // 모든 카테고리 영역과 충돌 검사 - 겹치는 모든 영역 찾기 (직계 부모 제외)
+        const overlappingCategories: CategoryBlock[] = [];
 
         for (const category of (currentPage.categories || [])) {
           if (!category.isExpanded) continue;
+
+          // 직계 부모는 제외
+          if (category.id === draggingItemParentId) continue;
 
           const area = calculateCategoryArea(category, currentPage);
           if (!area) continue;
@@ -1675,15 +1690,33 @@ const Canvas: React.FC<CanvasProps> = ({
           // 마우스가 영역 안에 있는지 확인
           if (mouseX >= area.x && mouseX <= area.x + area.width &&
               mouseY >= area.y && mouseY <= area.y + area.height) {
-            // 부모 영역이 아닌 경우만 타겟으로 설정 (추가 UI)
-            if (category.id !== draggingItemParentId) {
-              foundTarget = category.id;
-            }
-            // 부모 영역과 충돌: foundTarget을 설정하지 않음 (null 유지)
-            // 이렇게 하면 부모 영역에서는 dragTargetCategoryId가 null이 되어
-            // isParentBeingLeftBehind 조건에서 빼기 UI가 표시됨
-            break;
+            overlappingCategories.push(category);
           }
+        }
+
+        // 겹치는 영역 중에서 가장 깊은 레벨(가장 하위) 카테고리 선택
+        // 깊이(depth)를 계산하여 가장 깊은 것을 선택
+        let foundTarget: string | null = null;
+
+        if (overlappingCategories.length > 0) {
+          // 각 카테고리의 깊이를 계산
+          const categoriesWithDepth = overlappingCategories.map(category => {
+            let depth = 0;
+            let checkParent = category.parentId;
+            while (checkParent) {
+              depth++;
+              const parentCat = currentPage.categories?.find(c => c.id === checkParent);
+              checkParent = parentCat?.parentId;
+            }
+            return { category, depth };
+          });
+
+          // 깊이가 가장 큰 카테고리 선택 (같은 깊이면 첫 번째)
+          const deepest = categoriesWithDepth.reduce((max, item) =>
+            item.depth > max.depth ? item : max
+          );
+
+          foundTarget = deepest.category.id;
         }
 
         setDragTargetCategoryId(foundTarget);

@@ -164,7 +164,7 @@ interface MemoBlockProps {
   canvasOffset?: { x: number; y: number };
   activeImportanceFilters?: Set<ImportanceLevel>;
   showGeneralContent?: boolean;
-  onDragStart?: () => void;
+  onDragStart?: (memoId: string) => void;
   onDragEnd?: () => void;
   enableImportanceBackground?: boolean;
   currentPage?: Page;
@@ -395,7 +395,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         x: e.clientX - (memo.position.x * canvasScale + canvasOffset.x),
         y: e.clientY - (memo.position.y * canvasScale + canvasOffset.y)
       });
-      onDragStart?.();
+      onDragStart?.(memo.id);
       e.preventDefault(); // HTML5 드래그 방지, 마우스 드래그 우선
     }
   };

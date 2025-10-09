@@ -3,7 +3,7 @@ import { Page, MemoBlock, DataRegistry, MemoDisplaySize, ImportanceLevel, Catego
 import { globalDataRegistry } from './utils/dataRegistry';
 
 import { calculateCategoryArea, CategoryArea } from './utils/categoryAreaUtils';
-import { resolveAreaCollisions, resolveMemoCollisions } from './utils/collisionUtils';
+import { resolveAreaCollisions, resolveMemoCollisions, resolveHierarchicalCollisions, resolveMemoChildAreaCollisions, resolveSiblingMemoCollisions } from './utils/collisionUtils';
 import {
   canAddCategoryAsChild,
   addCategoryToParent,
@@ -277,7 +277,9 @@ const App: React.FC = () => {
   const collisionCheckCount = React.useRef<Map<string, number>>(new Map()); // 충돌 검사 횟수 추적
   const [dataRegistry, setDataRegistry] = useState<DataRegistry>({});
   const [isDraggingMemo, setIsDraggingMemo] = useState<boolean>(false);
+  const [draggingMemoId, setDraggingMemoId] = useState<string | null>(null);
   const [isDraggingCategory, setIsDraggingCategory] = useState<boolean>(false);
+  const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
 
   // Initialize data registry
   useEffect(() => {
@@ -1368,7 +1370,8 @@ const App: React.FC = () => {
     };
 
     // 타겟 카테고리 찾기 (자기 자신과 자신의 하위는 이미 pageWithoutDraggingCategory에서 제외됨)
-    const targetCategory = pageWithoutDraggingCategory.categories?.find(category => {
+    // 겹치는 모든 카테고리 찾기
+    const overlappingCategories = pageWithoutDraggingCategory.categories?.filter(category => {
 
       // 1. 카테고리 블록과의 겹침 체크
       const catWidth = category.size?.width || 200;
@@ -1410,7 +1413,31 @@ const App: React.FC = () => {
       }
 
       return false;
-    });
+    }) || [];
+
+    // 겹치는 카테고리 중에서 가장 깊은 레벨(가장 하위) 카테고리 선택
+    let targetCategory: CategoryBlock | null = null;
+
+    if (overlappingCategories.length > 0) {
+      // 각 카테고리의 깊이를 계산
+      const categoriesWithDepth = overlappingCategories.map(category => {
+        let depth = 0;
+        let checkParent = category.parentId;
+        while (checkParent) {
+          depth++;
+          const parentCat = currentPage.categories?.find(c => c.id === checkParent);
+          checkParent = parentCat?.parentId;
+        }
+        return { category, depth };
+      });
+
+      // 깊이가 가장 큰 카테고리 선택 (같은 깊이면 첫 번째)
+      const deepest = categoriesWithDepth.reduce((max, item) =>
+        item.depth > max.depth ? item : max
+      );
+
+      targetCategory = deepest.category;
+    }
 
     // 카테고리 변경 처리
     const newParentId = targetCategory ? targetCategory.id : undefined;
@@ -1539,8 +1566,8 @@ const App: React.FC = () => {
       memos: currentPage.memos.filter(m => m.id !== draggedMemo.id)
     };
 
-    // 카테고리 블록과 영역 모두 체크
-    const targetCategory = currentPage.categories?.find(category => {
+    // 카테고리 블록과 영역 모두 체크 - 겹치는 모든 카테고리 찾기
+    const overlappingCategories = currentPage.categories?.filter(category => {
       // 1. 카테고리 블록과의 겹침 체크
       const categoryWidth = category.size?.width || 200;
       const categoryHeight = category.size?.height || 80;
@@ -1581,7 +1608,32 @@ const App: React.FC = () => {
       }
 
       return false;
-    });
+    }) || [];
+
+    // 겹치는 카테고리 중에서 가장 깊은 레벨(가장 하위) 카테고리 선택
+    // 깊이(depth)를 계산하여 가장 깊은 것을 선택
+    let targetCategory: CategoryBlock | null = null;
+
+    if (overlappingCategories.length > 0) {
+      // 각 카테고리의 깊이를 계산
+      const categoriesWithDepth = overlappingCategories.map(category => {
+        let depth = 0;
+        let checkParent = category.parentId;
+        while (checkParent) {
+          depth++;
+          const parentCat = currentPage.categories?.find(c => c.id === checkParent);
+          checkParent = parentCat?.parentId;
+        }
+        return { category, depth };
+      });
+
+      // 깊이가 가장 큰 카테고리 선택 (같은 깊이면 첫 번째)
+      const deepest = categoriesWithDepth.reduce((max, item) =>
+        item.depth > max.depth ? item : max
+      );
+
+      targetCategory = deepest.category;
+    }
 
     // 카테고리 변경 처리
     const newParentId = targetCategory ? targetCategory.id : undefined;
@@ -1963,19 +2015,35 @@ const App: React.FC = () => {
           }));
         }
 
-        // 메모들의 원본 위치 저장
+        // 모든 하위 카테고리 ID 수집 (재귀적으로)
+        const getAllDescendantCategoryIds = (parentId: string): string[] => {
+          const directChildren = (currentPage.categories || [])
+            .filter(cat => cat.parentId === parentId)
+            .map(cat => cat.id);
+
+          const allDescendants = [...directChildren];
+          directChildren.forEach(childId => {
+            allDescendants.push(...getAllDescendantCategoryIds(childId));
+          });
+
+          return allDescendants;
+        };
+
+        const allDescendantCategoryIds = new Set([categoryId, ...getAllDescendantCategoryIds(categoryId)]);
+
+        // 모든 하위 depth의 메모들 원본 위치 저장
         const memoPositions = new Map<string, {x: number, y: number}>();
         currentPage.memos.forEach(memo => {
-          if (memo.parentId === categoryId) {
+          if (memo.parentId && allDescendantCategoryIds.has(memo.parentId)) {
             memoPositions.set(memo.id, { x: memo.position.x, y: memo.position.y });
           }
         });
         dragStartMemoPositions.current.set(categoryId, memoPositions);
 
-        // 하위 카테고리들의 원본 위치 저장
+        // 모든 하위 depth의 카테고리들 원본 위치 저장
         const categoryPositions = new Map<string, {x: number, y: number}>();
         currentPage.categories?.forEach(cat => {
-          if (cat.parentId === categoryId) {
+          if (allDescendantCategoryIds.has(cat.id) && cat.id !== categoryId) {
             categoryPositions.set(cat.id, { x: cat.position.x, y: cat.position.y });
           }
         });
@@ -1994,9 +2062,25 @@ const App: React.FC = () => {
       const totalDeltaX = cachedData ? position.x - cachedData.originalPosition.x : deltaX;
       const totalDeltaY = cachedData ? position.y - cachedData.originalPosition.y : deltaY;
 
-      // 하위 메모들도 함께 이동 (절대 위치 계산)
+      // 모든 하위 카테고리 ID 수집 (재귀적으로)
+      const getAllDescendantCategoryIds = (parentId: string): string[] => {
+        const directChildren = (page.categories || [])
+          .filter(cat => cat.parentId === parentId)
+          .map(cat => cat.id);
+
+        const allDescendants = [...directChildren];
+        directChildren.forEach(childId => {
+          allDescendants.push(...getAllDescendantCategoryIds(childId));
+        });
+
+        return allDescendants;
+      };
+
+      const allDescendantCategoryIds = new Set([categoryId, ...getAllDescendantCategoryIds(categoryId)]);
+
+      // 모든 하위 depth의 메모들도 함께 이동 (절대 위치 계산)
       const updatedMemos = page.memos.map(memo => {
-        if (memo.parentId === categoryId) {
+        if (memo.parentId && allDescendantCategoryIds.has(memo.parentId)) {
           const originalPos = dragStartMemoPositions.current.get(categoryId)?.get(memo.id);
           if (originalPos) {
             return {
@@ -2011,13 +2095,13 @@ const App: React.FC = () => {
         return memo;
       });
 
-      // 하위 카테고리들도 함께 이동 (절대 위치 계산)
+      // 모든 하위 depth의 카테고리들도 함께 이동 (절대 위치 계산)
       const updatedCategories = (page.categories || []).map(category => {
         if (category.id === categoryId) {
           return { ...category, position };
         }
 
-        if (category.parentId === categoryId) {
+        if (allDescendantCategoryIds.has(category.id) && category.id !== categoryId) {
           const originalPos = dragStartCategoryPositions.current.get(categoryId)?.get(category.id);
           if (originalPos) {
             return {
@@ -2041,12 +2125,19 @@ const App: React.FC = () => {
           categories: updatedCategories
         };
 
+        // 1. 기존 영역 충돌 검사 (최상위 영역끼리, 영역-메모)
         const collisionResult = resolveAreaCollisions(categoryId, pageWithUpdates);
+
+        // 2. 계층 충돌 검사 (같은 부모의 형제 영역끼리)
+        const hierarchicalResult = resolveHierarchicalCollisions(
+          categoryId,
+          { ...pageWithUpdates, categories: collisionResult.updatedCategories, memos: collisionResult.updatedMemos }
+        );
 
         return {
           ...page,
-          memos: collisionResult.updatedMemos,
-          categories: collisionResult.updatedCategories
+          memos: hierarchicalResult.updatedMemos,
+          categories: hierarchicalResult.updatedCategories
         };
       }
 
@@ -2783,16 +2874,29 @@ const App: React.FC = () => {
         )
       };
 
-      // 부모 카테고리가 있으면: 영역 충돌 검사 (영역끼리 밀어냄)
+      // 부모 카테고리가 있으면: 영역 충돌 검사 + 형제 메모 충돌 + 자식 영역과의 충돌 검사
       if (movedMemo?.parentId) {
+        // 1. 영역 충돌 검사 (영역끼리 밀어냄)
         const collisionResult = resolveAreaCollisions(movedMemo.parentId, updatedPage);
+
+        // 2. 형제 메모끼리 충돌 검사 (같은 부모를 가진 메모들)
+        const siblingMemoResult = resolveSiblingMemoCollisions(
+          memoId,
+          { ...updatedPage, categories: collisionResult.updatedCategories, memos: collisionResult.updatedMemos }
+        );
+
+        // 3. 메모와 직계 자식 영역 간 충돌 검사
+        const memoChildCollisionResult = resolveMemoChildAreaCollisions(
+          memoId,
+          { ...updatedPage, categories: collisionResult.updatedCategories, memos: siblingMemoResult }
+        );
 
         return prev.map(page =>
           page.id === currentPageId
             ? {
                 ...page,
-                categories: collisionResult.updatedCategories,
-                memos: collisionResult.updatedMemos
+                categories: memoChildCollisionResult.categories,
+                memos: memoChildCollisionResult.memos
               }
             : page
         );
@@ -3120,9 +3224,14 @@ const App: React.FC = () => {
         onUndo={undoCanvasAction}
         onRedo={redoCanvasAction}
         isDraggingMemo={isDraggingMemo}
-        onMemoDragStart={() => setIsDraggingMemo(true)}
+        draggingMemoId={draggingMemoId}
+        onMemoDragStart={(memoId: string) => {
+          setIsDraggingMemo(true);
+          setDraggingMemoId(memoId);
+        }}
         onMemoDragEnd={() => {
           setIsDraggingMemo(false);
+          setDraggingMemoId(null);
           // 드래그 완료 후 충돌 검사 - 주석 처리 (무한 반복 문제)
           // setTimeout(() => {
           //   const currentPage = pages.find(p => p.id === currentPageId);
