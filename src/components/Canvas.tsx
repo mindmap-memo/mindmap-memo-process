@@ -878,6 +878,23 @@ const Canvas: React.FC<CanvasProps> = ({
               하위 요소 빼기
             </div>
           )}
+          {!isShiftDragTarget && !isParentBeingLeftBehind && (
+            <div style={{
+              position: 'absolute',
+              top: '40px',
+              left: '10px',
+              fontSize: '11px',
+              color: 'rgba(139, 92, 246, 0.4)',
+              fontWeight: '400',
+              pointerEvents: 'none',
+              maxWidth: `${area.width - 20}px`,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
+              SHIFT + 드래그로 메모나 카테고리를 다른 카테고리 영역에 종속, 제거하세요
+            </div>
+          )}
         </div>
       );
     }

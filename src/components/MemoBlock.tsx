@@ -937,26 +937,23 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         }} />
       </div>
 
-      {/* 드래그 중 힌트 UI */}
-      {isDragging && !isShiftPressed && cursorPosition && (
+      {/* 드래그 중 힌트 UI - 메모 오른쪽에 고정 */}
+      {isDragging && !isShiftPressed && (
         <div
           style={{
-            position: 'fixed',
-            left: cursorPosition.x + 20,
-            top: cursorPosition.y - 10,
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            color: 'white',
-            padding: '6px 12px',
-            borderRadius: '6px',
-            fontSize: '12px',
-            fontWeight: '500',
+            position: 'absolute',
+            left: sizeConfig.width + 10,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            fontSize: '11px',
+            color: 'rgba(139, 92, 246, 0.4)',
+            fontWeight: '400',
             whiteSpace: 'nowrap',
             pointerEvents: 'none',
-            zIndex: 10000,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+            zIndex: 10000
           }}
         >
-          💡 Shift를 누르면 카테고리에 추가
+          SHIFT + 드래그로 메모나 카테고리를 다른 카테고리 영역에 종속, 제거하세요
         </div>
       )}
 
