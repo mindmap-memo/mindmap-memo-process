@@ -3,7 +3,7 @@ import { Page, MemoBlock, DataRegistry, MemoDisplaySize, ImportanceLevel, Catego
 import { globalDataRegistry } from './utils/dataRegistry';
 
 import { calculateCategoryArea, CategoryArea } from './utils/categoryAreaUtils';
-import { resolveAreaCollisions, resolveMemoCollisions, resolveHierarchicalCollisions, resolveMemoChildAreaCollisions, resolveSiblingMemoCollisions } from './utils/collisionUtils';
+import { resolveUnifiedCollisions } from './utils/collisionUtils';
 import {
   canAddCategoryAsChild,
   addCategoryToParent,
@@ -1096,26 +1096,47 @@ const App: React.FC = () => {
   // calculateCategoryArea는 이제 utils/categoryAreaUtils.ts에서 import
 
   const addMemoBlock = (position?: { x: number; y: number }) => {
-    const newPosition = position || { x: 300, y: 200 };
+    let newPosition = position || { x: 300, y: 200 };
 
-    // 위치에 따라 적절한 카테고리 찾기
-    let parentCategoryId: string | null = null;
+    // 영역과 겹치지 않는 위치 찾기
     if (position) {
       const currentPage = pages.find(p => p.id === currentPageId);
       if (currentPage?.categories) {
-        for (const category of currentPage.categories) {
-          if (category.isExpanded) {
-            const area = calculateCategoryArea(category, currentPage);
-            if (area &&
-                position.x >= area.x &&
-                position.x <= area.x + area.width &&
-                position.y >= area.y &&
-                position.y <= area.y + area.height) {
-              parentCategoryId = category.id;
-              break;
+        const memoWidth = 300;
+        const memoHeight = 200;
+        let isOverlapping = true;
+        let adjustedY = newPosition.y;
+
+        while (isOverlapping && adjustedY > -1000) {
+          isOverlapping = false;
+
+          for (const category of currentPage.categories) {
+            if (category.isExpanded) {
+              const area = calculateCategoryArea(category, currentPage);
+              if (area) {
+                // 메모와 영역이 겹치는지 확인
+                const memoLeft = newPosition.x;
+                const memoRight = newPosition.x + memoWidth;
+                const memoTop = adjustedY;
+                const memoBottom = adjustedY + memoHeight;
+
+                const areaLeft = area.x;
+                const areaRight = area.x + area.width;
+                const areaTop = area.y;
+                const areaBottom = area.y + area.height;
+
+                if (!(memoRight < areaLeft || memoLeft > areaRight || memoBottom < areaTop || memoTop > areaBottom)) {
+                  // 겹침 - 위로 이동
+                  isOverlapping = true;
+                  adjustedY -= 50;
+                  break;
+                }
+              }
             }
           }
         }
+
+        newPosition = { x: newPosition.x, y: adjustedY };
       }
     }
 
@@ -1134,7 +1155,7 @@ const App: React.FC = () => {
       connections: [],
       position: newPosition,
       displaySize: 'medium',
-      parentId: parentCategoryId
+      parentId: null
     };
 
     setPages(prev => prev.map(page =>
@@ -2125,19 +2146,13 @@ const App: React.FC = () => {
           categories: updatedCategories
         };
 
-        // 1. 기존 영역 충돌 검사 (최상위 영역끼리, 영역-메모)
-        const collisionResult = resolveAreaCollisions(categoryId, pageWithUpdates);
-
-        // 2. 계층 충돌 검사 (같은 부모의 형제 영역끼리)
-        const hierarchicalResult = resolveHierarchicalCollisions(
-          categoryId,
-          { ...pageWithUpdates, categories: collisionResult.updatedCategories, memos: collisionResult.updatedMemos }
-        );
+        // 통합 충돌 검사 (같은 depth의 메모와 영역 모두 처리)
+        const collisionResult = resolveUnifiedCollisions(categoryId, 'area', pageWithUpdates);
 
         return {
           ...page,
-          memos: hierarchicalResult.updatedMemos,
-          categories: hierarchicalResult.updatedCategories
+          memos: collisionResult.updatedMemos,
+          categories: collisionResult.updatedCategories
         };
       }
 
@@ -2874,37 +2889,8 @@ const App: React.FC = () => {
         )
       };
 
-      // 부모 카테고리가 있으면: 영역 충돌 검사 + 형제 메모 충돌 + 자식 영역과의 충돌 검사
-      if (movedMemo?.parentId) {
-        // 1. 영역 충돌 검사 (영역끼리 밀어냄)
-        const collisionResult = resolveAreaCollisions(movedMemo.parentId, updatedPage);
-
-        // 2. 형제 메모끼리 충돌 검사 (같은 부모를 가진 메모들)
-        const siblingMemoResult = resolveSiblingMemoCollisions(
-          memoId,
-          { ...updatedPage, categories: collisionResult.updatedCategories, memos: collisionResult.updatedMemos }
-        );
-
-        // 3. 메모와 직계 자식 영역 간 충돌 검사
-        const memoChildCollisionResult = resolveMemoChildAreaCollisions(
-          memoId,
-          { ...updatedPage, categories: collisionResult.updatedCategories, memos: siblingMemoResult }
-        );
-
-        return prev.map(page =>
-          page.id === currentPageId
-            ? {
-                ...page,
-                categories: memoChildCollisionResult.categories,
-                memos: memoChildCollisionResult.memos
-              }
-            : page
-        );
-      }
-
-      // 부모 카테고리가 없으면: 메모-메모 충돌 검사 (Shift 누르면 스킵)
+      // Shift 드래그 중에는 충돌 검사 안 함
       if (isShiftPressed) {
-        // Shift 드래그 중에는 충돌 검사 안 함
         return prev.map(page =>
           page.id === currentPageId
             ? updatedPage
@@ -2912,21 +2898,15 @@ const App: React.FC = () => {
         );
       }
 
-      const collisionResult = resolveMemoCollisions(memoId, updatedPage);
-
-      // 영역에 막혔으면 원래 위치로 복원
-      let finalMemos = collisionResult.memos;
-      if (collisionResult.blockedByArea) {
-        finalMemos = finalMemos.map(memo =>
-          memo.id === memoId ? { ...memo, position: movedMemo.position } : memo
-        );
-      }
+      // 통합 충돌 검사 (같은 depth의 메모와 영역 모두 처리)
+      const collisionResult = resolveUnifiedCollisions(memoId, 'memo', updatedPage);
 
       return prev.map(page =>
         page.id === currentPageId
           ? {
               ...page,
-              memos: finalMemos
+              categories: collisionResult.updatedCategories,
+              memos: collisionResult.updatedMemos
             }
           : page
       );

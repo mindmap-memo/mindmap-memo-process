@@ -78,17 +78,11 @@ export function calculateCategoryArea(
     }
   });
 
-  // 카테고리 블록(라벨)의 현재 위치를 영역에 포함
-  // 단, 하위 요소가 2개 이상이면 태그 위치는 제외하고 하위 요소들만으로 영역 계산
-  const totalChildren = childMemos.length + childCategories.length;
-  if (totalChildren < 2) {
-    // 하위 요소가 1개 이하면 태그 위치 포함 (태그가 영역 밖으로 나가지 않도록)
-    minX = Math.min(minX, category.position.x);
-    minY = Math.min(minY, category.position.y);
-    maxX = Math.max(maxX, category.position.x + categoryWidth);
-    maxY = Math.max(maxY, category.position.y + categoryHeight);
-  }
-  // 하위 요소가 2개 이상이면 태그는 updateCategoryPositions에서 자동으로 area.x, area.y로 이동
+  // 카테고리 블록(라벨)의 현재 위치를 항상 영역에 포함
+  minX = Math.min(minX, category.position.x);
+  minY = Math.min(minY, category.position.y);
+  maxX = Math.max(maxX, category.position.x + categoryWidth);
+  maxY = Math.max(maxY, category.position.y + categoryHeight);
 
   // 방문 완료 후 제거 (다른 브랜치에서 재방문 가능하도록)
   visited.delete(category.id);

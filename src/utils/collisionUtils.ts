@@ -7,6 +7,187 @@ export interface CollisionResult {
   updatedMemos: MemoBlock[];
 }
 
+// 충돌 가능 객체 타입 (메모 또는 영역)
+interface CollidableObject {
+  id: string;
+  type: 'memo' | 'area';
+  parentId: string | null | undefined;
+  bounds: CategoryArea;
+  originalMemo?: MemoBlock;
+  originalCategory?: CategoryBlock;
+}
+
+/**
+ * 통합 충돌 검사 시스템 - 같은 depth의 메모와 영역을 모두 처리
+ *
+ * @param movingId - 이동 중인 메모 또는 카테고리 ID
+ * @param movingType - 'memo' 또는 'area'
+ * @param page - 현재 페이지
+ * @param maxIterations - 최대 반복 횟수
+ */
+export function resolveUnifiedCollisions(
+  movingId: string,
+  movingType: 'memo' | 'area',
+  page: Page,
+  maxIterations: number = 10
+): CollisionResult {
+  let updatedMemos = [...page.memos];
+  let updatedCategories = [...(page.categories || [])];
+
+  // 이동 중인 객체 찾기
+  const movingMemo = movingType === 'memo' ? updatedMemos.find(m => m.id === movingId) : null;
+  const movingCategory = movingType === 'area' ? updatedCategories.find(c => c.id === movingId) : null;
+
+  if (!movingMemo && !movingCategory) {
+    return { updatedCategories, updatedMemos };
+  }
+
+  const movingParentId = movingMemo?.parentId ?? movingCategory?.parentId ?? null;
+
+  // 같은 depth의 모든 충돌 가능 객체 수집
+  const getCollidableObjects = (): CollidableObject[] => {
+    const objects: CollidableObject[] = [];
+
+    // 메모들 추가
+    updatedMemos.forEach(memo => {
+      if (memo.parentId === movingParentId) {
+        const width = memo.size?.width || 200;
+        const height = memo.size?.height || 95;
+        objects.push({
+          id: memo.id,
+          type: 'memo',
+          parentId: memo.parentId || undefined,
+          bounds: {
+            x: memo.position.x,
+            y: memo.position.y,
+            width,
+            height
+          },
+          originalMemo: memo
+        });
+      }
+    });
+
+    // 영역들 추가
+    updatedCategories.forEach(category => {
+      if (category.parentId === movingParentId) {
+        const area = calculateCategoryArea(category, { ...page, memos: updatedMemos, categories: updatedCategories });
+        if (area) {
+          objects.push({
+            id: category.id,
+            type: 'area',
+            parentId: category.parentId || undefined,
+            bounds: area,
+            originalCategory: category
+          });
+        }
+      }
+    });
+
+    return objects;
+  };
+
+  // 우선순위 맵: 이동 중인 객체가 최고 우선순위 (0)
+  const priorityMap = new Map<string, number>();
+  priorityMap.set(movingId, 0);
+
+  for (let iteration = 0; iteration < maxIterations; iteration++) {
+    let hasCollision = false;
+    const collidables = getCollidableObjects();
+    const originalCollidables = [...collidables];
+
+    for (const current of collidables) {
+      // 이동 중인 객체는 밀리지 않음
+      if (current.id === movingId) continue;
+
+      const currentPriority = priorityMap.get(current.id) ?? Infinity;
+      let totalPushX = 0;
+      let totalPushY = 0;
+      let highestPusherPriority = Infinity;
+
+      // 모든 다른 객체와 충돌 검사
+      for (const other of originalCollidables) {
+        if (current.id === other.id) continue;
+
+        const otherPriority = priorityMap.get(other.id) ?? Infinity;
+
+        // 우선순위가 같거나 높으면 밀리지 않음
+        if (currentPriority <= otherPriority) continue;
+
+        // 충돌 검사
+        const pushDirection = calculatePushDirection(other.bounds, current.bounds);
+
+        if (pushDirection.x !== 0 || pushDirection.y !== 0) {
+          hasCollision = true;
+
+          if (otherPriority < highestPusherPriority) {
+            totalPushX = pushDirection.x;
+            totalPushY = pushDirection.y;
+            highestPusherPriority = otherPriority;
+
+            if (!priorityMap.has(current.id)) {
+              priorityMap.set(current.id, otherPriority + 1);
+            }
+          }
+        }
+      }
+
+      // 밀어내기 적용
+      if (totalPushX !== 0 || totalPushY !== 0) {
+        if (current.type === 'memo' && current.originalMemo) {
+          updatedMemos = updatedMemos.map(memo =>
+            memo.id === current.id
+              ? { ...memo, position: { x: memo.position.x + totalPushX, y: memo.position.y + totalPushY } }
+              : memo
+          );
+        } else if (current.type === 'area' && current.originalCategory) {
+          // 카테고리 이동
+          updatedCategories = updatedCategories.map(cat =>
+            cat.id === current.id
+              ? { ...cat, position: { x: cat.position.x + totalPushX, y: cat.position.y + totalPushY } }
+              : cat
+          );
+
+          // 모든 하위 depth의 카테고리 ID 수집 (재귀)
+          const getAllDescendantCategoryIds = (parentId: string): Set<string> => {
+            const result = new Set<string>();
+            const directChildren = updatedCategories.filter(cat => cat.parentId === parentId);
+
+            directChildren.forEach(child => {
+              result.add(child.id);
+              const descendants = getAllDescendantCategoryIds(child.id);
+              descendants.forEach(id => result.add(id));
+            });
+
+            return result;
+          };
+
+          const allDescendantIds = getAllDescendantCategoryIds(current.id);
+          allDescendantIds.add(current.id); // 자기 자신도 포함
+
+          // 하위 카테고리들도 함께 이동
+          updatedCategories = updatedCategories.map(cat =>
+            allDescendantIds.has(cat.id) && cat.id !== current.id
+              ? { ...cat, position: { x: cat.position.x + totalPushX, y: cat.position.y + totalPushY } }
+              : cat
+          );
+
+          // 모든 하위 depth의 메모들도 함께 이동
+          updatedMemos = updatedMemos.map(memo =>
+            memo.parentId && allDescendantIds.has(memo.parentId)
+              ? { ...memo, position: { x: memo.position.x + totalPushX, y: memo.position.y + totalPushY } }
+              : memo
+          );
+        }
+      }
+    }
+
+    if (!hasCollision) break;
+  }
+
+  return { updatedCategories, updatedMemos };
+}
+
 /**
  * 우선순위 기반 카테고리 영역 충돌 검사 및 밀어내기
  *
@@ -222,7 +403,7 @@ export interface MemoCollisionResult {
 }
 
 /**
- * 메모블록-메모블록 충돌 검사 및 밀어내기 (영역-영역 충돌 로직과 동일)
+ * 메모블록-메모블록 충돌 검사 및 밀어내기 (같은 depth만)
  *
  * @param movingMemoId - 이동 중인 메모 ID (최고 우선순위)
  * @param page - 현재 페이지
@@ -235,6 +416,22 @@ export function resolveMemoCollisions(
   maxIterations: number = 10
 ): MemoCollisionResult {
   let updatedMemos = [...page.memos];
+
+  const movingMemo = page.memos.find(m => m.id === movingMemoId);
+  if (!movingMemo) {
+    return { memos: updatedMemos, blockedByArea: false };
+  }
+
+  // 같은 depth의 메모들만 찾기 (같은 parentId를 가진 메모)
+  const sameLevelMemos = page.memos.filter(m =>
+    m.id !== movingMemoId &&
+    m.parentId === movingMemo.parentId
+  );
+
+  // 같은 레벨 메모가 없으면 충돌 검사 불필요
+  if (sameLevelMemos.length === 0) {
+    return { memos: updatedMemos, blockedByArea: false };
+  }
 
   // 우선순위 맵: 이동 중인 메모가 최고 우선순위 (0)
   const priorityMap = new Map<string, number>();
@@ -258,7 +455,8 @@ export function resolveMemoCollisions(
     const newlyBlockedMemos = new Set<string>();
 
     for (const memo of updatedMemos) {
-      if (memo.parentId) continue;
+      // 같은 레벨이 아닌 메모는 스킵
+      if (memo.parentId !== movingMemo.parentId) continue;
 
       // 우선순위가 있는 메모만 확인 (밀리는 체인에 속한 메모)
       const memoPriority = priorityMap.get(memo.id);
@@ -300,7 +498,7 @@ export function resolveMemoCollisions(
 
           // 이 메모가 막혔으면, 이 메모가 밀고 있던 모든 메모(우선순위가 더 낮은)도 막아야 함
           for (const otherMemo of updatedMemos) {
-            if (otherMemo.parentId) continue;
+            if (otherMemo.parentId !== movingMemo.parentId) continue;
             const otherPriority = priorityMap.get(otherMemo.id);
             if (otherPriority !== undefined && otherPriority > memoPriority) {
               // 이 메모가 밀고 있던 메모들 (우선순위가 낮은 = 숫자가 큰)
@@ -326,7 +524,7 @@ export function resolveMemoCollisions(
     // 이렇게 하면 D가 영역에 막혔을 때, C를 처리하기 전에 D가 blockedMemos에 들어감
     const memosWithPriority = newMemos
       .map((memo, index) => ({ memo, index, priority: priorityMap.get(memo.id) ?? Infinity }))
-      .filter(item => !item.memo.parentId) // 부모 있는 메모만 제외
+      .filter(item => item.memo.parentId === movingMemo.parentId) // 같은 레벨만
       .sort((a, b) => b.priority - a.priority); // 내림차순 정렬 (큰 숫자 먼저, Infinity 먼저)
 
     for (const { memo: currentMemo, index: i } of memosWithPriority) {
@@ -344,7 +542,7 @@ export function resolveMemoCollisions(
       // 충돌 검사는 원본 위치 기준 (중복 방지)
       for (const otherMemo of originalMemos) {
         if (currentMemo.id === otherMemo.id) continue;
-        if (otherMemo.parentId) continue;
+        if (otherMemo.parentId !== movingMemo.parentId) continue; // 같은 레벨만
 
         // 우선순위 확인
         const currentPriority = priorityMap.get(currentMemo.id) ?? Infinity;
@@ -387,16 +585,20 @@ export function resolveMemoCollisions(
         const overlapWidth = overlapRight - overlapLeft;
         const overlapHeight = overlapBottom - overlapTop;
 
-        // 밀어낼 방향 계산 (짧은 쪽 방향으로만 밀기)
+        // 밀어낼 방향 계산 (겹침이 적은 쪽으로 밀기)
         let pushX = 0;
         let pushY = 0;
 
         if (overlapWidth < overlapHeight) {
-          // 가로 방향으로만 밀기
-          pushX = currentMemo.position.x < otherMemo.position.x ? -overlapWidth : overlapWidth;
+          // X축 겹침이 적음 - X 방향으로 밀기
+          // otherMemo가 currentMemo보다 왼쪽에 있으면 currentMemo를 오른쪽으로
+          const direction = otherMemo.position.x < currentMemo.position.x ? 1 : -1;
+          pushX = overlapWidth * direction;
         } else {
-          // 세로 방향으로만 밀기
-          pushY = currentMemo.position.y < otherMemo.position.y ? -overlapHeight : overlapHeight;
+          // Y축 겹침이 적음 - Y 방향으로 밀기
+          // otherMemo가 currentMemo보다 위에 있으면 currentMemo를 아래로
+          const direction = otherMemo.position.y < currentMemo.position.y ? 1 : -1;
+          pushY = overlapHeight * direction;
         }
 
         if (pushX !== 0 || pushY !== 0) {
@@ -454,7 +656,7 @@ export function resolveMemoCollisions(
 
         for (const otherMemo of updatedMemos) {
           if (otherMemo.id === currentMemo.id) continue;
-          if (otherMemo.parentId) continue;
+          if (otherMemo.parentId !== movingMemo.parentId) continue; // 같은 레벨만
 
           const otherWidth = otherMemo.size?.width || 200;
           const otherHeight = otherMemo.size?.height || 95;
@@ -518,7 +720,7 @@ export function resolveMemoCollisions(
 }
 
 /**
- * 메모블록이 영역과 충돌했는지 확인
+ * 메모블록이 영역과 충돌했는지 확인 (같은 depth만)
  *
  * @param memoId - 메모 ID
  * @param page - 현재 페이지
@@ -529,7 +731,7 @@ export function checkMemoAreaCollision(
   page: Page
 ): { blocked: boolean; restrictedDirections?: { left: boolean; right: boolean; up: boolean; down: boolean } } {
   const memo = page.memos.find(m => m.id === memoId);
-  if (!memo || memo.parentId) return { blocked: false }; // 부모가 있는 메모는 제외
+  if (!memo) return { blocked: false };
 
   const memoWidth = memo.size?.width || 200;
   const memoHeight = memo.size?.height || 95;
@@ -541,10 +743,13 @@ export function checkMemoAreaCollision(
     bottom: memo.position.y + memoHeight
   };
 
-  // 카테고리 영역과 충돌 검사
+  // 카테고리 영역과 충돌 검사 (같은 depth만 - 같은 parentId)
   const categories = page.categories || [];
 
   for (const category of categories) {
+    // 같은 depth가 아닌 카테고리는 스킵
+    if (category.parentId !== memo.parentId) continue;
+
     const categoryArea = calculateCategoryArea(category, page);
     if (!categoryArea) continue;
 
@@ -900,13 +1105,13 @@ export function resolveSiblingMemoCollisions(
         let pushY = 0;
 
         if (overlapWidth < overlapHeight) {
-          const currentCenterX = (currentBounds.left + currentBounds.right) / 2;
-          const otherCenterX = (otherBounds.left + otherBounds.right) / 2;
-          pushX = currentCenterX < otherCenterX ? overlapWidth : -overlapWidth;
+          // X축 겹침이 적음 - X 방향으로 밀기
+          const direction = otherOriginal.position.x < currentMemo.position.x ? 1 : -1;
+          pushX = overlapWidth * direction;
         } else {
-          const currentCenterY = (currentBounds.top + currentBounds.bottom) / 2;
-          const otherCenterY = (otherBounds.top + otherBounds.bottom) / 2;
-          pushY = currentCenterY < otherCenterY ? overlapHeight : -overlapHeight;
+          // Y축 겹침이 적음 - Y 방향으로 밀기
+          const direction = otherOriginal.position.y < currentMemo.position.y ? 1 : -1;
+          pushY = overlapHeight * direction;
         }
 
         // 가장 우선순위가 높은 밀어내는 메모만 적용
@@ -950,13 +1155,13 @@ export function resolveSiblingMemoCollisions(
           let pushY = 0;
 
           if (overlapWidth < overlapHeight) {
-            const currentCenterX = (currentBounds.left + currentBounds.right) / 2;
-            const movingCenterX = (movingBounds.left + movingBounds.right) / 2;
-            pushX = currentCenterX < movingCenterX ? overlapWidth : -overlapWidth;
+            // X축 겹침이 적음 - X 방향으로 밀기
+            const direction = movingCurrent.position.x < currentMemo.position.x ? 1 : -1;
+            pushX = overlapWidth * direction;
           } else {
-            const currentCenterY = (currentBounds.top + currentBounds.bottom) / 2;
-            const movingCenterY = (movingBounds.top + movingBounds.bottom) / 2;
-            pushY = currentCenterY < movingCenterY ? overlapHeight : -overlapHeight;
+            // Y축 겹침이 적음 - Y 방향으로 밀기
+            const direction = movingCurrent.position.y < currentMemo.position.y ? 1 : -1;
+            pushY = overlapHeight * direction;
           }
 
           const movingPriority = 0;
