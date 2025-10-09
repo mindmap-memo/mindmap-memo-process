@@ -182,6 +182,9 @@ const Canvas: React.FC<CanvasProps> = ({
   // Shift 드래그 중 드래그되는 카테고리 ID와 오프셋
   const [shiftDragInfo, setShiftDragInfo] = React.useState<{categoryId: string, offset: {x: number, y: number}} | null>(null);
 
+  // 드래그 타겟 카테고리 추적 (마우스 오버 상태)
+  const [dragTargetCategoryId, setDragTargetCategoryId] = React.useState<string | null>(null);
+
   // 카테고리 영역/라벨 컨텍스트 메뉴
   const [areaContextMenu, setAreaContextMenu] = React.useState<{x: number, y: number, categoryId: string} | null>(null);
   const [showAreaQuickNavModal, setShowAreaQuickNavModal] = React.useState<{categoryId: string, categoryName: string} | null>(null);
@@ -797,6 +800,14 @@ const Canvas: React.FC<CanvasProps> = ({
           }}
           onDrop={(e) => handleDropOnCategoryArea(e, category.id)}
           onDragOver={handleCategoryAreaDragOver}
+          onMouseEnter={() => {
+            if (isDraggingCategory || isDraggingMemo) {
+              setDragTargetCategoryId(category.id);
+            }
+          }}
+          onMouseLeave={() => {
+            setDragTargetCategoryId(null);
+          }}
           onContextMenu={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -811,7 +822,7 @@ const Canvas: React.FC<CanvasProps> = ({
     // 카테고리 이름 라벨은 항상 표시 (접어도 보임) - 마우스 드래그 사용
     // 하위 카테고리는 항상 라벨 표시, 최상위 카테고리는 자식 있을 때만
     if (hasChildren || isChildCategory) {
-      // 라벨 위치는 영역 위치 또는 카테고리 위치 사용 (영역에 이미 offset이 적용되어 있음)
+      // 라벨 위치는 영역의 좌상단에 고정
       const labelX = area?.x || category.position.x;
       const labelY = area?.y || category.position.y;
 
@@ -1135,6 +1146,8 @@ const Canvas: React.FC<CanvasProps> = ({
             isMemoBeingDragged={isDraggingMemo}
             onAddQuickNav={onAddQuickNav}
             isQuickNavExists={isQuickNavExists}
+            isDragTarget={dragTargetCategoryId === category.id}
+            isCategoryBeingDragged={isDraggingCategory}
           >
             {childrenElements}
           </CategoryBlockComponent>

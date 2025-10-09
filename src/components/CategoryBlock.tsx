@@ -32,6 +32,8 @@ interface CategoryBlockProps {
   canvasOffset?: { x: number; y: number };
   onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
   isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
+  isDragTarget?: boolean; // 드래그 타겟인지 여부
+  isCategoryBeingDragged?: boolean; // 카테고리가 드래그 중인지 여부
 }
 
 const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
@@ -62,7 +64,9 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   canvasScale = 1,
   canvasOffset = { x: 0, y: 0 },
   onAddQuickNav,
-  isQuickNavExists
+  isQuickNavExists,
+  isDragTarget = false,
+  isCategoryBeingDragged = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(category.title);
@@ -346,7 +350,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   };
 
   // 카테고리 블록 스타일 - 하위 아이템이 있으면 태그 스타일로 표시
-  const isHighlighted = isDragOver || (isMemoBeingDragged && isHovered);
+  const isHighlighted = isDragOver || (isMemoBeingDragged && isHovered) || (isCategoryBeingDragged && isDragTarget);
   const isTagMode = hasChildren && !isHighlighted; // 하위 아이템이 있으면 태그로 표시 (하이라이트 시 제외)
 
   const categoryStyle: React.CSSProperties = {

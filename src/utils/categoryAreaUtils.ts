@@ -41,10 +41,11 @@ export function calculateCategoryArea(
   const categoryWidth = category.size?.width || DEFAULT_CATEGORY_WIDTH;
   const categoryHeight = category.size?.height || DEFAULT_CATEGORY_HEIGHT;
 
-  let minX = category.position.x;
-  let minY = category.position.y;
-  let maxX = category.position.x + categoryWidth;
-  let maxY = category.position.y + categoryHeight;
+  // 초기값을 무한대로 설정 (하위 아이템들만으로 영역 계산)
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
 
   // 하위 메모들의 경계 포함
   childMemos.forEach(memo => {
@@ -76,6 +77,18 @@ export function calculateCategoryArea(
       maxY = Math.max(maxY, childCategory.position.y + childCategoryHeight);
     }
   });
+
+  // 카테고리 블록(라벨)의 현재 위치를 영역에 포함
+  // 단, 하위 요소가 2개 이상이면 태그 위치는 제외하고 하위 요소들만으로 영역 계산
+  const totalChildren = childMemos.length + childCategories.length;
+  if (totalChildren < 2) {
+    // 하위 요소가 1개 이하면 태그 위치 포함 (태그가 영역 밖으로 나가지 않도록)
+    minX = Math.min(minX, category.position.x);
+    minY = Math.min(minY, category.position.y);
+    maxX = Math.max(maxX, category.position.x + categoryWidth);
+    maxY = Math.max(maxY, category.position.y + categoryHeight);
+  }
+  // 하위 요소가 2개 이상이면 태그는 updateCategoryPositions에서 자동으로 area.x, area.y로 이동
 
   // 방문 완료 후 제거 (다른 브랜치에서 재방문 가능하도록)
   visited.delete(category.id);
@@ -122,6 +135,7 @@ export function calculateOverlap(area1: CategoryArea, area2: CategoryArea): { x:
 
 /**
  * 겹침에 따라 밀어낼 방향과 거리 계산
+ * 겹침이 적은 방향으로 밀어냄
  */
 export function calculatePushDirection(
   pushedArea: CategoryArea,
@@ -133,13 +147,15 @@ export function calculatePushDirection(
     return { x: 0, y: 0 };
   }
 
-  // 짧은 쪽 방향으로만 밀기
+  // 겹침이 적은 쪽으로 밀어냄
   if (overlap.x < overlap.y) {
-    const pushX = pushedArea.x < pusherArea.x ? -overlap.x : overlap.x;
-    return { x: pushX, y: 0 };
+    // X축 겹침이 적음 - X 방향으로 밀기
+    const direction = pushedArea.x < pusherArea.x ? -1 : 1;
+    return { x: overlap.x * direction, y: 0 };
   } else {
-    const pushY = pushedArea.y < pusherArea.y ? -overlap.y : overlap.y;
-    return { x: 0, y: pushY };
+    // Y축 겹침이 적음 - Y 방향으로 밀기
+    const direction = pushedArea.y < pusherArea.y ? -1 : 1;
+    return { x: 0, y: overlap.y * direction };
   }
 }
 

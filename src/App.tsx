@@ -333,6 +333,54 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // 카테고리 라벨 위치 자동 업데이트 (영역의 좌상단으로)
+  // 메모가 이동할 때만 업데이트
+  const updateCategoryPositions = React.useCallback(() => {
+    const currentPage = pages.find(p => p.id === currentPageId);
+    if (!currentPage || !currentPage.categories) return;
+
+    const categoriesToUpdate: CategoryBlock[] = [];
+
+    currentPage.categories.forEach(category => {
+      const childMemos = currentPage.memos.filter(m => m.parentId === category.id);
+      const childCategories = currentPage.categories?.filter(c => c.parentId === category.id) || [];
+      const hasChildren = childMemos.length > 0 || childCategories.length > 0;
+
+      if (hasChildren) {
+        const area = calculateCategoryArea(category, currentPage);
+        if (area) {
+          // 영역의 좌상단 위치와 category.position이 다르면 업데이트 필요
+          const padding = 20;
+          const newX = area.x + padding;
+          const newY = area.y + padding;
+
+          if (Math.abs(category.position.x - newX) > 1 || Math.abs(category.position.y - newY) > 1) {
+            categoriesToUpdate.push({
+              ...category,
+              position: { x: newX, y: newY }
+            });
+          }
+        }
+      }
+    });
+
+    // 업데이트가 필요한 카테고리가 있으면 한 번에 업데이트
+    if (categoriesToUpdate.length > 0) {
+      setPages(prev => prev.map(page => {
+        if (page.id === currentPageId) {
+          return {
+            ...page,
+            categories: page.categories?.map(cat => {
+              const updated = categoriesToUpdate.find(u => u.id === cat.id);
+              return updated || cat;
+            }) || []
+          };
+        }
+        return page;
+      }));
+    }
+  }, [pages, currentPageId]);
+
   // Canvas History Management Functions
   const saveCanvasState = React.useCallback((actionType: CanvasActionType, description: string) => {
     const currentPage = pages.find(p => p.id === currentPageId);
@@ -1098,12 +1146,14 @@ const App: React.FC = () => {
 
   // Category management functions
   const addCategory = (position?: { x: number; y: number }) => {
+    const pos = position || { x: 300, y: 200 };
     const newCategory: CategoryBlock = {
       id: Date.now().toString(),
       title: 'New Category',
       tags: [],
       connections: [],
-      position: position || { x: 300, y: 200 },
+      position: pos,
+      originalPosition: pos, // 초기 위치 저장
       isExpanded: true,
       children: []
     };
@@ -2604,6 +2654,13 @@ const App: React.FC = () => {
   const memoPositionTimers = React.useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   const updateMemoPosition = (memoId: string, position: { x: number; y: number }) => {
+    // 메모가 이동하면 부모 카테고리의 캐시 제거 (영역 재계산을 위해)
+    const currentPage = pages.find(p => p.id === currentPageId);
+    const movedMemo = currentPage?.memos.find(m => m.id === memoId);
+    if (movedMemo?.parentId) {
+      clearCategoryCache(movedMemo.parentId);
+    }
+
     setPages(prev => {
       const currentPage = prev.find(p => p.id === currentPageId);
       if (!currentPage) {
@@ -2728,6 +2785,11 @@ const App: React.FC = () => {
           : page
       );
     });
+
+    // 메모 이동 후 부모 카테고리의 라벨 위치 업데이트
+    if (movedMemo?.parentId) {
+      setTimeout(() => updateCategoryPositions(), 0);
+    }
 
     // 이동 완료 후 200ms 후에 히스토리 저장 (연속 이동을 하나로 묶기 위해)
     const existingTimer = memoPositionTimers.current.get(memoId);

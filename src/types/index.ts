@@ -198,6 +198,7 @@ export interface CategoryBlock {
   tags: string[];
   connections: string[]; // 연결된 아이템 IDs (MemoBlock 또는 CategoryBlock)
   position: { x: number; y: number };
+  originalPosition?: { x: number; y: number }; // 생성 시 초기 위치 (영역 계산용)
   size?: { width: number; height: number };
   isExpanded: boolean; // 펼침/접기 상태
   children: string[]; // 하위 블록 IDs (MemoBlock 또는 CategoryBlock)
