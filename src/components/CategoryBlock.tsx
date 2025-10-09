@@ -31,6 +31,7 @@ interface CategoryBlockProps {
   canvasScale?: number;
   canvasOffset?: { x: number; y: number };
   onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
+  isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
 }
 
 const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
@@ -60,7 +61,8 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   onMoveToCategory,
   canvasScale = 1,
   canvasOffset = { x: 0, y: 0 },
-  onAddQuickNav
+  onAddQuickNav,
+  isQuickNavExists
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(category.title);
@@ -131,6 +133,12 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
 
   // 단축 이동 추가 핸들러
   const handleAddQuickNav = () => {
+    // 중복 체크
+    if (isQuickNavExists && isQuickNavExists(category.id, 'category')) {
+      alert('이미 단축 이동이 설정되어 있습니다.');
+      setContextMenu(null);
+      return;
+    }
     setContextMenu(null);
     setShowQuickNavModal(true);
   };

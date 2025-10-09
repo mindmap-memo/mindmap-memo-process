@@ -172,6 +172,7 @@ interface MemoBlockProps {
   isShiftPressed?: boolean;
   onDelete?: (id: string) => void;
   onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
+  isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
 }
 
 const MemoBlock: React.FC<MemoBlockProps> = ({
@@ -198,7 +199,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   isDraggingAnyMemo = false,
   isShiftPressed = false,
   onDelete,
-  onAddQuickNav
+  onAddQuickNav,
+  isQuickNavExists
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -966,6 +968,11 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
           }
         }}
         onSetQuickNav={() => {
+          // 중복 체크
+          if (isQuickNavExists && isQuickNavExists(memo.id, 'memo')) {
+            alert('이미 단축 이동이 설정되어 있습니다.');
+            return;
+          }
           setShowQuickNavModal(true);
         }}
       />
@@ -977,6 +984,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
           setShowQuickNavModal(false);
         }}
         onConfirm={handleQuickNavConfirm}
+        initialName={memo.title || ''}
       />
     </div>
   );

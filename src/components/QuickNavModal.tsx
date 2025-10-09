@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 
 interface QuickNavModalProps {
@@ -15,6 +15,13 @@ const QuickNavModal: React.FC<QuickNavModalProps> = ({
   initialName = ''
 }) => {
   const [name, setName] = useState(initialName);
+
+  // initialName이 변경될 때마다 name 업데이트
+  useEffect(() => {
+    if (isOpen) {
+      setName(initialName);
+    }
+  }, [isOpen, initialName]);
 
   if (!isOpen) return null;
 

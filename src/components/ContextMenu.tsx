@@ -80,7 +80,9 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
             e.currentTarget.style.backgroundColor = 'white';
           }}
         >
-          <span>⭐</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+            <path d="M8 2L9.5 5.5L13 6L10.5 8.5L11 12L8 10L5 12L5.5 8.5L3 6L6.5 5.5L8 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
           <span>단축 이동 설정</span>
         </button>
 
@@ -113,7 +115,9 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
             e.currentTarget.style.backgroundColor = 'white';
           }}
         >
-          <span>🗑️</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+            <path d="M3 4H13M5 4V3C5 2.5 5.5 2 6 2H10C10.5 2 11 2.5 11 3V4M6.5 7.5V11.5M9.5 7.5V11.5M4 4H12V13C12 13.5 11.5 14 11 14H5C4.5 14 4 13.5 4 13V4Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
           <span>삭제</span>
         </button>
       </div>

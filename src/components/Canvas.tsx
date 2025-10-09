@@ -72,6 +72,7 @@ interface CanvasProps {
   setCanvasScale?: (scale: number) => void;
   onDeleteMemoById?: (id: string) => void;
   onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
+  isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -138,7 +139,8 @@ const Canvas: React.FC<CanvasProps> = ({
   canvasScale: externalCanvasScale,
   setCanvasScale: externalSetCanvasScale,
   onDeleteMemoById,
-  onAddQuickNav
+  onAddQuickNav,
+  isQuickNavExists
 }) => {
   const [isPanning, setIsPanning] = React.useState(false);
   const [panStart, setPanStart] = React.useState({ x: 0, y: 0 });
@@ -1081,6 +1083,7 @@ const Canvas: React.FC<CanvasProps> = ({
             isShiftPressed={isShiftPressed}
             onDelete={onDeleteMemoById}
             onAddQuickNav={onAddQuickNav}
+            isQuickNavExists={isQuickNavExists}
           />
         ))}
         {childCategories.map(childCategory => (
@@ -1130,6 +1133,8 @@ const Canvas: React.FC<CanvasProps> = ({
             onDrop={(e) => handleDropOnCategory(e, category.id)}
             onDragOver={handleCategoryDragOver}
             isMemoBeingDragged={isDraggingMemo}
+            onAddQuickNav={onAddQuickNav}
+            isQuickNavExists={isQuickNavExists}
           >
             {childrenElements}
           </CategoryBlockComponent>
@@ -1685,6 +1690,7 @@ const Canvas: React.FC<CanvasProps> = ({
             isShiftPressed={isShiftPressed}
             onDelete={onDeleteMemoById}
             onAddQuickNav={onAddQuickNav}
+            isQuickNavExists={isQuickNavExists}
           />
         ))}
 
@@ -1972,6 +1978,12 @@ const Canvas: React.FC<CanvasProps> = ({
           onSetQuickNav={() => {
             const category = currentPage?.categories?.find(c => c.id === areaContextMenu.categoryId);
             if (category) {
+              // 중복 체크
+              if (isQuickNavExists && isQuickNavExists(category.id, 'category')) {
+                alert('이미 단축 이동이 설정되어 있습니다.');
+                setAreaContextMenu(null);
+                return;
+              }
               setShowAreaQuickNavModal({ categoryId: category.id, categoryName: category.title });
             }
             setAreaContextMenu(null);
