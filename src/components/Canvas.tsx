@@ -782,6 +782,26 @@ const Canvas: React.FC<CanvasProps> = ({
       : (hasChildren && category.isExpanded); // 최상위는 자식 있고 펼쳐졌을 때
 
     if (area && shouldShowArea) {
+      // Shift 드래그 시 현재 드래그 중인 아이템의 부모 카테고리인지 확인
+      let isParentOfDraggingItem = false;
+
+      if (isShiftPressed && (isDraggingMemo || isDraggingCategory)) {
+        if (isDraggingMemo && selectedMemoId) {
+          const draggingMemo = currentPage?.memos.find(m => m.id === selectedMemoId);
+          if (draggingMemo && draggingMemo.parentId === category.id) {
+            isParentOfDraggingItem = true;
+          }
+        } else if (isDraggingCategory && selectedCategoryId) {
+          const draggingCategory = currentPage?.categories?.find(c => c.id === selectedCategoryId);
+          if (draggingCategory && draggingCategory.parentId === category.id) {
+            isParentOfDraggingItem = true;
+          }
+        }
+      }
+
+      // 타겟 영역 확인: 마우스가 올라간 영역 (부모가 아닌 경우)
+      const isShiftDragTarget = isShiftPressed && dragTargetCategoryId === category.id && (isDraggingMemo || isDraggingCategory) && !isParentOfDraggingItem;
+
       areas.push(
         <div
           key={`area-${category.id}`}
@@ -791,30 +811,61 @@ const Canvas: React.FC<CanvasProps> = ({
             top: `${area.y}px`,
             width: `${area.width}px`,
             height: `${area.height}px`,
-            backgroundColor: area.color,
-            border: '2px dashed rgba(139, 92, 246, 0.3)',
+            backgroundColor: isParentOfDraggingItem
+              ? 'rgba(239, 68, 68, 0.2)'  // 빨간색 (하위 요소 빼기)
+              : (isShiftDragTarget ? 'rgba(16, 185, 129, 0.2)' : area.color),  // 녹색 (하위 요소 추가)
+            border: isParentOfDraggingItem
+              ? '3px solid rgba(239, 68, 68, 0.6)'
+              : (isShiftDragTarget ? '3px solid rgba(16, 185, 129, 0.6)' : '2px dashed rgba(139, 92, 246, 0.3)'),
             borderRadius: '12px',
             pointerEvents: 'auto',
             zIndex: -1,
-            transition: 'all 0.1s ease'
+            transform: (isShiftDragTarget || isParentOfDraggingItem) ? 'scale(1.02)' : 'scale(1)',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
           }}
           onDrop={(e) => handleDropOnCategoryArea(e, category.id)}
           onDragOver={handleCategoryAreaDragOver}
-          onMouseEnter={() => {
-            if (isDraggingCategory || isDraggingMemo) {
-              setDragTargetCategoryId(category.id);
-            }
-          }}
-          onMouseLeave={() => {
-            setDragTargetCategoryId(null);
-          }}
           onContextMenu={(e) => {
             e.preventDefault();
             e.stopPropagation();
             onCategorySelect(category.id);
             setAreaContextMenu({ x: e.clientX, y: e.clientY, categoryId: category.id });
           }}
-        />
+        >
+          {isShiftDragTarget && (
+            <div style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              padding: '12px 24px',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              color: '#059669',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              pointerEvents: 'none',
+              zIndex: 1000
+            }}>
+              하위 요소 추가
+            </div>
+          )}
+          {isParentOfDraggingItem && (
+            <div style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              padding: '12px 24px',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              color: '#ef4444',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              pointerEvents: 'none',
+              zIndex: 1000
+            }}>
+              하위 요소 빼기
+            </div>
+          )}
+        </div>
       );
     }
 
@@ -1362,6 +1413,7 @@ const Canvas: React.FC<CanvasProps> = ({
 
   const handleMouseUp = () => {
     setIsPanning(false);
+    setDragTargetCategoryId(null); // Shift 드래그 종료 시 타겟 초기화
   };
 
   // Canvas 전체에서 카테고리 라벨 드롭 처리
@@ -1578,6 +1630,45 @@ const Canvas: React.FC<CanvasProps> = ({
       document.removeEventListener('keyup', handleKeyUp, { capture: true } as any);
     };
   }, [baseTool, isSpacePressed, isAltPressed, isMouseOverCanvas, isConnecting, onCancelConnection, onMemoSelect, canUndo, canRedo, onUndo, onRedo]);
+
+  // Shift 드래그 중 마우스 위치로 영역 충돌 감지
+  React.useEffect(() => {
+    if (isShiftPressed && (isDraggingMemo || isDraggingCategory) && currentPage) {
+      const handleMouseMove = (e: MouseEvent) => {
+        const canvasElement = document.querySelector('[data-canvas="true"]');
+        if (!canvasElement) return;
+
+        const rect = canvasElement.getBoundingClientRect();
+        const mouseX = (e.clientX - rect.left - (canvasOffset?.x || 0)) / (canvasScale || 1);
+        const mouseY = (e.clientY - rect.top - (canvasOffset?.y || 0)) / (canvasScale || 1);
+
+        // 모든 카테고리 영역과 충돌 검사
+        let foundTarget: string | null = null;
+
+        for (const category of (currentPage.categories || [])) {
+          if (!category.isExpanded) continue;
+
+          const area = calculateCategoryArea(category, currentPage);
+          if (!area) continue;
+
+          // 마우스가 영역 안에 있는지 확인
+          if (mouseX >= area.x && mouseX <= area.x + area.width &&
+              mouseY >= area.y && mouseY <= area.y + area.height) {
+            foundTarget = category.id;
+            break;
+          }
+        }
+
+        setDragTargetCategoryId(foundTarget);
+      };
+
+      document.addEventListener('mousemove', handleMouseMove);
+
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+      };
+    }
+  }, [isShiftPressed, isDraggingMemo, isDraggingCategory, currentPage, canvasOffset, canvasScale]);
 
   return (
     <div

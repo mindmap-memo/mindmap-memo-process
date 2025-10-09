@@ -180,6 +180,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         x: e.clientX - (category.position.x * (canvasScale || 1) + (canvasOffset?.x || 0)),
         y: e.clientY - (category.position.y * (canvasScale || 1) + (canvasOffset?.y || 0))
       });
+      onDragStart?.(e as any); // App.tsx에 드래그 시작 알림
       e.preventDefault(); // 기본 드래그 동작 방지
     }
   };
@@ -227,7 +228,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     }
   }, [isDraggingPosition, onPositionChange, dragMoved, dragStart, canvasOffset, canvasScale, category.id]);
 
-  const handleMouseUp = React.useCallback(() => {
+  const handleMouseUp = React.useCallback((e: MouseEvent) => {
     if (isDraggingPosition && onPositionChange) {
       // 드래그가 끝날 때 최종 위치 업데이트 (대기 중인 위치가 있으면 사용)
       if (pendingPosition.current) {
@@ -242,7 +243,8 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
       lastUpdateTime.current = 0;
     }
     setIsDraggingPosition(false);
-  }, [isDraggingPosition, onPositionChange, onPositionDragEnd, category.id]);
+    onDragEnd?.(e as any); // App.tsx에 드래그 종료 알림
+  }, [isDraggingPosition, onPositionChange, onPositionDragEnd, category.id, onDragEnd]);
 
   React.useEffect(() => {
     if (isDraggingPosition) {
@@ -350,7 +352,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   };
 
   // 카테고리 블록 스타일 - 하위 아이템이 있으면 태그 스타일로 표시
-  const isHighlighted = isDragOver || (isMemoBeingDragged && isHovered) || (isCategoryBeingDragged && isDragTarget);
+  const isHighlighted = isDragOver || (isMemoBeingDragged && isHovered) || (isCategoryBeingDragged && isHovered);
   const isTagMode = hasChildren && !isHighlighted; // 하위 아이템이 있으면 태그로 표시 (하이라이트 시 제외)
 
   const categoryStyle: React.CSSProperties = {
@@ -465,7 +467,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         ref={categoryRef}
         data-category-block="true"
         data-category-id={category.id}
-        draggable={false}
+        draggable={!isDraggingPosition}
         style={categoryStyle}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -481,7 +483,10 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
           }
         }}
         onMouseEnter={() => {
-          setIsHovered(true);
+          // 메모나 카테고리가 드래그 중일 때만 hover 상태 설정
+          if (isMemoBeingDragged || isCategoryBeingDragged) {
+            setIsHovered(true);
+          }
         }}
         onMouseLeave={() => {
           setIsHovered(false);
