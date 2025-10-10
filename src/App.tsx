@@ -207,7 +207,9 @@ const App: React.FC = () => {
   }, [currentPageId]);
 
   // 카테고리 드래그 종료 시 드롭 감지 및 캐시 제거
-  const handleCategoryPositionDragEnd = (categoryId: string) => {
+  const handleCategoryPositionDragEnd = (categoryId: string, finalPosition: { x: number; y: number }) => {
+    console.log('[App] handleCategoryPositionDragEnd - categoryId:', categoryId, 'finalPosition:', finalPosition);
+
     const currentPage = pages.find(p => p.id === currentPageId);
     if (!currentPage || !currentPage.categories) {
       clearCategoryCache(categoryId);
@@ -222,15 +224,45 @@ const App: React.FC = () => {
       return;
     }
 
+    // 최종 위치로 카테고리 위치 업데이트 (stale state 문제 해결)
+    const categoryWithFinalPosition = { ...draggedCategory, position: finalPosition };
+
+    // 드랍 시점의 카테고리 및 하위 메모 위치 로그
+    const childMemos = currentPage.memos.filter(m => m.parentId === categoryId);
+    console.log('[App] 드랍 시 카테고리 최종 위치:', { x: Math.round(finalPosition.x), y: Math.round(finalPosition.y) });
+    console.log('[App] 드랍 시 하위 메모 위치:', childMemos.map(m => ({ id: m.id, x: Math.round(m.position.x), y: Math.round(m.position.y) })));
+
+    // 상대적 위치 계산
+    if (childMemos.length > 0) {
+      const relativeMemoPos = childMemos.map(m => ({
+        id: m.id,
+        relX: Math.round(m.position.x - finalPosition.x),
+        relY: Math.round(m.position.y - finalPosition.y)
+      }));
+      console.log('[App] 카테고리 기준 상대 위치:', relativeMemoPos);
+    }
+
     // Shift 드래그는 별도 처리 (이미 handleShiftDropCategory에서 처리됨)
     if (!isShiftPressed) {
       // 일반 드롭: 카테고리 블록끼리 겹침 감지
-      handleCategoryOnCategoryDrop(draggedCategory, currentPage);
+      handleCategoryOnCategoryDrop(categoryWithFinalPosition, currentPage);
     }
 
     // 드래그 종료 후 캐시 제거 - 메모 위치에 따라 자연스럽게 크기 조정
-    clearCategoryCache(categoryId);
-    previousFramePosition.current.delete(categoryId);
+    // 다중 선택된 모든 카테고리의 캐시도 함께 제거
+    const isMultiSelected = selectedCategoryIds.includes(categoryId);
+    const categoriesToClear = isMultiSelected ? selectedCategoryIds : [categoryId];
+
+    categoriesToClear.forEach(catId => {
+      clearCategoryCache(catId);
+      previousFramePosition.current.delete(catId);
+      cacheCreationStarted.current.delete(catId);
+    });
+
+    // 드래그 종료 시 모든 위치 캐시 초기화
+    dragStartMemoPositions.current.clear();
+    dragStartCategoryPositions.current.clear();
+
     shiftDragAreaCache.current = {}; // Shift 드래그 캐시도 클리어
   };
 
@@ -263,6 +295,7 @@ const App: React.FC = () => {
   const [dragSelectStart, setDragSelectStart] = useState<{ x: number; y: number } | null>(null);
   const [dragSelectEnd, setDragSelectEnd] = useState<{ x: number; y: number } | null>(null);
   const [dragHoveredMemoIds, setDragHoveredMemoIds] = useState<string[]>([]);
+  const [dragHoveredCategoryIds, setDragHoveredCategoryIds] = useState<string[]>([]);
   const [isDragSelectingWithShift, setIsDragSelectingWithShift] = useState<boolean>(false);
   const [isRightPanelFullscreen, setIsRightPanelFullscreen] = useState<boolean>(false);
 
@@ -481,6 +514,20 @@ const App: React.FC = () => {
         return;
       }
 
+      // ESC: 모든 선택 해제
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setSelectedMemoIds([]);
+        setSelectedCategoryIds([]);
+        // 드래그 선택 UI도 초기화
+        setIsDragSelecting(false);
+        setDragSelectStart(null);
+        setDragSelectEnd(null);
+        setDragHoveredMemoIds([]);
+        setDragHoveredCategoryIds([]);
+        return;
+      }
+
       // Canvas undo/redo shortcuts
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         console.log('🔄 Undo triggered from keyboard');
@@ -595,6 +642,12 @@ const App: React.FC = () => {
     if (!memoId || !currentPage?.memos.find(m => m.id === memoId)) {
       setSelectedMemoId(null);
       setSelectedMemoIds([]);
+      // 드래그 선택 UI도 초기화
+      setIsDragSelecting(false);
+      setDragSelectStart(null);
+      setDragSelectEnd(null);
+      setDragHoveredMemoIds([]);
+      setDragHoveredCategoryIds([]);
       return;
     }
 
@@ -633,8 +686,8 @@ const App: React.FC = () => {
   const handleDragSelectMove = (position: { x: number; y: number }) => {
     if (isDragSelecting) {
       setDragSelectEnd(position);
-      
-      // 실시간으로 드래그 영역과 교집합된 메모들 계산
+
+      // 실시간으로 드래그 영역과 교집합된 메모들과 카테고리들 계산
       if (dragSelectStart && currentPage) {
         const minX = Math.min(dragSelectStart.x, position.x);
         const maxX = Math.max(dragSelectStart.x, position.x);
@@ -648,11 +701,42 @@ const App: React.FC = () => {
           const memoRight = memo.position.x + memoWidth;
           const memoTop = memo.position.y;
           const memoBottom = memo.position.y + memoHeight;
-          
+
           return (memoLeft < maxX && memoRight > minX && memoTop < maxY && memoBottom > minY);
         });
 
+        const hoveredCategories = (currentPage.categories || []).filter(category => {
+          const hasChildren = currentPage.memos.some(memo => memo.parentId === category.id) ||
+                             currentPage.categories?.some(cat => cat.parentId === category.id);
+
+          if (hasChildren && category.isExpanded) {
+            // 하위 아이템이 있고 펼쳐진 경우: 영역과 교집합 확인
+            const area = calculateCategoryArea(category, currentPage);
+            if (area) {
+              const areaLeft = area.x;
+              const areaRight = area.x + area.width;
+              const areaTop = area.y;
+              const areaBottom = area.y + area.height;
+
+              return (areaLeft < maxX && areaRight > minX && areaTop < maxY && areaBottom > minY);
+            }
+            return false;
+          } else {
+            // 하위 아이템이 없거나 접혀진 경우: 카테고리 블록과 교집합 확인
+            const categoryWidth = category.size?.width || 200;
+            const categoryHeight = category.size?.height || 95;
+
+            const categoryLeft = category.position.x;
+            const categoryRight = category.position.x + categoryWidth;
+            const categoryTop = category.position.y;
+            const categoryBottom = category.position.y + categoryHeight;
+
+            return (categoryLeft < maxX && categoryRight > minX && categoryTop < maxY && categoryBottom > minY);
+          }
+        });
+
         setDragHoveredMemoIds(hoveredMemos.map(memo => memo.id));
+        setDragHoveredCategoryIds(hoveredCategories.map(category => category.id));
       }
     }
   };
@@ -680,18 +764,26 @@ const App: React.FC = () => {
         return (memoLeft < maxX && memoRight > minX && memoTop < maxY && memoBottom > minY);
       });
 
-      // 카테고리 선택 확인 (블록 또는 라벨)
+      // 카테고리 선택 확인 (블록, 영역, 라벨)
       const categoriesInSelection = (currentPage.categories || []).filter(category => {
         const hasChildren = currentPage.memos.some(memo => memo.parentId === category.id) ||
                            currentPage.categories?.some(cat => cat.parentId === category.id);
 
         let intersects = false;
 
-        if (hasChildren) {
-          // 하위 아이템이 있는 경우: 일단 제외하고 하위 메모들만 선택하도록 함
-          intersects = false;
+        if (hasChildren && category.isExpanded) {
+          // 하위 아이템이 있고 펼쳐진 경우: 영역과 교집합 확인
+          const area = calculateCategoryArea(category, currentPage);
+          if (area) {
+            const areaLeft = area.x;
+            const areaRight = area.x + area.width;
+            const areaTop = area.y;
+            const areaBottom = area.y + area.height;
+
+            intersects = (areaLeft < maxX && areaRight > minX && areaTop < maxY && areaBottom > minY);
+          }
         } else {
-          // 하위 아이템이 없는 경우: 카테고리 블록과 교집합 확인
+          // 하위 아이템이 없거나 접혀진 경우: 카테고리 블록과 교집합 확인
           const categoryWidth = category.size?.width || 200;
           const categoryHeight = category.size?.height || 95;
 
@@ -1464,6 +1556,11 @@ const App: React.FC = () => {
     const newParentId = targetCategory ? targetCategory.id : undefined;
     const parentChanged = draggedCategory.parentId !== newParentId;
 
+    // 다중 선택된 카테고리들도 함께 종속
+    const categoriesToMove = selectedCategoryIds.includes(draggedCategory.id)
+      ? [draggedCategory.id, ...selectedCategoryIds.filter(id => id !== draggedCategory.id)]
+      : [draggedCategory.id];
+
     if (parentChanged) {
       setPages(pages.map(p => {
         if (p.id === currentPageId) {
@@ -1473,9 +1570,9 @@ const App: React.FC = () => {
 
           // 부모 카테고리의 children 업데이트
           let updatedCategories = (p.categories || []).map(category => {
-            // 드래그된 카테고리의 parentId만 변경하고 위치는 원래대로
-            if (category.id === draggedCategory.id) {
-              const originalPos = draggedCategoryAreas[draggedCategory.id]?.originalPosition;
+            // 드래그된 카테고리들의 parentId만 변경하고 위치는 원래대로
+            if (categoriesToMove.includes(category.id)) {
+              const originalPos = draggedCategoryAreas[category.id]?.originalPosition;
               return {
                 ...category,
                 parentId: newParentId,
@@ -1491,23 +1588,26 @@ const App: React.FC = () => {
               }
             }
 
-            // 이전 부모에서 제거
-            if (category.id === draggedCategory.parentId) {
+            // 이전 부모들에서 제거 (다중 선택된 카테고리들 모두)
+            if (categoriesToMove.some(catId => {
+              const cat = p.categories?.find(c => c.id === catId);
+              return cat?.parentId === category.id;
+            })) {
               return {
                 ...category,
-                children: (category.children || []).filter(id => id !== draggedCategory.id)
+                children: (category.children || []).filter(id => !categoriesToMove.includes(id))
               };
             }
 
-            // 새 부모에 추가
+            // 새 부모에 추가 (다중 선택된 카테고리들 모두)
             if (category.id === newParentId) {
               const currentChildren = category.children || [];
-              if (!currentChildren.includes(draggedCategory.id)) {
-                return {
-                  ...category,
-                  children: [...currentChildren, draggedCategory.id]
-                };
-              }
+              const newChildren = [...currentChildren, ...categoriesToMove.filter(id => !currentChildren.includes(id))];
+              return {
+                ...category,
+                children: newChildren,
+                isExpanded: true  // 자동 확장
+              };
             }
 
             return category;
@@ -1666,15 +1766,20 @@ const App: React.FC = () => {
       // 원래 위치 가져오기 (드래그 시작 시 저장된 위치)
       const originalMemoPositions = dragStartMemoPositions.current.get(draggedMemo.id);
 
-      console.log('[handleShiftDrop] setPages 호출 시작');
+      // 다중 선택된 메모들도 함께 종속
+      const memosToMove = selectedMemoIds.includes(draggedMemo.id)
+        ? [draggedMemo.id, ...selectedMemoIds.filter(id => id !== draggedMemo.id)]
+        : [draggedMemo.id];
+
+      console.log('[handleShiftDrop] setPages 호출 시작 - 이동할 메모:', memosToMove);
       setPages(prev => {
         console.log('[handleShiftDrop] setPages 콜백 실행');
         return prev.map(p => {
           if (p.id === currentPageId) {
           // 메모의 parentId만 변경하고 위치는 원래대로 복원
           const updatedMemos = p.memos.map(memo => {
-            if (memo.id === draggedMemo.id) {
-              const originalPos = originalMemoPositions?.get(draggedMemo.id);
+            if (memosToMove.includes(memo.id)) {
+              const originalPos = originalMemoPositions?.get(memo.id);
               console.log('[handleShiftDrop] parentId 변경:', memo.id, '이전:', memo.parentId, '→ 새로운:', newParentId);
               return {
                 ...memo,
@@ -1687,25 +1792,27 @@ const App: React.FC = () => {
 
           // 카테고리의 children 배열 업데이트 (그리고 필요시 expand)
           const updatedCategories = (p.categories || []).map(category => {
-            // 이전 부모에서 제거
-            if (category.id === draggedMemo.parentId) {
-              console.log('[handleShiftDrop] 이전 부모 children 업데이트:', category.id, 'before:', category.children, 'after:', category.children.filter(id => id !== draggedMemo.id));
+            // 이전 부모에서 제거 (모든 이동 메모)
+            if (memosToMove.some(memoId => {
+              const memo = p.memos.find(m => m.id === memoId);
+              return memo?.parentId === category.id;
+            })) {
+              console.log('[handleShiftDrop] 이전 부모 children 업데이트:', category.id);
               return {
                 ...category,
-                children: (category.children || []).filter(id => id !== draggedMemo.id)
+                children: (category.children || []).filter(id => !memosToMove.includes(id))
               };
             }
             // 새 부모에 추가 + expand
             if (category.id === newParentId) {
               const currentChildren = category.children || [];
-              if (!currentChildren.includes(draggedMemo.id)) {
-                console.log('[handleShiftDrop] 새 부모 children 업데이트:', category.id, 'before:', currentChildren, 'after:', [...currentChildren, draggedMemo.id]);
-                return {
-                  ...category,
-                  children: [...currentChildren, draggedMemo.id],
-                  isExpanded: true  // 여기서 expand 처리
-                };
-              }
+              const newChildren = [...currentChildren, ...memosToMove.filter(id => !currentChildren.includes(id))];
+              console.log('[handleShiftDrop] 새 부모 children 업데이트:', category.id, 'before:', currentChildren, 'after:', newChildren);
+              return {
+                ...category,
+                children: newChildren,
+                isExpanded: true  // 여기서 expand 처리
+              };
             }
             return category;
           });
@@ -1995,8 +2102,13 @@ const App: React.FC = () => {
   // 이전 프레임 위치 저장 (프레임 간 delta 계산용)
   const previousFramePosition = React.useRef<Map<string, {x: number, y: number}>>(new Map());
 
+  // 캐시 생성 추적 (동기적으로)
+  const cacheCreationStarted = React.useRef<Set<string>>(new Set());
+
   const updateCategoryPosition = (categoryId: string, position: { x: number; y: number }) => {
-    // 먼저 현재 카테고리 위치를 찾아서 델타 값 계산
+    console.log('[App] updateCategoryPosition 호출 - categoryId:', categoryId, 'position:', position, 'timestamp:', Date.now());
+
+    // 먼저 현재 카테고리 위치를 찾아서 델타 값 계산 (state 업데이트 전의 원본 위치 기준)
     const currentPage = pages.find(p => p.id === currentPageId);
     const targetCategory = currentPage?.categories?.find(cat => cat.id === categoryId);
 
@@ -2024,7 +2136,10 @@ const App: React.FC = () => {
       previousFramePosition.current.set(categoryId, { x: position.x, y: position.y });
 
       // 첫 번째 위치 변경 시 드래그 시작으로 간주하고 영역 캐시 및 메모 원본 위치 저장
-      if (!draggedCategoryAreas[categoryId] && currentPage) {
+      if (!cacheCreationStarted.current.has(categoryId) && currentPage) {
+        console.log('[App] 캐시 생성 시작 - categoryId:', categoryId, '원본 위치:', targetCategory.position);
+        cacheCreationStarted.current.add(categoryId);
+
         const currentArea = calculateCategoryArea(targetCategory, currentPage);
         if (currentArea) {
           setDraggedCategoryAreas(prev => ({
@@ -2052,23 +2167,50 @@ const App: React.FC = () => {
 
         const allDescendantCategoryIds = new Set([categoryId, ...getAllDescendantCategoryIds(categoryId)]);
 
-        // 모든 하위 depth의 메모들 원본 위치 저장
+        // 다중 선택된 모든 카테고리들의 하위 요소 ID 수집
+        const isMultiSelected = selectedCategoryIds.includes(categoryId);
+        const allSelectedCategoriesDescendants = new Set<string>();
+        if (isMultiSelected) {
+          selectedCategoryIds.forEach(selectedCatId => {
+            allSelectedCategoriesDescendants.add(selectedCatId);
+            getAllDescendantCategoryIds(selectedCatId).forEach(descId => {
+              allSelectedCategoriesDescendants.add(descId);
+            });
+          });
+        }
+
+        // 모든 하위 depth의 메모들 원본 위치 저장 (드래그 중인 카테고리 + 다중 선택된 다른 카테고리들)
         const memoPositions = new Map<string, {x: number, y: number}>();
         currentPage.memos.forEach(memo => {
+          // 드래그 중인 카테고리의 하위 메모
           if (memo.parentId && allDescendantCategoryIds.has(memo.parentId)) {
+            memoPositions.set(memo.id, { x: memo.position.x, y: memo.position.y });
+          }
+          // 다중 선택된 다른 카테고리들의 하위 메모
+          else if (isMultiSelected && memo.parentId && allSelectedCategoriesDescendants.has(memo.parentId)) {
+            memoPositions.set(memo.id, { x: memo.position.x, y: memo.position.y });
+          }
+          // 다중 선택된 메모들
+          else if (isMultiSelected && selectedMemoIds.includes(memo.id)) {
             memoPositions.set(memo.id, { x: memo.position.x, y: memo.position.y });
           }
         });
         dragStartMemoPositions.current.set(categoryId, memoPositions);
 
-        // 모든 하위 depth의 카테고리들 원본 위치 저장
+        // 모든 하위 depth의 카테고리들 원본 위치 저장 (드래그 중인 카테고리 + 다중 선택된 다른 카테고리들)
         const categoryPositions = new Map<string, {x: number, y: number}>();
         currentPage.categories?.forEach(cat => {
+          // 드래그 중인 카테고리의 하위 카테고리
           if (allDescendantCategoryIds.has(cat.id) && cat.id !== categoryId) {
+            categoryPositions.set(cat.id, { x: cat.position.x, y: cat.position.y });
+          }
+          // 다중 선택된 다른 카테고리들과 그 하위 카테고리들
+          else if (isMultiSelected && allSelectedCategoriesDescendants.has(cat.id) && cat.id !== categoryId) {
             categoryPositions.set(cat.id, { x: cat.position.x, y: cat.position.y });
           }
         });
         dragStartCategoryPositions.current.set(categoryId, categoryPositions);
+
       }
     }
 
@@ -2097,10 +2239,42 @@ const App: React.FC = () => {
         return allDescendants;
       };
 
+      // 다중 선택된 카테고리들 확인
+      const isMultiSelected = selectedCategoryIds.includes(categoryId);
+
+
+      // 드래그 중인 카테고리의 하위 요소만 수집 (이들은 부모를 따라 이동)
       const allDescendantCategoryIds = new Set([categoryId, ...getAllDescendantCategoryIds(categoryId)]);
+
+      // 다중 선택된 "모든" 카테고리들의 하위 요소 수집
+      const allSelectedCategoriesDescendants = new Set<string>();
+      if (isMultiSelected) {
+        selectedCategoryIds.forEach(selectedCatId => {
+          allSelectedCategoriesDescendants.add(selectedCatId);
+          getAllDescendantCategoryIds(selectedCatId).forEach(descId => {
+            allSelectedCategoriesDescendants.add(descId);
+          });
+        });
+      }
+
+      // 선택된 카테고리의 하위 요소인지 확인하는 함수
+      const isDescendantOfSelectedCategory = (itemParentId: string | null | undefined): boolean => {
+        if (!itemParentId) return false;
+        // 선택된 카테고리 중 하나가 이 아이템의 부모인지 확인 (직계 또는 간접)
+        let currentParentId: string | null | undefined = itemParentId;
+        while (currentParentId) {
+          if (selectedCategoryIds.includes(currentParentId)) {
+            return true;
+          }
+          const parentCategory = page.categories?.find(c => c.id === currentParentId);
+          currentParentId = parentCategory?.parentId;
+        }
+        return false;
+      };
 
       // 모든 하위 depth의 메모들도 함께 이동 (절대 위치 계산)
       const updatedMemos = page.memos.map(memo => {
+        // 1. 드래그 중인 카테고리의 하위 메모들 이동 (절대 위치)
         if (memo.parentId && allDescendantCategoryIds.has(memo.parentId)) {
           const originalPos = dragStartMemoPositions.current.get(categoryId)?.get(memo.id);
           if (originalPos) {
@@ -2112,6 +2286,42 @@ const App: React.FC = () => {
               }
             };
           }
+          // originalPos가 없으면 위치 변경하지 않음 (드래그 종료 후 호출 방지)
+        }
+
+        // 2. 다중 선택된 다른 카테고리들의 하위 메모들도 이동 (절대 위치)
+        if (isMultiSelected && memo.parentId && allSelectedCategoriesDescendants.has(memo.parentId)) {
+          // 이미 위에서 처리했으면 스킵
+          if (!allDescendantCategoryIds.has(memo.parentId)) {
+            const originalPos = dragStartMemoPositions.current.get(categoryId)?.get(memo.id);
+            if (originalPos) {
+              return {
+                ...memo,
+                position: {
+                  x: originalPos.x + totalDeltaX,
+                  y: originalPos.y + totalDeltaY
+                }
+              };
+            }
+            // originalPos가 없으면 위치 변경하지 않음
+          }
+        }
+
+        // 3. 다중 선택된 메모들도 이동 (절대 위치, 선택된 카테고리의 하위 요소가 아닌 경우만)
+        if (isMultiSelected && selectedMemoIds.includes(memo.id)) {
+          if (!isDescendantOfSelectedCategory(memo.parentId)) {
+            const originalPos = dragStartMemoPositions.current.get(categoryId)?.get(memo.id);
+            if (originalPos) {
+              return {
+                ...memo,
+                position: {
+                  x: originalPos.x + totalDeltaX,
+                  y: originalPos.y + totalDeltaY
+                }
+              };
+            }
+            // originalPos가 없으면 위치 변경하지 않음
+          }
         }
         return memo;
       });
@@ -2119,9 +2329,11 @@ const App: React.FC = () => {
       // 모든 하위 depth의 카테고리들도 함께 이동 (절대 위치 계산)
       const updatedCategories = (page.categories || []).map(category => {
         if (category.id === categoryId) {
+          console.log('[App setPages] 카테고리 위치 업데이트 - categoryId:', categoryId, 'position:', position);
           return { ...category, position };
         }
 
+        // 1. 드래그 중인 카테고리의 하위 카테고리들 이동 (절대 위치)
         if (allDescendantCategoryIds.has(category.id) && category.id !== categoryId) {
           const originalPos = dragStartCategoryPositions.current.get(categoryId)?.get(category.id);
           if (originalPos) {
@@ -2132,6 +2344,42 @@ const App: React.FC = () => {
                 y: originalPos.y + totalDeltaY
               }
             };
+          }
+          // originalPos가 없으면 위치 변경하지 않음
+        }
+
+        // 2. 다중 선택된 다른 카테고리들의 하위 카테고리들도 이동 (절대 위치)
+        if (isMultiSelected && allSelectedCategoriesDescendants.has(category.id)) {
+          // 이미 위에서 처리했으면 스킵
+          if (!allDescendantCategoryIds.has(category.id)) {
+            const originalPos = dragStartCategoryPositions.current.get(categoryId)?.get(category.id);
+            if (originalPos) {
+              return {
+                ...category,
+                position: {
+                  x: originalPos.x + totalDeltaX,
+                  y: originalPos.y + totalDeltaY
+                }
+              };
+            }
+            // originalPos가 없으면 위치 변경하지 않음
+          }
+        }
+
+        // 3. 다중 선택된 최상위 카테고리들도 이동 (절대 위치, 하위가 아닌 것만)
+        if (isMultiSelected && selectedCategoryIds.includes(category.id) && category.id !== categoryId && !allDescendantCategoryIds.has(category.id)) {
+          if (!isDescendantOfSelectedCategory(category.parentId)) {
+            const originalPos = dragStartCategoryPositions.current.get(categoryId)?.get(category.id);
+            if (originalPos) {
+              return {
+                ...category,
+                position: {
+                  x: originalPos.x + totalDeltaX,
+                  y: originalPos.y + totalDeltaY
+                }
+              };
+            }
+            // originalPos가 없으면 위치 변경하지 않음
           }
         }
 
@@ -2147,7 +2395,12 @@ const App: React.FC = () => {
         };
 
         // 통합 충돌 검사 (같은 depth의 메모와 영역 모두 처리)
-        const collisionResult = resolveUnifiedCollisions(categoryId, 'area', pageWithUpdates);
+        // 다중 선택된 모든 카테고리와 메모의 ID 수집
+        const allMovingIds = isMultiSelected
+          ? [...selectedCategoryIds, ...selectedMemoIds]
+          : [categoryId];
+
+        const collisionResult = resolveUnifiedCollisions(categoryId, 'area', pageWithUpdates, 10, allMovingIds);
 
         return {
           ...page,
@@ -2513,6 +2766,12 @@ const App: React.FC = () => {
     if (!categoryId || !currentPage?.categories?.find(c => c.id === categoryId)) {
       setSelectedCategoryId(null);
       setSelectedCategoryIds([]);
+      // 드래그 선택 UI도 초기화
+      setIsDragSelecting(false);
+      setDragSelectStart(null);
+      setDragSelectEnd(null);
+      setDragHoveredMemoIds([]);
+      setDragHoveredCategoryIds([]);
       return;
     }
 
@@ -2809,6 +3068,11 @@ const App: React.FC = () => {
       clearCategoryCache(movedMemo.parentId);
     }
 
+    // 다중 선택된 메모들 확인
+    const isMultiSelected = selectedMemoIds.includes(memoId);
+    const deltaX = movedMemo ? position.x - movedMemo.position.x : 0;
+    const deltaY = movedMemo ? position.y - movedMemo.position.y : 0;
+
     setPages(prev => {
       const currentPage = prev.find(p => p.id === currentPageId);
       if (!currentPage) {
@@ -2881,12 +3145,120 @@ const App: React.FC = () => {
         y: restrictedY ? movedMemo.position.y : position.y
       };
 
-      // 메모 위치 업데이트
+      // 선택된 카테고리의 하위 요소인지 확인하는 함수
+      const isDescendantOfSelectedCategory = (itemParentId: string | null | undefined): boolean => {
+        if (!itemParentId) return false;
+        // 선택된 카테고리 중 하나가 이 아이템의 부모인지 확인 (직계 또는 간접)
+        let currentParentId: string | null | undefined = itemParentId;
+        while (currentParentId) {
+          if (selectedCategoryIds.includes(currentParentId)) {
+            return true;
+          }
+          const parentCategory = currentPage.categories?.find(c => c.id === currentParentId);
+          currentParentId = parentCategory?.parentId;
+        }
+        return false;
+      };
+
+      // 선택된 카테고리의 모든 하위 요소(메모, 카테고리) 찾기
+      const getAllChildrenOfCategories = (categoryIds: string[]): { memos: Set<string>, categories: Set<string> } => {
+        const childMemos = new Set<string>();
+        const childCategories = new Set<string>();
+
+        const addDescendants = (catId: string) => {
+          // 이 카테고리의 직계 자식 메모들
+          currentPage.memos.forEach(m => {
+            if (m.parentId === catId) {
+              childMemos.add(m.id);
+            }
+          });
+
+          // 이 카테고리의 직계 자식 카테고리들
+          currentPage.categories?.forEach(c => {
+            if (c.parentId === catId) {
+              childCategories.add(c.id);
+              // 재귀적으로 하위 요소들도 추가
+              addDescendants(c.id);
+            }
+          });
+        };
+
+        categoryIds.forEach(catId => addDescendants(catId));
+        return { memos: childMemos, categories: childCategories };
+      };
+
+      const childrenOfSelectedCategories = isMultiSelected
+        ? getAllChildrenOfCategories(selectedCategoryIds)
+        : { memos: new Set<string>(), categories: new Set<string>() };
+
+      console.log('🔍 선택된 카테고리의 하위 요소:', {
+        selectedCategoryIds,
+        childMemos: Array.from(childrenOfSelectedCategories.memos),
+        childCategories: Array.from(childrenOfSelectedCategories.categories)
+      });
+
+      // 메모 위치 업데이트 (다중 선택 시 선택된 모든 메모 + 선택된 카테고리의 하위 메모들 함께 이동)
       const updatedPage = {
         ...currentPage,
-        memos: currentPage.memos.map(memo =>
-          memo.id === memoId ? { ...memo, position: finalPosition } : memo
-        )
+        memos: currentPage.memos.map(memo => {
+          if (memo.id === memoId) {
+            return { ...memo, position: finalPosition };
+          }
+
+          // 1. 다중 선택된 다른 메모들 이동 (단, 선택된 카테고리의 하위 요소가 아닌 경우만)
+          if (isMultiSelected && selectedMemoIds.includes(memo.id) && memo.id !== memoId) {
+            if (!isDescendantOfSelectedCategory(memo.parentId)) {
+              return {
+                ...memo,
+                position: {
+                  x: memo.position.x + deltaX,
+                  y: memo.position.y + deltaY
+                }
+              };
+            }
+          }
+
+          // 2. 선택된 카테고리의 하위 메모들도 이동
+          if (isMultiSelected && childrenOfSelectedCategories.memos.has(memo.id)) {
+            return {
+              ...memo,
+              position: {
+                x: memo.position.x + deltaX,
+                y: memo.position.y + deltaY
+              }
+            };
+          }
+
+          return memo;
+        }),
+        // 선택된 카테고리들 + 하위 카테고리들 함께 이동
+        categories: (currentPage.categories || []).map(category => {
+          // 1. 직접 선택된 카테고리 이동 (단, 다른 선택된 카테고리의 하위가 아닌 경우만)
+          if (isMultiSelected && selectedCategoryIds.includes(category.id)) {
+            if (!isDescendantOfSelectedCategory(category.parentId)) {
+              return {
+                ...category,
+                position: {
+                  x: category.position.x + deltaX,
+                  y: category.position.y + deltaY
+                }
+              };
+            }
+          }
+
+          // 2. 선택된 카테고리의 하위 카테고리들도 이동
+          if (isMultiSelected && childrenOfSelectedCategories.categories.has(category.id)) {
+            return {
+              ...category,
+              position: {
+                x: category.position.x + deltaX,
+                y: category.position.y + deltaY
+              }
+            };
+          }
+
+          return category;
+        })
       };
 
       // Shift 드래그 중에는 충돌 검사 안 함
@@ -2899,7 +3271,12 @@ const App: React.FC = () => {
       }
 
       // 통합 충돌 검사 (같은 depth의 메모와 영역 모두 처리)
-      const collisionResult = resolveUnifiedCollisions(memoId, 'memo', updatedPage);
+      // 다중 선택된 모든 메모와 카테고리의 ID 수집
+      const allMovingIds = isMultiSelected
+        ? [...selectedMemoIds, ...selectedCategoryIds]
+        : [memoId];
+
+      const collisionResult = resolveUnifiedCollisions(memoId, 'memo', updatedPage, 10, allMovingIds);
 
       return prev.map(page =>
         page.id === currentPageId
@@ -3192,6 +3569,7 @@ const App: React.FC = () => {
         dragSelectStart={dragSelectStart}
         dragSelectEnd={dragSelectEnd}
         dragHoveredMemoIds={dragHoveredMemoIds}
+        dragHoveredCategoryIds={dragHoveredCategoryIds}
         onDragSelectStart={handleDragSelectStart}
         onDragSelectMove={handleDragSelectMove}
         onDragSelectEnd={handleDragSelectEnd}

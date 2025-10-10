@@ -24,12 +24,14 @@ interface CollidableObject {
  * @param movingType - 'memo' 또는 'area'
  * @param page - 현재 페이지
  * @param maxIterations - 최대 반복 횟수
+ * @param movingIds - 다중 선택된 모든 메모/카테고리 ID 배열 (선택사항)
  */
 export function resolveUnifiedCollisions(
   movingId: string,
   movingType: 'memo' | 'area',
   page: Page,
-  maxIterations: number = 10
+  maxIterations: number = 10,
+  movingIds?: string[]
 ): CollisionResult {
   let updatedMemos = [...page.memos];
   let updatedCategories = [...(page.categories || [])];
@@ -80,8 +82,14 @@ export function resolveUnifiedCollisions(
 
       // 같은 부모를 가진 카테고리만 (형제 카테고리)
       if (categoryParent === movingParent) {
-        // expanded된 카테고리만 영역으로 추가 (자식 유무 상관없이)
+        // expanded되고 자식이 있는 카테고리만 영역으로 추가 (블록은 제외)
         if (!category.isExpanded) return;
+
+        // 자식이 있는지 확인
+        const hasChildren = updatedMemos.some(m => m.parentId === category.id) ||
+                           updatedCategories.some(c => c.parentId === category.id);
+
+        if (!hasChildren) return; // 자식이 없으면 블록이므로 충돌 대상에서 제외
 
         const area = calculateCategoryArea(category, { ...page, memos: updatedMemos, categories: updatedCategories });
         if (area) {
@@ -96,21 +104,18 @@ export function resolveUnifiedCollisions(
       }
     });
 
-    // 디버그: 수집된 충돌 대상 출력 - 영역이 포함된 경우만
-    const hasArea = objects.some(obj => obj.type === 'area');
-    if (objects.length > 1 && hasArea) {
-      console.log(`[충돌 대상] movingId: ${movingId} (${movingType}), parent: ${movingParentId}, count: ${objects.length}`);
-      objects.forEach(obj => {
-        console.log(`  → ${obj.id} (${obj.type})`);
-      });
-    }
-
     return objects;
   };
 
-  // 우선순위 맵: 이동 중인 객체가 최고 우선순위 (0)
+  // 우선순위 맵: 이동 중인 객체들이 최고 우선순위 (0)
   const priorityMap = new Map<string, number>();
-  priorityMap.set(movingId, 0);
+
+  // 다중 선택된 모든 요소들에게 최고 우선순위 부여
+  if (movingIds && movingIds.length > 0) {
+    movingIds.forEach(id => priorityMap.set(id, 0));
+  } else {
+    priorityMap.set(movingId, 0);
+  }
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     let hasCollision = false;
@@ -118,8 +123,8 @@ export function resolveUnifiedCollisions(
     const originalCollidables = [...collidables];
 
     for (const current of collidables) {
-      // 이동 중인 객체는 밀리지 않음
-      if (current.id === movingId) continue;
+      // 이동 중인 객체들은 밀리지 않음 (다중 선택 포함)
+      if (priorityMap.get(current.id) === 0) continue;
 
       const currentPriority = priorityMap.get(current.id) ?? Infinity;
       let totalPushX = 0;
@@ -140,7 +145,6 @@ export function resolveUnifiedCollisions(
 
         if (pushDirection.x !== 0 || pushDirection.y !== 0) {
           hasCollision = true;
-          console.log(`[충돌 발생] current: ${current.id} (${current.type}), other: ${other.id} (${other.type}), push: (${pushDirection.x}, ${pushDirection.y})`);
 
           if (otherPriority < highestPusherPriority) {
             totalPushX = pushDirection.x;
@@ -195,11 +199,12 @@ export function resolveUnifiedCollisions(
           );
 
           // 모든 하위 depth의 메모들도 함께 이동
-          updatedMemos = updatedMemos.map(memo =>
-            memo.parentId && allDescendantIds.has(memo.parentId)
-              ? { ...memo, position: { x: memo.position.x + totalPushX, y: memo.position.y + totalPushY } }
-              : memo
-          );
+          updatedMemos = updatedMemos.map(memo => {
+            if (memo.parentId && allDescendantIds.has(memo.parentId)) {
+              return { ...memo, position: { x: memo.position.x + totalPushX, y: memo.position.y + totalPushY } };
+            }
+            return memo;
+          });
         }
       }
     }

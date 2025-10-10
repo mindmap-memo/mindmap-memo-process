@@ -44,6 +44,7 @@ interface CanvasProps {
   dragSelectStart: { x: number; y: number } | null;
   dragSelectEnd: { x: number; y: number } | null;
   dragHoveredMemoIds: string[];
+  dragHoveredCategoryIds: string[];
   onDragSelectStart: (position: { x: number; y: number }, isShiftPressed: boolean) => void;
   onDragSelectMove: (position: { x: number; y: number }) => void;
   onDragSelectEnd: () => void;
@@ -63,7 +64,7 @@ interface CanvasProps {
   draggingCategoryId?: string | null;
   onCategoryDragStart?: () => void;
   onCategoryDragEnd?: () => void;
-  onCategoryPositionDragEnd?: (categoryId: string) => void;
+  onCategoryPositionDragEnd?: (categoryId: string, finalPosition: { x: number; y: number }) => void;
   onClearCategoryCache?: (categoryId: string) => void;
   isShiftPressed?: boolean;
   shiftDragAreaCacheRef?: React.MutableRefObject<{[categoryId: string]: any}>;
@@ -114,6 +115,7 @@ const Canvas: React.FC<CanvasProps> = ({
   dragSelectStart,
   dragSelectEnd,
   dragHoveredMemoIds,
+  dragHoveredCategoryIds,
   onDragSelectStart,
   onDragSelectMove,
   onDragSelectEnd,
@@ -182,6 +184,9 @@ const Canvas: React.FC<CanvasProps> = ({
 
   // 드래그 중 상태 추적
   const [isDraggingCategoryArea, setIsDraggingCategoryArea] = React.useState<string | null>(null);
+
+  // 최근 드래그 종료된 카테고리 ID (영역 계산 로그용)
+  const recentlyDraggedCategoryRef = React.useRef<string | null>(null);
 
   // Shift 드래그 중 드래그되는 카테고리 ID와 오프셋
   const [shiftDragInfo, setShiftDragInfo] = React.useState<{categoryId: string, offset: {x: number, y: number}} | null>(null);
@@ -261,15 +266,6 @@ const Canvas: React.FC<CanvasProps> = ({
   }, [
     currentPage?.categories?.map(c => `${c.id}:${c.size?.width}:${c.size?.height}:${c.isExpanded}`).join('|')
   ]);
-
-  // 추가적으로 실시간 업데이트를 위한 효과
-  React.useEffect(() => {
-    const interval = setInterval(() => {
-      setAreaUpdateTrigger(prev => prev + 1);
-    }, 100); // 100ms마다 강제 업데이트
-
-    return () => clearInterval(interval);
-  }, []);
 
   // Wheel 이벤트를 네이티브로 등록 (passive 경고 방지)
   React.useEffect(() => {
@@ -697,6 +693,15 @@ const Canvas: React.FC<CanvasProps> = ({
     const area = calculateCategoryArea(category, currentPage, visited);
     if (!area) return null;
 
+    // 최근 드래그한 카테고리만 로그 출력
+    if (recentlyDraggedCategoryRef.current === category.id) {
+      console.log('[calculateCategoryAreaWithColor 호출]', {
+        categoryId: category.id,
+        position: `(${category.position.x}, ${category.position.y})`,
+        계산된영역: `위치(${area.x}, ${area.y}) 크기(${area.width}x${area.height})`
+      });
+    }
+
     return {
       ...area,
       color: getCategoryAreaColor(category.id)
@@ -750,7 +755,19 @@ const Canvas: React.FC<CanvasProps> = ({
       };
     } else {
       // 캐시된 영역이 없으면 동적 계산
+      if (recentlyDraggedCategoryRef.current === category.id) {
+        console.log('[renderSingleCategoryArea] 캐시 없음 - 동적 계산 시작');
+      }
+
       area = calculateCategoryAreaWithColor(category);
+
+      // 최근 드래그한 카테고리만 로그 출력
+      if (recentlyDraggedCategoryRef.current === category.id) {
+        console.log('[renderSingleCategoryArea] 동적 계산 완료:', {
+          영역크기: area ? `${area.width}x${area.height}` : 'null',
+          영역좌표: area ? `(${area.x}, ${area.y})` : 'null'
+        });
+      }
 
       // 하위 카테고리인데 자식이 없어서 area가 null인 경우, 기본 영역 생성
       if (!area && category.parentId) {
@@ -815,9 +832,14 @@ const Canvas: React.FC<CanvasProps> = ({
       // 조건: 마우스가 올라간 영역이면서, 현재 부모가 아님
       const isShiftDragTarget = isShiftPressed && dragTargetCategoryId === category.id && (isDraggingMemo || isDraggingCategory) && !isCurrentParent;
 
+      // 드래그 선택 중 하이라이트
+      const isDragHovered = dragHoveredCategoryIds.includes(category.id);
+
       areas.push(
         <div
           key={`area-${category.id}`}
+          data-category-area="true"
+          data-category-id={category.id}
           style={{
             position: 'absolute',
             left: `${area.x}px`,
@@ -826,14 +848,14 @@ const Canvas: React.FC<CanvasProps> = ({
             height: `${area.height}px`,
             backgroundColor: isParentBeingLeftBehind
               ? 'rgba(239, 68, 68, 0.2)'  // 빨간색 (하위 요소 빼기)
-              : (isShiftDragTarget ? 'rgba(16, 185, 129, 0.2)' : area.color),  // 녹색 (하위 요소 추가)
+              : (isShiftDragTarget ? 'rgba(16, 185, 129, 0.2)' : (isDragHovered ? 'rgba(59, 130, 246, 0.3)' : area.color)),  // 드래그 선택: 파란색
             border: isParentBeingLeftBehind
               ? '3px solid rgba(239, 68, 68, 0.6)'
-              : (isShiftDragTarget ? '3px solid rgba(16, 185, 129, 0.6)' : '2px dashed rgba(139, 92, 246, 0.3)'),
+              : (isShiftDragTarget ? '3px solid rgba(16, 185, 129, 0.6)' : (isDragHovered ? '3px solid rgba(59, 130, 246, 0.6)' : '2px dashed rgba(139, 92, 246, 0.3)')),
             borderRadius: '12px',
             pointerEvents: 'auto',
             zIndex: -1,
-            transform: (isShiftDragTarget || isParentBeingLeftBehind) ? 'scale(1.02)' : 'scale(1)',
+            transform: (isShiftDragTarget || isParentBeingLeftBehind || isDragHovered) ? 'scale(1.02)' : 'scale(1)',
             transition: 'all 0.2s ease',
             display: 'flex',
             alignItems: 'center',
@@ -947,6 +969,7 @@ const Canvas: React.FC<CanvasProps> = ({
               let startX = e.clientX;
               let startY = e.clientY;
               const originalCategoryPosition = { x: category.position.x, y: category.position.y };
+              console.log('[Canvas 라벨] 드래그 시작 - categoryId:', category.id, '원본 위치:', originalCategoryPosition);
               let hasMoved = false;
               let isShiftMode = isShiftPressed; // 초기 Shift 상태
 
@@ -981,6 +1004,7 @@ const Canvas: React.FC<CanvasProps> = ({
 
               const handleMouseMove = (moveEvent: MouseEvent) => {
                 hasMoved = true;
+                console.log('[Canvas 라벨] handleMouseMove - categoryId:', category.id);
 
                 // 드래그 중 Shift 키 상태 확인 (실시간으로 변경 가능)
                 const currentShiftState = moveEvent.shiftKey;
@@ -1051,35 +1075,47 @@ const Canvas: React.FC<CanvasProps> = ({
               };
 
               const handleMouseUp = (upEvent: MouseEvent) => {
+                console.log('[Canvas 라벨] handleMouseUp - categoryId:', category.id, 'timestamp:', Date.now());
                 document.removeEventListener('mousemove', handleMouseMove);
                 document.removeEventListener('mouseup', handleMouseUp);
+                console.log('[Canvas 라벨] 이벤트 리스너 제거 완료 - categoryId:', category.id);
+
+                // 최종 위치 계산
+                const deltaX = (upEvent.clientX - startX) / canvasScale;
+                const deltaY = (upEvent.clientY - startY) / canvasScale;
+                const finalPosition = {
+                  x: originalCategoryPosition.x + deltaX,
+                  y: originalCategoryPosition.y + deltaY
+                };
+                console.log('[Canvas 라벨] 최종 위치 계산:', finalPosition, 'categoryId:', category.id);
 
                 if (hasMoved && isShiftMode) {
                   // Shift 모드였으면: drop 처리 (부모-자식 관계 변경)
-                  const deltaX = (upEvent.clientX - startX) / canvasScale;
-                  const deltaY = (upEvent.clientY - startY) / canvasScale;
-                  const finalPosition = {
-                    x: originalCategoryPosition.x + deltaX,
-                    y: originalCategoryPosition.y + deltaY
-                  };
                   onShiftDropCategory?.(category, finalPosition);
+                } else {
+                  // 일반 드롭: 최종 위치를 전달
+                  onCategoryPositionDragEnd?.(category.id, finalPosition);
                 }
 
                 // 드래그 종료 - 캐시 및 임시 위치 제거
                 setIsDraggingCategoryArea(null);
                 setShiftDragInfo(null); // Shift 드래그 정보 클리어
+
                 if (isShiftMode && shiftDragAreaCacheRef?.current) {
                   shiftDragAreaCacheRef.current = {};
-                  // Shift 모드에서도 캐시 클리어 필요
-                  onClearCategoryCache?.(category.id);
-                } else {
+                }
+
+                // Canvas 로컬 캐시는 약간의 딜레이 후 제거 (React 리렌더링 대기)
+                setTimeout(() => {
+                  console.log('[Canvas 라벨] 캐시 제거 전 - categoryId:', category.id, 'cached:', draggedCategoryAreas[category.id]);
                   setDraggedCategoryAreas(prev => {
                     const newAreas = { ...prev };
+                    const removed = newAreas[category.id];
                     delete newAreas[category.id];
+                    console.log('[Canvas 라벨] 캐시 제거 완료 - categoryId:', category.id, 'removed:', removed);
                     return newAreas;
                   });
-                  onClearCategoryCache?.(category.id);
-                }
+                }, 50);
               };
 
               document.addEventListener('mousemove', handleMouseMove);
@@ -1228,7 +1264,7 @@ const Canvas: React.FC<CanvasProps> = ({
             onAddQuickNav={onAddQuickNav}
             isQuickNavExists={isQuickNavExists}
             isDragTarget={dragTargetCategoryId === category.id}
-            isCategoryBeingDragged={isDraggingCategory}
+            isCategoryBeingDragged={isDraggingCategory || isDraggingCategoryArea === category.id}
           >
             {childrenElements}
           </CategoryBlockComponent>
@@ -1259,17 +1295,33 @@ const Canvas: React.FC<CanvasProps> = ({
   };
 
   // 카테고리 위치 변경 종료 (드래그 종료)
-  const handleCategoryPositionEnd = (categoryId: string) => {
+  const handleCategoryPositionEnd = (categoryId: string, finalPosition: { x: number; y: number }) => {
+    const cachedArea = draggedCategoryAreas[categoryId];
+    console.log('[Canvas] 드래그 종료:', categoryId, '최종 위치:', finalPosition, '캐시된 영역:', cachedArea);
 
-    // 드래그 종료 시 캐시 제거 (메모 위치에 따라 자연스럽게 크기 조정)
-    setDraggedCategoryAreas(prev => {
-      const newAreas = { ...prev };
-      delete newAreas[categoryId];
-      return newAreas;
-    });
+    // 최근 드래그한 카테고리 저장 (영역 계산 로그용)
+    recentlyDraggedCategoryRef.current = categoryId;
 
-    // App의 캐시도 제거
-    onCategoryPositionDragEnd?.(categoryId);
+    // App에서 캐시 제거 처리 (state 업데이트 후 자연스럽게 재계산)
+    onCategoryPositionDragEnd?.(categoryId, finalPosition);
+
+    // Canvas 로컬 캐시는 약간의 딜레이 후 제거 (React 리렌더링 대기)
+    setTimeout(() => {
+      console.log('[Canvas] 캐시 제거 시작:', categoryId);
+      setDraggedCategoryAreas(prev => {
+        const newAreas = { ...prev };
+        delete newAreas[categoryId];
+        console.log('[Canvas] 캐시 제거 완료:', categoryId);
+        return newAreas;
+      });
+
+      // 로그 추적 종료 (1초 후)
+      setTimeout(() => {
+        if (recentlyDraggedCategoryRef.current === categoryId) {
+          recentlyDraggedCategoryRef.current = null;
+        }
+      }, 1000);
+    }, 50); // 50ms 후 캐시 제거
   };
 
   // 기존 카테고리 드래그 핸들러들 (실제로는 사용되지 않음 - 마우스 이벤트로 처리)
@@ -1351,7 +1403,7 @@ const Canvas: React.FC<CanvasProps> = ({
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
 
     const target = e.target as Element;
-    
+
     // 스페이스바가 눌린 상태에서는 항상 팬 모드 (메모 블록 위에서도)
     if (isSpacePressed && !isConnecting) {
       setIsPanning(true);
@@ -1363,7 +1415,10 @@ const Canvas: React.FC<CanvasProps> = ({
       e.stopPropagation();
       return;
     }
-    
+
+    // 카테고리 영역인지 확인
+    const isCategoryArea = target.hasAttribute('data-category-area');
+
     // 캔버스 배경 영역에서만 팬 도구 활성화
     const isCanvasBackground = target.hasAttribute('data-canvas') ||
                               target.tagName === 'svg' ||
@@ -1371,8 +1426,9 @@ const Canvas: React.FC<CanvasProps> = ({
                               (target.tagName === 'DIV' &&
                                !target.closest('[data-memo-block="true"]') &&
                                !target.closest('[data-category-block="true"]') &&
-                               !target.closest('button'));
-    
+                               !target.closest('button') &&
+                               !isCategoryArea);
+
     if (isCanvasBackground && !isConnecting) {
       if (currentTool === 'pan') {
         setIsPanning(true);
@@ -1385,9 +1441,9 @@ const Canvas: React.FC<CanvasProps> = ({
         return;
       }
     }
-    
-    // 선택 도구이고 연결 모드가 아닐 때 전역 드래그 선택 시작 준비 (캔버스 배경에서만)
-    if (currentTool === 'select' && !isConnecting && !isPanning && isCanvasBackground) {
+
+    // 선택 도구이고 연결 모드가 아닐 때 전역 드래그 선택 시작 준비 (캔버스 배경 또는 카테고리 영역에서)
+    if (currentTool === 'select' && !isConnecting && !isPanning && (isCanvasBackground || isCategoryArea)) {
       setGlobalDragSelecting(true);
       setGlobalDragStart({ x: e.clientX, y: e.clientY });
       setGlobalDragWithShift(e.shiftKey);

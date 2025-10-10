@@ -25,7 +25,7 @@ interface CategoryBlockProps {
   onConnectItems?: (fromId: string, toId: string) => void;
   onRemoveConnection?: (fromId: string, toId: string) => void;
   onPositionChange?: (categoryId: string, position: { x: number; y: number }) => void;
-  onPositionDragEnd?: (categoryId: string) => void;
+  onPositionDragEnd?: (categoryId: string, finalPosition: { x: number; y: number }) => void;
   onSizeChange?: (id: string, size: { width: number; height: number }) => void;
   onMoveToCategory?: (itemId: string, categoryId: string | null) => void;
   canvasScale?: number;
@@ -84,6 +84,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   // 빠른 드래그 최적화를 위한 상태
   const lastUpdateTime = React.useRef<number>(0);
   const pendingPosition = React.useRef<{ x: number; y: number } | null>(null);
+  const isDraggingRef = React.useRef<boolean>(false);
 
   const titleRef = React.useRef<HTMLInputElement>(null);
   const categoryRef = React.useRef<HTMLDivElement>(null);
@@ -174,6 +175,17 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   // MemoBlock과 동일한 드래그 핸들러들
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button === 0 && !isConnecting && !isEditing) {
+      // Shift 클릭 시 다중 선택
+      if (e.shiftKey) {
+        onClick?.(category.id, true);
+        e.preventDefault();
+        return;
+      }
+
+      // 드래그 시작 시 클릭 처리 (선택되지 않은 카테고리를 클릭하면 선택)
+      onClick?.(category.id, false);
+
+      isDraggingRef.current = true;
       setIsDraggingPosition(true);
       setDragMoved(false);
       setDragStart({
@@ -206,7 +218,13 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   };
 
   const handleMouseMove = React.useCallback((e: MouseEvent) => {
-    if (isDraggingPosition && onPositionChange) {
+    // ref를 사용한 즉시 체크로 드래그 종료 후 이벤트 무시
+    if (!isDraggingRef.current) {
+      console.log('[CategoryBlock] mousemove 무시 - isDraggingRef:', isDraggingRef.current, 'categoryId:', category.id);
+      return;
+    }
+
+    if (onPositionChange) {
       if (!dragMoved) {
         setDragMoved(true);
       }
@@ -222,21 +240,29 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
       pendingPosition.current = newPosition;
 
       if (now - lastUpdateTime.current >= 50) {
+        console.log('[CategoryBlock] onPositionChange 호출 - categoryId:', category.id, 'newPosition:', newPosition);
         onPositionChange(category.id, newPosition);
         lastUpdateTime.current = now;
       }
     }
-  }, [isDraggingPosition, onPositionChange, dragMoved, dragStart, canvasOffset, canvasScale, category.id]);
+  }, [onPositionChange, dragMoved, dragStart, canvasOffset, canvasScale, category.id]);
 
   const handleMouseUp = React.useCallback((e: MouseEvent) => {
-    if (isDraggingPosition && onPositionChange) {
-      // 드래그가 끝날 때 최종 위치 업데이트 (대기 중인 위치가 있으면 사용)
-      if (pendingPosition.current) {
-        onPositionChange(category.id, pendingPosition.current);
-      }
+    console.log('[CategoryBlock] mouseup - categoryId:', category.id, 'isDraggingRef:', isDraggingRef.current);
+    if (isDraggingRef.current) {
+      // ref를 즉시 false로 설정하여 추가 mousemove 이벤트 무시
+      isDraggingRef.current = false;
+      console.log('[CategoryBlock] isDraggingRef를 false로 설정 - categoryId:', category.id);
 
-      // 드래그 종료 콜백 호출
-      onPositionDragEnd?.(category.id);
+      // 최종 위치 계산
+      const finalPosition = pendingPosition.current || {
+        x: (e.clientX - dragStart.x - (canvasOffset?.x || 0)) / (canvasScale || 1),
+        y: (e.clientY - dragStart.y - (canvasOffset?.y || 0)) / (canvasScale || 1)
+      };
+      console.log('[CategoryBlock] 최종 위치:', finalPosition, 'categoryId:', category.id);
+
+      // 드래그 종료 콜백 호출 (최종 위치 전달)
+      onPositionDragEnd?.(category.id, finalPosition);
 
       // 상태 초기화
       pendingPosition.current = null;
@@ -244,7 +270,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     }
     setIsDraggingPosition(false);
     onDragEnd?.(e as any); // App.tsx에 드래그 종료 알림
-  }, [isDraggingPosition, onPositionChange, onPositionDragEnd, category.id, onDragEnd]);
+  }, [onPositionDragEnd, category.id, onDragEnd, dragStart, canvasOffset, canvasScale]);
 
   React.useEffect(() => {
     if (isDraggingPosition) {
@@ -266,7 +292,8 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     const updateSize = () => {
       // 드래그 중이거나 호버/하이라이트 중일 때는 크기 업데이트 방지
       const isCurrentlyHighlighted = isDragOver || (isMemoBeingDragged && isHovered);
-      if (isDraggingPosition || isCurrentlyHighlighted) {
+      // CategoryBlock 드래그 또는 Canvas 라벨 드래그 중일 때 크기 업데이트 방지
+      if (isDraggingPosition || isCategoryBeingDragged || isCurrentlyHighlighted) {
         return;
       }
 
