@@ -188,6 +188,9 @@ const Canvas: React.FC<CanvasProps> = ({
   // 최근 드래그 종료된 카테고리 ID (영역 계산 로그용)
   const recentlyDraggedCategoryRef = React.useRef<string | null>(null);
 
+  // 렌더링된 카테고리 영역 정보 저장 (연결선 계산용)
+  const renderedCategoryAreas = React.useRef<{[categoryId: string]: {x: number, y: number, width: number, height: number}}>({});
+
   // Shift 드래그 중 드래그되는 카테고리 ID와 오프셋
   const [shiftDragInfo, setShiftDragInfo] = React.useState<{categoryId: string, offset: {x: number, y: number}} | null>(null);
 
@@ -326,33 +329,57 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
-  const getConnectionPoints = (memo: any) => {
-    // 실제 메모 블록의 크기를 가져오기 (동적 크기 반영)
-    const width = memo.size?.width || 200;
-    const height = memo.size?.height || 95;
-    
-    // SVG가 overflow:visible이므로 오프셋 없이 원본 좌표 사용
-    const points = {
-      top: { 
-        x: memo.position.x + width / 2,  // 가로 중앙
-        y: memo.position.y  // 메모 블록 상단 경계
+  // 블록(메모 또는 카테고리)의 연결점 계산 - 기존 로직 유지
+  const getBlockConnectionPoints = (item: any) => {
+    const width = item.size?.width || 200;
+    const height = item.size?.height || 95;
+
+    return {
+      top: {
+        x: item.position.x + width / 2,
+        y: item.position.y
       },
-      bottom: { 
-        x: memo.position.x + width / 2,  // 가로 중앙
-        y: memo.position.y + height  // 메모 블록 하단 경계
+      bottom: {
+        x: item.position.x + width / 2,
+        y: item.position.y + height
       },
-      left: { 
-        x: memo.position.x,  // 메모 블록 좌측 경계
-        y: memo.position.y + height / 2  // 세로 중앙
+      left: {
+        x: item.position.x,
+        y: item.position.y + height / 2
       },
-      right: { 
-        x: memo.position.x + width,  // 메모 블록 우측 경계
-        y: memo.position.y + height / 2  // 세로 중앙
+      right: {
+        x: item.position.x + width,
+        y: item.position.y + height / 2
       }
     };
-    
-    
-    return points;
+  };
+
+  const getConnectionPoints = (item: any) => {
+    // 카테고리인 경우 렌더링된 영역 정보를 우선 사용 (신규 기능)
+    if ('isExpanded' in item && renderedCategoryAreas.current[item.id]) {
+      const area = renderedCategoryAreas.current[item.id];
+      return {
+        top: {
+          x: area.x + area.width / 2,
+          y: area.y
+        },
+        bottom: {
+          x: area.x + area.width / 2,
+          y: area.y + area.height
+        },
+        left: {
+          x: area.x,
+          y: area.y + area.height / 2
+        },
+        right: {
+          x: area.x + area.width,
+          y: area.y + area.height / 2
+        }
+      };
+    }
+
+    // 메모 또는 영역이 없는 카테고리: 기존 블록 기준 계산 사용
+    return getBlockConnectionPoints(item);
   };
 
   const renderConnectionLines = () => {
@@ -360,10 +387,13 @@ const Canvas: React.FC<CanvasProps> = ({
     
     const lines: any[] = [];
     
-    // 기존 연결선들
+    // 기존 연결선들 (메모-메모)
     currentPage.memos.forEach(memo => {
       memo.connections.forEach(connId => {
         const connectedMemo = currentPage.memos.find(m => m.id === connId);
+        const connectedCategory = currentPage.categories?.find(c => c.id === connId);
+
+        // 메모-메모 연결만 여기서 처리 (메모-카테고리는 카테고리 섹션에서 처리)
         if (!connectedMemo || memo.id >= connId) return;
         
         // 최신 크기 정보로 연결점 계산
@@ -448,67 +478,30 @@ const Canvas: React.FC<CanvasProps> = ({
       });
     });
 
-    // 카테고리 연결선들 (카테고리끼리만)
+    // 카테고리 연결선들 (카테고리끼리 & 메모-카테고리)
     (currentPage.categories || []).forEach(category => {
       category.connections.forEach(connId => {
-        // 연결된 대상이 카테고리인지 확인 (메모와의 연결은 제외)
+        // 연결된 대상이 카테고리인지 메모인지 확인
         const connectedCategory = currentPage.categories?.find(c => c.id === connId);
+        const connectedMemo = currentPage.memos.find(m => m.id === connId);
+        const connected = connectedCategory || connectedMemo;
 
-        if (!connectedCategory) return; // 카테고리끼리만 연결
-        if (category.id >= connId) return; // 중복 연결선 방지
+        if (!connected) return; // 연결 대상이 없으면 무시
+        if (category.id >= connId) return; // 중복 연결선 방지 (같은 연결을 두 번 그리지 않음)
 
-        // 카테고리의 연결점 계산
-        const categoryWidth = category.size?.width || 200;
-        const categoryHeight = category.size?.height || 80;
-        const fromPoints = {
-          top: {
-            x: category.position.x + categoryWidth / 2,
-            y: category.position.y
-          },
-          bottom: {
-            x: category.position.x + categoryWidth / 2,
-            y: category.position.y + categoryHeight
-          },
-          left: {
-            x: category.position.x,
-            y: category.position.y + categoryHeight / 2
-          },
-          right: {
-            x: category.position.x + categoryWidth,
-            y: category.position.y + categoryHeight / 2
-          }
-        };
+        // getConnectionPoints 사용 (영역이 있으면 영역 기준으로 계산됨)
+        const fromPoints = getConnectionPoints(category);
+        const toPoints = getConnectionPoints(connected);
 
-        // 연결된 카테고리의 연결점 계산
-        const connWidth = connectedCategory.size?.width || 200;
-        const connHeight = connectedCategory.size?.height || 80;
-        const toPoints = {
-          top: {
-            x: connectedCategory.position.x + connWidth / 2,
-            y: connectedCategory.position.y
-          },
-          bottom: {
-            x: connectedCategory.position.x + connWidth / 2,
-            y: connectedCategory.position.y + connHeight
-          },
-          left: {
-            x: connectedCategory.position.x,
-            y: connectedCategory.position.y + connHeight / 2
-          },
-          right: {
-            x: connectedCategory.position.x + connWidth,
-            y: connectedCategory.position.y + connHeight / 2
-          }
-        };
-
-        // 최적 연결점 선택
+        // 최적 연결점 선택을 위한 중심점 계산
+        // fromPoints와 toPoints가 이미 영역을 고려하므로, 이를 기반으로 중심 계산
         const centerFrom = {
-          x: category.position.x + categoryWidth / 2,
-          y: category.position.y + categoryHeight / 2
+          x: (fromPoints.left.x + fromPoints.right.x) / 2,
+          y: (fromPoints.top.y + fromPoints.bottom.y) / 2
         };
         const centerTo = {
-          x: connectedCategory.position.x + connWidth / 2,
-          y: connectedCategory.position.y + connHeight / 2
+          x: (toPoints.left.x + toPoints.right.x) / 2,
+          y: (toPoints.top.y + toPoints.bottom.y) / 2
         };
 
         const dx = centerTo.x - centerFrom.x;
@@ -556,16 +549,16 @@ const Canvas: React.FC<CanvasProps> = ({
                 }}
               />
             )}
-            {/* 실제 보이는 연결선 (카테고리는 주황색으로) */}
+            {/* 실제 보이는 연결선 (카테고리는 보라색, 메모-카테고리는 초록색) */}
             <line
               x1={fromPoint.x}
               y1={fromPoint.y}
               x2={toPoint.x}
               y2={toPoint.y}
-              stroke={isDisconnectMode ? "#ef4444" : "#ff9800"}
+              stroke={isDisconnectMode ? "#ef4444" : (connectedMemo ? "#10b981" : "#a855f7")}
               strokeWidth={isDisconnectMode ? "4" : "2"}
               style={{
-                strokeDasharray: isDisconnectMode ? '5,5' : '8,4',
+                strokeDasharray: isDisconnectMode ? '5,5' : (connectedMemo ? '6,3' : '8,4'),
                 pointerEvents: 'none'
               }}
             />
@@ -803,6 +796,14 @@ const Canvas: React.FC<CanvasProps> = ({
       : (hasChildren && category.isExpanded); // 최상위는 자식 있고 펼쳐졌을 때
 
     if (area && shouldShowArea) {
+      // 렌더링된 영역 정보 저장 (연결선 계산용)
+      renderedCategoryAreas.current[category.id] = {
+        x: area.x,
+        y: area.y,
+        width: area.width,
+        height: area.height
+      };
+
       // Shift 드래그 시 UI 상태 확인
       let draggingItemParentId: string | null = null;
       let isCurrentParent = false;
@@ -917,6 +918,160 @@ const Canvas: React.FC<CanvasProps> = ({
               SHIFT + 드래그로 메모나 카테고리를 다른 카테고리 영역에 종속, 제거하세요
             </div>
           )}
+
+          {/* 영역 연결점들 - 4방향 */}
+          <div
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              if (!isConnecting) {
+                onCategorySelect(category.id);
+                onStartConnection?.(category.id);
+              }
+            }}
+            onMouseUp={(e) => {
+              e.stopPropagation();
+              if (isConnecting && connectingFromId && connectingFromId !== category.id) {
+                onConnectMemos(connectingFromId, category.id);
+              }
+            }}
+            style={{
+              position: 'absolute',
+              top: -8,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 16,
+              height: 16,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'crosshair',
+              zIndex: 15,
+              pointerEvents: 'auto'
+            }}
+          >
+            <div style={{
+              width: 8,
+              height: 8,
+              backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
+              borderRadius: '50%',
+              border: '2px solid white',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+            }} />
+          </div>
+          <div
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              if (!isConnecting) {
+                onCategorySelect(category.id);
+                onStartConnection?.(category.id);
+              }
+            }}
+            onMouseUp={(e) => {
+              e.stopPropagation();
+              if (isConnecting && connectingFromId && connectingFromId !== category.id) {
+                onConnectMemos(connectingFromId, category.id);
+              }
+            }}
+            style={{
+              position: 'absolute',
+              bottom: -8,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 16,
+              height: 16,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'crosshair',
+              zIndex: 15,
+              pointerEvents: 'auto'
+            }}
+          >
+            <div style={{
+              width: 8,
+              height: 8,
+              backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
+              borderRadius: '50%',
+              border: '2px solid white',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+            }} />
+          </div>
+          <div
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              if (!isConnecting) {
+                onCategorySelect(category.id);
+                onStartConnection?.(category.id);
+              }
+            }}
+            onMouseUp={(e) => {
+              e.stopPropagation();
+              if (isConnecting && connectingFromId && connectingFromId !== category.id) {
+                onConnectMemos(connectingFromId, category.id);
+              }
+            }}
+            style={{
+              position: 'absolute',
+              left: -8,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: 16,
+              height: 16,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'crosshair',
+              zIndex: 15,
+              pointerEvents: 'auto'
+            }}
+          >
+            <div style={{
+              width: 8,
+              height: 8,
+              backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
+              borderRadius: '50%',
+              border: '2px solid white',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+            }} />
+          </div>
+          <div
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              if (!isConnecting) {
+                onCategorySelect(category.id);
+                onStartConnection?.(category.id);
+              }
+            }}
+            onMouseUp={(e) => {
+              e.stopPropagation();
+              if (isConnecting && connectingFromId && connectingFromId !== category.id) {
+                onConnectMemos(connectingFromId, category.id);
+              }
+            }}
+            style={{
+              position: 'absolute',
+              right: -8,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: 16,
+              height: 16,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'crosshair',
+              zIndex: 15,
+              pointerEvents: 'auto'
+            }}
+          >
+            <div style={{
+              width: 8,
+              height: 8,
+              backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
+              borderRadius: '50%',
+              border: '2px solid white',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+            }} />
+          </div>
         </div>
       );
     }
