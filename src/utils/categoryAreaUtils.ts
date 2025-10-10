@@ -31,21 +31,15 @@ export function calculateCategoryArea(
   const childMemos = page.memos.filter(memo => memo.parentId === category.id);
   const childCategories = page.categories?.filter(cat => cat.parentId === category.id) || [];
 
-  // 하위 아이템이 없으면 영역 계산 안함
-  if (childMemos.length === 0 && childCategories.length === 0) {
-    visited.delete(category.id);
-    return null;
-  }
-
   // 카테고리 블록 자체의 위치와 크기
   const categoryWidth = category.size?.width || DEFAULT_CATEGORY_WIDTH;
   const categoryHeight = category.size?.height || DEFAULT_CATEGORY_HEIGHT;
 
-  // 초기값을 무한대로 설정 (하위 아이템들만으로 영역 계산)
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
+  // 초기값: 카테고리 블록 자체의 위치로 시작
+  let minX = category.position.x;
+  let minY = category.position.y;
+  let maxX = category.position.x + categoryWidth;
+  let maxY = category.position.y + categoryHeight;
 
   // 하위 메모들의 경계 포함
   childMemos.forEach(memo => {
@@ -77,12 +71,6 @@ export function calculateCategoryArea(
       maxY = Math.max(maxY, childCategory.position.y + childCategoryHeight);
     }
   });
-
-  // 카테고리 블록(라벨)의 현재 위치를 항상 영역에 포함
-  minX = Math.min(minX, category.position.x);
-  minY = Math.min(minY, category.position.y);
-  maxX = Math.max(maxX, category.position.x + categoryWidth);
-  maxY = Math.max(maxY, category.position.y + categoryHeight);
 
   // 방문 완료 후 제거 (다른 브랜치에서 재방문 가능하도록)
   visited.delete(category.id);

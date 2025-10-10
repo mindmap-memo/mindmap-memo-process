@@ -48,9 +48,13 @@ export function resolveUnifiedCollisions(
   const getCollidableObjects = (): CollidableObject[] => {
     const objects: CollidableObject[] = [];
 
-    // 메모들 추가
+    // 메모들 추가 (같은 parentId를 가진 메모만)
     updatedMemos.forEach(memo => {
-      if (memo.parentId === movingParentId) {
+      // null과 undefined를 동일하게 처리 (루트 레벨)
+      const memoParent = memo.parentId ?? null;
+      const movingParent = movingParentId ?? null;
+
+      if (memoParent === movingParent) {
         const width = memo.size?.width || 200;
         const height = memo.size?.height || 95;
         objects.push({
@@ -68,9 +72,17 @@ export function resolveUnifiedCollisions(
       }
     });
 
-    // 영역들 추가
+    // 영역들 추가 (같은 parentId를 가진 카테고리의 영역)
     updatedCategories.forEach(category => {
-      if (category.parentId === movingParentId) {
+      // null과 undefined를 동일하게 처리 (루트 레벨)
+      const categoryParent = category.parentId ?? null;
+      const movingParent = movingParentId ?? null;
+
+      // 같은 부모를 가진 카테고리만 (형제 카테고리)
+      if (categoryParent === movingParent) {
+        // expanded된 카테고리만 영역으로 추가 (자식 유무 상관없이)
+        if (!category.isExpanded) return;
+
         const area = calculateCategoryArea(category, { ...page, memos: updatedMemos, categories: updatedCategories });
         if (area) {
           objects.push({
@@ -83,6 +95,15 @@ export function resolveUnifiedCollisions(
         }
       }
     });
+
+    // 디버그: 수집된 충돌 대상 출력 - 영역이 포함된 경우만
+    const hasArea = objects.some(obj => obj.type === 'area');
+    if (objects.length > 1 && hasArea) {
+      console.log(`[충돌 대상] movingId: ${movingId} (${movingType}), parent: ${movingParentId}, count: ${objects.length}`);
+      objects.forEach(obj => {
+        console.log(`  → ${obj.id} (${obj.type})`);
+      });
+    }
 
     return objects;
   };
@@ -119,6 +140,7 @@ export function resolveUnifiedCollisions(
 
         if (pushDirection.x !== 0 || pushDirection.y !== 0) {
           hasCollision = true;
+          console.log(`[충돌 발생] current: ${current.id} (${current.type}), other: ${other.id} (${other.type}), push: (${pushDirection.x}, ${pushDirection.y})`);
 
           if (otherPriority < highestPusherPriority) {
             totalPushX = pushDirection.x;
