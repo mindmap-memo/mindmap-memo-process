@@ -34,8 +34,9 @@ interface CanvasProps {
   isConnecting: boolean;
   isDisconnectMode: boolean;
   connectingFromId: string | null;
+  connectingFromDirection: 'top' | 'bottom' | 'left' | 'right' | null;
   dragLineEnd: { x: number; y: number } | null;
-  onStartConnection: (memoId: string) => void;
+  onStartConnection: (memoId: string, direction?: 'top' | 'bottom' | 'left' | 'right') => void;
   onConnectMemos: (fromId: string, toId: string) => void;
   onCancelConnection: () => void;
   onRemoveConnection: (fromId: string, toId: string) => void;
@@ -105,6 +106,7 @@ const Canvas: React.FC<CanvasProps> = ({
   isConnecting,
   isDisconnectMode,
   connectingFromId,
+  connectingFromDirection,
   dragLineEnd,
   onStartConnection,
   onConnectMemos,
@@ -577,59 +579,50 @@ const Canvas: React.FC<CanvasProps> = ({
       if (connectingMemo) {
         const fromPoints = getConnectionPoints(connectingMemo);
 
-        const connectingWidth = connectingMemo.size?.width || 200;
-        const connectingHeight = connectingMemo.size?.height || 95;
-
-        // 원본 메모 좌표로 중심점 계산
-        const centerFrom = {
-          x: connectingMemo.position.x + connectingWidth / 2,
-          y: connectingMemo.position.y + connectingHeight / 2
-        };
-        // dragLineEnd를 원본 좌표로 변환
-        const dx = dragLineEnd.x - centerFrom.x;
-        const dy = dragLineEnd.y - centerFrom.y;
-
-        if (Math.abs(dx) > Math.abs(dy)) {
-          fromPoint = dx > 0 ? fromPoints.right : fromPoints.left;
+        // direction이 지정된 경우 해당 방향 사용, 아니면 자동 계산
+        if (connectingFromDirection) {
+          fromPoint = fromPoints[connectingFromDirection];
         } else {
-          fromPoint = dy > 0 ? fromPoints.bottom : fromPoints.top;
+          const connectingWidth = connectingMemo.size?.width || 200;
+          const connectingHeight = connectingMemo.size?.height || 95;
+
+          // 원본 메모 좌표로 중심점 계산
+          const centerFrom = {
+            x: connectingMemo.position.x + connectingWidth / 2,
+            y: connectingMemo.position.y + connectingHeight / 2
+          };
+          // dragLineEnd를 원본 좌표로 변환
+          const dx = dragLineEnd.x - centerFrom.x;
+          const dy = dragLineEnd.y - centerFrom.y;
+
+          if (Math.abs(dx) > Math.abs(dy)) {
+            fromPoint = dx > 0 ? fromPoints.right : fromPoints.left;
+          } else {
+            fromPoint = dy > 0 ? fromPoints.bottom : fromPoints.top;
+          }
         }
       } else if (connectingCategory) {
-        const categoryWidth = connectingCategory.size?.width || 200;
-        const categoryHeight = connectingCategory.size?.height || 40;
+        // getConnectionPoints를 사용하여 영역 정보를 고려
+        const fromPoints = getConnectionPoints(connectingCategory);
 
-        const fromPoints = {
-          top: {
-            x: connectingCategory.position.x + categoryWidth / 2,
-            y: connectingCategory.position.y
-          },
-          bottom: {
-            x: connectingCategory.position.x + categoryWidth / 2,
-            y: connectingCategory.position.y + categoryHeight
-          },
-          left: {
-            x: connectingCategory.position.x,
-            y: connectingCategory.position.y + categoryHeight / 2
-          },
-          right: {
-            x: connectingCategory.position.x + categoryWidth,
-            y: connectingCategory.position.y + categoryHeight / 2
-          }
-        };
-
-        // 카테고리 중심점 계산
-        const centerFrom = {
-          x: connectingCategory.position.x + categoryWidth / 2,
-          y: connectingCategory.position.y + categoryHeight / 2
-        };
-
-        const dx = dragLineEnd.x - centerFrom.x;
-        const dy = dragLineEnd.y - centerFrom.y;
-
-        if (Math.abs(dx) > Math.abs(dy)) {
-          fromPoint = dx > 0 ? fromPoints.right : fromPoints.left;
+        // direction이 지정된 경우 해당 방향 사용, 아니면 자동 계산
+        if (connectingFromDirection) {
+          fromPoint = fromPoints[connectingFromDirection];
         } else {
-          fromPoint = dy > 0 ? fromPoints.bottom : fromPoints.top;
+          // 카테고리 중심점 계산
+          const centerFrom = {
+            x: (fromPoints.left.x + fromPoints.right.x) / 2,
+            y: (fromPoints.top.y + fromPoints.bottom.y) / 2
+          };
+
+          const dx = dragLineEnd.x - centerFrom.x;
+          const dy = dragLineEnd.y - centerFrom.y;
+
+          if (Math.abs(dx) > Math.abs(dy)) {
+            fromPoint = dx > 0 ? fromPoints.right : fromPoints.left;
+          } else {
+            fromPoint = dy > 0 ? fromPoints.bottom : fromPoints.top;
+          }
         }
       }
 
@@ -864,6 +857,13 @@ const Canvas: React.FC<CanvasProps> = ({
           }}
           onDrop={(e) => handleDropOnCategoryArea(e, category.id)}
           onDragOver={handleCategoryAreaDragOver}
+          onMouseUp={(e) => {
+            // 연결 모드일 때 영역 어디에나 연결선을 놓으면 연결
+            if (isConnecting && connectingFromId && connectingFromId !== category.id) {
+              e.stopPropagation();
+              onConnectMemos(connectingFromId, category.id);
+            }
+          }}
           onContextMenu={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -920,12 +920,13 @@ const Canvas: React.FC<CanvasProps> = ({
           )}
 
           {/* 영역 연결점들 - 4방향 */}
+          {/* Top */}
           <div
             onMouseDown={(e) => {
               e.stopPropagation();
               if (!isConnecting) {
                 onCategorySelect(category.id);
-                onStartConnection?.(category.id);
+                onStartConnection?.(category.id, 'top');
               }
             }}
             onMouseUp={(e) => {
@@ -958,12 +959,13 @@ const Canvas: React.FC<CanvasProps> = ({
               boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
             }} />
           </div>
+          {/* Bottom */}
           <div
             onMouseDown={(e) => {
               e.stopPropagation();
               if (!isConnecting) {
                 onCategorySelect(category.id);
-                onStartConnection?.(category.id);
+                onStartConnection?.(category.id, 'bottom');
               }
             }}
             onMouseUp={(e) => {
@@ -996,12 +998,13 @@ const Canvas: React.FC<CanvasProps> = ({
               boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
             }} />
           </div>
+          {/* Left */}
           <div
             onMouseDown={(e) => {
               e.stopPropagation();
               if (!isConnecting) {
                 onCategorySelect(category.id);
-                onStartConnection?.(category.id);
+                onStartConnection?.(category.id, 'left');
               }
             }}
             onMouseUp={(e) => {
@@ -1034,12 +1037,13 @@ const Canvas: React.FC<CanvasProps> = ({
               boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
             }} />
           </div>
+          {/* Right */}
           <div
             onMouseDown={(e) => {
               e.stopPropagation();
               if (!isConnecting) {
                 onCategorySelect(category.id);
-                onStartConnection?.(category.id);
+                onStartConnection?.(category.id, 'right');
               }
             }}
             onMouseUp={(e) => {

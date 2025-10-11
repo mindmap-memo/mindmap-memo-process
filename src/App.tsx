@@ -10,7 +10,8 @@ import {
   addMemoToCategory,
   isParentChild,
   getDirectChildMemos,
-  getDirectChildCategories
+  getDirectChildCategories,
+  isAncestor
 } from './utils/categoryHierarchyUtils';
 import LeftPanel from './components/LeftPanel';
 import RightPanel from './components/RightPanel';
@@ -104,6 +105,7 @@ const App: React.FC = () => {
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [isDisconnectMode, setIsDisconnectMode] = useState<boolean>(false);
   const [connectingFromId, setConnectingFromId] = useState<string | null>(null);
+  const [connectingFromDirection, setConnectingFromDirection] = useState<'top' | 'bottom' | 'left' | 'right' | null>(null);
   const [isShiftPressed, setIsShiftPressed] = useState<boolean>(false);
 
   // Shift 드래그 중 영역 캐시 (영역 크기가 변하지 않도록)
@@ -2944,7 +2946,26 @@ const App: React.FC = () => {
     if (!isValidConnection) {
       setIsConnecting(false);
       setConnectingFromId(null);
+      setConnectingFromDirection(null);
       return;
+    }
+
+    // 카테고리-카테고리 연결 시 부모-자식 관계 체크
+    if (fromCategory && toCategory) {
+      const categories = currentPageData.categories || [];
+
+      // fromCategory가 toCategory의 조상인지 확인 (from이 to의 부모/조부모/...)
+      const fromIsAncestorOfTo = isAncestor(fromId, toId, categories);
+      // toCategory가 fromCategory의 조상인지 확인 (to가 from의 부모/조부모/...)
+      const toIsAncestorOfFrom = isAncestor(toId, fromId, categories);
+
+      // 부모-자식 관계가 있으면 연결 금지
+      if (fromIsAncestorOfTo || toIsAncestorOfFrom) {
+        setIsConnecting(false);
+        setConnectingFromId(null);
+        setConnectingFromDirection(null);
+        return;
+      }
     }
 
     setPages(prev => prev.map(page =>
@@ -3027,9 +3048,10 @@ const App: React.FC = () => {
     setTimeout(() => saveCanvasState('connection_remove', `연결 제거: ${fromId} ↔ ${toId}`), 0);
   };
 
-  const startConnection = (memoId: string) => {
+  const startConnection = (memoId: string, direction?: 'top' | 'bottom' | 'left' | 'right') => {
     setIsConnecting(true);
     setConnectingFromId(memoId);
+    setConnectingFromDirection(direction || null);
   };
 
   const updateDragLine = (mousePos: { x: number; y: number }) => {
@@ -3039,6 +3061,7 @@ const App: React.FC = () => {
   const cancelConnection = () => {
     setIsConnecting(false);
     setConnectingFromId(null);
+    setConnectingFromDirection(null);
     setDragLineEnd(null);
   };
 
@@ -3559,6 +3582,7 @@ const App: React.FC = () => {
         isConnecting={isConnecting}
         isDisconnectMode={isDisconnectMode}
         connectingFromId={connectingFromId}
+        connectingFromDirection={connectingFromDirection}
         dragLineEnd={dragLineEnd}
         onStartConnection={startConnection}
         onConnectMemos={connectMemos}
