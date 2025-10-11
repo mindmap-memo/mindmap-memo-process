@@ -115,21 +115,48 @@ export function calculateOverlap(area1: CategoryArea, area2: CategoryArea): { x:
   return { x: overlapX, y: overlapY };
 }
 
+// 충돌 방향 추적 맵 (전역)
+const collisionDirectionMap = new Map<string, 'left' | 'right' | 'up' | 'down'>();
+
+// 이전 위치 추적 맵 (이동 방향 계산용)
+const previousPositionMap = new Map<string, { x: number; y: number }>();
+
+/**
+ * 충돌 방향 추적 맵 초기화 (드래그 종료 시 호출)
+ */
+export function clearCollisionDirections() {
+  collisionDirectionMap.clear();
+  previousPositionMap.clear();
+}
+
 /**
  * 충돌한 테두리를 기준으로 밀어낼 방향과 거리 계산
  * 밀리는 애의 어느 테두리에서 충돌했는지 확인하고 그 방향으로 밀기
  * @param movingArea - 이동 중인 영역 (밀어내는 영역)
  * @param targetArea - 밀릴 영역
+ * @param movingId - 이동 중인 객체 ID
+ * @param targetId - 밀릴 객체 ID
  */
 export function calculatePushDirection(
   movingArea: CategoryArea,
-  targetArea: CategoryArea
+  targetArea: CategoryArea,
+  movingId?: string,
+  targetId?: string
 ): { x: number; y: number } {
   const overlap = calculateOverlap(movingArea, targetArea);
 
   if (overlap.x === 0 || overlap.y === 0) {
+    // 겹침이 해소되면 방향 초기화
+    if (movingId && targetId) {
+      const key = `${movingId}-${targetId}`;
+      collisionDirectionMap.delete(key);
+    }
     return { x: 0, y: 0 };
   }
+
+  // 충돌 쌍의 고유 키
+  const collisionKey = movingId && targetId ? `${movingId}-${targetId}` : '';
+  const existingDirection = collisionKey ? collisionDirectionMap.get(collisionKey) : undefined;
 
   // 밀리는 애(target)의 각 테두리 위치
   const targetLeft = targetArea.x;
@@ -143,52 +170,88 @@ export function calculatePushDirection(
   const movingTop = movingArea.y;
   const movingBottom = movingArea.y + movingArea.height;
 
-  // 각 테두리에서 충돌이 일어났는지 확인
-  // A(미는 애)의 어느 면이 B(밀리는 애)의 어느 테두리를 침범했는가?
-  const collidingLeft = movingRight > targetLeft && movingLeft < targetLeft;     // 왼쪽에서: A 오른쪽이 B 왼쪽 넘어섬 → B를 오른쪽으로
-  const collidingRight = movingLeft < targetRight && movingRight > targetRight;  // 오른쪽에서: A 왼쪽이 B 오른쪽 넘어섬 → B를 왼쪽으로
-  const collidingTop = movingBottom > targetBottom && movingTop < targetBottom;  // 아래에서: A 아래가 B 아래 넘어섬 → B를 위로
-  const collidingBottom = movingTop < targetTop && movingBottom > targetTop;     // 위에서: A 위가 B 위 넘어섬 → B를 아래로
-
-  let pushX = 0;
-  let pushY = 0;
-
   const GAP = 1; // 약간의 간격 (겹치지 않도록)
 
-  // X축 충돌 처리
-  if (collidingLeft) {
-    // 왼쪽에서: A 오른쪽 ↔ B 왼쪽 맞닿음 → B를 오른쪽으로
-    // B의 왼쪽을 A의 오른쪽 밖으로
-    pushX = movingRight - targetLeft + GAP;
-  } else if (collidingRight) {
-    // 오른쪽에서: A 왼쪽 ↔ B 오른쪽 맞닿음 → B를 왼쪽으로
-    // B의 오른쪽을 A의 왼쪽 밖으로
-    pushX = movingLeft - targetRight - GAP;
+  // 이미 충돌 방향이 결정되어 있으면 그 방향으로 계속 밀기 (절대 재계산하지 않음)
+  if (existingDirection) {
+    let pushX = 0;
+    let pushY = 0;
+
+    switch (existingDirection) {
+      case 'right':
+        pushX = overlap.x + GAP;
+        break;
+      case 'left':
+        pushX = -(overlap.x + GAP);
+        break;
+      case 'down':
+        pushY = overlap.y + GAP;
+        break;
+      case 'up':
+        pushY = -(overlap.y + GAP);
+        break;
+    }
+
+    return { x: pushX, y: pushY };
   }
 
-  // Y축 충돌 처리
-  if (collidingTop) {
-    // 아래에서: A 아래 ↔ B 아래 맞닿음 → B를 위로
-    // B의 아래를 A의 위 밖으로
-    pushY = movingTop - targetBottom - GAP;
-  } else if (collidingBottom) {
-    // 위에서: A 위 ↔ B 위 맞닿음 → B를 아래로
-    // B의 위를 A의 아래 밖으로
-    pushY = movingBottom - targetTop + GAP;
-  }
+  // 초기 충돌: 중심점 거리로 방향 판정
+  const movingCenterX = movingArea.x + movingArea.width / 2;
+  const movingCenterY = movingArea.y + movingArea.height / 2;
+  const targetCenterX = targetArea.x + targetArea.width / 2;
+  const targetCenterY = targetArea.y + targetArea.height / 2;
 
-  // X, Y 모두 충돌 중이면 겹침이 적은 쪽으로만 밀기
-  if (pushX !== 0 && pushY !== 0) {
-    if (overlap.x < overlap.y) {
-      console.log('[충돌] X축 선택 (X겹침 < Y겹침)', { overlapX: overlap.x, overlapY: overlap.y, pushX, pushY });
-      return { x: pushX, y: 0 };
+  const deltaX = movingCenterX - targetCenterX;
+  const deltaY = movingCenterY - targetCenterY;
+
+  let decidedDirection: 'left' | 'right' | 'up' | 'down';
+
+  // 중심점 간 거리가 더 큰 축 방향으로 밀기
+  // (거리가 크다 = 그 방향으로 더 멀리 떨어져 있다 = 그 방향에서 충돌)
+  if (Math.abs(deltaX) > Math.abs(deltaY)) {
+    // X축 거리가 더 큼 → 좌우에서 충돌
+    if (deltaX > 0) {
+      // moving이 오른쪽에 → target을 왼쪽으로
+      decidedDirection = 'left';
     } else {
-      console.log('[충돌] Y축 선택 (Y겹침 <= X겹침)', { overlapX: overlap.x, overlapY: overlap.y, pushX, pushY });
-      return { x: 0, y: pushY };
+      // moving이 왼쪽에 → target을 오른쪽으로
+      decidedDirection = 'right';
+    }
+  } else {
+    // Y축 거리가 더 큼 → 위아래에서 충돌
+    if (deltaY > 0) {
+      // moving이 아래에 → target을 위로
+      decidedDirection = 'up';
+    } else {
+      // moving이 위에 → target을 아래로
+      decidedDirection = 'down';
     }
   }
 
-  console.log('[충돌] 단일 방향', { pushX, pushY, collidingLeft, collidingRight, collidingTop, collidingBottom });
+  // 방향에 따라 밀기
+  let pushX = 0;
+  let pushY = 0;
+
+  switch (decidedDirection) {
+    case 'right':
+      pushX = overlap.x + GAP;
+      break;
+    case 'left':
+      pushX = -(overlap.x + GAP);
+      break;
+    case 'down':
+      pushY = overlap.y + GAP;
+      break;
+    case 'up':
+      pushY = -(overlap.y + GAP);
+      break;
+  }
+
+  // 충돌 방향 기억
+  if (collisionKey && decidedDirection) {
+    collisionDirectionMap.set(collisionKey, decidedDirection);
+  }
+
   return { x: pushX, y: pushY };
 }
 

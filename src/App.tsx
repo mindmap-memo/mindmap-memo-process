@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Page, MemoBlock, DataRegistry, MemoDisplaySize, ImportanceLevel, CategoryBlock, CanvasHistory, CanvasAction, CanvasActionType, QuickNavItem } from './types';
 import { globalDataRegistry } from './utils/dataRegistry';
 
-import { calculateCategoryArea, CategoryArea } from './utils/categoryAreaUtils';
+import { calculateCategoryArea, CategoryArea, clearCollisionDirections } from './utils/categoryAreaUtils';
 import { resolveUnifiedCollisions } from './utils/collisionUtils';
 import {
   canAddCategoryAsChild,
@@ -140,6 +140,7 @@ const App: React.FC = () => {
     });
     dragStartMemoPositions.current.delete(categoryId);
     dragStartCategoryPositions.current.delete(categoryId);
+    clearCollisionDirections(); // 충돌 방향 맵 초기화
   }, []);
 
   // 카테고리-카테고리 드롭 감지 (일반 드롭)

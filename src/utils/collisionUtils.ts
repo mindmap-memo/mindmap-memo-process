@@ -141,7 +141,7 @@ export function resolveUnifiedCollisions(
         if (currentPriority <= otherPriority) continue;
 
         // 충돌 검사
-        const pushDirection = calculatePushDirection(other.bounds, current.bounds);
+        const pushDirection = calculatePushDirection(other.bounds, current.bounds, other.id, current.id);
 
         if (pushDirection.x !== 0 || pushDirection.y !== 0) {
           hasCollision = true;
@@ -284,7 +284,7 @@ export function resolveAreaCollisions(
         if (!currentArea || !otherArea) continue;
 
         // 밀어낼 방향과 거리 계산 (otherArea가 밀고, currentArea가 밀림)
-        const pushDirection = calculatePushDirection(otherArea, currentArea);
+        const pushDirection = calculatePushDirection(otherArea, currentArea, otherCategory.id, currentCat.id);
 
         if (pushDirection.x !== 0 || pushDirection.y !== 0) {
           hasCollision = true;
@@ -914,7 +914,7 @@ export function resolveHierarchicalCollisions(
         };
 
         // 밀어낼 방향과 거리 계산 (otherArea가 밀고, currentArea가 밀림)
-        const pushDirection = calculatePushDirection(otherArea, currentArea);
+        const pushDirection = calculatePushDirection(otherArea, currentArea, otherSibling.id, currentCat.id);
 
         if (pushDirection.x !== 0 || pushDirection.y !== 0) {
           hasCollision = true;
@@ -945,7 +945,7 @@ export function resolveHierarchicalCollisions(
             height: movingFixed.area.height
           };
 
-          const pushDirection = calculatePushDirection(movingArea, currentArea);
+          const pushDirection = calculatePushDirection(movingArea, currentArea, movingCategoryId, currentCat.id);
 
           if (pushDirection.x !== 0 || pushDirection.y !== 0) {
             hasCollision = true;
@@ -1322,7 +1322,7 @@ export function resolveMemoChildAreaCollisions(
       };
 
       // 밀어낼 방향과 거리 계산 (memoArea가 밀고, currentArea가 밀림)
-      const pushDirection = calculatePushDirection(memoArea, currentArea);
+      const pushDirection = calculatePushDirection(memoArea, currentArea, movingMemoId, childArea.id);
 
       if (pushDirection.x !== 0 || pushDirection.y !== 0) {
         hasCollision = true;
