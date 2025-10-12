@@ -3385,51 +3385,93 @@ const App: React.FC = () => {
   };
 
   // 검색 결과 메모로 이동 - 캔버스 뷰를 메모 중심으로 이동하고 초기 줌 레벨로 설정
-  const handleNavigateToMemo = (memoId: string) => {
-    const currentPage = pages.find(p => p.id === currentPageId);
-    if (!currentPage) return;
+  const handleNavigateToMemo = (memoId: string, pageId?: string) => {
+    console.log('[handleNavigateToMemo] Called with:', { memoId, pageId, currentPageId });
+    const targetPageId = pageId || currentPageId;
+    console.log('[handleNavigateToMemo] Target page ID:', targetPageId);
+    const targetPage = pages.find(p => p.id === targetPageId);
+    if (!targetPage) {
+      console.error('[handleNavigateToMemo] Target page not found!');
+      return;
+    }
+    console.log('[handleNavigateToMemo] Found target page:', targetPage.name);
 
-    const memo = currentPage.memos.find(m => m.id === memoId);
-    if (!memo) return;
+    const memo = targetPage.memos.find(m => m.id === memoId);
+    if (!memo) {
+      console.error('[handleNavigateToMemo] Memo not found in target page!');
+      return;
+    }
+    console.log('[handleNavigateToMemo] Found memo:', memo.title, 'at position:', memo.position);
 
-    // 화면 크기 계산 (패널 제외)
-    const leftOffset = leftPanelOpen ? leftPanelWidth : 0;
-    const rightOffset = rightPanelOpen ? rightPanelWidth : 0;
-    const availableWidth = window.innerWidth - leftOffset - rightOffset;
-    const availableHeight = window.innerHeight;
+    // Canvas 컨테이너의 실제 크기 가져오기
+    const canvasElement = document.getElementById('main-canvas');
+    if (!canvasElement) {
+      console.error('[handleNavigateToMemo] Canvas element not found!');
+      return;
+    }
+    const rect = canvasElement.getBoundingClientRect();
+    const availableWidth = rect.width;
+    const availableHeight = rect.height;
+    console.log('[handleNavigateToMemo] Canvas size:', { width: availableWidth, height: availableHeight });
+    console.log('[handleNavigateToMemo] Canvas rect:', rect);
 
     // 메모 크기
     const memoWidth = memo.size?.width || 200;
     const memoHeight = memo.size?.height || 150;
+    console.log('[handleNavigateToMemo] Memo size:', { width: memoWidth, height: memoHeight });
 
     // 메모 중심 좌표
     const memoCenterX = memo.position.x + memoWidth / 2;
     const memoCenterY = memo.position.y + memoHeight / 2;
+    console.log('[handleNavigateToMemo] Memo center (world coords):', { x: memoCenterX, y: memoCenterY });
 
-    // 화면 중앙에 메모가 오도록 offset 계산
-    const newOffsetX = availableWidth / 2 - memoCenterX;
-    const newOffsetY = availableHeight / 2 - memoCenterY;
+    // scale을 1로 리셋할 것이므로 scale 1 기준으로 offset 계산
+    const targetScale = 1;
+    const newOffsetX = availableWidth / 2 - memoCenterX * targetScale;
+    const newOffsetY = availableHeight / 2 - memoCenterY * targetScale;
+
+    console.log('[handleNavigateToMemo] Target scale:', targetScale);
+    console.log('[handleNavigateToMemo] Calculated offset:', { newOffsetX, newOffsetY });
+    console.log('[handleNavigateToMemo] Before setCanvasOffset - current offset:', canvasOffset, 'current scale:', canvasScale);
 
     setCanvasOffset({ x: newOffsetX, y: newOffsetY });
-    setCanvasScale(1); // 초기 줌 레벨로 리셋
+    setCanvasScale(targetScale); // 초기 줌 레벨로 리셋
+
+    console.log('[handleNavigateToMemo] After setCanvasOffset called');
+    console.log('[handleNavigateToMemo] Expected screen position of memo center:', { x: availableWidth / 2, y: availableHeight / 2 });
   };
 
   // 카테고리로 이동 - 캔버스 뷰를 카테고리 중심으로 이동
-  const handleNavigateToCategory = (categoryId: string) => {
-    const currentPage = pages.find(p => p.id === currentPageId);
-    if (!currentPage) return;
+  const handleNavigateToCategory = (categoryId: string, pageId?: string) => {
+    console.log('[handleNavigateToCategory] Called with:', { categoryId, pageId, currentPageId });
+    const targetPageId = pageId || currentPageId;
+    console.log('[handleNavigateToCategory] Target page ID:', targetPageId);
+    const targetPage = pages.find(p => p.id === targetPageId);
+    if (!targetPage) {
+      console.error('[handleNavigateToCategory] Target page not found!');
+      return;
+    }
+    console.log('[handleNavigateToCategory] Found target page:', targetPage.name);
 
-    const category = currentPage.categories?.find(c => c.id === categoryId);
-    if (!category) return;
+    const category = targetPage.categories?.find(c => c.id === categoryId);
+    if (!category) {
+      console.error('[handleNavigateToCategory] Category not found in target page!');
+      return;
+    }
+    console.log('[handleNavigateToCategory] Found category:', category.title, 'at position:', category.position);
 
-    // 화면 크기 계산 (패널 제외)
-    const leftOffset = leftPanelOpen ? leftPanelWidth : 0;
-    const rightOffset = rightPanelOpen ? rightPanelWidth : 0;
-    const availableWidth = window.innerWidth - leftOffset - rightOffset;
-    const availableHeight = window.innerHeight;
+    // Canvas 컨테이너의 실제 크기 가져오기
+    const canvasElement = document.getElementById('main-canvas');
+    if (!canvasElement) {
+      console.error('[handleNavigateToCategory] Canvas element not found!');
+      return;
+    }
+    const rect = canvasElement.getBoundingClientRect();
+    const availableWidth = rect.width;
+    const availableHeight = rect.height;
 
     // 카테고리 영역 계산 (자식이 있는 경우)
-    const categoryArea = calculateCategoryArea(category, currentPage);
+    const categoryArea = calculateCategoryArea(category, targetPage);
 
     if (categoryArea && category.isExpanded) {
       // 영역이 있고 확장된 상태면 전체 영역이 화면에 보이도록 조정
@@ -3457,11 +3499,12 @@ const App: React.FC = () => {
       const categoryCenterX = category.position.x + categoryWidth / 2;
       const categoryCenterY = category.position.y + categoryHeight / 2;
 
+      const targetScale = 1;
       setCanvasOffset({
-        x: availableWidth / 2 - categoryCenterX,
-        y: availableHeight / 2 - categoryCenterY
+        x: availableWidth / 2 - categoryCenterX * targetScale,
+        y: availableHeight / 2 - categoryCenterY * targetScale
       });
-      setCanvasScale(1);
+      setCanvasScale(targetScale);
     }
   };
 
@@ -3544,6 +3587,10 @@ const App: React.FC = () => {
           onSearch={(query, category, results) => {
             // 검색 결과 처리 로직은 필요에 따라 추가
           }}
+          onDeleteMemo={deleteMemoById}
+          onDeleteCategory={deleteCategory}
+          onNavigateToMemo={handleNavigateToMemo}
+          onNavigateToCategory={handleNavigateToCategory}
         />
       )}
 

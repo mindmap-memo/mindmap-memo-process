@@ -151,7 +151,7 @@ const Canvas: React.FC<CanvasProps> = ({
   isQuickNavExists
 }) => {
   const [isPanning, setIsPanning] = React.useState(false);
-  const [panStart, setPanStart] = React.useState({ x: 0, y: 0 });
+  const [panStart, setPanStart] = React.useState({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
   const [localCanvasOffset, setLocalCanvasOffset] = React.useState({ x: 0, y: 0 });
   const [localCanvasScale, setLocalCanvasScale] = React.useState(1);
   const [currentTool, setCurrentTool] = React.useState<'select' | 'pan' | 'zoom'>('select');
@@ -291,9 +291,13 @@ const Canvas: React.FC<CanvasProps> = ({
         const newScale = Math.max(0.01, Math.min(5, canvasScale * zoomFactor));
 
         if (newScale !== canvasScale) {
-          const scaleDiff = newScale - canvasScale;
-          const newOffsetX = canvasOffset.x - (mouseX - canvasOffset.x) * (scaleDiff / canvasScale);
-          const newOffsetY = canvasOffset.y - (mouseY - canvasOffset.y) * (scaleDiff / canvasScale);
+          // 마우스 위치 아래의 월드 좌표 계산 (줌 전)
+          const worldX = (mouseX - canvasOffset.x) / canvasScale;
+          const worldY = (mouseY - canvasOffset.y) / canvasScale;
+
+          // 줌 후에도 같은 월드 좌표가 마우스 위치에 있도록 offset 조정
+          const newOffsetX = mouseX - worldX * newScale;
+          const newOffsetY = mouseY - worldY * newScale;
 
           setCanvasScale(newScale);
           setCanvasOffset({ x: newOffsetX, y: newOffsetY });
@@ -1566,10 +1570,13 @@ const Canvas: React.FC<CanvasProps> = ({
 
     // 스페이스바가 눌린 상태에서는 항상 팬 모드 (메모 블록 위에서도)
     if (isSpacePressed && !isConnecting) {
+      console.log('[Pan Start] Space key - mouse:', { x: e.clientX, y: e.clientY }, 'offset:', canvasOffset);
       setIsPanning(true);
       setPanStart({
-        x: e.clientX - canvasOffset.x,
-        y: e.clientY - canvasOffset.y
+        x: e.clientX,
+        y: e.clientY,
+        offsetX: canvasOffset.x,
+        offsetY: canvasOffset.y
       });
       e.preventDefault();
       e.stopPropagation();
@@ -1591,10 +1598,13 @@ const Canvas: React.FC<CanvasProps> = ({
 
     if (isCanvasBackground && !isConnecting) {
       if (currentTool === 'pan') {
+        console.log('[Pan Start] Pan tool - mouse:', { x: e.clientX, y: e.clientY }, 'offset:', canvasOffset);
         setIsPanning(true);
         setPanStart({
-          x: e.clientX - canvasOffset.x,
-          y: e.clientY - canvasOffset.y
+          x: e.clientX,
+          y: e.clientY,
+          offsetX: canvasOffset.x,
+          offsetY: canvasOffset.y
         });
         e.preventDefault();
         e.stopPropagation();
@@ -1612,29 +1622,43 @@ const Canvas: React.FC<CanvasProps> = ({
   };
 
   const handleWheel = (e: React.WheelEvent) => {
-    
+
     // Alt + 휠 또는 줌 도구 선택 시 확대/축소
     if (e.altKey || currentTool === 'zoom') {
       e.preventDefault();
       e.stopPropagation();
-      
+
       const rect = e.currentTarget.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-      
+      console.log('[handleWheel] Mouse position in canvas:', { mouseX, mouseY });
+      console.log('[handleWheel] Canvas rect:', rect);
+
       // 줌 델타 계산 (휠 방향에 따라)
       const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
       const newScale = Math.max(0.01, Math.min(5, canvasScale * zoomFactor));
-      
+      console.log('[handleWheel] Current scale:', canvasScale, '→ New scale:', newScale);
+
       if (newScale !== canvasScale) {
-        // 마우스 위치를 기준으로 줌
-        const scaleDiff = newScale - canvasScale;
-        const newOffsetX = canvasOffset.x - (mouseX - canvasOffset.x) * (scaleDiff / canvasScale);
-        const newOffsetY = canvasOffset.y - (mouseY - canvasOffset.y) * (scaleDiff / canvasScale);
-        
-        
+        console.log('[handleWheel] Before zoom - offset:', canvasOffset, 'scale:', canvasScale);
+
+        // 마우스 위치 아래의 월드 좌표 계산 (줌 전)
+        const worldX = (mouseX - canvasOffset.x) / canvasScale;
+        const worldY = (mouseY - canvasOffset.y) / canvasScale;
+        console.log('[handleWheel] World coords under mouse:', { worldX, worldY });
+
+        // 줌 후에도 같은 월드 좌표가 마우스 위치에 있도록 offset 조정
+        const newOffsetX = mouseX - worldX * newScale;
+        const newOffsetY = mouseY - worldY * newScale;
+        console.log('[handleWheel] After zoom - new offset:', { x: newOffsetX, y: newOffsetY });
+
         setCanvasScale(newScale);
         setCanvasOffset({ x: newOffsetX, y: newOffsetY });
+
+        // 검증: 줌 후 월드 좌표가 같은 화면 위치에 있는지 확인
+        const verifyScreenX = newOffsetX + worldX * newScale;
+        const verifyScreenY = newOffsetY + worldY * newScale;
+        console.log('[handleWheel] Verification - expected mouse pos:', { x: mouseX, y: mouseY }, 'actual:', { x: verifyScreenX, y: verifyScreenY });
       }
     }
   };
@@ -1649,15 +1673,21 @@ const Canvas: React.FC<CanvasProps> = ({
     }
     
     if (isPanning) {
+      const deltaX = e.clientX - panStart.x;
+      const deltaY = e.clientY - panStart.y;
       const newOffset = {
-        x: e.clientX - panStart.x,
-        y: e.clientY - panStart.y
+        x: panStart.offsetX + deltaX,
+        y: panStart.offsetY + deltaY
       };
+      console.log('[Pan Move] delta:', { deltaX, deltaY }, 'panStart:', panStart, 'newOffset:', newOffset);
       setCanvasOffset(newOffset);
     }
   };
 
   const handleMouseUp = () => {
+    if (isPanning) {
+      console.log('[Pan End] Final offset:', canvasOffset);
+    }
     setIsPanning(false);
     setDragTargetCategoryId(null); // Shift 드래그 종료 시 타겟 초기화
   };
@@ -1691,9 +1721,11 @@ const Canvas: React.FC<CanvasProps> = ({
   React.useEffect(() => {
     if (isPanning) {
       const handleGlobalMouseMove = (e: MouseEvent) => {
+        const deltaX = e.clientX - panStart.x;
+        const deltaY = e.clientY - panStart.y;
         const newOffset = {
-          x: e.clientX - panStart.x,
-          y: e.clientY - panStart.y
+          x: panStart.offsetX + deltaX,
+          y: panStart.offsetY + deltaY
         };
         setCanvasOffset(newOffset);
       };
