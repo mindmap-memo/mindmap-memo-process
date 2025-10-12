@@ -1,18 +1,26 @@
 import React, { useState } from 'react';
-import { ChecklistBlock } from '../../types';
+import { ChecklistBlock, ImportanceLevel } from '../../types';
+import { getImportanceStyle } from '../../utils/importanceStyles';
 
 interface ChecklistBlockProps {
   block: ChecklistBlock;
   isEditing?: boolean;
   onUpdate?: (block: ChecklistBlock) => void;
+  activeImportanceFilters?: Set<ImportanceLevel>;
+  showGeneralContent?: boolean;
 }
 
-const ChecklistBlockComponent: React.FC<ChecklistBlockProps> = ({ 
-  block, 
-  isEditing = false, 
-  onUpdate 
+const ChecklistBlockComponent: React.FC<ChecklistBlockProps> = ({
+  block,
+  isEditing = false,
+  onUpdate,
+  activeImportanceFilters,
+  showGeneralContent
 }) => {
   const [items, setItems] = useState(block.items);
+
+  // 중요도 스타일 가져오기
+  const importanceStyle = getImportanceStyle(block.importance);
 
   const handleToggleCheck = (itemId: string) => {
     const updatedItems = items.map(item =>
@@ -67,7 +75,12 @@ const ChecklistBlockComponent: React.FC<ChecklistBlockProps> = ({
   };
 
   return (
-    <div style={{ marginBottom: '8px' }}>
+    <div style={{
+      marginBottom: '8px',
+      padding: importanceStyle.backgroundColor ? '8px' : '0',
+      borderRadius: '4px',
+      ...importanceStyle
+    }}>
       {items.length === 0 && isEditing ? (
         <div style={{
           padding: '8px',

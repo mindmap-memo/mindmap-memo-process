@@ -2358,6 +2358,25 @@ const Canvas: React.FC<CanvasProps> = ({
         </button>
       </div>
 
+      {/* 확대율 표시 (좌측 하단) */}
+      <div style={{
+        position: 'absolute',
+        left: '20px',
+        bottom: '20px',
+        backgroundColor: 'white',
+        borderRadius: '8px',
+        padding: '8px 12px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        border: '1px solid #e1e5e9',
+        fontSize: '14px',
+        fontWeight: '500',
+        color: '#6b7280',
+        zIndex: 1000,
+        userSelect: 'none'
+      }}>
+        {Math.round(Math.min(canvasScale * 100, 200))}%
+      </div>
+
       {/* 중요도 필터 UI */}
       <ImportanceFilter
         activeFilters={activeImportanceFilters}

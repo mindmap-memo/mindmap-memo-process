@@ -58,6 +58,34 @@ const ColumnTypeSelector: React.FC<ColumnTypeSelectorProps> = ({
     onSelectType('select', options.length > 0 ? options : ['옵션1', '옵션2', '옵션3']);
   };
 
+  // 메뉴가 화면 밖으로 나가지 않도록 위치 조정
+  const menuWidth = 240;
+  const menuHeight = 400; // 대략적인 최대 높이
+  const padding = 10;
+
+  let x = position.x;
+  let y = position.y;
+
+  // 오른쪽 경계 체크
+  if (x + menuWidth > window.innerWidth) {
+    x = window.innerWidth - menuWidth - padding;
+  }
+
+  // 왼쪽 경계 체크
+  if (x < padding) {
+    x = padding;
+  }
+
+  // 아래쪽 경계 체크
+  if (y + menuHeight > window.innerHeight) {
+    y = window.innerHeight - menuHeight - padding;
+  }
+
+  // 위쪽 경계 체크
+  if (y < padding) {
+    y = padding;
+  }
+
   return (
     <>
       {/* Click outside overlay */}
@@ -72,14 +100,14 @@ const ColumnTypeSelector: React.FC<ColumnTypeSelectorProps> = ({
         }}
         onClick={onCancel}
       />
-      
+
       {/* Main menu */}
       <div
         ref={menuRef}
         style={{
           position: 'fixed',
-          top: position.y,
-          left: position.x,
+          top: y,
+          left: x,
           backgroundColor: 'white',
           border: '1px solid #e1e5e9',
           borderRadius: '8px',

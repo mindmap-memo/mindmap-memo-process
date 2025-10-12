@@ -1,20 +1,28 @@
 import React, { useState } from 'react';
-import { CodeBlock } from '../../types';
+import { CodeBlock, ImportanceLevel } from '../../types';
+import { getImportanceStyle } from '../../utils/importanceStyles';
 
 interface CodeBlockProps {
   block: CodeBlock;
   isEditing?: boolean;
   onUpdate?: (block: CodeBlock) => void;
+  activeImportanceFilters?: Set<ImportanceLevel>;
+  showGeneralContent?: boolean;
 }
 
-const CodeBlockComponent: React.FC<CodeBlockProps> = ({ 
-  block, 
-  isEditing = false, 
-  onUpdate 
+const CodeBlockComponent: React.FC<CodeBlockProps> = ({
+  block,
+  isEditing = false,
+  onUpdate,
+  activeImportanceFilters,
+  showGeneralContent
 }) => {
   const [content, setContent] = useState(block.content);
   const [language, setLanguage] = useState(block.language || 'javascript');
   const [isLocalEditing, setIsLocalEditing] = useState(false);
+
+  // 중요도 스타일 가져오기
+  const importanceStyle = getImportanceStyle(block.importance);
 
   const handleSave = () => {
     if (onUpdate) {
@@ -133,7 +141,8 @@ const CodeBlockComponent: React.FC<CodeBlockProps> = ({
         cursor: isEditing ? 'pointer' : 'default',
         borderRadius: '4px',
         overflow: 'hidden',
-        border: '1px solid #e2e8f0'
+        border: importanceStyle.borderLeft ? 'none' : '1px solid #e2e8f0',
+        ...importanceStyle
       }}
     >
       <div style={{

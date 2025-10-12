@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { TableBlock, TableCell, TableColumn, CellType } from '../../types';
+import { TableBlock, TableCell, TableColumn, CellType, ImportanceLevel } from '../../types';
 import { FormulaEngine } from '../../utils/formulaEngine';
 import { globalDataRegistry } from '../../utils/dataRegistry';
+import { getImportanceStyle } from '../../utils/importanceStyles';
 import CellEditor from '../table/CellEditor';
 import ColumnTypeSelector from '../table/ColumnTypeSelector';
 
@@ -11,15 +12,21 @@ interface TableBlockProps {
   onUpdate?: (block: TableBlock) => void;
   pageId?: string;
   memoId?: string;
+  activeImportanceFilters?: Set<ImportanceLevel>;
+  showGeneralContent?: boolean;
 }
 
-const TableBlockComponent: React.FC<TableBlockProps> = ({ 
-  block, 
-  isEditing = false, 
+const TableBlockComponent: React.FC<TableBlockProps> = ({
+  block,
+  isEditing = false,
   onUpdate,
   pageId = '',
-  memoId = ''
+  memoId = '',
+  activeImportanceFilters,
+  showGeneralContent
 }) => {
+  // 중요도 스타일 가져오기
+  const importanceStyle = getImportanceStyle(block.importance);
   const [headers, setHeaders] = useState(block.headers);
   const [rows, setRows] = useState(block.rows);
   const [columns, setColumns] = useState<TableColumn[]>([]);
@@ -776,14 +783,17 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
   }
 
   return (
-    <div 
+    <div
       ref={tableContainerRef}
-      style={{ 
+      style={{
         marginBottom: '8px',
         overflow: 'visible',
         position: 'relative',
         paddingLeft: isEditing ? '40px' : '0',
-        paddingBottom: isEditing ? '44px' : '0'
+        paddingBottom: isEditing ? '44px' : '0',
+        padding: importanceStyle.backgroundColor ? '8px' : undefined,
+        borderRadius: '4px',
+        ...importanceStyle
       }}
     >
 
@@ -792,7 +802,7 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
       }}>
         <div style={{
           overflowX: 'auto',
-          border: '1px solid #e0e0e0',
+          border: importanceStyle.borderLeft ? 'none' : '1px solid #e0e0e0',
           borderRadius: '4px',
           backgroundColor: 'white'
         }}>

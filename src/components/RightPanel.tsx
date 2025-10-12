@@ -1,5 +1,6 @@
 import React from 'react';
 import { MemoBlock, Page, ContentBlock, ContentBlockType, TextBlock, ImportanceLevel, CategoryBlock } from '../types';
+import { IMPORTANCE_LABELS, IMPORTANCE_COLORS } from '../utils/importanceStyles';
 import Resizer from './Resizer';
 import ContentBlockComponent from './ContentBlock';
 import GoogleAuth from './GoogleAuth';
@@ -68,11 +69,16 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const [isUndoRedoAction, setIsUndoRedoAction] = React.useState(false); // Undo/Redo 중인지 확인
   const blocksContainerRef = React.useRef<HTMLDivElement>(null);
   const rightPanelRef = React.useRef<HTMLDivElement>(null);
+  const importanceButtonRef = React.useRef<HTMLButtonElement>(null);
   const [showMenu, setShowMenu] = React.useState(false);
   const [menuPosition, setMenuPosition] = React.useState({ x: 0, y: 0 });
   const [isGoogleSignedIn, setIsGoogleSignedIn] = React.useState(false);
   const [showConnectedMemos, setShowConnectedMemos] = React.useState(false);
   const [isTitleFocused, setIsTitleFocused] = React.useState(false);
+  const [showContextMenu, setShowContextMenu] = React.useState(false);
+  const [contextMenuPosition, setContextMenuPosition] = React.useState({ x: 0, y: 0 });
+  const [showImportanceSubmenu, setShowImportanceSubmenu] = React.useState(false);
+  const [submenuPosition, setSubmenuPosition] = React.useState<'right' | 'left'>('right');
 
   // 공백 크기를 계산하는 함수 (최대 1블록 높이로 제한)
   const getSpacerHeight = (consecutiveHiddenBlocks: number): string => {
@@ -329,12 +335,12 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
       const newBlock = createNewBlock('text') as any;
       newBlock.content = content;
-      
+
       const updatedBlocks = [...selectedMemo.blocks];
       updatedBlocks.splice(blockIndex + 1, 0, newBlock);
-      
+
       onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
-      
+
       // 새 블록으로 포커스 이동 (약간의 지연 후)
       setTimeout(() => {
         const newTextarea = document.querySelector(`textarea[data-block-id="${newBlock.id}"]`) as HTMLTextAreaElement;
@@ -343,6 +349,144 @@ const RightPanel: React.FC<RightPanelProps> = ({
         }
       }, 50);
     }
+  };
+
+  const handleInsertBlockAfter = (afterBlockId: string, newBlock: ContentBlock) => {
+    if (selectedMemo && selectedMemo.blocks) {
+      saveToHistory();
+      const blockIndex = selectedMemo.blocks.findIndex(block => block.id === afterBlockId);
+      if (blockIndex === -1) return;
+
+      const updatedBlocks = [...selectedMemo.blocks];
+      updatedBlocks.splice(blockIndex + 1, 0, newBlock);
+
+      onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
+    }
+  };
+
+  // 드래그 앤 드롭으로 파일 추가
+  const handleFileDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!selectedMemo) return;
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+
+    saveToHistory();
+
+    const newBlocks: ContentBlock[] = [];
+
+    for (const file of files) {
+      const reader = new FileReader();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = (event) => resolve(event.target?.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      let newBlock: ContentBlock;
+
+      if (file.type.startsWith('image/')) {
+        // 이미지 파일
+        newBlock = {
+          id: Date.now().toString() + '_' + Math.random(),
+          type: 'image',
+          url: dataUrl,
+          caption: file.name
+        };
+      } else {
+        // 일반 파일
+        newBlock = {
+          id: Date.now().toString() + '_' + Math.random(),
+          type: 'file',
+          url: dataUrl,
+          name: file.name,
+          size: file.size
+        };
+      }
+
+      newBlocks.push(newBlock);
+    }
+
+    const updatedBlocks = [...(selectedMemo.blocks || []), ...newBlocks];
+    onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  // 우클릭 컨텍스트 메뉴
+  const handleBlockContextMenu = (e: React.MouseEvent) => {
+    const blocksToUse = selectedBlocks.length > 0 ? selectedBlocks : dragSelectedBlocks;
+    if (blocksToUse.length === 0) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    // 메뉴 크기 추정 (실제 렌더링 전 대략적인 크기)
+    const menuWidth = 150;
+    const menuHeight = 120; // 기본 메뉴 높이
+    const submenuWidth = 140;
+    const submenuHeight = 260; // 중요도 서브메뉴 높이 (7개 항목)
+
+    // 화면 크기
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // 초기 위치
+    let x = e.clientX;
+    let y = e.clientY;
+
+    // 오른쪽 경계 체크
+    if (x + menuWidth > viewportWidth) {
+      x = viewportWidth - menuWidth - 10; // 10px 여유 공간
+    }
+
+    // 왼쪽 경계 체크
+    if (x < 10) {
+      x = 10;
+    }
+
+    // 아래쪽 경계 체크 (서브메뉴를 고려하여 더 큰 높이 체크)
+    if (y + Math.max(menuHeight, submenuHeight) > viewportHeight) {
+      y = viewportHeight - Math.max(menuHeight, submenuHeight) - 10;
+    }
+
+    // 위쪽 경계 체크
+    if (y < 10) {
+      y = 10;
+    }
+
+    setContextMenuPosition({ x, y });
+    setShowContextMenu(true);
+  };
+
+  // 선택된 블록 삭제
+  const handleDeleteSelectedBlocks = () => {
+    handleBlocksDelete();
+    setShowContextMenu(false);
+  };
+
+  // 선택된 블록에 중요도 적용
+  const handleApplyImportance = (level: ImportanceLevel) => {
+    if (!selectedMemo) return;
+
+    saveToHistory();
+    const blocksToUpdate = selectedBlocks.length > 0 ? selectedBlocks : dragSelectedBlocks;
+    const updatedBlocks = selectedMemo.blocks?.map(block => {
+      if (blocksToUpdate.includes(block.id)) {
+        return { ...block, importance: level } as ContentBlock;
+      }
+      return block;
+    }) || [];
+
+    onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
+    setShowContextMenu(false);
+    setShowImportanceSubmenu(false);
   };
 
   const handleMergeWithPrevious = (blockId: string, currentContent: string) => {
@@ -928,6 +1072,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
       ref={rightPanelRef}
       data-right-panel="true"
       onClick={handleMemoAreaClick}
+      onDrop={handleFileDrop}
+      onDragOver={handleDragOver}
       style={{
         display: 'flex',
         height: '100vh',
@@ -1756,10 +1902,260 @@ const RightPanel: React.FC<RightPanelProps> = ({
               </>
             )}
 
+            {/* 우클릭 컨텍스트 메뉴 */}
+            {showContextMenu && (
+              <>
+                <div
+                  style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    zIndex: 999
+                  }}
+                  onClick={() => {
+                    setShowContextMenu(false);
+                    setShowImportanceSubmenu(false);
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'fixed',
+                    top: `${contextMenuPosition.y}px`,
+                    left: `${contextMenuPosition.x}px`,
+                    backgroundColor: 'white',
+                    border: '1px solid #e1e5e9',
+                    borderRadius: '8px',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                    padding: '8px 0',
+                    minWidth: '150px',
+                    zIndex: 1001
+                  }}
+                >
+                  <button
+                    onClick={handleDeleteSelectedBlocks}
+                    style={{
+                      width: '100%',
+                      padding: '8px 16px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      textAlign: 'left',
+                      color: '#ff4444'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fef2f2'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    삭제
+                  </button>
+                  <div style={{ height: '1px', backgroundColor: '#f0f0f0', margin: '4px 0' }} />
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      ref={importanceButtonRef}
+                      onClick={() => {
+                        if (!showImportanceSubmenu && importanceButtonRef.current) {
+                          // 서브메뉴를 열 때 위치 계산
+                          const rect = importanceButtonRef.current.getBoundingClientRect();
+                          const submenuWidth = 140;
+                          const spaceOnRight = window.innerWidth - rect.right;
+
+                          // 오른쪽에 공간이 충분하면 오른쪽에, 아니면 왼쪽에 표시
+                          setSubmenuPosition(spaceOnRight >= submenuWidth + 10 ? 'right' : 'left');
+                        }
+                        setShowImportanceSubmenu(!showImportanceSubmenu);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '8px 16px',
+                        border: 'none',
+                        backgroundColor: 'transparent',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        textAlign: 'left',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      중요도 부여
+                      <span style={{ fontSize: '12px', color: '#6b7280' }}>▶</span>
+                    </button>
+
+                    {/* 중요도 서브메뉴 */}
+                    {showImportanceSubmenu && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          ...(submenuPosition === 'right'
+                            ? { left: '100%', marginLeft: '4px' }
+                            : { right: '100%', marginRight: '4px' }
+                          ),
+                          top: 0,
+                          backgroundColor: 'white',
+                          border: '1px solid #e1e5e9',
+                          borderRadius: '8px',
+                          boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                          padding: '8px 0',
+                          minWidth: '140px',
+                          zIndex: 1002
+                        }}
+                      >
+                        <button
+                          onClick={() => handleApplyImportance('critical')}
+                          style={{
+                            width: '100%',
+                            padding: '8px 16px',
+                            border: 'none',
+                            backgroundColor: 'transparent',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            textAlign: 'left',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fef2f2'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          <span style={{ width: '16px', height: '16px', backgroundColor: IMPORTANCE_COLORS.critical, borderRadius: '3px', display: 'inline-block' }}></span>
+                          {IMPORTANCE_LABELS.critical}
+                        </button>
+                        <button
+                          onClick={() => handleApplyImportance('important')}
+                          style={{
+                            width: '100%',
+                            padding: '8px 16px',
+                            border: 'none',
+                            backgroundColor: 'transparent',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            textAlign: 'left',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fff7ed'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          <span style={{ width: '16px', height: '16px', backgroundColor: IMPORTANCE_COLORS.important, borderRadius: '3px', display: 'inline-block' }}></span>
+                          {IMPORTANCE_LABELS.important}
+                        </button>
+                        <button
+                          onClick={() => handleApplyImportance('opinion')}
+                          style={{
+                            width: '100%',
+                            padding: '8px 16px',
+                            border: 'none',
+                            backgroundColor: 'transparent',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            textAlign: 'left',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fef9c3'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          <span style={{ width: '16px', height: '16px', backgroundColor: IMPORTANCE_COLORS.opinion, borderRadius: '3px', display: 'inline-block' }}></span>
+                          {IMPORTANCE_LABELS.opinion}
+                        </button>
+                        <button
+                          onClick={() => handleApplyImportance('reference')}
+                          style={{
+                            width: '100%',
+                            padding: '8px 16px',
+                            border: 'none',
+                            backgroundColor: 'transparent',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            textAlign: 'left',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f0fdf4'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          <span style={{ width: '16px', height: '16px', backgroundColor: IMPORTANCE_COLORS.reference, borderRadius: '3px', display: 'inline-block' }}></span>
+                          {IMPORTANCE_LABELS.reference}
+                        </button>
+                        <button
+                          onClick={() => handleApplyImportance('question')}
+                          style={{
+                            width: '100%',
+                            padding: '8px 16px',
+                            border: 'none',
+                            backgroundColor: 'transparent',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            textAlign: 'left',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#eff6ff'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          <span style={{ width: '16px', height: '16px', backgroundColor: IMPORTANCE_COLORS.question, borderRadius: '3px', display: 'inline-block' }}></span>
+                          {IMPORTANCE_LABELS.question}
+                        </button>
+                        <button
+                          onClick={() => handleApplyImportance('idea')}
+                          style={{
+                            width: '100%',
+                            padding: '8px 16px',
+                            border: 'none',
+                            backgroundColor: 'transparent',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            textAlign: 'left',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#faf5ff'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          <span style={{ width: '16px', height: '16px', backgroundColor: IMPORTANCE_COLORS.idea, borderRadius: '3px', display: 'inline-block' }}></span>
+                          {IMPORTANCE_LABELS.idea}
+                        </button>
+                        <button
+                          onClick={() => handleApplyImportance('data')}
+                          style={{
+                            width: '100%',
+                            padding: '8px 16px',
+                            border: 'none',
+                            backgroundColor: 'transparent',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            textAlign: 'left',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          <span style={{ width: '16px', height: '16px', backgroundColor: IMPORTANCE_COLORS.data, borderRadius: '3px', display: 'inline-block' }}></span>
+                          {IMPORTANCE_LABELS.data}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
             {/* 블록들 렌더링 */}
-            <div 
+            <div
               ref={blocksContainerRef}
-              style={{ 
+              onContextMenu={handleBlockContextMenu}
+              style={{
                 marginBottom: '16px',
                 position: 'relative',
                 userSelect: 'none',
@@ -1847,6 +2243,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                             onMoveDown={(blockId) => handleBlockMove(blockId, 'down')}
                             onConvertToBlock={handleConvertBlock}
                             onCreateNewBlock={handleCreateNewBlock}
+                            onInsertBlockAfter={handleInsertBlockAfter}
                             onFocusPrevious={handleFocusPrevious}
                             onFocusNext={handleFocusNext}
                             onBlockClick={handleBlockClick}

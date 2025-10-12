@@ -48,6 +48,34 @@ const BlockSelector: React.FC<BlockSelectorProps> = ({
 
   if (!isVisible) return null;
 
+  // 메뉴가 화면 밖으로 나가지 않도록 위치 조정
+  const menuWidth = 320;
+  const menuHeight = 300; // 최대 높이
+  const padding = 10;
+
+  let x = position.x;
+  let y = position.y;
+
+  // 오른쪽 경계 체크
+  if (x + menuWidth > window.innerWidth) {
+    x = window.innerWidth - menuWidth - padding;
+  }
+
+  // 왼쪽 경계 체크
+  if (x < padding) {
+    x = padding;
+  }
+
+  // 아래쪽 경계 체크
+  if (y + menuHeight > window.innerHeight) {
+    y = window.innerHeight - menuHeight - padding;
+  }
+
+  // 위쪽 경계 체크
+  if (y < padding) {
+    y = padding;
+  }
+
   return (
     <>
       {/* 배경 오버레이 */}
@@ -63,13 +91,13 @@ const BlockSelector: React.FC<BlockSelectorProps> = ({
         }}
         onClick={onClose}
       />
-      
+
       {/* 블록 선택기 */}
       <div
         style={{
           position: 'fixed',
-          left: `${position.x}px`,
-          top: `${position.y}px`,
+          left: `${x}px`,
+          top: `${y}px`,
           backgroundColor: 'white',
           border: '1px solid #e1e5e9',
           borderRadius: '8px',

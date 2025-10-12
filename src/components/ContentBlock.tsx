@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { ContentBlock, ContentBlockType, ImportanceLevel } from '../types';
+import { shouldShowBlock } from '../utils/importanceStyles';
 import TextBlockComponent from './blocks/TextBlock';
 import CalloutBlockComponent from './blocks/CalloutBlock';
 import ChecklistBlockComponent from './blocks/ChecklistBlock';
@@ -26,6 +27,7 @@ interface ContentBlockProps {
   onMoveDown?: (blockId: string) => void;
   onConvertToBlock?: (blockId: string, newBlockType: ContentBlockType) => void;
   onCreateNewBlock?: (afterBlockId: string, content: string) => void;
+  onInsertBlockAfter?: (afterBlockId: string, newBlock: ContentBlock) => void;
   onFocusPrevious?: (blockId: string) => void;
   onFocusNext?: (blockId: string) => void;
   onBlockClick?: (blockId: string, event: React.MouseEvent) => void;
@@ -52,6 +54,7 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
   onMoveDown,
   onConvertToBlock,
   onCreateNewBlock,
+  onInsertBlockAfter,
   onFocusPrevious,
   onFocusNext,
   onBlockClick,
@@ -66,6 +69,16 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
   const [showMenu, setShowMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{left?: string, right?: string}>({left: '-100px'});
   const blockRef = useRef<HTMLDivElement>(null);
+
+  // 블록 필터링 확인 - TextBlock은 별도로 처리하므로 제외
+  const blockImportance = block.type !== 'text' ? (block as any).importance : undefined;
+  const shouldShow = block.type === 'text' || shouldShowBlock(blockImportance, activeImportanceFilters, showGeneralContent);
+
+  // 필터링된 블록은 렌더링하지 않음
+  if (!shouldShow) {
+    return null;
+  }
+
   const renderBlock = () => {
     const commonProps = {
       block,
@@ -81,8 +94,8 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
         return <TextBlockComponent
           {...commonProps}
           block={block as any}
-          onConvertToBlock={onConvertToBlock ? (newBlockType) => onConvertToBlock(block.id, newBlockType) : undefined}
           onCreateNewBlock={onCreateNewBlock}
+          onInsertBlockAfter={onInsertBlockAfter}
           onDeleteBlock={onDelete}
           onFocusPrevious={onFocusPrevious}
           onFocusNext={onFocusNext}
@@ -93,21 +106,63 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
           onResetFilters={onResetFilters}
         />;
       case 'callout':
-        return <CalloutBlockComponent {...commonProps} block={block as any} />;
+        return <CalloutBlockComponent
+          {...commonProps}
+          block={block as any}
+          activeImportanceFilters={activeImportanceFilters}
+          showGeneralContent={showGeneralContent}
+        />;
       case 'checklist':
-        return <ChecklistBlockComponent {...commonProps} block={block as any} />;
+        return <ChecklistBlockComponent
+          {...commonProps}
+          block={block as any}
+          activeImportanceFilters={activeImportanceFilters}
+          showGeneralContent={showGeneralContent}
+        />;
       case 'image':
-        return <ImageBlockComponent {...commonProps} block={block as any} />;
+        return <ImageBlockComponent
+          {...commonProps}
+          block={block as any}
+          activeImportanceFilters={activeImportanceFilters}
+          showGeneralContent={showGeneralContent}
+        />;
       case 'file':
-        return <FileBlockComponent {...commonProps} block={block as any} />;
+        return <FileBlockComponent
+          {...commonProps}
+          block={block as any}
+          activeImportanceFilters={activeImportanceFilters}
+          showGeneralContent={showGeneralContent}
+        />;
       case 'bookmark':
-        return <BookmarkBlockComponent {...commonProps} block={block as any} />;
+        return <BookmarkBlockComponent
+          {...commonProps}
+          block={block as any}
+          activeImportanceFilters={activeImportanceFilters}
+          showGeneralContent={showGeneralContent}
+        />;
       case 'quote':
-        return <QuoteBlockComponent {...commonProps} block={block as any} />;
+        return <QuoteBlockComponent
+          {...commonProps}
+          block={block as any}
+          activeImportanceFilters={activeImportanceFilters}
+          showGeneralContent={showGeneralContent}
+        />;
       case 'code':
-        return <CodeBlockComponent {...commonProps} block={block as any} />;
+        return <CodeBlockComponent
+          {...commonProps}
+          block={block as any}
+          activeImportanceFilters={activeImportanceFilters}
+          showGeneralContent={showGeneralContent}
+        />;
       case 'table':
-        return <TableBlockComponent {...commonProps} block={block as any} pageId={pageId} memoId={memoId} />;
+        return <TableBlockComponent
+          {...commonProps}
+          block={block as any}
+          pageId={pageId}
+          memoId={memoId}
+          activeImportanceFilters={activeImportanceFilters}
+          showGeneralContent={showGeneralContent}
+        />;
       case 'sheets':
         return <SheetsBlockComponent 
           block={block as any} 

@@ -1,17 +1,24 @@
 import React, { useState } from 'react';
-import { BookmarkBlock } from '../../types';
+import { BookmarkBlock, ImportanceLevel } from '../../types';
+import { getImportanceStyle } from '../../utils/importanceStyles';
 
 interface BookmarkBlockProps {
   block: BookmarkBlock;
   isEditing?: boolean;
   onUpdate?: (block: BookmarkBlock) => void;
+  activeImportanceFilters?: Set<ImportanceLevel>;
+  showGeneralContent?: boolean;
 }
 
-const BookmarkBlockComponent: React.FC<BookmarkBlockProps> = ({ 
-  block, 
-  isEditing = false, 
-  onUpdate 
+const BookmarkBlockComponent: React.FC<BookmarkBlockProps> = ({
+  block,
+  isEditing = false,
+  onUpdate,
+  activeImportanceFilters,
+  showGeneralContent
 }) => {
+  // 중요도 스타일 가져오기
+  const importanceStyle = getImportanceStyle(block.importance);
   const [url, setUrl] = useState(block.url);
   const [title, setTitle] = useState(block.title || '');
   const [description, setDescription] = useState(block.description || '');
@@ -61,11 +68,11 @@ const BookmarkBlockComponent: React.FC<BookmarkBlockProps> = ({
     <div
       onClick={() => isEditing && setIsLocalEditing(true)}
       style={{
-        border: '1px solid #e0e0e0',
+        border: importanceStyle.borderLeft || '1px solid #e0e0e0',
         borderRadius: '8px',
         overflow: 'hidden',
         cursor: isEditing ? 'pointer' : 'default',
-        backgroundColor: 'white'
+        backgroundColor: importanceStyle.backgroundColor || 'white'
       }}
     >
       {block.image && (

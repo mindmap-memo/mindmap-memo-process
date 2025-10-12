@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { ImageBlock } from '../../types';
+import { ImageBlock, ImportanceLevel } from '../../types';
+import { getImportanceStyle } from '../../utils/importanceStyles';
 
 // 파일을 Base64로 변환하는 함수
 const fileToBase64 = (file: File): Promise<string> => {
@@ -15,20 +16,30 @@ interface ImageBlockProps {
   block: ImageBlock;
   isEditing?: boolean;
   onUpdate?: (block: ImageBlock) => void;
+  activeImportanceFilters?: Set<ImportanceLevel>;
+  showGeneralContent?: boolean;
 }
 
 const ImageBlockComponent: React.FC<ImageBlockProps> = ({
   block,
   isEditing = false,
-  onUpdate
+  onUpdate,
+  activeImportanceFilters,
+  showGeneralContent
 }) => {
+  // 중요도 스타일 가져오기
+  const importanceStyle = getImportanceStyle(block.importance);
   const [url, setUrl] = useState(block.url);
   const [alt, setAlt] = useState(block.alt || '');
   const [caption, setCaption] = useState(block.caption || '');
   const [isLocalEditing, setIsLocalEditing] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [imageWidth, setImageWidth] = useState(block.width || 400);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
 
   const handleSave = () => {
     if (onUpdate) {
@@ -118,6 +129,39 @@ const ImageBlockComponent: React.FC<ImageBlockProps> = ({
         handleFile(file);
       }
     }
+  };
+
+  // 리사이즈 핸들러
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+
+    const startX = e.clientX;
+    const startWidth = imageWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const newWidth = Math.max(100, Math.min(800, startWidth + deltaX));
+      setImageWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+
+      // 리사이즈 완료 시 블록 업데이트
+      if (onUpdate) {
+        onUpdate({
+          ...block,
+          width: imageWidth
+        });
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   };
 
   if (isEditing && isLocalEditing) {
@@ -250,10 +294,10 @@ const ImageBlockComponent: React.FC<ImageBlockProps> = ({
       style={{
         marginBottom: '8px',
         cursor: isEditing && !block.url ? 'pointer' : 'default',
-        border: isEditing ? '1px dashed #ddd' : 'none',
+        border: importanceStyle.borderLeft || (isEditing ? '1px dashed #ddd' : 'none'),
         borderRadius: '4px',
-        padding: isEditing ? '8px' : '0',
-        backgroundColor: isDragOver ? '#f8f9fa' : 'transparent',
+        padding: importanceStyle.backgroundColor ? '8px' : (isEditing ? '8px' : '0'),
+        backgroundColor: importanceStyle.backgroundColor || (isDragOver ? '#f8f9fa' : 'transparent'),
         transition: 'background-color 0.3s ease'
       }}
       tabIndex={isEditing ? 0 : -1}
@@ -268,22 +312,59 @@ const ImageBlockComponent: React.FC<ImageBlockProps> = ({
 
       {block.url ? (
         <div
-          onClick={() => isEditing && setIsLocalEditing(true)}
-          style={{ cursor: isEditing ? 'pointer' : 'default' }}
+          ref={imageContainerRef}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => !isResizing && setIsHovered(false)}
+          onClick={() => isEditing && !isResizing && setIsLocalEditing(true)}
+          style={{
+            cursor: isEditing && !isResizing ? 'pointer' : 'default',
+            position: 'relative',
+            display: 'inline-block',
+            width: imageWidth,
+            maxWidth: '100%'
+          }}
         >
           <img
             src={block.url}
             alt={block.alt || '이미지'}
             style={{
-              maxWidth: '100%',
+              width: '100%',
               height: 'auto',
               borderRadius: '4px',
-              display: 'block'
+              display: 'block',
+              border: isHovered && isEditing ? '2px solid #007bff' : 'none',
+              transition: 'border 0.2s ease'
             }}
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
             }}
           />
+
+          {/* 우측 리사이즈 핸들 */}
+          {isHovered && isEditing && (
+            <div
+              onMouseDown={handleResizeStart}
+              style={{
+                position: 'absolute',
+                right: -5,
+                top: 0,
+                bottom: 0,
+                width: 10,
+                cursor: 'ew-resize',
+                backgroundColor: isResizing ? '#007bff' : 'transparent',
+                transition: 'background-color 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#007bff';
+              }}
+              onMouseLeave={(e) => {
+                if (!isResizing) {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }
+              }}
+            />
+          )}
+
           {block.caption && (
             <div style={{
               fontSize: '12px',

@@ -37,6 +37,7 @@ export interface CalloutBlock extends BaseContentBlock {
   content: string;
   emoji?: string;
   color?: string;
+  importance?: ImportanceLevel;
 }
 
 export interface ChecklistBlock extends BaseContentBlock {
@@ -46,6 +47,7 @@ export interface ChecklistBlock extends BaseContentBlock {
     text: string;
     checked: boolean;
   }>;
+  importance?: ImportanceLevel;
 }
 
 export interface ImageBlock extends BaseContentBlock {
@@ -53,6 +55,8 @@ export interface ImageBlock extends BaseContentBlock {
   url: string;
   alt?: string;
   caption?: string;
+  width?: number;
+  importance?: ImportanceLevel;
 }
 
 export interface FileBlock extends BaseContentBlock {
@@ -61,6 +65,7 @@ export interface FileBlock extends BaseContentBlock {
   name: string;
   size?: number;
   type_info?: string;
+  importance?: ImportanceLevel;
 }
 
 export interface BookmarkBlock extends BaseContentBlock {
@@ -70,18 +75,21 @@ export interface BookmarkBlock extends BaseContentBlock {
   description?: string;
   image?: string;
   favicon?: string;
+  importance?: ImportanceLevel;
 }
 
 export interface QuoteBlock extends BaseContentBlock {
   type: 'quote';
   content: string;
   author?: string;
+  importance?: ImportanceLevel;
 }
 
 export interface CodeBlock extends BaseContentBlock {
   type: 'code';
   content: string;
   language?: string;
+  importance?: ImportanceLevel;
 }
 
 // Enhanced table cell types
@@ -153,6 +161,7 @@ export interface TableBlock extends BaseContentBlock {
   autoSum?: boolean;
   dependencies?: DataLink[];
   permissions?: { [cellId: string]: string[] }; // Cell permissions by user
+  importance?: ImportanceLevel;
 }
 
 export interface SheetsBlock extends BaseContentBlock {
@@ -162,6 +171,7 @@ export interface SheetsBlock extends BaseContentBlock {
   height?: number;
   title?: string;
   zoom?: number; // 확대/축소 비율 (%)
+  importance?: ImportanceLevel;
 }
 
 export type ContentBlock = 

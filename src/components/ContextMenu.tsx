@@ -17,10 +17,34 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
   if (!position) return null;
 
   // 컨텍스트 메뉴가 화면 밖으로 나가지 않도록 조정
-  const adjustedPosition = {
-    x: Math.min(position.x, window.innerWidth - 200),
-    y: Math.min(position.y, window.innerHeight - 100)
-  };
+  const menuWidth = 180;
+  const menuHeight = 90; // 대략적인 메뉴 높이 (2개 항목)
+  const padding = 10; // 화면 가장자리 여유 공간
+
+  let x = position.x;
+  let y = position.y;
+
+  // 오른쪽 경계 체크
+  if (x + menuWidth > window.innerWidth) {
+    x = window.innerWidth - menuWidth - padding;
+  }
+
+  // 왼쪽 경계 체크
+  if (x < padding) {
+    x = padding;
+  }
+
+  // 아래쪽 경계 체크
+  if (y + menuHeight > window.innerHeight) {
+    y = window.innerHeight - menuHeight - padding;
+  }
+
+  // 위쪽 경계 체크
+  if (y < padding) {
+    y = padding;
+  }
+
+  const adjustedPosition = { x, y };
 
   // Portal을 사용하여 document.body에 직접 렌더링 (캔버스 transform 영향 제거)
   return ReactDOM.createPortal(

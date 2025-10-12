@@ -1,21 +1,29 @@
 import React, { useState } from 'react';
-import { CalloutBlock } from '../../types';
+import { CalloutBlock, ImportanceLevel } from '../../types';
+import { getImportanceStyle } from '../../utils/importanceStyles';
 
 interface CalloutBlockProps {
   block: CalloutBlock;
   isEditing?: boolean;
   onUpdate?: (block: CalloutBlock) => void;
+  activeImportanceFilters?: Set<ImportanceLevel>;
+  showGeneralContent?: boolean;
 }
 
-const CalloutBlockComponent: React.FC<CalloutBlockProps> = ({ 
-  block, 
-  isEditing = false, 
-  onUpdate 
+const CalloutBlockComponent: React.FC<CalloutBlockProps> = ({
+  block,
+  isEditing = false,
+  onUpdate,
+  activeImportanceFilters,
+  showGeneralContent
 }) => {
   const [content, setContent] = useState(block.content);
   const [emoji, setEmoji] = useState(block.emoji || '💡');
   const [color, setColor] = useState(block.color || 'blue');
   const [isLocalEditing, setIsLocalEditing] = useState(false);
+
+  // 중요도 스타일 가져오기
+  const importanceStyle = getImportanceStyle(block.importance);
 
   const handleSave = () => {
     if (onUpdate) {
@@ -57,11 +65,11 @@ const CalloutBlockComponent: React.FC<CalloutBlockProps> = ({
 
   if (isEditing && isLocalEditing) {
     return (
-      <div style={{ 
+      <div style={{
         marginBottom: '4px',
         padding: '12px',
-        borderLeft: `4px solid ${currentStyle.borderColor}`,
-        backgroundColor: currentStyle.backgroundColor,
+        borderLeft: importanceStyle.borderLeft || `4px solid ${currentStyle.borderColor}`,
+        backgroundColor: importanceStyle.backgroundColor || currentStyle.backgroundColor,
         borderRadius: '4px'
       }}>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
@@ -132,8 +140,8 @@ const CalloutBlockComponent: React.FC<CalloutBlockProps> = ({
       onClick={() => isEditing && setIsLocalEditing(true)}
       style={{
         padding: '12px',
-        borderLeft: `4px solid ${currentStyle.borderColor}`,
-        backgroundColor: currentStyle.backgroundColor,
+        borderLeft: importanceStyle.borderLeft || `4px solid ${currentStyle.borderColor}`,
+        backgroundColor: importanceStyle.backgroundColor || currentStyle.backgroundColor,
         borderRadius: '4px',
         cursor: isEditing ? 'pointer' : 'default',
         minHeight: '50px',

@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { TextBlock, ContentBlockType, ImportanceLevel, ImportanceRange } from '../../types';
-import BlockSelector from '../BlockSelector';
+import { TextBlock, ImportanceLevel, ImportanceRange, ContentBlock } from '../../types';
 
 // 중요도 레벨별 형광펜 스타일 정의
 const getImportanceStyle = (level: ImportanceLevel) => {
@@ -39,8 +38,8 @@ interface TextBlockProps {
   block: TextBlock;
   isEditing?: boolean;
   onUpdate?: (block: TextBlock) => void;
-  onConvertToBlock?: (blockType: ContentBlockType) => void;
   onCreateNewBlock?: (afterBlockId: string, content: string) => void;
+  onInsertBlockAfter?: (afterBlockId: string, newBlock: ContentBlock) => void;
   onDeleteBlock?: (blockId: string) => void;
   onFocusPrevious?: (blockId: string) => void;
   onFocusNext?: (blockId: string) => void;
@@ -55,8 +54,8 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   block,
   isEditing = false,
   onUpdate,
-  onConvertToBlock,
   onCreateNewBlock,
+  onInsertBlockAfter,
   onDeleteBlock,
   onFocusPrevious,
   onFocusNext,
@@ -117,10 +116,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     return result;
   };
   const [content, setContent] = useState(block.content);
-  const [showBlockSelector, setShowBlockSelector] = useState(false);
-  const [selectorPosition, setSelectorPosition] = useState({ x: 0, y: 0 });
-  const [slashQuery, setSlashQuery] = useState('');
-  const [slashStartPos, setSlashStartPos] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [showImportanceMenu, setShowImportanceMenu] = useState(false);
   const [importanceMenuPosition, setImportanceMenuPosition] = useState({ x: 0, y: 0 });
@@ -218,15 +213,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   }, [content]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (showBlockSelector) {
-      if (e.key === 'Escape') {
-        setShowBlockSelector(false);
-        setSlashQuery('');
-        return;
-      }
-      return;
-    }
-
     // Enter로 새 텍스트 블록 생성 (Shift+Enter는 줄바꿈)
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -248,8 +234,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
       if (onCreateNewBlock) {
         onCreateNewBlock(block.id, afterCursor);
         // blur 제거 - 새 블록으로의 포커스 이동을 방해하지 않도록
-      } else if (onConvertToBlock) {
-        onConvertToBlock('text');
       }
     }
 
@@ -311,8 +295,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
-    const cursorPos = e.target.selectionStart || 0;
-    
+
     // 높이 자동 조정
     const textarea = e.target;
     textarea.style.height = '24px'; // 먼저 기본 높이로 설정
@@ -321,83 +304,114 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     if (newContent.trim() !== '' && (newContent.includes('\n') || textarea.scrollHeight > 24)) {
       textarea.style.height = `${textarea.scrollHeight}px`;
     }
-    
-    // 슬래시 명령어 감지
-    if (newContent[cursorPos - 1] === '/') {
-      const textarea = e.target;
-      const rect = textarea.getBoundingClientRect();
-      
-      // 대략적인 커서 위치 계산
-      const lineHeight = 20;
-      const lines = newContent.substring(0, cursorPos).split('\n');
-      const currentLine = lines.length - 1;
-      const charInLine = lines[lines.length - 1].length;
-      
-      setSelectorPosition({
-        x: rect.left + charInLine * 8,
-        y: rect.top + currentLine * lineHeight + lineHeight + window.scrollY
-      });
-      
-      setSlashStartPos(cursorPos - 1);
-      setSlashQuery('');
-      setShowBlockSelector(true);
-    } else if (showBlockSelector) {
-      // 슬래시 명령어 입력 중
-      const slashPart = newContent.substring(slashStartPos);
-      if (slashPart.startsWith('/')) {
-        const query = slashPart.substring(1).split(/\s/)[0];
-        setSlashQuery(query);
-      } else {
-        setShowBlockSelector(false);
-        setSlashQuery('');
-      }
-    }
-    
+
     setContent(newContent);
   };
 
-  const handleBlockSelect = (blockType: ContentBlockType) => {
-    // 슬래시 명령어 부분을 제거
-    const beforeSlash = content.substring(0, slashStartPos);
-    const afterSlash = content.substring(slashStartPos + slashQuery.length + 1);
-    const cleanContent = beforeSlash + afterSlash;
-    
-    // 현재 블록 내용을 슬래시 명령어 제거한 내용으로 업데이트
-    setContent(cleanContent);
-    if (onUpdate) {
-      onUpdate({ ...block, content: cleanContent });
+  // 붙여넣기 핸들러
+  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items || !onInsertBlockAfter) return;
+
+    // 파일이 있는지 확인
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+
+      // 이미지 파일 처리
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          // FileReader로 이미지를 Data URL로 변환
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const dataUrl = event.target?.result as string;
+            const imageBlock: ContentBlock = {
+              id: Date.now().toString(),
+              type: 'image',
+              url: dataUrl,
+              caption: file.name
+            };
+            onInsertBlockAfter(block.id, imageBlock);
+            if (onSaveToHistory) {
+              setTimeout(() => onSaveToHistory(), 100);
+            }
+          };
+          reader.readAsDataURL(file);
+        }
+        return;
+      }
+
+      // 일반 파일 처리
+      if (item.kind === 'file') {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          // FileReader로 파일을 Data URL로 변환
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const dataUrl = event.target?.result as string;
+            const fileBlock: ContentBlock = {
+              id: Date.now().toString(),
+              type: 'file',
+              url: dataUrl,
+              name: file.name,
+              size: file.size
+            };
+            onInsertBlockAfter(block.id, fileBlock);
+            if (onSaveToHistory) {
+              setTimeout(() => onSaveToHistory(), 100);
+            }
+          };
+          reader.readAsDataURL(file);
+        }
+        return;
+      }
     }
-    
-    // 새 블록 타입으로 변환 (블록 타입과 함께 전달)
-    if (onConvertToBlock) {
-      onConvertToBlock(blockType);
+
+    // 텍스트 데이터 처리
+    const text = e.clipboardData?.getData('text');
+    if (text) {
+      // URL 감지 (http://, https:// 로 시작하는 경우)
+      const urlRegex = /^(https?:\/\/[^\s]+)$/;
+      const trimmedText = text.trim();
+
+      if (urlRegex.test(trimmedText)) {
+        e.preventDefault();
+
+        // 북마크 블록 생성
+        const bookmarkBlock: ContentBlock = {
+          id: Date.now().toString(),
+          type: 'bookmark',
+          url: trimmedText,
+          title: trimmedText
+        };
+        onInsertBlockAfter(block.id, bookmarkBlock);
+        if (onSaveToHistory) {
+          setTimeout(() => onSaveToHistory(), 100);
+        }
+        return;
+      }
     }
-    
-    setShowBlockSelector(false);
-    setSlashQuery('');
+
+    // 그 외의 경우는 기본 붙여넣기 동작 허용
   };
 
-  const handleCloseBlockSelector = () => {
-    setShowBlockSelector(false);
-    setSlashQuery('');
-  };
 
   const handleFocus = () => {
     setIsFocused(true);
   };
 
   const handleBlur = () => {
-    if (!showBlockSelector) {
-      setIsFocused(false);
+    setIsFocused(false);
 
-      // 내용이 변경되었으면 저장
-      if (content !== block.content && onUpdate) {
-        onUpdate({ ...block, content, importanceRanges: block.importanceRanges });
+    // 내용이 변경되었으면 저장
+    if (content !== block.content && onUpdate) {
+      onUpdate({ ...block, content, importanceRanges: block.importanceRanges });
 
-        // 실제로 내용이 변경되었을 때만 히스토리 저장
-        if (onSaveToHistory) {
-          setTimeout(() => onSaveToHistory(), 100); // 약간의 지연으로 업데이트 완료 후 저장
-        }
+      // 실제로 내용이 변경되었을 때만 히스토리 저장
+      if (onSaveToHistory) {
+        setTimeout(() => onSaveToHistory(), 100); // 약간의 지연으로 업데이트 완료 후 저장
       }
     }
   };
@@ -738,6 +752,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
             ref={textareaRef}
             value={canEdit ? content : getFilteredText()}
             onChange={handleInputChange}
+            onPaste={handlePaste}
             onFocus={handleFocus}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
@@ -745,7 +760,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
             onMouseUp={handleTextSelection}
             data-block-id={block.id}
             disabled={!canEdit}
-            placeholder={content === '' && isFocused ? "'/'를 입력하여 블록을 추가하거나 바로 텍스트를 입력하세요" : ''}
+            placeholder={content === '' && isFocused ? "텍스트를 입력하세요" : ''}
             style={{
               position: 'relative',
               zIndex: 2,
@@ -779,15 +794,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
             }}
           />
         </div>
-        
-        <BlockSelector
-          isVisible={showBlockSelector}
-          position={selectorPosition}
-          searchQuery={slashQuery}
-          onSelect={handleBlockSelect}
-          onClose={handleCloseBlockSelector}
-        />
-        
+
         {/* 중요도 메뉴 */}
         {showImportanceMenu && (
           <div

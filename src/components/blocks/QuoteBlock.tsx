@@ -1,20 +1,28 @@
 import React, { useState } from 'react';
-import { QuoteBlock } from '../../types';
+import { QuoteBlock, ImportanceLevel } from '../../types';
+import { getImportanceStyle } from '../../utils/importanceStyles';
 
 interface QuoteBlockProps {
   block: QuoteBlock;
   isEditing?: boolean;
   onUpdate?: (block: QuoteBlock) => void;
+  activeImportanceFilters?: Set<ImportanceLevel>;
+  showGeneralContent?: boolean;
 }
 
-const QuoteBlockComponent: React.FC<QuoteBlockProps> = ({ 
-  block, 
-  isEditing = false, 
-  onUpdate 
+const QuoteBlockComponent: React.FC<QuoteBlockProps> = ({
+  block,
+  isEditing = false,
+  onUpdate,
+  activeImportanceFilters,
+  showGeneralContent
 }) => {
   const [content, setContent] = useState(block.content);
   const [author, setAuthor] = useState(block.author || '');
   const [isLocalEditing, setIsLocalEditing] = useState(false);
+
+  // 중요도 스타일 가져오기
+  const importanceStyle = getImportanceStyle(block.importance);
 
   const handleSave = () => {
     if (onUpdate) {
@@ -44,11 +52,11 @@ const QuoteBlockComponent: React.FC<QuoteBlockProps> = ({
 
   if (isEditing && isLocalEditing) {
     return (
-      <div style={{ 
+      <div style={{
         marginBottom: '4px',
         padding: '16px',
-        borderLeft: '4px solid #666',
-        backgroundColor: '#f8f8f8',
+        borderLeft: importanceStyle.borderLeft || '4px solid #666',
+        backgroundColor: importanceStyle.backgroundColor || '#f8f8f8',
         borderRadius: '4px'
       }}>
         <textarea
@@ -102,8 +110,8 @@ const QuoteBlockComponent: React.FC<QuoteBlockProps> = ({
       onClick={() => isEditing && setIsLocalEditing(true)}
       style={{
         padding: '16px',
-        borderLeft: '4px solid #666',
-        backgroundColor: '#f8f8f8',
+        borderLeft: importanceStyle.borderLeft || '4px solid #666',
+        backgroundColor: importanceStyle.backgroundColor || '#f8f8f8',
         borderRadius: '4px',
         cursor: isEditing ? 'pointer' : 'default',
         minHeight: '50px',
