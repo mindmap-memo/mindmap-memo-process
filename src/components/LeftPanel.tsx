@@ -232,20 +232,50 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
         results.push(...textResults);
       }
 
-      // 검색어가 있을 때 파일/이미지/URL 블록 표시
-      if (searchQuery) {
-        memo.blocks.forEach((block, index) => {
-          if (searchBlockMetadata(block, searchQuery)) {
+      // 파일/이미지/URL 블록 표시 (중요도 필터 적용)
+      memo.blocks.forEach((block, index) => {
+        if (block.type === 'file' || block.type === 'image' || block.type === 'bookmark') {
+          const blockWithImportance = block as any;
+
+          // 중요도 필터 확인
+          const hasImportance = blockWithImportance.importance;
+          const passesImportanceFilter = !hasImportance || searchImportanceFilters.has(blockWithImportance.importance);
+
+          // 검색어 매칭 확인
+          const passesSearchQuery = !searchQuery || searchBlockMetadata(block, searchQuery);
+
+          // 필터를 통과하면 표시
+          if (passesImportanceFilter && passesSearchQuery) {
             const blockKey = `block-${index}`;
+            const importanceStyle = hasImportance ? getImportanceStyle(blockWithImportance.importance) : {};
+
             if (block.type === 'file') {
               results.push(
-                <div key={blockKey} style={{ marginTop: '4px', fontSize: '10px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div key={blockKey} style={{
+                  marginTop: '4px',
+                  fontSize: '10px',
+                  color: '#64748b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: importanceStyle.backgroundColor ? '4px 6px' : '0',
+                  backgroundColor: importanceStyle.backgroundColor,
+                  borderRadius: '4px'
+                }}>
                   📎 {block.name}
                 </div>
               );
             } else if (block.type === 'image') {
               results.push(
-                <div key={blockKey} style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div key={blockKey} style={{
+                  marginTop: '6px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                  padding: importanceStyle.backgroundColor ? '6px' : '0',
+                  backgroundColor: importanceStyle.backgroundColor,
+                  borderRadius: '4px'
+                }}>
                   <img
                     src={block.url}
                     alt={block.alt || '이미지'}
@@ -279,14 +309,24 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
               );
             } else if (block.type === 'bookmark') {
               results.push(
-                <div key={blockKey} style={{ marginTop: '4px', fontSize: '10px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div key={blockKey} style={{
+                  marginTop: '4px',
+                  fontSize: '10px',
+                  color: '#64748b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: importanceStyle.backgroundColor ? '4px 6px' : '0',
+                  backgroundColor: importanceStyle.backgroundColor,
+                  borderRadius: '4px'
+                }}>
                   🔗 {block.title || block.url}
                 </div>
               );
             }
           }
-        });
-      }
+        }
+      });
     }
 
     // 레거시 content 필드 확인
@@ -563,19 +603,24 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
           return true;
         }
 
-        // 텍스트 블록이 없으면 표시
-        const hasTextBlocks = memo.blocks.some(block => block.type === 'text');
-        if (!hasTextBlocks) {
-          return true;
-        }
-
-        // 텍스트 블록이 있으면 중요도 필터 적용
+        // 어떤 블록이라도 중요도 필터를 통과하면 메모 표시
         return memo.blocks.some(block => {
+          // 텍스트 블록: 중요도 필터 적용
           if (block.type === 'text') {
             const filteredContent = getFilteredTextFromBlock(block);
             return filteredContent && filteredContent.length > 0;
           }
-          return false;
+
+          // 파일/이미지/북마크 블록: 중요도 필터 확인
+          if (block.type === 'file' || block.type === 'image' || block.type === 'bookmark') {
+            const blockWithImportance = block as any;
+            const hasImportance = blockWithImportance.importance;
+            // 중요도가 없거나 필터에 포함된 중요도면 표시
+            return !hasImportance || searchImportanceFilters.has(blockWithImportance.importance);
+          }
+
+          // 다른 블록 타입은 항상 표시
+          return true;
         });
       });
     }
@@ -596,14 +641,22 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
           if (memo.content && flexibleMatch(memo.content, query)) {
             matchesQuery = true;
           }
-          // blocks 내용도 검색 (중요도 필터링된 텍스트에서만 검색)
+          // blocks 내용도 검색 (중요도 필터링 적용)
           if (!matchesQuery && memo.blocks) {
             matchesQuery = memo.blocks.some(block => {
               if (block.type === 'text') {
                 const filteredContent = getFilteredTextFromBlock(block);
                 return filteredContent && flexibleMatch(filteredContent, query);
               }
-              // 파일/이미지/URL 등의 메타데이터 검색
+              // 파일/이미지/북마크: 검색어 매칭 + 중요도 필터 확인
+              if (block.type === 'file' || block.type === 'image' || block.type === 'bookmark') {
+                const blockWithImportance = block as any;
+                const hasImportance = blockWithImportance.importance;
+                const passesImportanceFilter = !hasImportance || searchImportanceFilters.has(blockWithImportance.importance);
+                const passesSearchQuery = searchBlockMetadata(block, query);
+                return passesImportanceFilter && passesSearchQuery;
+              }
+              // 기타 블록: 메타데이터 검색만
               return searchBlockMetadata(block, query);
             });
           }
@@ -625,7 +678,15 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 const filteredContent = getFilteredTextFromBlock(block);
                 return filteredContent && flexibleMatch(filteredContent, query);
               }
-              // 파일/이미지/URL 등의 메타데이터 검색
+              // 파일/이미지/북마크: 검색어 매칭 + 중요도 필터 확인
+              if (block.type === 'file' || block.type === 'image' || block.type === 'bookmark') {
+                const blockWithImportance = block as any;
+                const hasImportance = blockWithImportance.importance;
+                const passesImportanceFilter = !hasImportance || searchImportanceFilters.has(blockWithImportance.importance);
+                const passesSearchQuery = searchBlockMetadata(block, query);
+                return passesImportanceFilter && passesSearchQuery;
+              }
+              // 기타 블록: 메타데이터 검색만
               return searchBlockMetadata(block, query);
             });
           }
@@ -644,14 +705,22 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
           if (!matchesQuery && memo.content && flexibleMatch(memo.content, query)) {
             matchesQuery = true;
           }
-          // blocks 내용 검색 (중요도 필터링된 텍스트에서만 검색)
+          // blocks 내용 검색 (중요도 필터링 적용)
           if (!matchesQuery && memo.blocks) {
             matchesQuery = memo.blocks.some(block => {
               if (block.type === 'text') {
                 const filteredContent = getFilteredTextFromBlock(block);
                 return filteredContent && flexibleMatch(filteredContent, query);
               }
-              // 파일/이미지/URL 등의 메타데이터 검색
+              // 파일/이미지/북마크: 검색어 매칭 + 중요도 필터 확인
+              if (block.type === 'file' || block.type === 'image' || block.type === 'bookmark') {
+                const blockWithImportance = block as any;
+                const hasImportance = blockWithImportance.importance;
+                const passesImportanceFilter = !hasImportance || searchImportanceFilters.has(blockWithImportance.importance);
+                const passesSearchQuery = searchBlockMetadata(block, query);
+                return passesImportanceFilter && passesSearchQuery;
+              }
+              // 기타 블록: 메타데이터 검색만
               return searchBlockMetadata(block, query);
             });
           }
@@ -950,13 +1019,17 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
       
       {/* 검색 결과 섹션 */}
       {isSearchMode && (
-        <div style={{ marginBottom: '24px', flex: '0 1 auto', overflowY: 'auto' }}>
+        <div style={{ marginBottom: '24px', flex: '0 0 auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
             <h3 style={{ margin: 0, flex: 1, fontSize: '18px', fontWeight: '600', color: '#374151' }}>
               검색 결과 ({searchResults.length + searchCategoryResults.length}개)
             </h3>
           </div>
-          <div>
+          <div style={{
+            maxHeight: '400px',
+            overflowY: 'auto',
+            overflowX: 'hidden'
+          }}>
             {/* 메모 결과 */}
             {searchResults.length > 0 && (
               <div style={{ marginBottom: '16px' }}>

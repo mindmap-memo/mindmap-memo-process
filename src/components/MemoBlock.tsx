@@ -215,7 +215,11 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   const [showQuickNavModal, setShowQuickNavModal] = useState(false);
   const [isConnectionDragging, setIsConnectionDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [mouseDownPos, setMouseDownPos] = useState<{ x: number; y: number } | null>(null);
   const [dragMoved, setDragMoved] = useState(false);
+
+  // 드래그 임계값 (픽셀 단위)
+  const DRAG_THRESHOLD = 5;
   const [isScrolling, setIsScrolling] = useState(false);
   const [scrollTimeout, setScrollTimeout] = useState<NodeJS.Timeout | null>(null);
   const [isHovering, setIsHovering] = useState(false);
@@ -387,13 +391,13 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
 
     // 연결 모드가 아닐 때만 드래그 준비 (왼쪽 클릭만)
     if (e.button === 0 && !isConnecting) {
-      setIsDragging(true);
+      // 마우스 다운 위치 저장 (임계값 판단용)
+      setMouseDownPos({ x: e.clientX, y: e.clientY });
       setDragMoved(false);
       setDragStart({
         x: e.clientX - (memo.position.x * canvasScale + canvasOffset.x),
         y: e.clientY - (memo.position.y * canvasScale + canvasOffset.y)
       });
-      onDragStart?.(memo.id);
       e.preventDefault(); // HTML5 드래그 방지, 마우스 드래그 우선
     }
   };
@@ -417,6 +421,20 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   };
 
   const handleMouseMove = React.useCallback((e: MouseEvent) => {
+    // 마우스 다운 후 드래그 임계값 확인
+    if (mouseDownPos && !isDragging) {
+      const distance = Math.sqrt(
+        Math.pow(e.clientX - mouseDownPos.x, 2) +
+        Math.pow(e.clientY - mouseDownPos.y, 2)
+      );
+
+      // 임계값을 넘으면 드래그 시작
+      if (distance >= DRAG_THRESHOLD) {
+        setIsDragging(true);
+        onDragStart?.(memo.id);
+      }
+    }
+
     if (isDragging) {
       // 커서 위치 저장 (힌트 UI용)
       setCursorPosition({ x: e.clientX, y: e.clientY });
@@ -474,7 +492,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         lastUpdateTime.current = now;
       }
     }
-  }, [isDragging, dragMoved, dragStart, canvasOffset, canvasScale, onPositionChange, memo.id, memo.position, memo.parentId, currentPage, isShiftPressed]);
+  }, [isDragging, dragMoved, dragStart, canvasOffset, canvasScale, onPositionChange, memo.id, memo.position, memo.parentId, currentPage, isShiftPressed, mouseDownPos, DRAG_THRESHOLD, onDragStart]);
 
   const handleMouseUp = React.useCallback((e: MouseEvent) => {
     if (isDragging) {
@@ -500,12 +518,16 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       setRestrictedDirections(null); // 이동 제한 해제
       setCursorPosition(null); // 커서 위치 리셋
     }
+
+    // 모든 경우에 상태 초기화 (드래그 임계값 미달로 드래그가 시작되지 않은 경우 포함)
     setIsDragging(false);
+    setMouseDownPos(null);
     onDragEnd?.();
-  }, [isDragging, dragMoved, dragStart, canvasOffset, canvasScale, onDetectCategoryOnDrop, onPositionChange, memo.id, onDragEnd]);
+  }, [isDragging, dragMoved, dragStart, canvasOffset, canvasScale, onDetectCategoryOnDrop, onPositionChange, memo.id, onDragEnd, isShiftPressed]);
 
   React.useEffect(() => {
-    if (isDragging) {
+    // 마우스 다운 상태이거나 드래그 중일 때 이벤트 리스너 등록
+    if (mouseDownPos || isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
       return () => {
@@ -513,7 +535,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+  }, [mouseDownPos, isDragging, handleMouseMove, handleMouseUp]);
 
   React.useEffect(() => {
     if (memoRef.current && onSizeChange) {

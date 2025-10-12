@@ -79,7 +79,11 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   const [isDraggingPosition, setIsDraggingPosition] = useState(false);
   const [isConnectionDragging, setIsConnectionDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [mouseDownPos, setMouseDownPos] = useState<{ x: number; y: number } | null>(null);
   const [dragMoved, setDragMoved] = useState(false);
+
+  // 드래그 임계값 (픽셀 단위)
+  const DRAG_THRESHOLD = 5;
 
   // 빠른 드래그 최적화를 위한 상태
   const lastUpdateTime = React.useRef<number>(0);
@@ -182,17 +186,13 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         return;
       }
 
-      // 드래그 시작 시 클릭 처리 (선택되지 않은 카테고리를 클릭하면 선택)
-      onClick?.(category.id, false);
-
-      isDraggingRef.current = true;
-      setIsDraggingPosition(true);
+      // 마우스 다운 위치 저장 (임계값 판단용)
+      setMouseDownPos({ x: e.clientX, y: e.clientY });
       setDragMoved(false);
       setDragStart({
         x: e.clientX - (category.position.x * (canvasScale || 1) + (canvasOffset?.x || 0)),
         y: e.clientY - (category.position.y * (canvasScale || 1) + (canvasOffset?.y || 0))
       });
-      onDragStart?.(e as any); // App.tsx에 드래그 시작 알림
       e.preventDefault(); // 기본 드래그 동작 방지
     }
   };
@@ -218,9 +218,24 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   };
 
   const handleMouseMove = React.useCallback((e: MouseEvent) => {
+    // 마우스 다운 후 드래그 임계값 확인
+    if (mouseDownPos && !isDraggingRef.current) {
+      const distance = Math.sqrt(
+        Math.pow(e.clientX - mouseDownPos.x, 2) +
+        Math.pow(e.clientY - mouseDownPos.y, 2)
+      );
+
+      // 임계값을 넘으면 드래그 시작
+      if (distance >= DRAG_THRESHOLD) {
+        isDraggingRef.current = true;
+        setIsDraggingPosition(true);
+        onClick?.(category.id, false); // 드래그 시작 시 선택
+        onDragStart?.(e as any); // App.tsx에 드래그 시작 알림
+      }
+    }
+
     // ref를 사용한 즉시 체크로 드래그 종료 후 이벤트 무시
     if (!isDraggingRef.current) {
-      console.log('[CategoryBlock] mousemove 무시 - isDraggingRef:', isDraggingRef.current, 'categoryId:', category.id);
       return;
     }
 
@@ -240,26 +255,22 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
       pendingPosition.current = newPosition;
 
       if (now - lastUpdateTime.current >= 50) {
-        console.log('[CategoryBlock] onPositionChange 호출 - categoryId:', category.id, 'newPosition:', newPosition);
         onPositionChange(category.id, newPosition);
         lastUpdateTime.current = now;
       }
     }
-  }, [onPositionChange, dragMoved, dragStart, canvasOffset, canvasScale, category.id]);
+  }, [onPositionChange, dragMoved, dragStart, canvasOffset, canvasScale, category.id, mouseDownPos, DRAG_THRESHOLD, onClick, onDragStart]);
 
   const handleMouseUp = React.useCallback((e: MouseEvent) => {
-    console.log('[CategoryBlock] mouseup - categoryId:', category.id, 'isDraggingRef:', isDraggingRef.current);
     if (isDraggingRef.current) {
       // ref를 즉시 false로 설정하여 추가 mousemove 이벤트 무시
       isDraggingRef.current = false;
-      console.log('[CategoryBlock] isDraggingRef를 false로 설정 - categoryId:', category.id);
 
       // 최종 위치 계산
       const finalPosition = pendingPosition.current || {
         x: (e.clientX - dragStart.x - (canvasOffset?.x || 0)) / (canvasScale || 1),
         y: (e.clientY - dragStart.y - (canvasOffset?.y || 0)) / (canvasScale || 1)
       };
-      console.log('[CategoryBlock] 최종 위치:', finalPosition, 'categoryId:', category.id);
 
       // 드래그 종료 콜백 호출 (최종 위치 전달)
       onPositionDragEnd?.(category.id, finalPosition);
@@ -268,12 +279,16 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
       pendingPosition.current = null;
       lastUpdateTime.current = 0;
     }
+
+    // 모든 경우에 상태 초기화 (드래그 임계값 미달로 드래그가 시작되지 않은 경우 포함)
     setIsDraggingPosition(false);
+    setMouseDownPos(null);
     onDragEnd?.(e as any); // App.tsx에 드래그 종료 알림
   }, [onPositionDragEnd, category.id, onDragEnd, dragStart, canvasOffset, canvasScale]);
 
   React.useEffect(() => {
-    if (isDraggingPosition) {
+    // 마우스 다운 상태이거나 드래그 중일 때 이벤트 리스너 등록
+    if (mouseDownPos || isDraggingPosition) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
       return () => {
@@ -281,7 +296,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDraggingPosition, handleMouseMove, handleMouseUp]);
+  }, [mouseDownPos, isDraggingPosition, handleMouseMove, handleMouseUp]);
 
   // ResizeObserver로 실제 크기 측정 (드래그 중에는 비활성화)
   React.useEffect(() => {
