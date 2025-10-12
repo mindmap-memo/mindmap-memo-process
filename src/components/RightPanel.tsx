@@ -403,32 +403,59 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
   // 빈 공간 우클릭 핸들러 (패널의 빈 영역)
   const handleEmptySpaceContextMenu = (e: React.MouseEvent) => {
-    // 블록이나 다른 UI 요소 위에서 우클릭한 경우는 무시
+    e.preventDefault();
+    e.stopPropagation();
+
+    // 이벤트 정보 저장 (React 합성 이벤트는 비동기에서 사용 불가)
+    const clientX = e.clientX;
+    const clientY = e.clientY;
     const target = e.target as HTMLElement;
 
+    // 컨텍스트 메뉴가 이미 열려있으면 먼저 닫기
+    if (showContextMenu || showEmptySpaceMenu) {
+      setShowContextMenu(false);
+      setShowEmptySpaceMenu(false);
+      // 잠시 대기 후 새로운 메뉴 판정
+      setTimeout(() => {
+        handleEmptySpaceContextMenuInternal(clientX, clientY, target);
+      }, 10);
+      return;
+    }
+
+    handleEmptySpaceContextMenuInternal(clientX, clientY, target);
+  };
+
+  const handleEmptySpaceContextMenuInternal = (clientX: number, clientY: number, targetElement: HTMLElement) => {
+    // 컨텍스트 메뉴 자체를 클릭한 경우 무시
+    if (targetElement.closest('[data-context-menu]')) {
+      return;
+    }
+
     // 블록 위에서 클릭한 경우
-    if (target.closest('[data-block-id]')) {
+    if (targetElement.closest('[data-block-id]')) {
+      return;
+    }
+
+    // 블록 컨테이너 내부에서 클릭한 경우 (블록이 아닌 경우에도)
+    if (targetElement.closest('.blocks-container')) {
       return;
     }
 
     // 태그나 다른 입력 요소 위에서 클릭한 경우
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON') {
+    if (targetElement.tagName === 'INPUT' || targetElement.tagName === 'TEXTAREA' || targetElement.tagName === 'BUTTON') {
       return;
     }
 
-    // 블록 컨테이너가 아닌 패널의 빈 공간만 감지
-    if (!target.closest('.right-panel-content') || target.closest('.blocks-container')) {
+    // 패널의 빈 공간이 아닌 경우
+    if (!targetElement.closest('.right-panel-content')) {
       return;
     }
-
-    e.preventDefault();
-    e.stopPropagation();
 
     // 맨 끝에 블록 추가
     const insertPosition = selectedMemo?.blocks?.length || 0;
     setClickedPosition(insertPosition);
 
-    setEmptySpaceMenuPosition({ x: e.clientX, y: e.clientY });
+    setEmptySpaceMenuPosition({ x: clientX, y: clientY });
     setShowEmptySpaceMenu(true);
   };
 
@@ -657,11 +684,49 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
   // 우클릭 컨텍스트 메뉴
   const handleBlockContextMenu = (e: React.MouseEvent) => {
-    const blocksToUse = selectedBlocks.length > 0 ? selectedBlocks : dragSelectedBlocks;
-    if (blocksToUse.length === 0) return;
-
     e.preventDefault();
     e.stopPropagation();
+
+    // 이벤트 정보 저장 (React 합성 이벤트는 비동기에서 사용 불가)
+    const clientX = e.clientX;
+    const clientY = e.clientY;
+    const target = e.target as HTMLElement;
+
+    // 컨텍스트 메뉴가 이미 열려있으면 먼저 닫기
+    if (showContextMenu || showEmptySpaceMenu) {
+      setShowContextMenu(false);
+      setShowEmptySpaceMenu(false);
+      // 잠시 대기 후 새로운 메뉴 판정 (메뉴 DOM이 제거될 시간을 줌)
+      setTimeout(() => {
+        handleBlockContextMenuInternal(clientX, clientY, target);
+      }, 10);
+      return;
+    }
+
+    handleBlockContextMenuInternal(clientX, clientY, target);
+  };
+
+  const handleBlockContextMenuInternal = (clientX: number, clientY: number, targetElement: HTMLElement) => {
+    // 컨텍스트 메뉴 자체를 클릭한 경우 무시
+    if (targetElement.closest('[data-context-menu]')) {
+      return;
+    }
+
+    const blockElement = targetElement.closest('[data-block-id]') as HTMLElement;
+
+    let blocksToUse = selectedBlocks.length > 0 ? selectedBlocks : dragSelectedBlocks;
+
+    // 우클릭한 위치에 블록이 있고, 그 블록이 선택되지 않은 경우 해당 블록을 선택
+    if (blockElement) {
+      const clickedBlockId = blockElement.getAttribute('data-block-id');
+      if (clickedBlockId && !blocksToUse.includes(clickedBlockId)) {
+        blocksToUse = [clickedBlockId];
+        setSelectedBlocks([clickedBlockId]);
+        setDragSelectedBlocks([]);
+      }
+    }
+
+    if (blocksToUse.length === 0) return;
 
     // 메뉴 크기 추정 (실제 렌더링 전 대략적인 크기)
     const menuWidth = 150;
@@ -674,8 +739,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
     const viewportHeight = window.innerHeight;
 
     // 초기 위치
-    let x = e.clientX;
-    let y = e.clientY;
+    let x = clientX;
+    let y = clientY;
 
     // 오른쪽 경계 체크
     if (x + menuWidth > viewportWidth) {
@@ -2159,6 +2224,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                   }}
                 />
                 <div
+                  data-context-menu="true"
                   style={{
                     position: 'fixed',
                     top: `${contextMenuPosition.y}px`,
@@ -2227,6 +2293,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     {/* 중요도 서브메뉴 */}
                     {showImportanceSubmenu && (
                       <div
+                        data-context-menu="true"
                         style={{
                           position: 'absolute',
                           ...(submenuPosition === 'right'
@@ -2657,6 +2724,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
         {/* 빈 공간 우클릭 컨텍스트 메뉴 */}
         {showEmptySpaceMenu && (
           <div
+            data-context-menu="true"
             style={{
               position: 'fixed',
               left: `${emptySpaceMenuPosition.x}px`,

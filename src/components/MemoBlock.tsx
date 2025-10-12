@@ -141,6 +141,14 @@ const getHighestImportanceLevel = (memo: MemoBlockType): ImportanceLevel | null 
           }
         });
       }
+    } else {
+      // 비텍스트 블록의 중요도 확인 (image, file, callout, bookmark, quote, code, table, sheets 등)
+      const blockWithImportance = block as any;
+      if (blockWithImportance.importance) {
+        if (!highestLevel || importancePriority.indexOf(blockWithImportance.importance) < importancePriority.indexOf(highestLevel)) {
+          highestLevel = blockWithImportance.importance;
+        }
+      }
     }
   });
 
@@ -295,20 +303,10 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
     }
   };
 
-  // 배경색을 메모이제이션하여 memo.blocks 변경 시 재계산
+  // 배경색은 항상 흰색 또는 선택 시 회색 (#f3f4f6)
   const backgroundColor = React.useMemo(() => {
-    // enableImportanceBackground가 true인 경우에만 중요도 색상 적용
-    if (enableImportanceBackground && activeImportanceFilters !== undefined && showGeneralContent !== undefined) {
-      const highestImportance = getHighestImportanceLevel(memo);
-      if (highestImportance) {
-        const importanceStyle = getImportanceStyle(highestImportance);
-        return isSelected ?
-          importanceStyle.backgroundColor :
-          `${importanceStyle.backgroundColor}80`; // 투명도 50% 적용
-      }
-    }
     return isSelected ? '#f3f4f6' : 'white';
-  }, [memo.blocks, isSelected, activeImportanceFilters, showGeneralContent, enableImportanceBackground]);
+  }, [isSelected]);
 
   // 스크롤 이벤트 핸들러
   const handleScroll = () => {
@@ -781,8 +779,15 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
                   } else if (block.type === 'image') {
                     const imageBlock = block as any;
                     if (imageBlock.url) {
+                      const imageImportanceStyle = imageBlock.importance ? getImportanceStyle(imageBlock.importance) : {};
                       renderedBlocks.push(
-                        <div key={block.id} style={{ margin: '4px 0' }}>
+                        <div key={block.id} style={{
+                          margin: '4px 0',
+                          padding: imageImportanceStyle.backgroundColor ? '8px' : '0',
+                          backgroundColor: imageImportanceStyle.backgroundColor,
+                          borderRadius: '4px',
+                          border: (imageImportanceStyle as any).borderLeft
+                        }}>
                           <img
                             src={imageBlock.url}
                             alt={imageBlock.alt || '이미지'}
@@ -817,6 +822,73 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
                       </div>
                     );
                     totalContentLength += calloutBlock.content?.length || 0;
+                  } else if (block.type === 'file') {
+                    const fileBlock = block as any;
+                    const fileImportanceStyle = fileBlock.importance ? getImportanceStyle(fileBlock.importance) : {};
+                    renderedBlocks.push(
+                      <div key={block.id} style={{
+                        margin: '4px 0',
+                        padding: '6px 8px',
+                        backgroundColor: fileImportanceStyle.backgroundColor || '#f8f9fa',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '12px',
+                        border: (fileImportanceStyle as any).borderLeft || 'none'
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#495057" strokeWidth="2">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                          <polyline points="7 10 12 15 17 10" />
+                          <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                        <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {fileBlock.name || '파일'}
+                        </div>
+                      </div>
+                    );
+                    totalContentLength += 30; // 파일은 대략 30글자로 계산
+                  } else if (block.type === 'bookmark') {
+                    const bookmarkBlock = block as any;
+                    const bookmarkImportanceStyle = bookmarkBlock.importance ? getImportanceStyle(bookmarkBlock.importance) : {};
+                    try {
+                      const urlObj = new URL(bookmarkBlock.url);
+                      renderedBlocks.push(
+                        <div key={block.id} style={{
+                          margin: '4px 0',
+                          padding: '8px',
+                          backgroundColor: bookmarkImportanceStyle.backgroundColor || '#f8f9fa',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          border: (bookmarkImportanceStyle as any).borderLeft || '1px solid #e0e0e0'
+                        }}>
+                          <div style={{ fontWeight: '600', marginBottom: '2px' }}>
+                            🔗 {bookmarkBlock.title || urlObj.hostname}
+                          </div>
+                          {bookmarkBlock.description && (
+                            <div style={{ fontSize: '11px', color: '#6c757d', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {bookmarkBlock.description}
+                            </div>
+                          )}
+                        </div>
+                      );
+                      totalContentLength += 40; // 북마크는 대략 40글자로 계산
+                    } catch {
+                      // URL 파싱 실패 시 기본 렌더링
+                      renderedBlocks.push(
+                        <div key={block.id} style={{
+                          margin: '4px 0',
+                          padding: '8px',
+                          backgroundColor: bookmarkImportanceStyle.backgroundColor || '#f8f9fa',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          border: (bookmarkImportanceStyle as any).borderLeft || '1px solid #e0e0e0'
+                        }}>
+                          🔗 {bookmarkBlock.title || 'URL'}
+                        </div>
+                      );
+                      totalContentLength += 20;
+                    }
                   }
 
                   consecutiveHiddenBlocks = 0; // 보이는 블록 발견시 리셋
