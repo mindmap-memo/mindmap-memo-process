@@ -1340,18 +1340,32 @@ const App: React.FC = () => {
   };
 
   const toggleCategoryExpanded = (categoryId: string) => {
-    setPages(prev => prev.map(page =>
-      page.id === currentPageId
-        ? {
-            ...page,
-            categories: (page.categories || []).map(category =>
-              category.id === categoryId
-                ? { ...category, isExpanded: !category.isExpanded }
-                : category
-            )
-          }
-        : page
-    ));
+    setPages(prev => prev.map(page => {
+      if (page.id !== currentPageId) return page;
+
+      const targetCategory = page.categories.find(c => c.id === categoryId);
+      if (!targetCategory) return page;
+
+      const newExpandedState = !targetCategory.isExpanded;
+
+      // 모든 하위 카테고리 ID 수집 (재귀적으로)
+      const getAllDescendantCategoryIds = (catId: string): string[] => {
+        const childCategories = page.categories.filter(c => c.parentId === catId);
+        return childCategories.flatMap(child => [child.id, ...getAllDescendantCategoryIds(child.id)]);
+      };
+
+      const descendantIds = getAllDescendantCategoryIds(categoryId);
+      const affectedIds = [categoryId, ...descendantIds];
+
+      return {
+        ...page,
+        categories: page.categories.map(category =>
+          affectedIds.includes(category.id)
+            ? { ...category, isExpanded: newExpandedState }
+            : category
+        )
+      };
+    }));
   };
 
   const moveToCategory = (itemId: string, categoryId: string | null) => {
