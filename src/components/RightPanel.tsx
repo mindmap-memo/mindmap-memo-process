@@ -811,11 +811,12 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const handleMouseDown = (event: React.MouseEvent) => {
     // 버튼이나 인터랙티브 요소가 아닌 곳에서 드래그 시작
     const target = event.target as HTMLElement;
-    const isInteractiveElement = target.tagName === 'BUTTON' || 
-                                target.tagName === 'INPUT' || 
+    const isInteractiveElement = target.tagName === 'BUTTON' ||
+                                target.tagName === 'INPUT' ||
                                 target.tagName === 'TEXTAREA' ||
-                                target.closest('button') !== null;
-    
+                                target.closest('button') !== null ||
+                                target.closest('textarea') !== null; // textarea 내부 요소도 제외
+
     // 오른쪽 패널 전체에서 드래그 허용 (블록 편집 모드일 때만)
     const isInRightPanel = rightPanelRef.current?.contains(target) ||
                            blocksContainerRef.current?.contains(target);
@@ -829,7 +830,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
     if (!isInteractiveElement && isInRightPanel && (isNotInBlockContent || allowBlockSelection) &&
         selectedMemo && !event.shiftKey) {
       event.preventDefault();
-      
+
       // 블록 컨테이너가 있으면 그것 기준으로, 없으면 오른쪽 패널 기준으로 좌표 계산
       const container = blocksContainerRef.current || rightPanelRef.current;
       if (container) {
@@ -838,7 +839,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
           x: event.clientX - containerRect.left,
           y: event.clientY - containerRect.top
         };
-        
+
         setIsDragSelecting(true);
         setIsDragMoved(false); // 드래그 움직임 초기화
         setDragStart(startPos);

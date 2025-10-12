@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { TextBlock, ImportanceLevel, ImportanceRange, ContentBlock } from '../../types';
 
 // 중요도 레벨별 형광펜 스타일 정의
@@ -122,6 +123,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   const [selectedRange, setSelectedRange] = useState<{ start: number; end: number } | null>(null);
   const [, forceUpdate] = useState({});
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // 외부에서 블록 내용이 변경되었을 때 로컬 상태 동기화
   useEffect(() => {
@@ -171,25 +173,53 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     }
   }, [isEditing]);
 
-  // 메뉴 외부 클릭 시 닫기
+  // 메뉴 외부 클릭/드래그 시 닫기
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOrDragOutside = (event: MouseEvent) => {
       const target = event.target as Element;
-      // 메뉴 내부 클릭이 아닌 경우에만 닫기
-      if (showImportanceMenu && !target.closest('[data-importance-menu]')) {
+      // 메뉴 내부 클릭/드래그가 아니고, 현재 textarea도 아닌 경우 닫기
+      if (showImportanceMenu &&
+          !target.closest('[data-importance-menu]') &&
+          target !== textareaRef.current) {
         setShowImportanceMenu(false);
         setSelectedRange(null);
       }
     };
 
     if (showImportanceMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
+      // mousedown과 drag 이벤트 모두 감지
+      document.addEventListener('mousedown', handleClickOrDragOutside, true); // capture phase
+      document.addEventListener('dragstart', handleClickOrDragOutside, true);
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('mousedown', handleClickOrDragOutside, true);
+      document.removeEventListener('dragstart', handleClickOrDragOutside, true);
     };
   }, [showImportanceMenu]);
+
+  // 메뉴가 렌더링된 후 실제 DOM 위치 확인
+  useEffect(() => {
+    if (showImportanceMenu && menuRef.current) {
+      const menuRect = menuRef.current.getBoundingClientRect();
+      console.log('=== 실제 렌더링된 메뉴 위치 ===');
+      console.log('설정한 position:', importanceMenuPosition);
+      console.log('실제 DOM 위치:', {
+        top: menuRect.top,
+        left: menuRect.left,
+        bottom: menuRect.bottom,
+        right: menuRect.right,
+        width: menuRect.width,
+        height: menuRect.height
+      });
+      console.log('메뉴 style:', {
+        left: menuRef.current.style.left,
+        top: menuRef.current.style.top,
+        position: menuRef.current.style.position
+      });
+      console.log('================================');
+    }
+  }, [showImportanceMenu, importanceMenuPosition]);
 
   // 텍스트 영역 자동 리사이즈 (항상 적용)
   useEffect(() => {
@@ -422,31 +452,92 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     }
   };
 
-  // 텍스트 선택 처리
+  // 텍스트 선택 처리 (드래그 끝난 후)
   const handleTextSelection = (e: React.MouseEvent) => {
-    if (!isEditing) return;
-    
-    setTimeout(() => {
-      const textarea = textareaRef.current;
-      
-      if (textarea) {
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        
-        
-        if (start !== end && end > start) {
-          setSelectedRange({ start, end });
-          setImportanceMenuPosition({
-            x: e.clientX,
-            y: e.clientY - 10
-          });
-          setShowImportanceMenu(true);
-        } else {
-          setShowImportanceMenu(false);
-          setSelectedRange(null);
-        }
+    if (!isEditing || !canEdit) return;
+
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+
+    if (start !== end && end > start) {
+      // 텍스트가 선택된 경우
+      setSelectedRange({ start, end });
+
+      // 메뉴 크기 (8개 항목 * 약 30px + padding)
+      const menuWidth = 150;
+      const menuHeight = 240;
+
+      // 화면 크기
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      // textarea의 실제 화면상 위치
+      const textareaRect = textarea.getBoundingClientRect();
+
+      // 드래그 끝난 위치 (마우스 업 위치)를 사용
+      const mouseX = e.clientX;
+      const mouseY = e.clientY;
+
+      console.log('=== 중요도 메뉴 위치 계산 ===');
+      console.log('마우스 위치:', { mouseX, mouseY });
+      console.log('textarea 위치:', {
+        top: textareaRect.top,
+        left: textareaRect.left,
+        bottom: textareaRect.bottom,
+        right: textareaRect.right,
+        width: textareaRect.width,
+        height: textareaRect.height
+      });
+      console.log('화면 크기:', { viewportWidth, viewportHeight });
+
+      // 기본 위치: 마우스 오른쪽에 바로 붙여서 표시
+      let x = mouseX + 10;
+      let y = mouseY - 10; // 마우스 위치보다 약간 위에 표시
+
+      console.log('초기 계산 위치:', { x, y });
+
+      // 오른쪽 경계 체크 - 화면을 넘어가면 왼쪽에 표시
+      if (x + menuWidth > viewportWidth) {
+        x = mouseX - menuWidth - 10;
+        console.log('오른쪽 경계 초과 -> 왼쪽으로 이동:', x);
       }
-    }, 10);
+
+      // 왼쪽 경계 체크
+      if (x < 10) {
+        x = 10;
+        console.log('왼쪽 경계 초과 -> 10px로 보정:', x);
+      }
+
+      // 아래쪽 경계 체크 - 화면을 넘어가면 위로 올림
+      if (y + menuHeight > viewportHeight) {
+        y = viewportHeight - menuHeight - 10;
+        console.log('아래쪽 경계 초과 -> 상단으로 이동:', y);
+      }
+
+      // 위쪽 경계 체크
+      if (y < 10) {
+        y = 10;
+        console.log('위쪽 경계 초과 -> 10px로 보정:', y);
+      }
+
+      console.log('최종 위치:', { x, y });
+      console.log('마우스가 textarea 영역 내에 있는가?',
+        mouseX >= textareaRect.left &&
+        mouseX <= textareaRect.right &&
+        mouseY >= textareaRect.top &&
+        mouseY <= textareaRect.bottom
+      );
+      console.log('=======================');
+
+      setImportanceMenuPosition({ x, y });
+      setShowImportanceMenu(true);
+    } else {
+      setShowImportanceMenu(false);
+      setSelectedRange(null);
+    }
   };
 
   // 중요도 적용
@@ -757,7 +848,16 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             onClick={handleClick}
-            onMouseUp={handleTextSelection}
+            onMouseDown={(e) => {
+              // 새로운 드래그 시작 시 기존 메뉴 닫기
+              if (showImportanceMenu) {
+                setShowImportanceMenu(false);
+                setSelectedRange(null);
+              }
+              // 텍스트 선택을 위해 이벤트 전파 막기
+              e.stopPropagation();
+            }}
+            onMouseUp={(e) => handleTextSelection(e)}
             data-block-id={block.id}
             disabled={!canEdit}
             placeholder={content === '' && isFocused ? "텍스트를 입력하세요" : ''}
@@ -795,22 +895,24 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
           />
         </div>
 
-        {/* 중요도 메뉴 */}
-        {showImportanceMenu && (
+        {/* 중요도 메뉴 - Portal을 사용하여 document.body에 렌더링 */}
+        {showImportanceMenu && ReactDOM.createPortal(
           <div
+            ref={menuRef}
             data-importance-menu
             onMouseDown={(e) => e.preventDefault()} // 선택 해제 방지
             style={{
               position: 'fixed',
-              left: importanceMenuPosition.x,
-              top: importanceMenuPosition.y,
+              left: `${importanceMenuPosition.x}px`,
+              top: `${importanceMenuPosition.y}px`,
               backgroundColor: '#ffffff',
               border: '1px solid #e0e0e0',
               borderRadius: '8px',
               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-              zIndex: 1000,
+              zIndex: 10000,
               padding: '4px',
-              minWidth: '140px'
+              minWidth: '140px',
+              maxWidth: '200px'
             }}
           >
             {Object.entries(IMPORTANCE_LABELS).map(([level, label]) => (
@@ -842,7 +944,8 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
                 {label}
               </button>
             ))}
-          </div>
+          </div>,
+          document.body
         )}
       </>
     );
