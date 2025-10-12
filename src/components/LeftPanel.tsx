@@ -201,11 +201,14 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
 
   // 검색 결과용 하이라이팅 렌더링 함수
   const renderSearchResultContent = (memo: MemoBlock) => {
-    // blocks 배열에서 텍스트 내용 추출하여 중요도 표시
+    const results: React.ReactNode[] = [];
+
+    // blocks 배열에서 내용 추출
     if (memo.blocks && memo.blocks.length > 0) {
+      // 텍스트 블록 처리
       const textBlocks = memo.blocks.filter(block => block.type === 'text' && block.content);
       if (textBlocks.length > 0) {
-        const results = textBlocks.map((block, blockIndex) => {
+        const textResults = textBlocks.map((block, blockIndex) => {
           const textBlock = block as any;
           const { content, importanceRanges } = textBlock;
 
@@ -226,17 +229,72 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
           }
         }).filter(result => result !== null);
 
-        // 결과가 있으면 반환, 없으면 빈 배열 반환 (빈 텍스트 방지)
-        return results.length > 0 ? results : [];
+        results.push(...textResults);
+      }
+
+      // 검색어가 있을 때 파일/이미지/URL 블록 표시
+      if (searchQuery) {
+        memo.blocks.forEach((block, index) => {
+          if (searchBlockMetadata(block, searchQuery)) {
+            const blockKey = `block-${index}`;
+            if (block.type === 'file') {
+              results.push(
+                <div key={blockKey} style={{ marginTop: '4px', fontSize: '10px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  📎 {block.name}
+                </div>
+              );
+            } else if (block.type === 'image') {
+              results.push(
+                <div key={blockKey} style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <img
+                    src={block.url}
+                    alt={block.alt || '이미지'}
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: '80px',
+                      objectFit: 'cover',
+                      borderRadius: '4px',
+                      border: '1px solid #e5e7eb'
+                    }}
+                    onError={(e) => {
+                      // 이미지 로드 실패 시 대체 텍스트 표시
+                      const target = e.currentTarget;
+                      target.style.display = 'none';
+                      const parent = target.parentElement;
+                      if (parent) {
+                        const fallback = document.createElement('div');
+                        fallback.style.fontSize = '10px';
+                        fallback.style.color = '#64748b';
+                        fallback.textContent = `🖼️ ${block.caption || block.alt || '이미지'}`;
+                        parent.appendChild(fallback);
+                      }
+                    }}
+                  />
+                  {(block.caption || block.alt) && (
+                    <div style={{ fontSize: '9px', color: '#94a3b8' }}>
+                      {block.caption || block.alt}
+                    </div>
+                  )}
+                </div>
+              );
+            } else if (block.type === 'bookmark') {
+              results.push(
+                <div key={blockKey} style={{ marginTop: '4px', fontSize: '10px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  🔗 {block.title || block.url}
+                </div>
+              );
+            }
+          }
+        });
       }
     }
 
     // 레거시 content 필드 확인
-    if (memo.content) {
+    if (results.length === 0 && memo.content) {
       return memo.content.length > 100 ? memo.content.substring(0, 100) + '...' : memo.content;
     }
 
-    return '내용 없음';
+    return results.length > 0 ? results : '내용 없음';
   };
 
   // 하이라이팅된 텍스트 렌더링 (모든 중요도 표시)
@@ -445,6 +503,37 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
     return childMemos;
   };
 
+  // blocks에서 파일/이미지/URL 등의 메타데이터 검색
+  const searchBlockMetadata = (block: any, query: string): boolean => {
+    switch (block.type) {
+      case 'file':
+        // 파일 이름과 URL 검색
+        return flexibleMatch(block.name || '', query) || flexibleMatch(block.url || '', query);
+      case 'image':
+        // 이미지 alt, caption, URL 검색
+        return flexibleMatch(block.alt || '', query) ||
+               flexibleMatch(block.caption || '', query) ||
+               flexibleMatch(block.url || '', query);
+      case 'bookmark':
+        // 북마크 제목, 설명, URL 검색
+        return flexibleMatch(block.title || '', query) ||
+               flexibleMatch(block.description || '', query) ||
+               flexibleMatch(block.url || '', query);
+      case 'callout':
+        // 콜아웃 내용 검색
+        return flexibleMatch(block.content || '', query);
+      case 'quote':
+        // 인용구 내용과 저자 검색
+        return flexibleMatch(block.content || '', query) ||
+               flexibleMatch(block.author || '', query);
+      case 'code':
+        // 코드 내용 검색
+        return flexibleMatch(block.content || '', query);
+      default:
+        return false;
+    }
+  };
+
   // 검색 로직
   const searchMemos = (query: string, category: SearchCategory): MemoBlock[] => {
     const currentPage = pages.find(p => p.id === currentPageId);
@@ -514,7 +603,8 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 const filteredContent = getFilteredTextFromBlock(block);
                 return filteredContent && flexibleMatch(filteredContent, query);
               }
-              return false;
+              // 파일/이미지/URL 등의 메타데이터 검색
+              return searchBlockMetadata(block, query);
             });
           }
           break;
@@ -535,7 +625,8 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 const filteredContent = getFilteredTextFromBlock(block);
                 return filteredContent && flexibleMatch(filteredContent, query);
               }
-              return false;
+              // 파일/이미지/URL 등의 메타데이터 검색
+              return searchBlockMetadata(block, query);
             });
           }
           break;
@@ -560,7 +651,8 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 const filteredContent = getFilteredTextFromBlock(block);
                 return filteredContent && flexibleMatch(filteredContent, query);
               }
-              return false;
+              // 파일/이미지/URL 등의 메타데이터 검색
+              return searchBlockMetadata(block, query);
             });
           }
           break;
@@ -865,123 +957,9 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
             </h3>
           </div>
           <div>
-            {/* 카테고리 결과 */}
-            {searchCategoryResults.length > 0 && (
-              <div style={{ marginBottom: '16px' }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#6b7280' }}>
-                  카테고리 ({searchCategoryResults.length}개)
-                </h4>
-                {searchCategoryResults.map(category => {
-                  const parentPage = pages.find(p => p.categories?.some(c => c.id === category.id));
-                  return (
-                    <div
-                      key={category.id}
-                      style={{
-                        padding: '12px 16px',
-                        paddingRight: '40px', // 삭제 버튼 공간 확보
-                        marginBottom: '8px',
-                        backgroundColor: '#fef3c7',
-                        border: '1px solid #fde68a',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        fontSize: '13px',
-                        position: 'relative'
-                      }}
-                      onClick={() => {
-                        console.log('[LeftPanel] Category clicked:', category.title, category.id);
-                        if (parentPage) {
-                          console.log('[LeftPanel] Parent page:', parentPage.name, parentPage.id);
-                          // 페이지 전환 (같은 페이지면 무시됨)
-                          onPageSelect(parentPage.id);
-                          // 페이지 ID를 함께 전달하여 즉시 네비게이션
-                          if (onNavigateToCategory) {
-                            console.log('[LeftPanel] Calling onNavigateToCategory');
-                            onNavigateToCategory(category.id, parentPage.id);
-                          } else {
-                            console.error('[LeftPanel] onNavigateToCategory is not defined!');
-                          }
-                        }
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.backgroundColor = '#fde68a';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.backgroundColor = '#fef3c7';
-                      }}
-                    >
-                      <div style={{ fontWeight: '600', color: '#78350f', marginBottom: '4px' }}>
-                        📁 {category.title || '제목 없음'}
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#92400e', marginBottom: '4px' }}>
-                        📄 {parentPage?.name || '페이지 없음'}
-                      </div>
-                      {category.tags && category.tags.length > 0 && (
-                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                          {category.tags.map(tag => (
-                            <span key={tag} style={{
-                              padding: '2px 6px',
-                              backgroundColor: '#f59e0b',
-                              color: 'white',
-                              borderRadius: '3px',
-                              fontSize: '10px'
-                            }}>
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* 삭제 버튼 */}
-                      {onDeleteCategory && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (window.confirm(`"${category.title || '제목 없음'}" 카테고리를 정말 삭제하시겠습니까?`)) {
-                              onDeleteCategory(category.id);
-                            }
-                          }}
-                          style={{
-                            position: 'absolute',
-                            top: '8px',
-                            right: '8px',
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: '4px',
-                            borderRadius: '4px',
-                            color: '#92400e',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.backgroundColor = '#fef2f2';
-                            e.currentTarget.style.color = '#ef4444';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                            e.currentTarget.style.color = '#92400e';
-                          }}
-                          title="카테고리 삭제"
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M3 6h18"/>
-                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
-                            <path d="M8 6V4c0-1 1-2 2-2h4c0 1 1 2 2 2v2"/>
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
             {/* 메모 결과 */}
             {searchResults.length > 0 && (
-              <div>
+              <div style={{ marginBottom: '16px' }}>
                 {searchCategoryResults.length > 0 && (
                   <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#6b7280' }}>
                     메모 ({searchResults.length}개)
@@ -1091,6 +1069,122 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                             e.currentTarget.style.color = '#64748b';
                           }}
                           title="메모 삭제"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M3 6h18"/>
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                            <path d="M8 6V4c0-1 1-2 2-2h4c0 1 1 2 2 2v2"/>
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* 카테고리 결과 */}
+            {searchCategoryResults.length > 0 && (
+              <div>
+                {searchResults.length > 0 && (
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#6b7280' }}>
+                    카테고리 ({searchCategoryResults.length}개)
+                  </h4>
+                )}
+                {searchCategoryResults.map(category => {
+                  const parentPage = pages.find(p => p.categories?.some(c => c.id === category.id));
+                  return (
+                    <div
+                      key={category.id}
+                      style={{
+                        padding: '12px 16px',
+                        paddingRight: '40px', // 삭제 버튼 공간 확보
+                        marginBottom: '8px',
+                        backgroundColor: '#fef3c7',
+                        border: '1px solid #fde68a',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        fontSize: '13px',
+                        position: 'relative'
+                      }}
+                      onClick={() => {
+                        console.log('[LeftPanel] Category clicked:', category.title, category.id);
+                        if (parentPage) {
+                          console.log('[LeftPanel] Parent page:', parentPage.name, parentPage.id);
+                          // 페이지 전환 (같은 페이지면 무시됨)
+                          onPageSelect(parentPage.id);
+                          // 페이지 ID를 함께 전달하여 즉시 네비게이션
+                          if (onNavigateToCategory) {
+                            console.log('[LeftPanel] Calling onNavigateToCategory');
+                            onNavigateToCategory(category.id, parentPage.id);
+                          } else {
+                            console.error('[LeftPanel] onNavigateToCategory is not defined!');
+                          }
+                        }
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.backgroundColor = '#fde68a';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.backgroundColor = '#fef3c7';
+                      }}
+                    >
+                      <div style={{ fontWeight: '600', color: '#78350f', marginBottom: '4px' }}>
+                        📁 {category.title || '제목 없음'}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#92400e', marginBottom: '4px' }}>
+                        📄 {parentPage?.name || '페이지 없음'}
+                      </div>
+                      {category.tags && category.tags.length > 0 && (
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                          {category.tags.map(tag => (
+                            <span key={tag} style={{
+                              padding: '2px 6px',
+                              backgroundColor: '#f59e0b',
+                              color: 'white',
+                              borderRadius: '3px',
+                              fontSize: '10px'
+                            }}>
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* 삭제 버튼 */}
+                      {onDeleteCategory && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`"${category.title || '제목 없음'}" 카테고리를 정말 삭제하시겠습니까?`)) {
+                              onDeleteCategory(category.id);
+                            }
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            borderRadius: '4px',
+                            color: '#92400e',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.backgroundColor = '#fef2f2';
+                            e.currentTarget.style.color = '#ef4444';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = '#92400e';
+                          }}
+                          title="카테고리 삭제"
                         >
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M3 6h18"/>
