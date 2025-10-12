@@ -80,6 +80,21 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const [showImportanceSubmenu, setShowImportanceSubmenu] = React.useState(false);
   const [submenuPosition, setSubmenuPosition] = React.useState<'right' | 'left'>('right');
 
+  // 블록 드래그 앤 드롭 상태
+  const [isDraggingBlock, setIsDraggingBlock] = React.useState(false);
+  const [draggedBlockId, setDraggedBlockId] = React.useState<string | null>(null);
+  const [dropTargetIndex, setDropTargetIndex] = React.useState<number | null>(null);
+  const [dragStartY, setDragStartY] = React.useState(0);
+  const [currentDragY, setCurrentDragY] = React.useState(0);
+  const [dragOffset, setDragOffset] = React.useState({ x: 0, y: 0 }); // 드래그 시작 시 마우스와 블록의 상대 위치
+  const [dragPreviewPosition, setDragPreviewPosition] = React.useState({ x: 0, y: 0 }); // 드래그 프리뷰 절대 위치
+
+  // 빈 공간 우클릭 컨텍스트 메뉴
+  const [showEmptySpaceMenu, setShowEmptySpaceMenu] = React.useState(false);
+  const [emptySpaceMenuPosition, setEmptySpaceMenuPosition] = React.useState({ x: 0, y: 0 });
+  const [clickedPosition, setClickedPosition] = React.useState<number | null>(null); // 블록 삽입 위치
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   // 공백 크기를 계산하는 함수 (최대 1블록 높이로 제한)
   const getSpacerHeight = (consecutiveHiddenBlocks: number): string => {
     if (consecutiveHiddenBlocks <= 1) return '0';
@@ -252,16 +267,237 @@ const RightPanel: React.FC<RightPanelProps> = ({
     if (selectedMemo && selectedMemo.blocks) {
       const blocks = [...selectedMemo.blocks];
       const index = blocks.findIndex(block => block.id === blockId);
-      
+
       if (direction === 'up' && index > 0) {
         [blocks[index], blocks[index - 1]] = [blocks[index - 1], blocks[index]];
       } else if (direction === 'down' && index < blocks.length - 1) {
         [blocks[index], blocks[index + 1]] = [blocks[index + 1], blocks[index]];
       }
-      
+
       onMemoUpdate(selectedMemo.id, { blocks });
     }
   };
+
+  // 블록 드래그 시작
+  const handleBlockDragStart = (e: React.MouseEvent, blockId: string) => {
+    // 텍스트 선택 중이거나 입력 중일 때는 드래그 금지
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      return;
+    }
+
+    e.preventDefault();
+
+    // 드래그하는 블록 요소 찾기
+    const blockElement = target.closest('[data-block-id]') as HTMLElement;
+    if (!blockElement) return;
+
+    const rect = blockElement.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+
+    setIsDraggingBlock(true);
+    setDraggedBlockId(blockId);
+    setDragStartY(e.clientY);
+    setCurrentDragY(e.clientY);
+    setDragOffset({ x: offsetX, y: offsetY });
+    setDragPreviewPosition({ x: e.clientX - offsetX, y: e.clientY - offsetY });
+  };
+
+  // 블록 드래그 중
+  const handleBlockDragMove = React.useCallback((e: MouseEvent) => {
+    if (!isDraggingBlock || !draggedBlockId || !selectedMemo?.blocks) return;
+
+    setCurrentDragY(e.clientY);
+
+    // 드래그 프리뷰 위치 업데이트
+    const previewX = e.clientX - dragOffset.x;
+    const previewY = e.clientY - dragOffset.y;
+    setDragPreviewPosition({ x: previewX, y: previewY });
+
+    // 드롭 타겟 인덱스 계산 - 마우스 커서와 가장 가까운 경계
+    const container = blocksContainerRef.current;
+    if (!container) return;
+
+    const blockElements = Array.from(container.querySelectorAll('[data-block-id]'));
+    const draggedIndex = selectedMemo.blocks.findIndex(b => b.id === draggedBlockId);
+
+    // 마우스 커서 Y 좌표
+    const mouseY = e.clientY;
+
+    // 모든 블록 경계 위치 수집 (위쪽과 아래쪽)
+    const boundaries: { index: number; y: number }[] = [];
+
+    blockElements.forEach((element, i) => {
+      const rect = element.getBoundingClientRect();
+      // 블록 위쪽 경계
+      boundaries.push({ index: i, y: rect.top });
+      // 블록 아래쪽 경계 (다음 삽입 위치)
+      boundaries.push({ index: i + 1, y: rect.bottom });
+    });
+
+    // 마우스 커서에서 가장 가까운 경계 찾기
+    let targetIndex = 0;
+    let minDistance = Infinity;
+
+    boundaries.forEach(boundary => {
+      const distance = Math.abs(mouseY - boundary.y);
+      if (distance < minDistance) {
+        minDistance = distance;
+        targetIndex = boundary.index;
+      }
+    });
+
+    // 자기 자신의 원래 위치로 돌아가는 경우만 null로 설정 (이동 없음을 의미)
+    if (targetIndex === draggedIndex || targetIndex === draggedIndex + 1) {
+      setDropTargetIndex(null);
+    } else {
+      setDropTargetIndex(targetIndex);
+    }
+  }, [isDraggingBlock, draggedBlockId, selectedMemo?.blocks, dragOffset]);
+
+  // 블록 드래그 종료
+  const handleBlockDragEnd = React.useCallback(() => {
+    if (!isDraggingBlock || !draggedBlockId || !selectedMemo?.blocks || dropTargetIndex === null) {
+      setIsDraggingBlock(false);
+      setDraggedBlockId(null);
+      setDropTargetIndex(null);
+      return;
+    }
+
+    const blocks = [...selectedMemo.blocks];
+    const draggedIndex = blocks.findIndex(b => b.id === draggedBlockId);
+    const draggedBlock = blocks[draggedIndex];
+
+    // 블록 제거
+    blocks.splice(draggedIndex, 1);
+
+    // 새 위치에 삽입 (드래그한 블록이 제거되었으므로 인덱스 조정)
+    let insertIndex = dropTargetIndex;
+    if (dropTargetIndex > draggedIndex) {
+      insertIndex = dropTargetIndex - 1;
+    }
+
+    blocks.splice(insertIndex, 0, draggedBlock);
+
+    onMemoUpdate(selectedMemo.id, { blocks });
+
+    // 상태 초기화
+    setIsDraggingBlock(false);
+    setDraggedBlockId(null);
+    setDropTargetIndex(null);
+  }, [isDraggingBlock, draggedBlockId, selectedMemo, dropTargetIndex, onMemoUpdate]);
+
+  // 드래그 이벤트 리스너 등록
+  React.useEffect(() => {
+    if (isDraggingBlock) {
+      window.addEventListener('mousemove', handleBlockDragMove);
+      window.addEventListener('mouseup', handleBlockDragEnd);
+
+      return () => {
+        window.removeEventListener('mousemove', handleBlockDragMove);
+        window.removeEventListener('mouseup', handleBlockDragEnd);
+      };
+    }
+  }, [isDraggingBlock, handleBlockDragMove, handleBlockDragEnd]);
+
+  // 빈 공간 우클릭 핸들러 (패널의 빈 영역)
+  const handleEmptySpaceContextMenu = (e: React.MouseEvent) => {
+    // 블록이나 다른 UI 요소 위에서 우클릭한 경우는 무시
+    const target = e.target as HTMLElement;
+
+    // 블록 위에서 클릭한 경우
+    if (target.closest('[data-block-id]')) {
+      return;
+    }
+
+    // 태그나 다른 입력 요소 위에서 클릭한 경우
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON') {
+      return;
+    }
+
+    // 블록 컨테이너가 아닌 패널의 빈 공간만 감지
+    if (!target.closest('.right-panel-content') || target.closest('.blocks-container')) {
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    // 맨 끝에 블록 추가
+    const insertPosition = selectedMemo?.blocks?.length || 0;
+    setClickedPosition(insertPosition);
+
+    setEmptySpaceMenuPosition({ x: e.clientX, y: e.clientY });
+    setShowEmptySpaceMenu(true);
+  };
+
+  // 파일 첨부 핸들러
+  const handleFileAttach = () => {
+    setShowEmptySpaceMenu(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  // 파일 선택 핸들러
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedMemo || clickedPosition === null) return;
+
+    // 파일을 Data URL로 변환
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const fileUrl = event.target?.result as string;
+      const newBlock: ContentBlock = {
+        id: Date.now().toString(),
+        type: 'file',
+        url: fileUrl,
+        name: file.name
+      };
+
+      const blocks = [...(selectedMemo.blocks || [])];
+      blocks.splice(clickedPosition, 0, newBlock);
+      onMemoUpdate(selectedMemo.id, { blocks });
+    };
+    reader.readAsDataURL(file);
+
+    // input 초기화
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // 입력창 추가 핸들러
+  const handleAddTextBlock = () => {
+    setShowEmptySpaceMenu(false);
+
+    if (!selectedMemo || clickedPosition === null) return;
+
+    const newBlock: ContentBlock = {
+      id: Date.now().toString(),
+      type: 'text',
+      content: ''
+    };
+
+    const blocks = [...(selectedMemo.blocks || [])];
+    blocks.splice(clickedPosition, 0, newBlock);
+    onMemoUpdate(selectedMemo.id, { blocks });
+  };
+
+  // 빈 공간 메뉴 닫기
+  React.useEffect(() => {
+    const handleClickOutside = () => {
+      if (showEmptySpaceMenu) {
+        setShowEmptySpaceMenu(false);
+      }
+    };
+
+    if (showEmptySpaceMenu) {
+      window.addEventListener('click', handleClickOutside);
+      return () => window.removeEventListener('click', handleClickOutside);
+    }
+  }, [showEmptySpaceMenu]);
 
   const addNewBlock = (type: ContentBlockType) => {
     if (selectedMemo) {
@@ -1172,10 +1408,12 @@ const RightPanel: React.FC<RightPanelProps> = ({
         )}
       </div>
 
-      <div 
+      <div
         ref={rightPanelRef}
+        className="right-panel-content"
         style={{ flex: 1, overflow: 'auto', padding: '16px' }}
         onMouseDown={handleMouseDown}
+        onContextMenu={handleEmptySpaceContextMenu}
       >
         {(selectedMemos.length > 1 || selectedCategories.length > 1 || (selectedMemos.length > 0 && selectedCategories.length > 0)) ? (
           // 멀티 선택 모드
@@ -2154,6 +2392,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
             {/* 블록들 렌더링 */}
             <div
               ref={blocksContainerRef}
+              className="blocks-container"
               onContextMenu={handleBlockContextMenu}
               style={{
                 marginBottom: '16px',
@@ -2225,35 +2464,88 @@ const RightPanel: React.FC<RightPanelProps> = ({
                       }
                     }
 
+                    const isDragging = draggedBlockId === block.id;
+                    const blockIndex = selectedMemo.blocks?.findIndex(b => b.id === block.id) ?? -1;
+                    const shouldShowDropIndicator = dropTargetIndex === blockIndex;
+
                     renderedElements.push(
                       <React.Fragment key={block.id}>
-                        <div data-block-id={block.id} style={{ position: 'relative', marginBottom: '0px' }}>
-                          <ContentBlockComponent
-                            block={block}
-                            isEditing={!isTitleFocused}
-                            isSelected={isSelected}
-                            isDragSelected={dragSelectedBlocks.includes(block.id)}
-                            isDragHovered={dragHoveredBlocks.includes(block.id)}
-                            pageId={currentPage?.id}
-                            memoId={selectedMemo?.id}
-                            onUpdate={handleBlockUpdate}
-                            onDelete={handleBlockDelete}
-                            onDuplicate={handleBlockDuplicate}
-                            onMoveUp={(blockId) => handleBlockMove(blockId, 'up')}
-                            onMoveDown={(blockId) => handleBlockMove(blockId, 'down')}
-                            onConvertToBlock={handleConvertBlock}
-                            onCreateNewBlock={handleCreateNewBlock}
-                            onInsertBlockAfter={handleInsertBlockAfter}
-                            onFocusPrevious={handleFocusPrevious}
-                            onFocusNext={handleFocusNext}
-                            onBlockClick={handleBlockClick}
-                            onMergeWithPrevious={handleMergeWithPrevious}
-                            onBlockSelect={handleBlockSelect}
-                            onSaveToHistory={saveToHistory}
-                            activeImportanceFilters={activeImportanceFilters}
-                            showGeneralContent={showGeneralContent}
-                            onResetFilters={onResetFilters}
-                          />
+                        {shouldShowDropIndicator && (
+                          <div style={{
+                            height: '2px',
+                            backgroundColor: '#3b82f6',
+                            margin: '8px 0',
+                            borderRadius: '1px',
+                            boxShadow: '0 0 4px rgba(59, 130, 246, 0.5)'
+                          }} />
+                        )}
+                        <div
+                          data-block-id={block.id}
+                          style={{
+                            position: 'relative',
+                            marginBottom: '0px',
+                            opacity: isDragging ? 0.2 : 1,
+                            transform: isDragging ? 'scale(0.95)' : 'scale(1)',
+                            transition: isDragging ? 'none' : 'transform 0.15s ease, opacity 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '4px'
+                          }}
+                        >
+                          {/* 드래그 핸들 */}
+                          <div
+                            onMouseDown={(e) => handleBlockDragStart(e, block.id)}
+                            style={{
+                              cursor: 'grab',
+                              padding: '4px',
+                              marginTop: '8px',
+                              opacity: 0.3,
+                              transition: 'opacity 0.15s ease',
+                              flexShrink: 0,
+                              userSelect: 'none',
+                              fontSize: '16px',
+                              lineHeight: 1,
+                              color: '#6b7280'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.opacity = '0.7';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.opacity = '0.3';
+                            }}
+                          >
+                            ⋮⋮
+                          </div>
+
+                          {/* 블록 콘텐츠 */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <ContentBlockComponent
+                              block={block}
+                              isEditing={!isTitleFocused}
+                              isSelected={isSelected}
+                              isDragSelected={dragSelectedBlocks.includes(block.id)}
+                              isDragHovered={dragHoveredBlocks.includes(block.id)}
+                              pageId={currentPage?.id}
+                              memoId={selectedMemo?.id}
+                              onUpdate={handleBlockUpdate}
+                              onDelete={handleBlockDelete}
+                              onDuplicate={handleBlockDuplicate}
+                              onMoveUp={(blockId) => handleBlockMove(blockId, 'up')}
+                              onMoveDown={(blockId) => handleBlockMove(blockId, 'down')}
+                              onConvertToBlock={handleConvertBlock}
+                              onCreateNewBlock={handleCreateNewBlock}
+                              onInsertBlockAfter={handleInsertBlockAfter}
+                              onFocusPrevious={handleFocusPrevious}
+                              onFocusNext={handleFocusNext}
+                              onBlockClick={handleBlockClick}
+                              onMergeWithPrevious={handleMergeWithPrevious}
+                              onBlockSelect={handleBlockSelect}
+                              onSaveToHistory={saveToHistory}
+                              activeImportanceFilters={activeImportanceFilters}
+                              showGeneralContent={showGeneralContent}
+                              onResetFilters={onResetFilters}
+                            />
+                          </div>
                         </div>
                       </React.Fragment>
                     );
@@ -2266,6 +2558,19 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     }
                   }
                 });
+
+                // 맨 끝에 드롭 인디케이터 표시
+                if (dropTargetIndex === blocks.length) {
+                  renderedElements.push(
+                    <div key="drop-indicator-end" style={{
+                      height: '2px',
+                      backgroundColor: '#3b82f6',
+                      margin: '8px 0',
+                      borderRadius: '1px',
+                      boxShadow: '0 0 4px rgba(59, 130, 246, 0.5)'
+                    }} />
+                  );
+                }
 
                 return renderedElements;
               })()}
@@ -2282,6 +2587,143 @@ const RightPanel: React.FC<RightPanelProps> = ({
             메모나 카테고리를 선택하여 편집하세요
           </div>
         )}
+
+        {/* 드래그 프리뷰 */}
+        {isDraggingBlock && draggedBlockId && selectedMemo?.blocks && (
+          <div
+            style={{
+              position: 'fixed',
+              left: `${dragPreviewPosition.x}px`,
+              top: `${dragPreviewPosition.y}px`,
+              pointerEvents: 'none',
+              zIndex: 10001,
+              opacity: 0.8,
+              transform: 'rotate(-2deg)',
+              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.3)',
+              maxWidth: '600px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
+              {/* 드래그 핸들 */}
+              <div
+                style={{
+                  padding: '4px',
+                  marginTop: '8px',
+                  opacity: 0.5,
+                  flexShrink: 0,
+                  userSelect: 'none',
+                  fontSize: '16px',
+                  lineHeight: 1,
+                  color: '#6b7280'
+                }}
+              >
+                ⋮⋮
+              </div>
+
+              {/* 블록 콘텐츠 복사본 */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <ContentBlockComponent
+                  block={selectedMemo.blocks.find(b => b.id === draggedBlockId)!}
+                  isEditing={false}
+                  isSelected={false}
+                  isDragSelected={false}
+                  isDragHovered={false}
+                  pageId={currentPage?.id}
+                  memoId={selectedMemo?.id}
+                  onUpdate={() => {}}
+                  onDelete={() => {}}
+                  onDuplicate={() => {}}
+                  onMoveUp={() => {}}
+                  onMoveDown={() => {}}
+                  onConvertToBlock={() => {}}
+                  onCreateNewBlock={() => {}}
+                  onInsertBlockAfter={() => {}}
+                  onFocusPrevious={() => {}}
+                  onFocusNext={() => {}}
+                  onBlockClick={() => {}}
+                  onMergeWithPrevious={() => {}}
+                  onBlockSelect={() => {}}
+                  onSaveToHistory={() => {}}
+                  activeImportanceFilters={activeImportanceFilters}
+                  showGeneralContent={showGeneralContent}
+                  onResetFilters={onResetFilters}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 빈 공간 우클릭 컨텍스트 메뉴 */}
+        {showEmptySpaceMenu && (
+          <div
+            style={{
+              position: 'fixed',
+              left: `${emptySpaceMenuPosition.x}px`,
+              top: `${emptySpaceMenuPosition.y}px`,
+              backgroundColor: 'white',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+              padding: '4px',
+              zIndex: 10000,
+              minWidth: '160px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              onClick={handleFileAttach}
+              style={{
+                padding: '8px 12px',
+                cursor: 'pointer',
+                borderRadius: '4px',
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'background-color 0.15s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <span>📎</span>
+              <span>파일 첨부</span>
+            </div>
+            <div
+              onClick={handleAddTextBlock}
+              style={{
+                padding: '8px 12px',
+                cursor: 'pointer',
+                borderRadius: '4px',
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'background-color 0.15s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <span>➕</span>
+              <span>입력창 추가</span>
+            </div>
+          </div>
+        )}
+
+        {/* 숨겨진 파일 input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          style={{ display: 'none' }}
+          onChange={handleFileSelect}
+        />
       </div>
     </div>
   );
