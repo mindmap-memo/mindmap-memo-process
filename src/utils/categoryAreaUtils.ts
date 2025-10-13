@@ -297,3 +297,32 @@ export function constrainAreaWithinParent(
 
   return { x: constrainedX, y: constrainedY };
 }
+
+/**
+ * 캔버스를 특정 위치가 중앙에 오도록 조정
+ * @param targetPosition - 중앙에 위치시킬 좌표
+ * @param canvasWidth - 캔버스 컨테이너 너비
+ * @param canvasHeight - 캔버스 컨테이너 높이
+ * @param canvasScale - 현재 캔버스 스케일
+ * @returns 새로운 캔버스 오프셋
+ */
+export function centerCanvasOnPosition(
+  targetPosition: { x: number; y: number },
+  canvasWidth: number,
+  canvasHeight: number,
+  canvasScale: number
+): { x: number; y: number } {
+  // 타겟 위치를 스케일 적용한 좌표로 변환
+  const scaledTargetX = targetPosition.x * canvasScale;
+  const scaledTargetY = targetPosition.y * canvasScale;
+
+  // 캔버스 중앙 좌표
+  const centerX = canvasWidth / 2;
+  const centerY = canvasHeight / 2;
+
+  // 타겟이 중앙에 오도록 오프셋 계산
+  const newOffsetX = centerX - scaledTargetX;
+  const newOffsetY = centerY - scaledTargetY;
+
+  return { x: newOffsetX, y: newOffsetY };
+}

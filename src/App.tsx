@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Page, MemoBlock, DataRegistry, MemoDisplaySize, ImportanceLevel, CategoryBlock, CanvasHistory, CanvasAction, CanvasActionType, QuickNavItem } from './types';
 import { globalDataRegistry } from './utils/dataRegistry';
 
-import { calculateCategoryArea, CategoryArea, clearCollisionDirections } from './utils/categoryAreaUtils';
+import { calculateCategoryArea, CategoryArea, clearCollisionDirections, centerCanvasOnPosition } from './utils/categoryAreaUtils';
 import { resolveUnifiedCollisions } from './utils/collisionUtils';
 import {
   canAddCategoryAsChild,
@@ -1788,7 +1788,8 @@ const App: React.FC = () => {
   // calculateCategoryArea는 이제 utils/categoryAreaUtils.ts에서 import
 
   const addMemoBlock = (position?: { x: number; y: number }) => {
-    let newPosition = position || { x: 300, y: 200 };
+    const originalPosition = position || { x: 300, y: 200 };
+    let newPosition = { ...originalPosition };
 
     // 영역과 겹치지 않는 위치 찾기
     if (position) {
@@ -1856,20 +1857,84 @@ const App: React.FC = () => {
         : page
     ));
 
+    // 위치가 변경된 경우 캔버스를 새 위치로 자동 이동
+    if (position && (newPosition.x !== originalPosition.x || newPosition.y !== originalPosition.y)) {
+      // 메모의 중심점 계산 (블록 중심이 화면 중앙에 오도록)
+      const memoCenterX = newPosition.x + 150; // 메모 너비의 절반
+      const memoCenterY = newPosition.y + 100; // 메모 높이의 절반
+
+      // 캔버스 크기 (윈도우 크기 기준, 좌우 패널 제외)
+      const canvasWidth = window.innerWidth - (leftPanelWidth + (rightPanelOpen ? rightPanelWidth : 0));
+      const canvasHeight = window.innerHeight;
+
+      const newOffset = centerCanvasOnPosition(
+        { x: memoCenterX, y: memoCenterY },
+        canvasWidth,
+        canvasHeight,
+        canvasScale
+      );
+
+      setCanvasOffset(newOffset);
+    }
+
     // Save canvas state for undo/redo
     setTimeout(() => saveCanvasState('memo_create', `메모 생성: ${newMemo.id}`), 0);
   };
 
   // Category management functions
   const addCategory = (position?: { x: number; y: number }) => {
-    const pos = position || { x: 300, y: 200 };
+    const originalPosition = position || { x: 300, y: 200 };
+    let newPosition = { ...originalPosition };
+
+    // 영역과 겹치지 않는 위치 찾기
+    if (position) {
+      const currentPage = pages.find(p => p.id === currentPageId);
+      if (currentPage?.categories) {
+        const categoryWidth = 200;
+        const categoryHeight = 60;
+        let isOverlapping = true;
+        let adjustedY = newPosition.y;
+
+        while (isOverlapping && adjustedY > -1000) {
+          isOverlapping = false;
+
+          for (const category of currentPage.categories) {
+            if (category.isExpanded) {
+              const area = calculateCategoryArea(category, currentPage);
+              if (area) {
+                // 카테고리와 영역이 겹치는지 확인
+                const catLeft = newPosition.x;
+                const catRight = newPosition.x + categoryWidth;
+                const catTop = adjustedY;
+                const catBottom = adjustedY + categoryHeight;
+
+                const areaLeft = area.x;
+                const areaRight = area.x + area.width;
+                const areaTop = area.y;
+                const areaBottom = area.y + area.height;
+
+                if (!(catRight < areaLeft || catLeft > areaRight || catBottom < areaTop || catTop > areaBottom)) {
+                  // 겹침 - 위로 이동
+                  isOverlapping = true;
+                  adjustedY -= 50;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        newPosition = { x: newPosition.x, y: adjustedY };
+      }
+    }
+
     const newCategory: CategoryBlock = {
       id: Date.now().toString(),
       title: 'New Category',
       tags: [],
       connections: [],
-      position: pos,
-      originalPosition: pos, // 초기 위치 저장
+      position: newPosition,
+      originalPosition: newPosition, // 초기 위치 저장
       isExpanded: true,
       children: []
     };
@@ -1879,6 +1944,26 @@ const App: React.FC = () => {
         ? { ...page, categories: [...(page.categories || []), newCategory] }
         : page
     ));
+
+    // 위치가 변경된 경우 캔버스를 새 위치로 자동 이동
+    if (position && (newPosition.x !== originalPosition.x || newPosition.y !== originalPosition.y)) {
+      // 카테고리의 중심점 계산 (블록 중심이 화면 중앙에 오도록)
+      const categoryCenterX = newPosition.x + 100; // 카테고리 너비의 절반
+      const categoryCenterY = newPosition.y + 30; // 카테고리 높이의 절반
+
+      // 캔버스 크기 (윈도우 크기 기준, 좌우 패널 제외)
+      const canvasWidth = window.innerWidth - (leftPanelWidth + (rightPanelOpen ? rightPanelWidth : 0));
+      const canvasHeight = window.innerHeight;
+
+      const newOffset = centerCanvasOnPosition(
+        { x: categoryCenterX, y: categoryCenterY },
+        canvasWidth,
+        canvasHeight,
+        canvasScale
+      );
+
+      setCanvasOffset(newOffset);
+    }
 
     // Save canvas state for undo/redo
     setTimeout(() => saveCanvasState('category_create', `카테고리 생성: ${newCategory.title}`), 0);

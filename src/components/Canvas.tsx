@@ -1887,6 +1887,25 @@ const Canvas: React.FC<CanvasProps> = ({
         }
         e.preventDefault();
       }
+
+      // Delete 키: 선택된 메모/카테고리 삭제
+      if (e.code === 'Delete') {
+        // RightPanel의 입력 필드에 포커스가 있는 경우 무시
+        const activeElement = document.activeElement;
+        const isInputFocused = activeElement && (
+          activeElement.tagName === 'INPUT' ||
+          activeElement.tagName === 'TEXTAREA' ||
+          activeElement.getAttribute('contenteditable') === 'true'
+        );
+
+        if (!isInputFocused) {
+          // 선택된 메모나 카테고리가 있으면 삭제
+          if (selectedMemoId || selectedCategoryId || selectedMemoIds.length > 0 || selectedCategoryIds.length > 0) {
+            onDeleteSelected();
+            e.preventDefault();
+          }
+        }
+      }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -1920,7 +1939,7 @@ const Canvas: React.FC<CanvasProps> = ({
       document.removeEventListener('keydown', handleKeyDown, { capture: true } as any);
       document.removeEventListener('keyup', handleKeyUp, { capture: true } as any);
     };
-  }, [baseTool, isSpacePressed, isAltPressed, isMouseOverCanvas, isConnecting, onCancelConnection, onMemoSelect, canUndo, canRedo, onUndo, onRedo]);
+  }, [baseTool, isSpacePressed, isAltPressed, isMouseOverCanvas, isConnecting, onCancelConnection, onMemoSelect, canUndo, canRedo, onUndo, onRedo, selectedMemoId, selectedCategoryId, selectedMemoIds, selectedCategoryIds, onDeleteSelected]);
 
   // Shift 드래그 중 마우스 위치로 영역 충돌 감지
   React.useEffect(() => {
