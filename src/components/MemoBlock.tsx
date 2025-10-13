@@ -181,6 +181,8 @@ interface MemoBlockProps {
   onDelete?: (id: string) => void;
   onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
   isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
+  onTitleUpdate?: (id: string, title: string) => void;
+  onBlockUpdate?: (memoId: string, blockId: string, content: string) => void;
 }
 
 const MemoBlock: React.FC<MemoBlockProps> = ({
@@ -208,7 +210,9 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   isShiftPressed = false,
   onDelete,
   onAddQuickNav,
-  isQuickNavExists
+  isQuickNavExists,
+  onTitleUpdate,
+  onBlockUpdate
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -217,6 +221,12 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [mouseDownPos, setMouseDownPos] = useState<{ x: number; y: number } | null>(null);
   const [dragMoved, setDragMoved] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(memo.title);
+  const titleInputRef = React.useRef<HTMLInputElement>(null);
+  const [isEditingAllBlocks, setIsEditingAllBlocks] = useState(false);
+  const [editedAllContent, setEditedAllContent] = useState('');
+  const allBlocksInputRef = React.useRef<HTMLTextAreaElement>(null);
 
   // 드래그 임계값 (픽셀 단위)
   const DRAG_THRESHOLD = 5;
@@ -305,6 +315,105 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       onAddQuickNav(name.trim(), memo.id, 'memo');
       setShowQuickNavModal(false);
     }
+  };
+
+  // 제목 더블클릭 핸들러
+  const handleTitleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isSelected && !isEditingTitle) {
+      setIsEditingTitle(true);
+      setEditedTitle(memo.title);
+      // 약간 지연 후 포커스 (렌더링 완료 후)
+      setTimeout(() => {
+        titleInputRef.current?.focus();
+        titleInputRef.current?.select();
+      }, 10);
+    }
+  };
+
+  // 제목 편집 완료
+  const handleTitleBlur = () => {
+    if (isEditingTitle) {
+      setIsEditingTitle(false);
+      if (editedTitle !== memo.title && onTitleUpdate) {
+        onTitleUpdate(memo.id, editedTitle);
+      }
+    }
+  };
+
+  // 제목 편집 중 엔터/ESC 처리
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleTitleBlur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setEditedTitle(memo.title);
+      setIsEditingTitle(false);
+    }
+  };
+
+  // 통합 편집 핸들러 - 모든 텍스트 블록을 하나로 합쳐서 편집
+  const handleAllBlocksDoubleClick = () => {
+    if (isSelected && !isEditingAllBlocks) {
+      // 모든 텍스트 블록의 내용을 \n\n으로 구분해서 합치기
+      const textBlocks = (memo.blocks || []).filter(b => b.type === 'text');
+      const combined = textBlocks.map(b => (b as any).content || '').join('\n\n');
+
+      setIsEditingAllBlocks(true);
+      setEditedAllContent(combined);
+      setTimeout(() => {
+        if (allBlocksInputRef.current) {
+          allBlocksInputRef.current.focus();
+          // 초기 높이 설정
+          allBlocksInputRef.current.style.height = 'auto';
+          allBlocksInputRef.current.style.height = allBlocksInputRef.current.scrollHeight + 'px';
+        }
+      }, 10);
+    }
+  };
+
+  // 통합 편집 완료 - \n\n 기준으로 블록 분리
+  const handleAllBlocksBlur = () => {
+    if (isEditingAllBlocks && onBlockUpdate) {
+      // \n\n 기준으로 블록 분리
+      const newContents = editedAllContent.split('\n\n').filter(c => c.trim() !== '');
+      const textBlocks = (memo.blocks || []).filter(b => b.type === 'text') as any[];
+
+      // 각 블록에 새 내용 업데이트
+      newContents.forEach((content, index) => {
+        if (textBlocks[index]) {
+          onBlockUpdate(memo.id, textBlocks[index].id, content);
+        }
+      });
+
+      setIsEditingAllBlocks(false);
+      setEditedAllContent('');
+    }
+  };
+
+  // 통합 편집 중 키 처리
+  const handleAllBlocksKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      // Enter = 블록 구분자 삽입 (\n\n)
+      e.preventDefault();
+      const cursorPos = e.currentTarget.selectionStart;
+      const before = editedAllContent.substring(0, cursorPos);
+      const after = editedAllContent.substring(cursorPos);
+      setEditedAllContent(before + '\n\n' + after);
+      // 커서 위치 조정
+      setTimeout(() => {
+        if (allBlocksInputRef.current) {
+          allBlocksInputRef.current.selectionStart = cursorPos + 2;
+          allBlocksInputRef.current.selectionEnd = cursorPos + 2;
+        }
+      }, 0);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsEditingAllBlocks(false);
+      setEditedAllContent('');
+    }
+    // Shift+Enter는 일반 \n으로 자동 처리됨
   };
 
   // 배경색은 항상 흰색 또는 선택 시 회색 (#f3f4f6)
@@ -646,19 +755,44 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
           alignItems: 'center',
           marginBottom: '8px'
         }}>
-          <div style={{
+          <div
+            onDoubleClick={handleTitleDoubleClick}
+            style={{
             fontWeight: '600',
             fontSize: '16px',
             color: memo.title ? '#1f2937' : '#9ca3af',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            flex: 1
+            flex: 1,
+            cursor: isSelected ? 'text' : 'default'
           }}>
             {isDragging && isShiftPressed && (
               <span style={{ color: '#10b981', fontSize: '18px', fontWeight: 'bold' }}>+</span>
             )}
-            📝 {memo.title || '제목을 입력해주세요'}
+            {!isEditingTitle ? (
+              <>📝 {memo.title || '제목을 입력해주세요'}</>
+            ) : (
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                onBlur={handleTitleBlur}
+                onKeyDown={handleTitleKeyDown}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{
+                  flex: 1,
+                  border: '1px solid #8b5cf6',
+                  borderRadius: '4px',
+                  padding: '4px 8px',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  outline: 'none',
+                  backgroundColor: 'white'
+                }}
+              />
+            )}
           </div>
           {isSelected && (
             <div style={{ display: 'flex', gap: '4px' }}>
@@ -706,15 +840,51 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
           </div>
         )}
         {sizeConfig.showContent && (
-          <div style={{ 
-            fontSize: '14px', 
-            color: '#6b7280',
-            lineHeight: '1.5'
-          }}>
-            {(() => {
-              if (!memo.blocks || memo.blocks.length === 0) {
-                return memo.content || '텍스트를 입력하세요...';
-              }
+          <div
+            onDoubleClick={handleAllBlocksDoubleClick}
+            style={{
+              fontSize: '14px',
+              color: '#6b7280',
+              lineHeight: '1.5',
+              cursor: isSelected ? 'text' : 'default'
+            }}
+          >
+            {isEditingAllBlocks ? (
+              <textarea
+                ref={allBlocksInputRef}
+                value={editedAllContent}
+                onChange={(e) => {
+                  setEditedAllContent(e.target.value);
+                  // 높이 자동 조절
+                  if (allBlocksInputRef.current) {
+                    allBlocksInputRef.current.style.height = 'auto';
+                    allBlocksInputRef.current.style.height = allBlocksInputRef.current.scrollHeight + 'px';
+                  }
+                }}
+                onBlur={handleAllBlocksBlur}
+                onKeyDown={handleAllBlocksKeyDown}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{
+                  width: '100%',
+                  border: '1px solid #8b5cf6',
+                  borderRadius: '4px',
+                  padding: '8px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  resize: 'none',
+                  fontFamily: 'inherit',
+                  backgroundColor: 'white',
+                  lineHeight: '1.5',
+                  color: '#6b7280',
+                  overflow: 'hidden'
+                }}
+              />
+            ) : (
+              <>
+                {(() => {
+                  if (!memo.blocks || memo.blocks.length === 0) {
+                    return memo.content || '텍스트를 입력하세요...';
+                  }
 
               // 기본 상태(모든 필터 활성화) 확인
               const allLevels: ImportanceLevel[] = ['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'];
@@ -783,11 +953,14 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
 
                       // 실제 내용 렌더링
                       renderedBlocks.push(
-                        <div key={block.id} style={{
-                          whiteSpace: 'pre-wrap',
-                          wordWrap: 'break-word',
-                          overflowWrap: 'break-word'
-                        }}>
+                        <div
+                          key={block.id}
+                          style={{
+                            whiteSpace: 'pre-wrap',
+                            wordWrap: 'break-word',
+                            overflowWrap: 'break-word'
+                          }}
+                        >
                           {isDefaultFilterState ? (
                             // 기본 상태에서는 하이라이팅 적용된 원본 표시
                             renderHighlightedText(displayContent, textBlock.importanceRanges, undefined, true)
@@ -920,7 +1093,9 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
               }
 
               return renderedBlocks.length > 0 ? renderedBlocks : '텍스트를 입력하세요...';
-            })()}
+                })()}
+              </>
+            )}
           </div>
         )}
       </div>

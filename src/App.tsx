@@ -421,134 +421,6 @@ const App: React.FC = () => {
     clearCollisionDirections(); // 충돌 방향 맵 초기화
   }, []);
 
-  // 카테고리-카테고리 드롭 감지 (일반 드롭)
-  const handleCategoryOnCategoryDrop = React.useCallback((draggedCategory: CategoryBlock, currentPage: Page) => {
-    const categoryWidth = draggedCategory.size?.width || 200;
-    const categoryHeight = draggedCategory.size?.height || 80;
-    const draggedBounds = {
-      left: draggedCategory.position.x,
-      top: draggedCategory.position.y,
-      right: draggedCategory.position.x + categoryWidth,
-      bottom: draggedCategory.position.y + categoryHeight
-    };
-
-    // 겹침 감지 함수
-    const isOverlapping = (bounds1: any, bounds2: any, margin = 20) => {
-      return !(bounds1.right + margin < bounds2.left ||
-               bounds1.left - margin > bounds2.right ||
-               bounds1.bottom + margin < bounds2.top ||
-               bounds1.top - margin > bounds2.bottom);
-    };
-
-    // 드래그 중인 카테고리와 그 모든 하위 카테고리들을 제외한 페이지 데이터 생성
-    const getAllDescendantIds = (categoryId: string): string[] => {
-      const descendants: string[] = [categoryId];
-      const children = (currentPage.categories || []).filter(c => c.parentId === categoryId);
-      children.forEach(child => {
-        descendants.push(...getAllDescendantIds(child.id));
-      });
-      return descendants;
-    };
-
-    const excludedIds = getAllDescendantIds(draggedCategory.id);
-    const pageWithoutDraggingCategory = {
-      ...currentPage,
-      categories: (currentPage.categories || []).filter(c => !excludedIds.includes(c.id)),
-      memos: currentPage.memos.filter(m => !excludedIds.includes(m.parentId || ''))
-    };
-
-    // 드롭 대상 카테고리 찾기 (카테고리 블록 + 영역)
-    const overlappingCategories = currentPage.categories?.filter(category => {
-      // 자기 자신과 하위 카테고리는 제외
-      if (excludedIds.includes(category.id)) return false;
-
-      // 1. 카테고리 블록과의 겹침 체크
-      const targetWidth = category.size?.width || 200;
-      const targetHeight = category.size?.height || 80;
-      const targetBounds = {
-        left: category.position.x,
-        top: category.position.y,
-        right: category.position.x + targetWidth,
-        bottom: category.position.y + targetHeight
-      };
-
-      if (isOverlapping(draggedBounds, targetBounds, 20)) {
-        return true;
-      }
-
-      // 2. 카테고리 영역과의 겹침 체크
-      if (category.isExpanded) {
-        const categoryArea = calculateCategoryArea(category, pageWithoutDraggingCategory);
-        if (categoryArea) {
-          const areaBounds = {
-            left: categoryArea.x,
-            top: categoryArea.y,
-            right: categoryArea.x + categoryArea.width,
-            bottom: categoryArea.y + categoryArea.height
-          };
-          if (isOverlapping(draggedBounds, areaBounds, 20)) {
-            return true;
-          }
-        }
-      }
-
-      return false;
-    }) || [];
-
-    // 겹치는 카테고리 중에서 가장 깊은 레벨(가장 하위) 카테고리 선택
-    let targetCategory: CategoryBlock | null = null;
-
-    if (overlappingCategories.length > 0) {
-      // 각 카테고리의 깊이를 계산
-      const categoriesWithDepth = overlappingCategories.map(category => {
-        let depth = 0;
-        let checkParent = category.parentId;
-        while (checkParent) {
-          depth++;
-          const parentCat = currentPage.categories?.find(c => c.id === checkParent);
-          checkParent = parentCat?.parentId;
-        }
-        return { category, depth };
-      });
-
-      // 깊이가 가장 큰 카테고리 선택 (같은 깊이면 첫 번째)
-      const deepest = categoriesWithDepth.reduce((max, item) =>
-        item.depth > max.depth ? item : max
-      );
-      targetCategory = deepest.category;
-    }
-
-    if (targetCategory) {
-      // 카테고리를 다른 카테고리에 드롭
-      const targetCategoryId = targetCategory.id; // null 체크 후 변수에 저장
-
-      // 순환 참조 체크
-      if (!canAddCategoryAsChild(targetCategoryId, draggedCategory.id, currentPage.categories || [])) {
-        return;
-      }
-
-      // 이미 같은 부모의 자식이면 무시
-      if (draggedCategory.parentId === targetCategoryId) {
-        return;
-      }
-
-      // 카테고리를 하위로 추가
-      setPages(prev => prev.map(page => {
-        if (page.id !== currentPageId) return page;
-
-        const updatedCategories = addCategoryToParent(
-          draggedCategory.id,
-          targetCategoryId,
-          page.categories || []
-        );
-
-        return {
-          ...page,
-          categories: updatedCategories
-        };
-      }));
-    }
-  }, [currentPageId]);
 
   // 카테고리 드래그 종료 시 드롭 감지 및 캐시 제거
   const handleCategoryPositionDragEnd = (categoryId: string, finalPosition: { x: number; y: number }) => {
@@ -560,16 +432,6 @@ const App: React.FC = () => {
       previousFramePosition.current.delete(categoryId);
       return;
     }
-
-    const draggedCategory = currentPage.categories.find(c => c.id === categoryId);
-    if (!draggedCategory) {
-      clearCategoryCache(categoryId);
-      previousFramePosition.current.delete(categoryId);
-      return;
-    }
-
-    // 최종 위치로 카테고리 위치 업데이트 (stale state 문제 해결)
-    const categoryWithFinalPosition = { ...draggedCategory, position: finalPosition };
 
     // 드랍 시점의 카테고리 및 하위 메모 위치 로그
     const childMemos = currentPage.memos.filter(m => m.parentId === categoryId);
@@ -587,10 +449,7 @@ const App: React.FC = () => {
     }
 
     // Shift 드래그는 별도 처리 (이미 handleShiftDropCategory에서 처리됨)
-    if (!isShiftPressed) {
-      // 일반 드롭: 카테고리 블록끼리 겹침 감지
-      handleCategoryOnCategoryDrop(categoryWithFinalPosition, currentPage);
-    }
+    // 일반 드래그로는 종속 관계를 변경하지 않음 (위치만 밀어냄)
 
     // 드래그 종료 후 캐시 제거 - 메모 위치에 따라 자연스럽게 크기 조정
     // 다중 선택된 모든 카테고리의 캐시도 함께 제거
@@ -694,12 +553,14 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Shift') {
+        console.log('[App] Shift 키 눌림');
         setIsShiftPressed(true);
       }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'Shift') {
+        console.log('[App] Shift 키 떼어짐');
         setIsShiftPressed(false);
       }
     };
@@ -4049,13 +3910,39 @@ const App: React.FC = () => {
   };
 
   const updateMemoDisplaySize = (memoId: string, displaySize: MemoDisplaySize) => {
-    setPages(prev => prev.map(page => 
-      page.id === currentPageId 
+    setPages(prev => prev.map(page =>
+      page.id === currentPageId
         ? {
             ...page,
-            memos: page.memos.map(memo => 
-              memo.id === memoId 
+            memos: page.memos.map(memo =>
+              memo.id === memoId
                 ? { ...memo, displaySize }
+                : memo
+            )
+          }
+        : page
+    ));
+  };
+
+  const updateMemoTitle = (memoId: string, title: string) => {
+    updateMemo(memoId, { title });
+  };
+
+  const updateMemoBlockContent = (memoId: string, blockId: string, content: string) => {
+    setPages(prev => prev.map(page =>
+      page.id === currentPageId
+        ? {
+            ...page,
+            memos: page.memos.map(memo =>
+              memo.id === memoId && memo.blocks
+                ? {
+                    ...memo,
+                    blocks: memo.blocks.map(block =>
+                      block.id === blockId && block.type === 'text'
+                        ? { ...block, content }
+                        : block
+                    )
+                  }
                 : memo
             )
           }
@@ -4323,6 +4210,8 @@ const App: React.FC = () => {
         onMemoSizeChange={updateMemoSize}
         onCategorySizeChange={updateCategorySize}
         onMemoDisplaySizeChange={updateMemoDisplaySize}
+        onMemoTitleUpdate={updateMemoTitle}
+        onMemoBlockUpdate={updateMemoBlockContent}
         onCategoryUpdate={updateCategory}
         onCategoryToggleExpanded={toggleCategoryExpanded}
         onMoveToCategory={moveToCategory}

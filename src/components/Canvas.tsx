@@ -32,6 +32,8 @@ interface CanvasProps {
   onDetectCategoryOnDrop: (memoId: string, position: { x: number; y: number }) => void; // 드래그 완료 시 카테고리 감지
   onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }) => void; // 카테고리 드래그 완료 시 처리
   onMemoDisplaySizeChange?: (memoId: string, size: MemoDisplaySize) => void;
+  onMemoTitleUpdate?: (memoId: string, title: string) => void;
+  onMemoBlockUpdate?: (memoId: string, blockId: string, content: string) => void;
   isConnecting: boolean;
   isDisconnectMode: boolean;
   connectingFromId: string | null;
@@ -104,6 +106,8 @@ const Canvas: React.FC<CanvasProps> = ({
   onDetectCategoryOnDrop,
   onDetectCategoryDropForCategory,
   onMemoDisplaySizeChange,
+  onMemoTitleUpdate,
+  onMemoBlockUpdate,
   isConnecting,
   isDisconnectMode,
   connectingFromId,
@@ -1366,6 +1370,8 @@ const Canvas: React.FC<CanvasProps> = ({
             onPositionChange={onMemoPositionChange}
             onSizeChange={onMemoSizeChange}
             onDisplaySizeChange={onMemoDisplaySizeChange}
+            onTitleUpdate={onMemoTitleUpdate}
+            onBlockUpdate={onMemoBlockUpdate}
             onDetectCategoryOnDrop={onDetectCategoryOnDrop}
             isConnecting={isConnecting}
             connectingFromId={connectingFromId}
@@ -2086,6 +2092,8 @@ const Canvas: React.FC<CanvasProps> = ({
             onPositionChange={onMemoPositionChange}
             onSizeChange={onMemoSizeChange}
             onDisplaySizeChange={onMemoDisplaySizeChange}
+            onTitleUpdate={onMemoTitleUpdate}
+            onBlockUpdate={onMemoBlockUpdate}
             onDetectCategoryOnDrop={onDetectCategoryOnDrop}
             isConnecting={isConnecting}
             connectingFromId={connectingFromId}
