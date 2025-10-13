@@ -328,6 +328,22 @@ const saveToStorage = (key: string, data: any): void => {
 };
 
 const App: React.FC = () => {
+  // 브라우저 기본 Ctrl/Command + 휠 줌 차단 (전역)
+  useEffect(() => {
+    const preventBrowserZoom = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+      }
+    };
+
+    // document 전체에 리스너 추가 (passive: false로 preventDefault 가능하게)
+    document.addEventListener('wheel', preventBrowserZoom, { passive: false });
+
+    return () => {
+      document.removeEventListener('wheel', preventBrowserZoom);
+    };
+  }, []);
+
   // 한 번만 실행되는 localStorage 마이그레이션 (임시)
   useEffect(() => {
     const migrationDone = localStorage.getItem('categories-migration-done');
@@ -1460,10 +1476,11 @@ const App: React.FC = () => {
   const focusOnMemo = (memoId: string) => {
     const memo = currentPage?.memos.find(m => m.id === memoId);
     if (memo) {
-      // Canvas offset 업데이트는 Canvas 컴포넌트에서 처리하도록 함
-      // 여기서는 단일 선택으로 변경
+      // 메모를 선택하고 화면을 해당 메모로 이동
       setSelectedMemoId(memoId);
       setSelectedMemoIds([]);
+      // 화면을 해당 메모로 이동
+      handleNavigateToMemo(memoId);
     }
   };
 

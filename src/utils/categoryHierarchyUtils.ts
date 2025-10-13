@@ -304,3 +304,59 @@ export function getDirectChildCategories(
 
   return (page.categories || []).filter(cat => category.children.includes(cat.id));
 }
+
+/**
+ * 메모나 카테고리가 접힌(collapsed) 카테고리 안에 있는지 확인
+ * 부모 카테고리 체인을 따라가며 isExpanded가 false인 카테고리가 있으면 true 반환
+ */
+export function isInsideCollapsedCategory(
+  itemId: string,
+  page: Page
+): boolean {
+  // 메모인지 카테고리인지 확인
+  const memo = page.memos.find(m => m.id === itemId);
+  const category = page.categories?.find(c => c.id === itemId);
+
+  if (!memo && !category) {
+    return false;
+  }
+
+  // 부모 카테고리 ID 찾기
+  let parentId: string | undefined;
+
+  if (memo) {
+    // 메모의 부모는 categories에서 children에 이 메모 ID가 포함된 카테고리
+    const parentCategory = page.categories?.find(c => c.children.includes(itemId));
+    parentId = parentCategory?.id;
+  } else if (category) {
+    // 카테고리의 부모는 parentId 필드
+    parentId = category.parentId;
+  }
+
+  // 부모 카테고리 체인을 따라 올라가며 접힌 카테고리가 있는지 확인
+  const visited = new Set<string>();
+
+  while (parentId) {
+    if (visited.has(parentId)) {
+      // 순환 참조 방지
+      break;
+    }
+    visited.add(parentId);
+
+    const parentCategory = page.categories?.find(c => c.id === parentId);
+
+    if (!parentCategory) {
+      break;
+    }
+
+    // 부모 카테고리가 접혀있으면 true 반환
+    if (!parentCategory.isExpanded) {
+      return true;
+    }
+
+    // 다음 부모로 이동
+    parentId = parentCategory.parentId;
+  }
+
+  return false;
+}

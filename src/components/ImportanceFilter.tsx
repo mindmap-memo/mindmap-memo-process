@@ -47,37 +47,109 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
   showGeneralContent,
   onToggleGeneralContent
 }) => {
+  const [isCollapsed, setIsCollapsed] = React.useState(false);
+  const [position, setPosition] = React.useState({ x: 20, y: 70 });
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [dragStart, setDragStart] = React.useState({ x: 0, y: 0 });
+
   const importanceLevels: Exclude<ImportanceLevel, 'none'>[] = [
     'critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'
   ];
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // 체크박스나 버튼 클릭 시에는 드래그하지 않음
+    if ((e.target as HTMLElement).tagName === 'INPUT' ||
+        (e.target as HTMLElement).tagName === 'BUTTON') {
+      return;
+    }
+
+    setIsDragging(true);
+    setDragStart({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y
+    });
+    e.preventDefault();
+  };
+
+  React.useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging) {
+        setPosition({
+          x: e.clientX - dragStart.x,
+          y: e.clientY - dragStart.y
+        });
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, dragStart]);
+
   return (
-    <div style={{
-      position: 'absolute',
-      top: '70px',
-      left: '20px',
-      backgroundColor: 'white',
-      border: '1px solid #e5e7eb',
-      borderRadius: '8px',
-      padding: '12px',
-      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-      zIndex: 1000,
-      minWidth: '200px'
-    }}>
+    <div
+      onMouseDown={handleMouseDown}
+      style={{
+        position: 'absolute',
+        top: `${position.y}px`,
+        left: `${position.x}px`,
+        backgroundColor: 'white',
+        border: '1px solid #e5e7eb',
+        borderRadius: '8px',
+        padding: '12px',
+        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+        zIndex: 1000,
+        minWidth: isCollapsed ? 'auto' : '200px',
+        cursor: isDragging ? 'grabbing' : 'grab',
+        userSelect: 'none'
+      }}
+    >
       <div style={{
         fontSize: '14px',
         fontWeight: '600',
-        marginBottom: '8px',
-        color: '#374151'
+        marginBottom: isCollapsed ? '0' : '8px',
+        color: '#374151',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px'
       }}>
-        중요도 필터
+        <span>중요도 필터</span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsCollapsed(!isCollapsed);
+          }}
+          style={{
+            padding: '2px 6px',
+            fontSize: '12px',
+            backgroundColor: '#f3f4f6',
+            border: '1px solid #d1d5db',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            color: '#374151'
+          }}
+        >
+          {isCollapsed ? '▼' : '▲'}
+        </button>
       </div>
 
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '4px'
-      }}>
+      {!isCollapsed && (
+        <>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px'
+          }}>
         {importanceLevels.map(level => {
           const isActive = activeFilters.has(level);
           const style = getImportanceStyle(level);
@@ -235,6 +307,8 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
           전체 해제
         </button>
       </div>
+        </>
+      )}
     </div>
   );
 };

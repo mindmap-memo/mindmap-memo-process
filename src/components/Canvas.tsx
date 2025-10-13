@@ -1,6 +1,7 @@
 import React from 'react';
 import { Page, MemoDisplaySize, ImportanceLevel, CategoryBlock, MemoBlock as MemoBlockType, isMemoBlock, isCategoryBlock } from '../types';
 import { calculateCategoryArea } from '../utils/categoryAreaUtils';
+import { isInsideCollapsedCategory } from '../utils/categoryHierarchyUtils';
 import MemoBlock from './MemoBlock';
 import CategoryBlockComponent from './CategoryBlock';
 import ImportanceFilter from './ImportanceFilter';
@@ -180,6 +181,7 @@ const Canvas: React.FC<CanvasProps> = ({
       shiftDragAreaCache.current = {};
     }
   }, [isDraggingMemo, isShiftPressed, shiftDragAreaCache]);
+
 
   // 드래그 중인 카테고리의 영역 캐시 (드래그 중에 크기가 변하지 않도록)
   const [draggedCategoryAreas, setDraggedCategoryAreas] = React.useState<{[categoryId: string]: {area: any, originalPosition: {x: number, y: number}}}>({});
@@ -390,9 +392,9 @@ const Canvas: React.FC<CanvasProps> = ({
 
   const renderConnectionLines = () => {
     if (!currentPage) return null;
-    
+
     const lines: any[] = [];
-    
+
     // 기존 연결선들 (메모-메모)
     currentPage.memos.forEach(memo => {
       memo.connections.forEach(connId => {
@@ -401,6 +403,12 @@ const Canvas: React.FC<CanvasProps> = ({
 
         // 메모-메모 연결만 여기서 처리 (메모-카테고리는 카테고리 섹션에서 처리)
         if (!connectedMemo || memo.id >= connId) return;
+
+        // 메모가 접힌 카테고리 안에 있으면 연결선 숨기기
+        if (isInsideCollapsedCategory(memo.id, currentPage) ||
+            isInsideCollapsedCategory(connectedMemo.id, currentPage)) {
+          return;
+        }
         
         // 최신 크기 정보로 연결점 계산
         const fromPoints = getConnectionPoints(memo);
@@ -494,6 +502,12 @@ const Canvas: React.FC<CanvasProps> = ({
 
         if (!connected) return; // 연결 대상이 없으면 무시
         if (category.id >= connId) return; // 중복 연결선 방지 (같은 연결을 두 번 그리지 않음)
+
+        // 카테고리나 연결 대상이 접힌 카테고리 안에 있으면 연결선 숨기기
+        if (isInsideCollapsedCategory(category.id, currentPage) ||
+            isInsideCollapsedCategory(connId, currentPage)) {
+          return;
+        }
 
         // getConnectionPoints 사용 (영역이 있으면 영역 기준으로 계산됨)
         const fromPoints = getConnectionPoints(category);
@@ -1622,9 +1636,8 @@ const Canvas: React.FC<CanvasProps> = ({
   };
 
   const handleWheel = (e: React.WheelEvent) => {
-
-    // Alt + 휠 또는 줌 도구 선택 시 확대/축소
-    if (e.altKey || currentTool === 'zoom') {
+    // Alt + 휠, Ctrl + 휠 (Windows/Linux), Command + 휠 (macOS), 또는 줌 도구 선택 시 확대/축소
+    if (e.altKey || e.ctrlKey || e.metaKey || currentTool === 'zoom') {
       e.preventDefault();
       e.stopPropagation();
 
@@ -2008,7 +2021,8 @@ const Canvas: React.FC<CanvasProps> = ({
         backgroundColor: '#ffffff',
         cursor: isPanning ? 'grabbing' :
                 (isSpacePressed || currentTool === 'pan') ? 'grab' :
-                currentTool === 'zoom' ? 'crosshair' : 'default'
+                currentTool === 'zoom' ? 'crosshair' : 'default',
+        touchAction: 'none'
       }}
       onContextMenu={(e) => {
         // 캔버스 배경에서 우클릭 방지

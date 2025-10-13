@@ -80,6 +80,13 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const [showImportanceSubmenu, setShowImportanceSubmenu] = React.useState(false);
   const [submenuPosition, setSubmenuPosition] = React.useState<'right' | 'left'>('right');
 
+  // 메모가 변경될 때마다 연결된 메모를 펼침
+  React.useEffect(() => {
+    if (selectedMemo) {
+      setShowConnectedMemos(true);
+    }
+  }, [selectedMemo?.id]);
+
   // 블록 드래그 앤 드롭 상태
   const [isDraggingBlock, setIsDraggingBlock] = React.useState(false);
   const [draggedBlockId, setDraggedBlockId] = React.useState<string | null>(null);
