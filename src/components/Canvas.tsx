@@ -798,13 +798,8 @@ const Canvas: React.FC<CanvasProps> = ({
     const childCategories = currentPage?.categories?.filter(cat => cat.parentId === category.id) || [];
     const hasChildren = childMemos.length > 0 || childCategories.length > 0;
 
-    // 확장 가능한 영역 배경 (메모-카테고리 변환용)
-    // 하위 카테고리인 경우: 자식이 없어도 항상 영역 표시 (부모 안에서 태그형 영역으로)
-    // 최상위 카테고리인 경우: 자식이 있고 펼쳐졌을 때만 영역 표시
-    const isChildCategory = !!category.parentId;
-    const shouldShowArea = isChildCategory
-      ? category.isExpanded  // 하위 카테고리는 펼쳐졌을 때만
-      : (hasChildren && category.isExpanded); // 최상위는 자식 있고 펼쳐졌을 때
+    // 확장 가능한 영역 배경 - 항상 표시 (isExpanded일 때)
+    const shouldShowArea = category.isExpanded;
 
     if (area && shouldShowArea) {
       // 렌더링된 영역 정보 저장 (연결선 계산용)
@@ -919,21 +914,21 @@ const Canvas: React.FC<CanvasProps> = ({
               하위 요소 빼기
             </div>
           )}
-          {!isShiftDragTarget && !isParentBeingLeftBehind && (
+          {!isShiftDragTarget && !isParentBeingLeftBehind && !hasChildren && (
             <div style={{
-              position: 'absolute',
-              top: '40px',
-              left: '10px',
-              fontSize: '11px',
-              color: 'rgba(139, 92, 246, 0.4)',
-              fontWeight: '400',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              height: '100%',
+              fontSize: '16px',
+              color: 'rgba(139, 92, 246, 0.5)',
+              fontWeight: '600',
               pointerEvents: 'none',
-              maxWidth: `${area.width - 20}px`,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
+              textAlign: 'center',
+              padding: '20px'
             }}>
-              SHIFT + 드래그로 메모나 카테고리를 다른 카테고리 영역에 종속, 제거하세요
+              SHIFT + 드래그로 메모나 카테고리를<br/>다른 카테고리 영역에 종속, 제거하세요
             </div>
           )}
 
@@ -1099,9 +1094,8 @@ const Canvas: React.FC<CanvasProps> = ({
     }
 
 
-    // 카테고리 이름 라벨은 항상 표시 (접어도 보임) - 마우스 드래그 사용
-    // 하위 카테고리는 항상 라벨 표시, 최상위 카테고리는 자식 있을 때만
-    if (hasChildren || isChildCategory) {
+    // 카테고리 이름 라벨은 항상 표시
+    if (true) {
       // 라벨 위치는 영역의 좌상단에 고정
       const labelX = area?.x || category.position.x;
       const labelY = area?.y || category.position.y;
@@ -1403,52 +1397,8 @@ const Canvas: React.FC<CanvasProps> = ({
     // 하위 아이템 여부 계산
     const hasChildren = childMemos.length > 0 || childCategories.length > 0;
 
-    return (
-      <>
-        {/* 하위 아이템이 없을 때만 CategoryBlock 렌더링, 있으면 라벨만 표시 */}
-        {!hasChildren && (
-          <CategoryBlockComponent
-            key={category.id}
-            category={category}
-            hasChildren={hasChildren}
-            isSelected={selectedCategoryId === category.id || selectedCategoryIds.includes(category.id)}
-            isConnecting={isConnecting}
-            isDisconnectMode={isDisconnectMode}
-            connectingFromId={connectingFromId}
-            onUpdate={onCategoryUpdate}
-            onDelete={onDeleteCategory}
-            onToggleExpanded={onCategoryToggleExpanded}
-            onClick={onCategorySelect}
-            onStartConnection={onStartConnection}
-            onConnectItems={onConnectMemos}
-            onRemoveConnection={onRemoveConnection}
-            onPositionChange={(categoryId, position) => {
-              // 첫 번째 위치 변경 시 드래그 시작으로 간주하고 영역 캐시
-              if (!draggedCategoryAreas[categoryId]) {
-                handleCategoryPositionStart(categoryId);
-              }
-              onCategoryPositionChange(categoryId, position);
-            }}
-            onPositionDragEnd={handleCategoryPositionEnd}
-            onSizeChange={onCategorySizeChange}
-            onMoveToCategory={onMoveToCategory}
-            canvasScale={canvasScale}
-            canvasOffset={canvasOffset}
-            onDragStart={handleCategoryDragStart}
-            onDragEnd={handleCategoryDragEnd}
-            onDrop={(e) => handleDropOnCategory(e, category.id)}
-            onDragOver={handleCategoryDragOver}
-            isMemoBeingDragged={isDraggingMemo}
-            onAddQuickNav={onAddQuickNav}
-            isQuickNavExists={isQuickNavExists}
-            isDragTarget={dragTargetCategoryId === category.id}
-            isCategoryBeingDragged={isDraggingCategory || isDraggingCategoryArea === category.id}
-          >
-            {childrenElements}
-          </CategoryBlockComponent>
-        )}
-      </>
-    );
+    // 카테고리 블록은 더 이상 렌더링하지 않음 (영역과 라벨만 표시)
+    return null;
   };
 
   // 카테고리 위치 변경 시작 (드래그 시작)

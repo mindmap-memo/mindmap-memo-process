@@ -1890,33 +1890,38 @@ const App: React.FC = () => {
     if (position) {
       const currentPage = pages.find(p => p.id === currentPageId);
       if (currentPage?.categories) {
-        const categoryWidth = 200;
-        const categoryHeight = 60;
+        // 새 카테고리의 실제 영역 크기 (최소 크기)
+        const newCategoryWidth = 400;
+        const newCategoryHeight = 250;
         let isOverlapping = true;
         let adjustedY = newPosition.y;
+        const moveStep = 300; // 충분히 밀어내기 위한 이동 거리
 
-        while (isOverlapping && adjustedY > -1000) {
+        while (isOverlapping && adjustedY > -2000) {
           isOverlapping = false;
 
           for (const category of currentPage.categories) {
             if (category.isExpanded) {
               const area = calculateCategoryArea(category, currentPage);
               if (area) {
-                // 카테고리와 영역이 겹치는지 확인
-                const catLeft = newPosition.x;
-                const catRight = newPosition.x + categoryWidth;
-                const catTop = adjustedY;
-                const catBottom = adjustedY + categoryHeight;
+                // 새 카테고리 영역과 기존 영역이 겹치는지 확인
+                const newCatLeft = newPosition.x;
+                const newCatRight = newPosition.x + newCategoryWidth;
+                const newCatTop = adjustedY;
+                const newCatBottom = adjustedY + newCategoryHeight;
 
                 const areaLeft = area.x;
                 const areaRight = area.x + area.width;
                 const areaTop = area.y;
                 const areaBottom = area.y + area.height;
 
-                if (!(catRight < areaLeft || catLeft > areaRight || catBottom < areaTop || catTop > areaBottom)) {
-                  // 겹침 - 위로 이동
+                // 겹침 여유 공간 추가 (20px 간격)
+                const margin = 20;
+                if (!(newCatRight + margin < areaLeft || newCatLeft - margin > areaRight ||
+                      newCatBottom + margin < areaTop || newCatTop - margin > areaBottom)) {
+                  // 겹침 - 위로 충분히 이동
                   isOverlapping = true;
-                  adjustedY -= 50;
+                  adjustedY -= moveStep;
                   break;
                 }
               }

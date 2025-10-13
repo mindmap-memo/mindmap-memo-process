@@ -77,11 +77,19 @@ export function calculateCategoryArea(
 
   // 여백 추가 (적절한 간격)
   const padding = 20;
+
+  // 최소 크기 보장 (빈 카테고리도 충분한 크기로)
+  const minWidth = 400;
+  const minHeight = 250;
+
+  const calculatedWidth = maxX - minX + padding * 2;
+  const calculatedHeight = maxY - minY + padding * 2;
+
   const finalArea = {
     x: minX - padding,
     y: minY - padding,
-    width: maxX - minX + padding * 2,
-    height: maxY - minY + padding * 2
+    width: Math.max(calculatedWidth, minWidth),
+    height: Math.max(calculatedHeight, minHeight)
   };
 
   return finalArea;

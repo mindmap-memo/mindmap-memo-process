@@ -82,14 +82,8 @@ export function resolveUnifiedCollisions(
 
       // 같은 부모를 가진 카테고리만 (형제 카테고리)
       if (categoryParent === movingParent) {
-        // expanded되고 자식이 있는 카테고리만 영역으로 추가 (블록은 제외)
+        // expanded된 카테고리는 영역으로 추가 (자식 유무 관계없이)
         if (!category.isExpanded) return;
-
-        // 자식이 있는지 확인
-        const hasChildren = updatedMemos.some(m => m.parentId === category.id) ||
-                           updatedCategories.some(c => c.parentId === category.id);
-
-        if (!hasChildren) return; // 자식이 없으면 블록이므로 충돌 대상에서 제외
 
         const area = calculateCategoryArea(category, { ...page, memos: updatedMemos, categories: updatedCategories });
         if (area) {
