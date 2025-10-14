@@ -8,6 +8,11 @@ import { useAppState } from './hooks/useAppState';
 import { usePanelState } from './hooks/usePanelState';
 import { useDragState } from './hooks/useDragState';
 import { useSelectionHandlers } from './hooks/useSelectionHandlers';
+import { useMemoHandlers } from './hooks/useMemoHandlers';
+import { useConnectionHandlers } from './hooks/useConnectionHandlers';
+import { useTutorialHandlers } from './hooks/useTutorialHandlers';
+import { useQuickNavHandlers } from './hooks/useQuickNavHandlers';
+import { usePanelHandlers } from './hooks/usePanelHandlers';
 import { calculateCategoryArea, CategoryArea, centerCanvasOnPosition } from './utils/categoryAreaUtils';
 import { resolveUnifiedCollisions } from './utils/collisionUtils';
 import {
@@ -150,6 +155,97 @@ const App: React.FC = () => {
     focusOnMemo
   } = selectionHandlers;
 
+  // ===== Canvas History 관리 =====
+  const { saveCanvasState, undoCanvasAction, redoCanvasAction, canUndo, canRedo } = useCanvasHistory({
+    pages,
+    setPages,
+    currentPageId
+  });
+
+  // ===== 메모 핸들러 =====
+  const memoHandlers = useMemoHandlers({
+    pages,
+    setPages,
+    currentPageId,
+    selectedMemoId,
+    setSelectedMemoId,
+    selectedMemoIds,
+    setSelectedMemoIds,
+    quickNavItems,
+    setQuickNavItems,
+    saveCanvasState
+  });
+
+  const {
+    addMemoBlock,
+    updateMemo,
+    updateMemoSize,
+    updateMemoDisplaySize,
+    updateMemoTitle,
+    updateMemoBlockContent,
+    deleteMemoBlock,
+    deleteMemoById
+  } = memoHandlers;
+
+  // ===== Connection 핸들러 =====
+  const connectionHandlers = useConnectionHandlers({
+    pages,
+    setPages,
+    currentPageId,
+    isDisconnectMode,
+    setIsDisconnectMode,
+    setIsConnecting,
+    setConnectingFromId,
+    setConnectingFromDirection,
+    setDragLineEnd: appState.setDragLineEnd,
+    saveCanvasState
+  });
+
+  const {
+    disconnectMemo,
+    connectMemos,
+    removeConnection,
+    startConnection,
+    updateDragLine,
+    cancelConnection
+  } = connectionHandlers;
+
+  // ===== Quick Navigation 핸들러 =====
+  const quickNavHandlers = useQuickNavHandlers({
+    pages,
+    currentPageId,
+    quickNavItems,
+    setQuickNavItems,
+    setCurrentPageId,
+    setCanvasOffset,
+    setCanvasScale
+  });
+
+  const {
+    handleNavigateToMemo,
+    handleNavigateToCategory,
+    addQuickNavItem,
+    deleteQuickNavItem,
+    executeQuickNav,
+    isQuickNavExists
+  } = quickNavHandlers;
+
+  // ===== Panel 핸들러 =====
+  const panelHandlers = usePanelHandlers({
+    leftPanelWidth,
+    setLeftPanelWidth,
+    rightPanelWidth,
+    setRightPanelWidth,
+    isRightPanelFullscreen: panelState.isRightPanelFullscreen,
+    setIsRightPanelFullscreen: panelState.setIsRightPanelFullscreen
+  });
+
+  const {
+    handleLeftPanelResize,
+    handleRightPanelResize,
+    toggleRightPanelFullscreen
+  } = panelHandlers;
+
   // 튜토리얼 상태
   const [tutorialState, setTutorialState] = useState<TutorialState>(() => {
     const completed = localStorage.getItem('tutorial-completed') === 'true';
@@ -169,6 +265,36 @@ const App: React.FC = () => {
   const initialCanvasScale = React.useRef(canvasScale);
   const initialMemoPositions = React.useRef<Map<string, { x: number; y: number }>>(new Map());
   const initialMemoCount = React.useRef(0);
+
+  // ===== Tutorial 핸들러 =====
+  const tutorialHandlers = useTutorialHandlers({
+    tutorialState,
+    setTutorialState,
+    canvasPanned,
+    setCanvasPanned,
+    canvasZoomed,
+    setCanvasZoomed,
+    memoCreated,
+    setMemoCreated,
+    memoDragged,
+    setMemoDragged,
+    initialCanvasOffset,
+    initialCanvasScale,
+    initialMemoPositions,
+    initialMemoCount,
+    canvasOffset,
+    canvasScale,
+    pages,
+    currentPageId
+  });
+
+  const {
+    handleStartTutorial,
+    handleTutorialNext,
+    handleTutorialSkip,
+    handleTutorialComplete,
+    canProceedTutorial
+  } = tutorialHandlers;
 
   // 캔버스 이동 감지 (2단계 - canvas-pan)
   React.useEffect(() => {
@@ -293,15 +419,6 @@ const App: React.FC = () => {
     shiftDragAreaCache.current = {}; // Shift 드래그 캐시도 클리어
   };
 
-  // Canvas history for undo/redo functionality - using custom hook
-  const {
-    canvasHistory,
-    canUndo,
-    canRedo,
-    saveCanvasState,
-    undoCanvasAction,
-    redoCanvasAction
-  } = useCanvasHistory({ pages, currentPageId, setPages });
   const [dragLineEnd, setDragLineEnd] = useState<{ x: number; y: number } | null>(null);
 
   // 중요도 필터 상태
@@ -508,10 +625,6 @@ const App: React.FC = () => {
     ? [selectedCategoryId, ...selectedCategoryIds.filter(id => id !== selectedCategoryId)]
     : selectedCategoryIds;
   const selectedCategories = currentPage?.categories?.filter(category => allSelectedCategoryIds.includes(category.id)) || [];
-
-  const toggleRightPanelFullscreen = () => {
-    setIsRightPanelFullscreen(!isRightPanelFullscreen);
-  };
 
   const addPage = () => {
     const pageId = Date.now().toString();
@@ -1109,100 +1222,6 @@ const App: React.FC = () => {
 
 
   // calculateCategoryArea는 이제 utils/categoryAreaUtils.ts에서 import
-
-  const addMemoBlock = (position?: { x: number; y: number }) => {
-    const originalPosition = position || { x: 300, y: 200 };
-    let newPosition = { ...originalPosition };
-
-    // 영역과 겹치지 않는 위치 찾기
-    if (position) {
-      const currentPage = pages.find(p => p.id === currentPageId);
-      if (currentPage?.categories) {
-        const memoWidth = 300;
-        const memoHeight = 200;
-        let isOverlapping = true;
-        let adjustedY = newPosition.y;
-
-        while (isOverlapping && adjustedY > -1000) {
-          isOverlapping = false;
-
-          for (const category of currentPage.categories) {
-            if (category.isExpanded) {
-              const area = calculateCategoryArea(category, currentPage);
-              if (area) {
-                // 메모와 영역이 겹치는지 확인
-                const memoLeft = newPosition.x;
-                const memoRight = newPosition.x + memoWidth;
-                const memoTop = adjustedY;
-                const memoBottom = adjustedY + memoHeight;
-
-                const areaLeft = area.x;
-                const areaRight = area.x + area.width;
-                const areaTop = area.y;
-                const areaBottom = area.y + area.height;
-
-                if (!(memoRight < areaLeft || memoLeft > areaRight || memoBottom < areaTop || memoTop > areaBottom)) {
-                  // 겹침 - 위로 이동
-                  isOverlapping = true;
-                  adjustedY -= 50;
-                  break;
-                }
-              }
-            }
-          }
-        }
-
-        newPosition = { x: newPosition.x, y: adjustedY };
-      }
-    }
-
-    const newMemo: MemoBlock = {
-      id: Date.now().toString(),
-      title: '',
-      content: '',
-      blocks: [
-        {
-          id: Date.now().toString() + '_text',
-          type: 'text',
-          content: ''
-        }
-      ],
-      tags: [],
-      connections: [],
-      position: newPosition,
-      displaySize: 'medium',
-      parentId: null
-    };
-
-    setPages(prev => prev.map(page =>
-      page.id === currentPageId
-        ? { ...page, memos: [...page.memos, newMemo] }
-        : page
-    ));
-
-    // 위치가 변경된 경우 캔버스를 새 위치로 자동 이동
-    if (position && (newPosition.x !== originalPosition.x || newPosition.y !== originalPosition.y)) {
-      // 메모의 중심점 계산 (블록 중심이 화면 중앙에 오도록)
-      const memoCenterX = newPosition.x + 150; // 메모 너비의 절반
-      const memoCenterY = newPosition.y + 100; // 메모 높이의 절반
-
-      // 캔버스 크기 (윈도우 크기 기준, 좌우 패널 제외)
-      const canvasWidth = window.innerWidth - (leftPanelWidth + (rightPanelOpen ? rightPanelWidth : 0));
-      const canvasHeight = window.innerHeight;
-
-      const newOffset = centerCanvasOnPosition(
-        { x: memoCenterX, y: memoCenterY },
-        canvasWidth,
-        canvasHeight,
-        canvasScale
-      );
-
-      setCanvasOffset(newOffset);
-    }
-
-    // Save canvas state for undo/redo
-    setTimeout(() => saveCanvasState('memo_create', `메모 생성: ${newMemo.id}`), 0);
-  };
 
   // Category management functions
   const addCategory = (position?: { x: number; y: number }) => {
@@ -2783,81 +2802,6 @@ const App: React.FC = () => {
     ));
   };
 
-
-  const deleteMemoBlock = () => {
-    if (!selectedMemoId) return;
-
-    // 삭제된 메모의 제목 가져오기
-    const deletedMemo = pages.find(p => p.id === currentPageId)?.memos.find(m => m.id === selectedMemoId);
-    const memoTitle = deletedMemo?.title || '메모';
-
-    setPages(prev => prev.map(page =>
-      page.id === currentPageId
-        ? {
-            ...page,
-            memos: page.memos
-              .filter(memo => memo.id !== selectedMemoId) // 해당 메모 삭제
-              .map(memo => ({
-                ...memo,
-                connections: memo.connections.filter(connId => connId !== selectedMemoId) // 다른 메모들에서 삭제된 메모로의 연결 제거
-              })),
-            categories: (page.categories || []).map(category => ({
-              ...category,
-              connections: category.connections.filter(connId => connId !== selectedMemoId), // 카테고리에서도 삭제된 메모로의 연결 제거
-              children: category.children.filter(childId => childId !== selectedMemoId) // 자식 목록에서도 제거
-            }))
-          }
-        : page
-    ));
-
-    // 단축 이동 목록에서 삭제된 메모 제거
-    setQuickNavItems(prev => prev.filter(item => item.targetId !== selectedMemoId));
-
-    setSelectedMemoId(null);
-
-    // 실행 취소를 위한 상태 저장
-    setTimeout(() => saveCanvasState('memo_delete', `메모 삭제: ${memoTitle}`), 0);
-  };
-
-  // 특정 메모를 ID로 삭제하는 함수 (검색 결과에서 사용)
-  const deleteMemoById = (memoId: string) => {
-    // 삭제된 메모의 제목 가져오기
-    let deletedMemoTitle = '메모';
-    for (const page of pages) {
-      const memo = page.memos.find(m => m.id === memoId);
-      if (memo) {
-        deletedMemoTitle = memo.title || '메모';
-        break;
-      }
-    }
-
-    setPages(prev => prev.map(page => ({
-      ...page,
-      memos: page.memos
-        .filter(memo => memo.id !== memoId) // 해당 메모 삭제
-        .map(memo => ({
-          ...memo,
-          connections: memo.connections.filter(connId => connId !== memoId) // 다른 메모들에서 삭제된 메모로의 연결 제거
-        })),
-      categories: (page.categories || []).map(category => ({
-        ...category,
-        connections: category.connections.filter(connId => connId !== memoId), // 카테고리에서도 삭제된 메모로의 연결 제거
-        children: category.children.filter(childId => childId !== memoId) // 자식 목록에서도 제거
-      }))
-    })));
-
-    // 단축 이동 목록에서 삭제된 메모 제거
-    setQuickNavItems(prev => prev.filter(item => item.targetId !== memoId));
-
-    // 삭제한 메모가 현재 선택된 메모였다면 선택 해제
-    if (selectedMemoId === memoId) {
-      setSelectedMemoId(null);
-    }
-
-    // 실행 취소를 위한 상태 저장
-    setTimeout(() => saveCanvasState('memo_delete', `메모 삭제: ${deletedMemoTitle}`), 0);
-  };
-
   // 통합 삭제 함수 - 현재 선택된 아이템(메모 또는 카테고리) 삭제
   const deleteSelectedItem = () => {
     // 다중 선택된 항목들 삭제
@@ -2903,164 +2847,6 @@ const App: React.FC = () => {
       deleteCategory(selectedCategoryId);
       setSelectedCategoryId(null);
     }
-  };
-
-  const disconnectMemo = () => {
-    setIsDisconnectMode(!isDisconnectMode);
-  };
-
-  const connectMemos = (fromId: string, toId: string) => {
-    if (fromId === toId) return;
-
-    // 현재 페이지에서 아이템 타입 확인
-    const currentPageData = pages.find(p => p.id === currentPageId);
-    if (!currentPageData) return;
-
-    const fromMemo = currentPageData.memos.find(m => m.id === fromId);
-    const toMemo = currentPageData.memos.find(m => m.id === toId);
-    const fromCategory = (currentPageData.categories || []).find(c => c.id === fromId);
-    const toCategory = (currentPageData.categories || []).find(c => c.id === toId);
-
-    // 연결 규칙: 메모끼리만, 카테고리끼리만 연결 가능
-    const isValidConnection =
-      (fromMemo && toMemo) || // 메모-메모 연결
-      (fromCategory && toCategory); // 카테고리-카테고리 연결
-
-    if (!isValidConnection) {
-      setIsConnecting(false);
-      setConnectingFromId(null);
-      setConnectingFromDirection(null);
-      return;
-    }
-
-    // 카테고리-카테고리 연결 시 부모-자식 관계 체크
-    if (fromCategory && toCategory) {
-      const categories = currentPageData.categories || [];
-
-      // fromCategory가 toCategory의 조상인지 확인 (from이 to의 부모/조부모/...)
-      const fromIsAncestorOfTo = isAncestor(fromId, toId, categories);
-      // toCategory가 fromCategory의 조상인지 확인 (to가 from의 부모/조부모/...)
-      const toIsAncestorOfFrom = isAncestor(toId, fromId, categories);
-
-      // 부모-자식 관계가 있으면 연결 금지
-      if (fromIsAncestorOfTo || toIsAncestorOfFrom) {
-        setIsConnecting(false);
-        setConnectingFromId(null);
-        setConnectingFromDirection(null);
-        return;
-      }
-    }
-
-    setPages(prev => prev.map(page =>
-      page.id === currentPageId
-        ? {
-            ...page,
-            memos: page.memos.map(memo => {
-              if (memo.id === fromId && fromMemo && toMemo) {
-                return {
-                  ...memo,
-                  connections: memo.connections.includes(toId)
-                    ? memo.connections
-                    : [...memo.connections, toId]
-                };
-              }
-              if (memo.id === toId && fromMemo && toMemo) {
-                return {
-                  ...memo,
-                  connections: memo.connections.includes(fromId)
-                    ? memo.connections
-                    : [...memo.connections, fromId]
-                };
-              }
-              return memo;
-            }),
-            categories: (page.categories || []).map(category => {
-              if (category.id === fromId && fromCategory && toCategory) {
-                return {
-                  ...category,
-                  connections: category.connections.includes(toId)
-                    ? category.connections
-                    : [...category.connections, toId]
-                };
-              }
-              if (category.id === toId && fromCategory && toCategory) {
-                return {
-                  ...category,
-                  connections: category.connections.includes(fromId)
-                    ? category.connections
-                    : [...category.connections, fromId]
-                };
-              }
-              return category;
-            })
-          }
-        : page
-    ));
-
-    setIsConnecting(false);
-    setConnectingFromId(null);
-
-    // Save canvas state for undo/redo
-    setTimeout(() => saveCanvasState('connection_add', `연결 추가: ${fromId} ↔ ${toId}`), 0);
-  };
-
-  const removeConnection = (fromId: string, toId: string) => {
-    setPages(prev => prev.map(page =>
-      page.id === currentPageId
-        ? {
-            ...page,
-            memos: page.memos.map(memo => ({
-              ...memo,
-              connections: memo.connections.filter(id =>
-                !(memo.id === fromId && id === toId) &&
-                !(memo.id === toId && id === fromId)
-              )
-            })),
-            categories: (page.categories || []).map(category => ({
-              ...category,
-              connections: category.connections.filter(id =>
-                !(category.id === fromId && id === toId) &&
-                !(category.id === toId && id === fromId)
-              )
-            }))
-          }
-        : page
-    ));
-
-    // Save canvas state for undo/redo
-    setTimeout(() => saveCanvasState('connection_remove', `연결 제거: ${fromId} ↔ ${toId}`), 0);
-  };
-
-  const startConnection = (memoId: string, direction?: 'top' | 'bottom' | 'left' | 'right') => {
-    setIsConnecting(true);
-    setConnectingFromId(memoId);
-    setConnectingFromDirection(direction || null);
-  };
-
-  const updateDragLine = (mousePos: { x: number; y: number }) => {
-    setDragLineEnd(mousePos);
-  };
-
-  const cancelConnection = () => {
-    setIsConnecting(false);
-    setConnectingFromId(null);
-    setConnectingFromDirection(null);
-    setDragLineEnd(null);
-  };
-
-  const updateMemo = (memoId: string, updates: Partial<MemoBlock>) => {
-    setPages(prev => prev.map(page => 
-      page.id === currentPageId 
-        ? {
-            ...page,
-            memos: page.memos.map(memo => 
-              memo.id === memoId 
-                ? { ...memo, ...updates }
-                : memo
-            )
-          }
-        : page
-    ));
   };
 
   // 메모 위치 업데이트 히스토리 타이머 관리
@@ -3312,369 +3098,6 @@ const App: React.FC = () => {
     }, 200);
 
     memoPositionTimers.current.set(memoId, newTimer);
-  };
-
-  const updateMemoSize = (memoId: string, size: { width: number; height: number }) => {
-    setPages(prev => prev.map(page => 
-      page.id === currentPageId 
-        ? {
-            ...page,
-            memos: page.memos.map(memo => 
-              memo.id === memoId 
-                ? { ...memo, size }
-                : memo
-            )
-          }
-        : page
-    ));
-  };
-
-  const updateMemoDisplaySize = (memoId: string, displaySize: MemoDisplaySize) => {
-    setPages(prev => prev.map(page =>
-      page.id === currentPageId
-        ? {
-            ...page,
-            memos: page.memos.map(memo =>
-              memo.id === memoId
-                ? { ...memo, displaySize }
-                : memo
-            )
-          }
-        : page
-    ));
-  };
-
-  const updateMemoTitle = (memoId: string, title: string) => {
-    updateMemo(memoId, { title });
-  };
-
-  const updateMemoBlockContent = (memoId: string, blockId: string, content: string) => {
-    setPages(prev => prev.map(page =>
-      page.id === currentPageId
-        ? {
-            ...page,
-            memos: page.memos.map(memo =>
-              memo.id === memoId && memo.blocks
-                ? {
-                    ...memo,
-                    blocks: memo.blocks.map(block =>
-                      block.id === blockId && block.type === 'text'
-                        ? { ...block, content }
-                        : block
-                    )
-                  }
-                : memo
-            )
-          }
-        : page
-    ));
-  };
-
-  const handleLeftPanelResize = (deltaX: number) => {
-    setLeftPanelWidth(prev => Math.max(200, Math.min(500, prev + deltaX)));
-  };
-
-  const handleRightPanelResize = (deltaX: number) => {
-    setRightPanelWidth(prev => Math.max(250, Math.min(1200, prev + deltaX)));
-  };
-
-  // 검색 결과 메모로 이동 - 캔버스 뷰를 메모 중심으로 이동하고 초기 줌 레벨로 설정
-  const handleNavigateToMemo = (memoId: string, pageId?: string) => {
-    console.log('[handleNavigateToMemo] Called with:', { memoId, pageId, currentPageId });
-    const targetPageId = pageId || currentPageId;
-    console.log('[handleNavigateToMemo] Target page ID:', targetPageId);
-    const targetPage = pages.find(p => p.id === targetPageId);
-    if (!targetPage) {
-      console.error('[handleNavigateToMemo] Target page not found!');
-      return;
-    }
-    console.log('[handleNavigateToMemo] Found target page:', targetPage.name);
-
-    const memo = targetPage.memos.find(m => m.id === memoId);
-    if (!memo) {
-      console.error('[handleNavigateToMemo] Memo not found in target page!');
-      return;
-    }
-    console.log('[handleNavigateToMemo] Found memo:', memo.title, 'at position:', memo.position);
-
-    // Canvas 컨테이너의 실제 크기 가져오기
-    const canvasElement = document.getElementById('main-canvas');
-    if (!canvasElement) {
-      console.error('[handleNavigateToMemo] Canvas element not found!');
-      return;
-    }
-    const rect = canvasElement.getBoundingClientRect();
-    const availableWidth = rect.width;
-    const availableHeight = rect.height;
-    console.log('[handleNavigateToMemo] Canvas size:', { width: availableWidth, height: availableHeight });
-    console.log('[handleNavigateToMemo] Canvas rect:', rect);
-
-    // 메모 크기
-    const memoWidth = memo.size?.width || 200;
-    const memoHeight = memo.size?.height || 150;
-    console.log('[handleNavigateToMemo] Memo size:', { width: memoWidth, height: memoHeight });
-
-    // 메모 중심 좌표
-    const memoCenterX = memo.position.x + memoWidth / 2;
-    const memoCenterY = memo.position.y + memoHeight / 2;
-    console.log('[handleNavigateToMemo] Memo center (world coords):', { x: memoCenterX, y: memoCenterY });
-
-    // scale을 1로 리셋할 것이므로 scale 1 기준으로 offset 계산
-    const targetScale = 1;
-    const newOffsetX = availableWidth / 2 - memoCenterX * targetScale;
-    const newOffsetY = availableHeight / 2 - memoCenterY * targetScale;
-
-    console.log('[handleNavigateToMemo] Target scale:', targetScale);
-    console.log('[handleNavigateToMemo] Calculated offset:', { newOffsetX, newOffsetY });
-    console.log('[handleNavigateToMemo] Before setCanvasOffset - current offset:', canvasOffset, 'current scale:', canvasScale);
-
-    setCanvasOffset({ x: newOffsetX, y: newOffsetY });
-    setCanvasScale(targetScale); // 초기 줌 레벨로 리셋
-
-    console.log('[handleNavigateToMemo] After setCanvasOffset called');
-    console.log('[handleNavigateToMemo] Expected screen position of memo center:', { x: availableWidth / 2, y: availableHeight / 2 });
-  };
-
-  // 카테고리로 이동 - 캔버스 뷰를 카테고리 중심으로 이동
-  const handleNavigateToCategory = (categoryId: string, pageId?: string) => {
-    console.log('[handleNavigateToCategory] Called with:', { categoryId, pageId, currentPageId });
-    const targetPageId = pageId || currentPageId;
-    console.log('[handleNavigateToCategory] Target page ID:', targetPageId);
-    const targetPage = pages.find(p => p.id === targetPageId);
-    if (!targetPage) {
-      console.error('[handleNavigateToCategory] Target page not found!');
-      return;
-    }
-    console.log('[handleNavigateToCategory] Found target page:', targetPage.name);
-
-    const category = targetPage.categories?.find(c => c.id === categoryId);
-    if (!category) {
-      console.error('[handleNavigateToCategory] Category not found in target page!');
-      return;
-    }
-    console.log('[handleNavigateToCategory] Found category:', category.title, 'at position:', category.position);
-
-    // Canvas 컨테이너의 실제 크기 가져오기
-    const canvasElement = document.getElementById('main-canvas');
-    if (!canvasElement) {
-      console.error('[handleNavigateToCategory] Canvas element not found!');
-      return;
-    }
-    const rect = canvasElement.getBoundingClientRect();
-    const availableWidth = rect.width;
-    const availableHeight = rect.height;
-
-    // 카테고리 영역 계산 (자식이 있는 경우)
-    const categoryArea = calculateCategoryArea(category, targetPage);
-
-    if (categoryArea && category.isExpanded) {
-      // 영역이 있고 확장된 상태면 전체 영역이 화면에 보이도록 조정
-      const areaWidth = categoryArea.width;
-      const areaHeight = categoryArea.height;
-      const areaCenterX = categoryArea.x + areaWidth / 2;
-      const areaCenterY = categoryArea.y + areaHeight / 2;
-
-      // 영역이 화면에 맞도록 스케일 계산 (여백 20% 추가)
-      const margin = 0.2;
-      const scaleX = availableWidth / (areaWidth * (1 + margin));
-      const scaleY = availableHeight / (areaHeight * (1 + margin));
-      const optimalScale = Math.min(scaleX, scaleY, 1); // 최대 1배 (확대 안함)
-
-      // 화면 중앙에 영역이 오도록 offset 계산
-      const newOffsetX = availableWidth / 2 - areaCenterX * optimalScale;
-      const newOffsetY = availableHeight / 2 - areaCenterY * optimalScale;
-
-      setCanvasOffset({ x: newOffsetX, y: newOffsetY });
-      setCanvasScale(optimalScale);
-    } else {
-      // 영역이 없거나 축소된 상태면 카테고리 블록만 중앙에 표시
-      const categoryWidth = category.size?.width || 200;
-      const categoryHeight = category.size?.height || 80;
-      const categoryCenterX = category.position.x + categoryWidth / 2;
-      const categoryCenterY = category.position.y + categoryHeight / 2;
-
-      const targetScale = 1;
-      setCanvasOffset({
-        x: availableWidth / 2 - categoryCenterX * targetScale,
-        y: availableHeight / 2 - categoryCenterY * targetScale
-      });
-      setCanvasScale(targetScale);
-    }
-  };
-
-  // 단축 이동 항목 추가
-  const addQuickNavItem = (name: string, targetId: string, targetType: 'memo' | 'category') => {
-    // 중복 체크: 같은 페이지의 같은 타겟에 대한 단축 이동이 이미 있는지 확인
-    const isDuplicate = quickNavItems.some(
-      item => item.targetId === targetId && item.targetType === targetType && item.pageId === currentPageId
-    );
-
-    if (isDuplicate) {
-      alert('이미 단축 이동이 설정되어 있습니다.');
-      return;
-    }
-
-    const newItem: QuickNavItem = {
-      id: Date.now().toString(),
-      name,
-      targetId,
-      targetType,
-      pageId: currentPageId
-    };
-    setQuickNavItems(prev => [...prev, newItem]);
-  };
-
-  // 단축 이동 중복 확인
-  const isQuickNavExists = (targetId: string, targetType: 'memo' | 'category'): boolean => {
-    return quickNavItems.some(
-      item => item.targetId === targetId && item.targetType === targetType && item.pageId === currentPageId
-    );
-  };
-
-  // 단축 이동 항목 삭제
-  const deleteQuickNavItem = (itemId: string) => {
-    setQuickNavItems(prev => prev.filter(item => item.id !== itemId));
-  };
-
-  // 단축 이동 실행 - 대상으로 이동하고 필요 시 페이지도 전환
-  const executeQuickNav = (item: QuickNavItem) => {
-    // 페이지가 다르면 페이지 전환
-    if (item.pageId !== currentPageId) {
-      setCurrentPageId(item.pageId);
-      // 페이지 전환 후 약간의 딜레이를 두고 이동 (상태 업데이트 대기)
-      setTimeout(() => {
-        if (item.targetType === 'memo') {
-          handleNavigateToMemo(item.targetId);
-        } else {
-          handleNavigateToCategory(item.targetId);
-        }
-      }, 100);
-    } else {
-      // 같은 페이지면 바로 이동
-      if (item.targetType === 'memo') {
-        handleNavigateToMemo(item.targetId);
-      } else {
-        handleNavigateToCategory(item.targetId);
-      }
-    }
-  };
-
-  // 튜토리얼 핸들러
-  const handleTutorialNext = () => {
-    const currentStep = tutorialState.currentStep;
-
-    setTutorialState(prev => ({
-      ...prev,
-      currentStep: prev.currentStep + 1
-    }));
-
-    // 다음 단계로 넘어갈 때 validation 상태 리셋
-    if (currentStep === 2) {
-      // 캔버스 이동 완료 후
-      setCanvasPanned(false);
-      initialCanvasOffset.current = canvasOffset;
-    }
-    if (currentStep === 3) {
-      // 캔버스 줌 완료 후
-      setCanvasZoomed(false);
-      initialCanvasScale.current = canvasScale;
-      // 메모 개수 저장
-      const currentPage = pages.find(p => p.id === currentPageId);
-      if (currentPage) {
-        initialMemoCount.current = currentPage.memos.length;
-      }
-    }
-    if (currentStep === 4) {
-      // 메모 생성 완료 후
-      setMemoCreated(false);
-      // 현재 메모 위치를 저장
-      const currentPage = pages.find(p => p.id === currentPageId);
-      if (currentPage) {
-        initialMemoPositions.current.clear();
-        currentPage.memos.forEach(memo => {
-          initialMemoPositions.current.set(memo.id, { x: memo.position.x, y: memo.position.y });
-        });
-      }
-    }
-    if (currentStep === 5) {
-      // 메모 드래그 완료 후
-      setMemoDragged(false);
-    }
-  };
-
-  const handleTutorialSkip = () => {
-    setTutorialState({
-      isActive: false,
-      currentStep: 0,
-      completed: true
-    });
-    localStorage.setItem('tutorial-completed', 'true');
-    setCanvasPanned(false);
-    setCanvasZoomed(false);
-    setMemoCreated(false);
-    setMemoDragged(false);
-  };
-
-  const handleTutorialComplete = () => {
-    setTutorialState({
-      isActive: false,
-      currentStep: 0,
-      completed: true
-    });
-    localStorage.setItem('tutorial-completed', 'true');
-    setCanvasPanned(false);
-    setCanvasZoomed(false);
-    setMemoCreated(false);
-    setMemoDragged(false);
-  };
-
-  const handleStartTutorial = () => {
-    setTutorialState({
-      isActive: true,
-      currentStep: 0,
-      completed: false
-    });
-    setCanvasPanned(false);
-    setCanvasZoomed(false);
-    setMemoCreated(false);
-    setMemoDragged(false);
-    initialCanvasOffset.current = canvasOffset;
-    initialCanvasScale.current = canvasScale;
-
-    // 현재 메모 개수와 위치를 저장
-    const currentPage = pages.find(p => p.id === currentPageId);
-    if (currentPage) {
-      initialMemoCount.current = currentPage.memos.length;
-      initialMemoPositions.current.clear();
-      currentPage.memos.forEach(memo => {
-        initialMemoPositions.current.set(memo.id, { x: memo.position.x, y: memo.position.y });
-      });
-    }
-  };
-
-  // 현재 단계에서 다음으로 진행할 수 있는지 확인
-  const canProceedTutorial = () => {
-    const step = tutorialState.currentStep;
-
-    // 2단계: 캔버스 이동
-    if (step === 2) {
-      return canvasPanned;
-    }
-    // 3단계: 캔버스 줌
-    if (step === 3) {
-      return canvasZoomed;
-    }
-    // 4단계: 메모 생성
-    if (step === 4) {
-      return memoCreated;
-    }
-    // 5단계: 메모 드래그
-    if (step === 5) {
-      return memoDragged;
-    }
-
-    // 다른 단계는 자유롭게 진행
-    return true;
   };
 
   return (
