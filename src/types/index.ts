@@ -280,6 +280,24 @@ export interface QuickNavItem {
   pageId: string; // 어느 페이지에 있는지
 }
 
+// Tutorial System
+export interface TutorialStep {
+  id: string;
+  title: string;
+  description: string;
+  targetElement?: string; // CSS selector for highlighting
+  position?: 'top' | 'bottom' | 'left' | 'right' | 'center';
+  action?: 'click' | 'drag' | 'type' | 'none'; // Required user action
+  validation?: () => boolean; // Check if step is completed
+  nextButtonText?: string;
+}
+
+export interface TutorialState {
+  isActive: boolean;
+  currentStep: number;
+  completed: boolean;
+}
+
 export interface AppState {
   pages: Page[];
   currentPageId: string;
@@ -289,4 +307,5 @@ export interface AppState {
   dataRegistry: DataRegistry; // Global data registry for named data
   canvasHistory: CanvasHistory; // Canvas-specific undo/redo history
   quickNavItems?: QuickNavItem[]; // Quick navigation shortcuts
+  tutorialState?: TutorialState; // Tutorial state
 }

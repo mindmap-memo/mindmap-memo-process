@@ -1380,6 +1380,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
     <div
       ref={rightPanelRef}
       data-right-panel="true"
+      data-tutorial="right-panel"
       onClick={handleMemoAreaClick}
       onDrop={handleFileDrop}
       onDragOver={handleDragOver}

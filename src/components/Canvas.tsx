@@ -1987,6 +1987,7 @@ const Canvas: React.FC<CanvasProps> = ({
   return (
     <div
       data-canvas="true"
+      data-tutorial="canvas"
       tabIndex={0}
       style={{
         flex: 1,
@@ -2240,6 +2241,7 @@ const Canvas: React.FC<CanvasProps> = ({
         
         {/* 기능 버튼들 */}
         <button
+          data-tutorial="add-memo-btn"
           onClick={() => {
             const canvas = document.querySelector('[data-canvas="true"]') as HTMLElement;
             if (canvas) {
@@ -2266,6 +2268,7 @@ const Canvas: React.FC<CanvasProps> = ({
           + 블록 생성
         </button>
         <button
+          data-tutorial="add-category-btn"
           onClick={() => {
             const canvas = document.querySelector('[data-canvas="true"]') as HTMLElement;
             if (canvas) {
@@ -2292,6 +2295,7 @@ const Canvas: React.FC<CanvasProps> = ({
           카테고리 생성
         </button>
         <button
+          data-tutorial="disconnect-btn"
           onClick={onDisconnectMemo}
           style={{
             backgroundColor: isDisconnectMode ? '#fee2e2' : 'white',
@@ -2341,6 +2345,7 @@ const Canvas: React.FC<CanvasProps> = ({
         backdropFilter: 'blur(4px)'
       }}>
         <button
+          data-tutorial="undo-btn"
           onClick={onUndo}
           disabled={!canUndo}
           title="실행 취소 (Ctrl+Z)"

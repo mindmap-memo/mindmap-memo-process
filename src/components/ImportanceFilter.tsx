@@ -98,6 +98,7 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
 
   return (
     <div
+      data-tutorial="importance-filter"
       onMouseDown={handleMouseDown}
       style={{
         position: 'absolute',

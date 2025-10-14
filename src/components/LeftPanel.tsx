@@ -40,6 +40,7 @@ interface LeftPanelProps {
   onDeleteCategory?: (categoryId: string) => void;
   onNavigateToMemo?: (memoId: string, pageId?: string) => void;
   onNavigateToCategory?: (categoryId: string, pageId?: string) => void;
+  onStartTutorial?: () => void;
 }
 
 const LeftPanel: React.FC<LeftPanelProps> = ({
@@ -55,7 +56,8 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
   onDeleteMemo,
   onDeleteCategory,
   onNavigateToMemo,
-  onNavigateToCategory
+  onNavigateToCategory,
+  onStartTutorial
 }) => {
   const [editingPageId, setEditingPageId] = React.useState<string | null>(null);
   const [editingName, setEditingName] = React.useState<string>('');
@@ -767,20 +769,56 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
   };
 
   return (
-    <div style={{
-      width: `${width}px`,
-      height: '100vh',
-      backgroundColor: '#ffffff',
-      color: '#1f2937',
-      padding: '24px',
-      borderRight: '1px solid #e5e7eb',
-      position: 'relative',
-      overflowY: 'auto',
-      display: 'flex',
-      flexDirection: 'column'
-    }}>
+    <div
+      data-tutorial="left-panel"
+      style={{
+        width: `${width}px`,
+        height: '100vh',
+        backgroundColor: '#ffffff',
+        color: '#1f2937',
+        padding: '24px',
+        borderRight: '1px solid #e5e7eb',
+        position: 'relative',
+        overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
       <div style={{ marginBottom: '32px' }}>
-        <h2 style={{ margin: '0 0 20px 0', fontSize: '24px', fontWeight: '700', color: '#1f2937' }}>마인드맵</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+          <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700', color: '#1f2937' }}>마인드맵</h2>
+          {onStartTutorial && (
+            <button
+              onClick={onStartTutorial}
+              style={{
+                backgroundColor: '#4A90E2',
+                color: 'white',
+                border: 'none',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                cursor: 'pointer',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#357ABD';
+                e.currentTarget.style.transform = 'scale(1.05)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#4A90E2';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+              title="튜토리얼 다시 보기"
+            >
+              ?
+            </button>
+          )}
+        </div>
 
         {/* 검색 UI */}
         <div style={{ marginBottom: '16px' }}>
@@ -791,6 +829,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
             gap: '8px'
           }}>
             <input
+              data-tutorial="search"
               type="text"
               placeholder="메모 검색..."
               value={searchQuery}

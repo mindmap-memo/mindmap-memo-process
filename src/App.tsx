@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Page, MemoBlock, DataRegistry, MemoDisplaySize, ImportanceLevel, CategoryBlock, QuickNavItem } from './types';
+import { Page, MemoBlock, DataRegistry, MemoDisplaySize, ImportanceLevel, CategoryBlock, QuickNavItem, TutorialState } from './types';
 import { globalDataRegistry } from './utils/dataRegistry';
 import { STORAGE_KEYS, DEFAULT_PAGES } from './constants/defaultData';
 import { loadFromStorage, saveToStorage } from './utils/storageUtils';
@@ -18,6 +18,8 @@ import {
 import LeftPanel from './components/LeftPanel';
 import RightPanel from './components/RightPanel';
 import Canvas from './components/Canvas';
+import { Tutorial } from './components/Tutorial';
+import { tutorialSteps } from './utils/tutorialSteps';
 
 const App: React.FC = () => {
   // 브라우저 기본 Ctrl/Command + 휠 줌 차단 (전역)
@@ -94,6 +96,78 @@ const App: React.FC = () => {
     loadFromStorage(STORAGE_KEYS.QUICK_NAV_ITEMS, [])
   );
   const [showQuickNavPanel, setShowQuickNavPanel] = useState(false);
+
+  // 튜토리얼 상태
+  const [tutorialState, setTutorialState] = useState<TutorialState>(() => {
+    const completed = localStorage.getItem('tutorial-completed') === 'true';
+    return {
+      isActive: !completed, // 완료하지 않았으면 자동으로 시작
+      currentStep: 0,
+      completed: completed
+    };
+  });
+
+  // 튜토리얼 validation 상태
+  const [canvasPanned, setCanvasPanned] = useState(false);
+  const [canvasZoomed, setCanvasZoomed] = useState(false);
+  const [memoCreated, setMemoCreated] = useState(false);
+  const [memoDragged, setMemoDragged] = useState(false);
+  const initialCanvasOffset = React.useRef(canvasOffset);
+  const initialCanvasScale = React.useRef(canvasScale);
+  const initialMemoPositions = React.useRef<Map<string, { x: number; y: number }>>(new Map());
+  const initialMemoCount = React.useRef(0);
+
+  // 캔버스 이동 감지 (2단계 - canvas-pan)
+  React.useEffect(() => {
+    if (tutorialState.isActive && tutorialState.currentStep === 2) {
+      const dx = Math.abs(canvasOffset.x - initialCanvasOffset.current.x);
+      const dy = Math.abs(canvasOffset.y - initialCanvasOffset.current.y);
+      if (dx > 50 || dy > 50) {
+        setCanvasPanned(true);
+      }
+    }
+  }, [canvasOffset, tutorialState.isActive, tutorialState.currentStep]);
+
+  // 캔버스 줌 감지 (3단계 - canvas-zoom)
+  React.useEffect(() => {
+    if (tutorialState.isActive && tutorialState.currentStep === 3) {
+      const scaleDiff = Math.abs(canvasScale - initialCanvasScale.current);
+      if (scaleDiff > 0.1) {
+        setCanvasZoomed(true);
+      }
+    }
+  }, [canvasScale, tutorialState.isActive, tutorialState.currentStep]);
+
+  // 메모 생성 감지 (4단계 - add-memo)
+  React.useEffect(() => {
+    if (tutorialState.isActive && tutorialState.currentStep === 4) {
+      const currentPage = pages.find(p => p.id === currentPageId);
+      if (currentPage && currentPage.memos.length > initialMemoCount.current) {
+        setMemoCreated(true);
+      }
+    }
+  }, [pages, currentPageId, tutorialState.isActive, tutorialState.currentStep]);
+
+  // 메모 드래그 감지 (5단계 - memo-drag)
+  React.useEffect(() => {
+    if (tutorialState.isActive && tutorialState.currentStep === 5) {
+      const currentPage = pages.find(p => p.id === currentPageId);
+      if (!currentPage) return;
+
+      // 메모 위치가 변경되었는지 확인
+      for (const memo of currentPage.memos) {
+        const initialPos = initialMemoPositions.current.get(memo.id);
+        if (initialPos) {
+          const dx = Math.abs(memo.position.x - initialPos.x);
+          const dy = Math.abs(memo.position.y - initialPos.y);
+          if (dx > 20 || dy > 20) {
+            setMemoDragged(true);
+            break;
+          }
+        }
+      }
+    }
+  }, [pages, currentPageId, tutorialState.isActive, tutorialState.currentStep]);
 
   // 드래그 시작 시 메모들의 원래 위치 저장
   const dragStartMemoPositions = React.useRef<Map<string, Map<string, {x: number, y: number}>>>(new Map());
@@ -3742,6 +3816,124 @@ const App: React.FC = () => {
     }
   };
 
+  // 튜토리얼 핸들러
+  const handleTutorialNext = () => {
+    const currentStep = tutorialState.currentStep;
+
+    setTutorialState(prev => ({
+      ...prev,
+      currentStep: prev.currentStep + 1
+    }));
+
+    // 다음 단계로 넘어갈 때 validation 상태 리셋
+    if (currentStep === 2) {
+      // 캔버스 이동 완료 후
+      setCanvasPanned(false);
+      initialCanvasOffset.current = canvasOffset;
+    }
+    if (currentStep === 3) {
+      // 캔버스 줌 완료 후
+      setCanvasZoomed(false);
+      initialCanvasScale.current = canvasScale;
+      // 메모 개수 저장
+      const currentPage = pages.find(p => p.id === currentPageId);
+      if (currentPage) {
+        initialMemoCount.current = currentPage.memos.length;
+      }
+    }
+    if (currentStep === 4) {
+      // 메모 생성 완료 후
+      setMemoCreated(false);
+      // 현재 메모 위치를 저장
+      const currentPage = pages.find(p => p.id === currentPageId);
+      if (currentPage) {
+        initialMemoPositions.current.clear();
+        currentPage.memos.forEach(memo => {
+          initialMemoPositions.current.set(memo.id, { x: memo.position.x, y: memo.position.y });
+        });
+      }
+    }
+    if (currentStep === 5) {
+      // 메모 드래그 완료 후
+      setMemoDragged(false);
+    }
+  };
+
+  const handleTutorialSkip = () => {
+    setTutorialState({
+      isActive: false,
+      currentStep: 0,
+      completed: true
+    });
+    localStorage.setItem('tutorial-completed', 'true');
+    setCanvasPanned(false);
+    setCanvasZoomed(false);
+    setMemoCreated(false);
+    setMemoDragged(false);
+  };
+
+  const handleTutorialComplete = () => {
+    setTutorialState({
+      isActive: false,
+      currentStep: 0,
+      completed: true
+    });
+    localStorage.setItem('tutorial-completed', 'true');
+    setCanvasPanned(false);
+    setCanvasZoomed(false);
+    setMemoCreated(false);
+    setMemoDragged(false);
+  };
+
+  const handleStartTutorial = () => {
+    setTutorialState({
+      isActive: true,
+      currentStep: 0,
+      completed: false
+    });
+    setCanvasPanned(false);
+    setCanvasZoomed(false);
+    setMemoCreated(false);
+    setMemoDragged(false);
+    initialCanvasOffset.current = canvasOffset;
+    initialCanvasScale.current = canvasScale;
+
+    // 현재 메모 개수와 위치를 저장
+    const currentPage = pages.find(p => p.id === currentPageId);
+    if (currentPage) {
+      initialMemoCount.current = currentPage.memos.length;
+      initialMemoPositions.current.clear();
+      currentPage.memos.forEach(memo => {
+        initialMemoPositions.current.set(memo.id, { x: memo.position.x, y: memo.position.y });
+      });
+    }
+  };
+
+  // 현재 단계에서 다음으로 진행할 수 있는지 확인
+  const canProceedTutorial = () => {
+    const step = tutorialState.currentStep;
+
+    // 2단계: 캔버스 이동
+    if (step === 2) {
+      return canvasPanned;
+    }
+    // 3단계: 캔버스 줌
+    if (step === 3) {
+      return canvasZoomed;
+    }
+    // 4단계: 메모 생성
+    if (step === 4) {
+      return memoCreated;
+    }
+    // 5단계: 메모 드래그
+    if (step === 5) {
+      return memoDragged;
+    }
+
+    // 다른 단계는 자유롭게 진행
+    return true;
+  };
+
   return (
     <div style={{
       display: 'flex',
@@ -3768,6 +3960,7 @@ const App: React.FC = () => {
           onDeleteCategory={deleteCategory}
           onNavigateToMemo={handleNavigateToMemo}
           onNavigateToCategory={handleNavigateToCategory}
+          onStartTutorial={handleStartTutorial}
         />
       )}
 
@@ -3934,6 +4127,7 @@ const App: React.FC = () => {
 
       {/* 단축 이동 버튼 */}
       <button
+        data-tutorial="quick-nav-btn"
         onClick={() => setShowQuickNavPanel(!showQuickNavPanel)}
         style={{
           position: 'fixed',
@@ -4254,6 +4448,18 @@ const App: React.FC = () => {
           activeImportanceFilters={activeImportanceFilters}
           showGeneralContent={showGeneralContent}
           onResetFilters={resetFiltersToDefault}
+        />
+      )}
+
+      {/* 튜토리얼 오버레이 */}
+      {tutorialState.isActive && (
+        <Tutorial
+          steps={tutorialSteps}
+          currentStep={tutorialState.currentStep}
+          onNext={handleTutorialNext}
+          onSkip={handleTutorialSkip}
+          onComplete={handleTutorialComplete}
+          canProceed={canProceedTutorial()}
         />
       )}
     </div>
