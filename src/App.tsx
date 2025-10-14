@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Page, MemoBlock, DataRegistry, MemoDisplaySize, ImportanceLevel, CategoryBlock, QuickNavItem, TutorialState } from './types';
 import { globalDataRegistry } from './utils/dataRegistry';
-import { STORAGE_KEYS, DEFAULT_PAGES } from './constants/defaultData';
-import { loadFromStorage, saveToStorage } from './utils/storageUtils';
+import { STORAGE_KEYS } from './constants/defaultData';
+import { saveToStorage } from './utils/storageUtils';
 import { useCanvasHistory } from './hooks/useCanvasHistory';
-import { calculateCategoryArea, CategoryArea, clearCollisionDirections, centerCanvasOnPosition } from './utils/categoryAreaUtils';
+import { useAppState } from './hooks/useAppState';
+import { usePanelState } from './hooks/usePanelState';
+import { useDragState } from './hooks/useDragState';
+import { useSelectionHandlers } from './hooks/useSelectionHandlers';
+import { calculateCategoryArea, CategoryArea, centerCanvasOnPosition } from './utils/categoryAreaUtils';
 import { resolveUnifiedCollisions } from './utils/collisionUtils';
 import {
   canAddCategoryAsChild,
@@ -49,53 +53,102 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // localStorage에서 초기 데이터 로드
-  const [pages, setPages] = useState<Page[]>(() =>
-    loadFromStorage(STORAGE_KEYS.PAGES, DEFAULT_PAGES)
-  );
-  const [currentPageId, setCurrentPageId] = useState<string>(() =>
-    loadFromStorage(STORAGE_KEYS.CURRENT_PAGE_ID, '1')
-  );
-  const [selectedMemoId, setSelectedMemoId] = useState<string | null>(null);
-  const [selectedMemoIds, setSelectedMemoIds] = useState<string[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  // ===== 커스텀 훅으로 상태 관리 =====
+  const appState = useAppState();
+  const {
+    pages,
+    setPages,
+    currentPageId,
+    setCurrentPageId,
+    selectedMemoId,
+    setSelectedMemoId,
+    selectedMemoIds,
+    setSelectedMemoIds,
+    selectedCategoryId,
+    setSelectedCategoryId,
+    selectedCategoryIds,
+    setSelectedCategoryIds,
+    canvasOffset,
+    setCanvasOffset,
+    canvasScale,
+    setCanvasScale,
+    quickNavItems,
+    setQuickNavItems,
+    showQuickNavPanel,
+    setShowQuickNavPanel,
+    isConnecting,
+    setIsConnecting,
+    isDisconnectMode,
+    setIsDisconnectMode,
+    connectingFromId,
+    setConnectingFromId,
+    connectingFromDirection,
+    setConnectingFromDirection,
+    isShiftPressed,
+    setIsShiftPressed
+  } = appState;
 
-  // 패널 설정도 localStorage에서 로드
-  const [panelSettings] = useState(() =>
-    loadFromStorage(STORAGE_KEYS.PANEL_SETTINGS, {
-      leftPanelOpen: true,
-      rightPanelOpen: true,
-      leftPanelWidth: 250,
-      rightPanelWidth: 600
-    })
-  );
-  const [leftPanelOpen, setLeftPanelOpen] = useState<boolean>(panelSettings.leftPanelOpen);
-  const [rightPanelOpen, setRightPanelOpen] = useState<boolean>(panelSettings.rightPanelOpen);
-  const [leftPanelWidth, setLeftPanelWidth] = useState<number>(panelSettings.leftPanelWidth);
-  const [rightPanelWidth, setRightPanelWidth] = useState<number>(panelSettings.rightPanelWidth);
-  const [isConnecting, setIsConnecting] = useState<boolean>(false);
-  const [isDisconnectMode, setIsDisconnectMode] = useState<boolean>(false);
-  const [connectingFromId, setConnectingFromId] = useState<string | null>(null);
-  const [connectingFromDirection, setConnectingFromDirection] = useState<'top' | 'bottom' | 'left' | 'right' | null>(null);
-  const [isShiftPressed, setIsShiftPressed] = useState<boolean>(false);
+  const panelState = usePanelState();
+  const {
+    leftPanelOpen,
+    setLeftPanelOpen,
+    rightPanelOpen,
+    setRightPanelOpen,
+    leftPanelWidth,
+    setLeftPanelWidth,
+    rightPanelWidth,
+    setRightPanelWidth
+  } = panelState;
 
-  // Shift 드래그 중 영역 캐시 (영역 크기가 변하지 않도록)
-  const shiftDragAreaCache = React.useRef<{[categoryId: string]: any}>({});
-  const shiftDropProcessedMemos = React.useRef<Set<string>>(new Set()); // Shift 드래그로 처리된 메모 추적
+  const dragState = useDragState();
+  const {
+    draggedCategoryAreas,
+    setDraggedCategoryAreas,
+    shiftDragAreaCache,
+    shiftDropProcessedMemos,
+    dragStartMemoPositions,
+    dragStartCategoryPositions,
+    clearCategoryCache: clearCategoryCacheFromHook
+  } = dragState;
 
-  // 드래그 중인 카테고리의 영역 캐시 (Canvas와 동일한 시스템)
-  const [draggedCategoryAreas, setDraggedCategoryAreas] = useState<{[categoryId: string]: {area: any, originalPosition: {x: number, y: number}}}>({});
+  // 선택 핸들러 훅 사용
+  const selectionHandlers = useSelectionHandlers({
+    pages,
+    currentPageId,
+    selectedMemoId,
+    setSelectedMemoId,
+    selectedMemoIds,
+    setSelectedMemoIds,
+    selectedCategoryId,
+    setSelectedCategoryId,
+    selectedCategoryIds,
+    setSelectedCategoryIds,
+    isDragSelecting: appState.isDragSelecting,
+    setIsDragSelecting: appState.setIsDragSelecting,
+    dragSelectStart: appState.dragSelectStart,
+    setDragSelectStart: appState.setDragSelectStart,
+    dragSelectEnd: appState.dragSelectEnd,
+    setDragSelectEnd: appState.setDragSelectEnd,
+    setDragHoveredMemoIds: appState.setDragHoveredMemoIds,
+    setDragHoveredCategoryIds: appState.setDragHoveredCategoryIds,
+    isDragSelectingWithShift: appState.isDragSelectingWithShift,
+    setIsDragSelectingWithShift: appState.setIsDragSelectingWithShift,
+    activeImportanceFilters: appState.activeImportanceFilters,
+    setActiveImportanceFilters: appState.setActiveImportanceFilters,
+    showGeneralContent: appState.showGeneralContent,
+    setShowGeneralContent: appState.setShowGeneralContent
+  });
 
-  // 캔버스 뷰포트 상태 (Canvas에서 App으로 이동)
-  const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
-  const [canvasScale, setCanvasScale] = useState(1);
-
-  // 단축 이동 (Quick Navigation)
-  const [quickNavItems, setQuickNavItems] = useState<QuickNavItem[]>(() =>
-    loadFromStorage(STORAGE_KEYS.QUICK_NAV_ITEMS, [])
-  );
-  const [showQuickNavPanel, setShowQuickNavPanel] = useState(false);
+  const {
+    handleMemoSelect,
+    selectCategory,
+    handleDragSelectStart,
+    handleDragSelectMove,
+    handleDragSelectEnd,
+    toggleImportanceFilter,
+    resetFiltersToDefault,
+    focusOnMemo
+  } = selectionHandlers;
 
   // 튜토리얼 상태
   const [tutorialState, setTutorialState] = useState<TutorialState>(() => {
@@ -169,23 +222,8 @@ const App: React.FC = () => {
     }
   }, [pages, currentPageId, tutorialState.isActive, tutorialState.currentStep]);
 
-  // 드래그 시작 시 메모들의 원래 위치 저장
-  const dragStartMemoPositions = React.useRef<Map<string, Map<string, {x: number, y: number}>>>(new Map());
-
-  // 드래그 시작 시 하위 카테고리들의 원래 위치 저장
-  const dragStartCategoryPositions = React.useRef<Map<string, Map<string, {x: number, y: number}>>>(new Map());
-
-  // 메모 위치 변경 시 캐시 제거 (Canvas.tsx와 동기화)
-  const clearCategoryCache = React.useCallback((categoryId: string) => {
-    setDraggedCategoryAreas(prev => {
-      const newAreas = { ...prev };
-      delete newAreas[categoryId];
-      return newAreas;
-    });
-    dragStartMemoPositions.current.delete(categoryId);
-    dragStartCategoryPositions.current.delete(categoryId);
-    clearCollisionDirections(); // 충돌 방향 맵 초기화
-  }, []);
+  // clearCategoryCache는 useDragState에서 가져온 것을 사용
+  const clearCategoryCache = clearCategoryCacheFromHook;
 
 
   // 카테고리 라벨만 이동 (영역은 변경하지 않음)
@@ -767,259 +805,6 @@ const App: React.FC = () => {
     // 선택된 메모 초기화
     setSelectedMemoId(null);
     setSelectedMemoIds([]);
-  };
-
-  // 통합 메모 선택 핸들러 (멀티 선택 지원)
-  const handleMemoSelect = (memoId: string, isShiftClick: boolean = false) => {
-    // 카테고리 선택 해제
-    setSelectedCategoryId(null);
-    setSelectedCategoryIds([]);
-
-    // 빈 문자열이거나 유효하지 않은 ID인 경우 모든 선택 해제
-    if (!memoId || !currentPage?.memos.find(m => m.id === memoId)) {
-      setSelectedMemoId(null);
-      setSelectedMemoIds([]);
-      // 드래그 선택 UI도 초기화
-      setIsDragSelecting(false);
-      setDragSelectStart(null);
-      setDragSelectEnd(null);
-      setDragHoveredMemoIds([]);
-      setDragHoveredCategoryIds([]);
-      return;
-    }
-
-    if (isShiftClick) {
-      // Shift + 클릭: 멀티 선택
-      setSelectedMemoIds(prev => {
-        // 기존에 단일 선택된 메모가 있으면 다중 선택 목록에 추가
-        const currentSelection = selectedMemoId ? [selectedMemoId, ...prev] : prev;
-
-        if (currentSelection.includes(memoId)) {
-          // 이미 선택된 경우 제거
-          return currentSelection.filter(id => id !== memoId);
-        } else {
-          // 새로 추가
-          return [...currentSelection, memoId];
-        }
-      });
-
-      // 멀티 선택 시에는 단일 선택 해제
-      setSelectedMemoId(null);
-    } else {
-      // 일반 클릭: 단일 선택
-      setSelectedMemoId(memoId);
-      setSelectedMemoIds([]);
-    }
-  };
-
-  // 드래그 선택 관련 핸들러들
-  const handleDragSelectStart = (position: { x: number; y: number }, isShiftPressed: boolean = false) => {
-    setIsDragSelecting(true);
-    setDragSelectStart(position);
-    setDragSelectEnd(position);
-    setIsDragSelectingWithShift(isShiftPressed);
-  };
-
-  const handleDragSelectMove = (position: { x: number; y: number }) => {
-    if (isDragSelecting) {
-      setDragSelectEnd(position);
-
-      // 실시간으로 드래그 영역과 교집합된 메모들과 카테고리들 계산
-      if (dragSelectStart && currentPage) {
-        const minX = Math.min(dragSelectStart.x, position.x);
-        const maxX = Math.max(dragSelectStart.x, position.x);
-        const minY = Math.min(dragSelectStart.y, position.y);
-        const maxY = Math.max(dragSelectStart.y, position.y);
-
-        const hoveredMemos = currentPage.memos.filter(memo => {
-          const memoWidth = memo.size?.width || 200;
-          const memoHeight = memo.size?.height || 95;
-          const memoLeft = memo.position.x;
-          const memoRight = memo.position.x + memoWidth;
-          const memoTop = memo.position.y;
-          const memoBottom = memo.position.y + memoHeight;
-
-          return (memoLeft < maxX && memoRight > minX && memoTop < maxY && memoBottom > minY);
-        });
-
-        const hoveredCategories = (currentPage.categories || []).filter(category => {
-          const hasChildren = currentPage.memos.some(memo => memo.parentId === category.id) ||
-                             currentPage.categories?.some(cat => cat.parentId === category.id);
-
-          if (hasChildren && category.isExpanded) {
-            // 하위 아이템이 있고 펼쳐진 경우: 영역과 교집합 확인
-            const area = calculateCategoryArea(category, currentPage);
-            if (area) {
-              const areaLeft = area.x;
-              const areaRight = area.x + area.width;
-              const areaTop = area.y;
-              const areaBottom = area.y + area.height;
-
-              return (areaLeft < maxX && areaRight > minX && areaTop < maxY && areaBottom > minY);
-            }
-            return false;
-          } else {
-            // 하위 아이템이 없거나 접혀진 경우: 카테고리 블록과 교집합 확인
-            const categoryWidth = category.size?.width || 200;
-            const categoryHeight = category.size?.height || 95;
-
-            const categoryLeft = category.position.x;
-            const categoryRight = category.position.x + categoryWidth;
-            const categoryTop = category.position.y;
-            const categoryBottom = category.position.y + categoryHeight;
-
-            return (categoryLeft < maxX && categoryRight > minX && categoryTop < maxY && categoryBottom > minY);
-          }
-        });
-
-        setDragHoveredMemoIds(hoveredMemos.map(memo => memo.id));
-        setDragHoveredCategoryIds(hoveredCategories.map(category => category.id));
-      }
-    }
-  };
-
-  const handleDragSelectEnd = () => {
-    if (isDragSelecting && dragSelectStart && dragSelectEnd && currentPage) {
-      // 선택 영역 계산 (드래그 좌표는 이미 월드 좌표로 변환됨)
-      const minX = Math.min(dragSelectStart.x, dragSelectEnd.x);
-      const maxX = Math.max(dragSelectStart.x, dragSelectEnd.x);
-      const minY = Math.min(dragSelectStart.y, dragSelectEnd.y);
-      const maxY = Math.max(dragSelectStart.y, dragSelectEnd.y);
-
-
-      const memosInSelection = currentPage.memos.filter(memo => {
-        const memoWidth = memo.size?.width || 200;
-        const memoHeight = memo.size?.height || 95;
-
-        // 메모 블록의 경계 계산
-        const memoLeft = memo.position.x;
-        const memoRight = memo.position.x + memoWidth;
-        const memoTop = memo.position.y;
-        const memoBottom = memo.position.y + memoHeight;
-
-        // 사각형 교집합 확인
-        return (memoLeft < maxX && memoRight > minX && memoTop < maxY && memoBottom > minY);
-      });
-
-      // 카테고리 선택 확인 (블록, 영역, 라벨)
-      const categoriesInSelection = (currentPage.categories || []).filter(category => {
-        const hasChildren = currentPage.memos.some(memo => memo.parentId === category.id) ||
-                           currentPage.categories?.some(cat => cat.parentId === category.id);
-
-        let intersects = false;
-
-        if (hasChildren && category.isExpanded) {
-          // 하위 아이템이 있고 펼쳐진 경우: 영역과 교집합 확인
-          const area = calculateCategoryArea(category, currentPage);
-          if (area) {
-            const areaLeft = area.x;
-            const areaRight = area.x + area.width;
-            const areaTop = area.y;
-            const areaBottom = area.y + area.height;
-
-            intersects = (areaLeft < maxX && areaRight > minX && areaTop < maxY && areaBottom > minY);
-          }
-        } else {
-          // 하위 아이템이 없거나 접혀진 경우: 카테고리 블록과 교집합 확인
-          const categoryWidth = category.size?.width || 200;
-          const categoryHeight = category.size?.height || 95;
-
-          const categoryLeft = category.position.x;
-          const categoryRight = category.position.x + categoryWidth;
-          const categoryTop = category.position.y;
-          const categoryBottom = category.position.y + categoryHeight;
-
-          intersects = (categoryLeft < maxX && categoryRight > minX && categoryTop < maxY && categoryBottom > minY);
-        }
-
-        return intersects;
-      });
-
-      if (memosInSelection.length > 0 || categoriesInSelection.length > 0) {
-        if (isDragSelectingWithShift) {
-          // Shift + 드래그: 기존 선택 유지하면서 드래그 영역 아이템들 토글
-          const currentMemoSelection = selectedMemoId ? [selectedMemoId, ...selectedMemoIds] : selectedMemoIds;
-          const currentCategorySelection = selectedCategoryId ? [selectedCategoryId, ...selectedCategoryIds] : selectedCategoryIds;
-          let newMemoSelection = [...currentMemoSelection];
-          let newCategorySelection = [...currentCategorySelection];
-
-          memosInSelection.forEach(memo => {
-            if (newMemoSelection.includes(memo.id)) {
-              // 이미 선택된 메모는 선택 해제
-              newMemoSelection = newMemoSelection.filter(id => id !== memo.id);
-            } else {
-              // 선택되지 않은 메모는 선택에 추가
-              newMemoSelection.push(memo.id);
-            }
-          });
-
-          categoriesInSelection.forEach(category => {
-            if (newCategorySelection.includes(category.id)) {
-              // 이미 선택된 카테고리는 선택 해제
-              newCategorySelection = newCategorySelection.filter(id => id !== category.id);
-            } else {
-              // 선택되지 않은 카테고리는 선택에 추가
-              newCategorySelection.push(category.id);
-            }
-          });
-
-          setSelectedMemoIds(newMemoSelection);
-          setSelectedMemoId(null);
-          setSelectedCategoryIds(newCategorySelection);
-          setSelectedCategoryId(null);
-        } else {
-          // 일반 드래그: 기존 선택 해제하고 드래그 영역 아이템들만 선택
-          setSelectedMemoIds(memosInSelection.map(memo => memo.id));
-          setSelectedMemoId(null);
-          setSelectedCategoryIds(categoriesInSelection.map(category => category.id));
-          setSelectedCategoryId(null);
-        }
-      } else if (!isDragSelectingWithShift) {
-        // 일반 드래그로 아무것도 선택하지 않았으면 기존 선택 해제
-        setSelectedMemoIds([]);
-        setSelectedMemoId(null);
-        setSelectedCategoryIds([]);
-        setSelectedCategoryId(null);
-      }
-    }
-
-    setIsDragSelecting(false);
-    setDragSelectStart(null);
-    setDragSelectEnd(null);
-    setDragHoveredMemoIds([]);
-    setIsDragSelectingWithShift(false);
-  };
-
-  // 중요도 필터 토글 함수
-  const toggleImportanceFilter = (level: ImportanceLevel) => {
-    setActiveImportanceFilters(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(level)) {
-        newSet.delete(level);
-      } else {
-        newSet.add(level);
-      }
-      return newSet;
-    });
-  };
-
-  // 필터를 기본 상태로 리셋 (모든 중요도 필터 활성화 + 일반 내용 표시)
-  const resetFiltersToDefault = () => {
-    const allLevels: ImportanceLevel[] = ['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'];
-    setActiveImportanceFilters(new Set(allLevels));
-    setShowGeneralContent(true);
-  };
-
-  // 특정 메모로 화면 이동하는 함수
-  const focusOnMemo = (memoId: string) => {
-    const memo = currentPage?.memos.find(m => m.id === memoId);
-    if (memo) {
-      // 메모를 선택하고 화면을 해당 메모로 이동
-      setSelectedMemoId(memoId);
-      setSelectedMemoIds([]);
-      // 화면을 해당 메모로 이동
-      handleNavigateToMemo(memoId);
-    }
   };
 
 
@@ -2998,48 +2783,6 @@ const App: React.FC = () => {
     ));
   };
 
-
-  const selectCategory = (categoryId: string, isShiftClick: boolean = false) => {
-    // 메모 선택 해제
-    setSelectedMemoId(null);
-    setSelectedMemoIds([]);
-
-    // 빈 문자열이거나 유효하지 않은 ID인 경우 모든 선택 해제
-    if (!categoryId || !currentPage?.categories?.find(c => c.id === categoryId)) {
-      setSelectedCategoryId(null);
-      setSelectedCategoryIds([]);
-      // 드래그 선택 UI도 초기화
-      setIsDragSelecting(false);
-      setDragSelectStart(null);
-      setDragSelectEnd(null);
-      setDragHoveredMemoIds([]);
-      setDragHoveredCategoryIds([]);
-      return;
-    }
-
-    if (isShiftClick) {
-      // Shift + 클릭: 멀티 선택
-      setSelectedCategoryIds(prev => {
-        // 기존에 단일 선택된 카테고리가 있으면 다중 선택 목록에 추가
-        const currentSelection = selectedCategoryId ? [selectedCategoryId, ...prev] : prev;
-
-        if (currentSelection.includes(categoryId)) {
-          // 이미 선택된 경우 제거
-          return currentSelection.filter(id => id !== categoryId);
-        } else {
-          // 새로 추가
-          return [...currentSelection, categoryId];
-        }
-      });
-
-      // 멀티 선택 시에는 단일 선택 해제
-      setSelectedCategoryId(null);
-    } else {
-      // 일반 클릭: 단일 선택
-      setSelectedCategoryId(categoryId);
-      setSelectedCategoryIds([]);
-    }
-  };
 
   const deleteMemoBlock = () => {
     if (!selectedMemoId) return;

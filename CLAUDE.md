@@ -10,16 +10,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run eject` - Eject from Create React App (irreversible)
 - `npx tsc --noEmit` - Type check without compilation
 
-## Google Sheets Integration
-
-The application integrates with Google Sheets API for data extraction and table creation:
-
-- **API Configuration**: Google OAuth client configured in `src/config/google.ts` with read-only sheets access
-- **Authentication**: Uses Google Identity Services (GIS) via GoogleAuth component for secure sign-in
-- **Range Detection**: Smart clipboard-based system detects copied sheet ranges and auto-calculates A1 notation
-- **Data Extraction**: Supports both structured table conversion and plain text extraction from sheet ranges
-- **SheetsBlock**: Embedded iframe view of Google Sheets with range selection tools and extraction controls
-
 ## Application Architecture
 
 This is a React TypeScript mindmap memo application built with Create React App. The app provides an interactive canvas for creating, connecting, and organizing memo blocks in a mind mapping interface.
@@ -34,6 +24,7 @@ This is a React TypeScript mindmap memo application built with Create React App.
 
 - **Canvas** (`src/components/Canvas.tsx`): Interactive mindmap area with SVG connection lines, drag-and-drop memo positioning, and connection modes
 - **MemoBlock** (`src/components/MemoBlock.tsx`): Draggable memo cards with connection points, resize detection, and interactive connection handling
+- **CategoryArea** (`src/components/CategoryArea.tsx`): Visual representation of category boundaries with semi-transparent colored regions
 - **LeftPanel** (`src/components/LeftPanel.tsx`): Page navigation with inline editing capabilities and resizable interface
 - **RightPanel** (`src/components/RightPanel.tsx`): Detailed memo editing form with title, tags, content, and connection navigation
 - **Resizer** (`src/components/Resizer.tsx`): Reusable panel resize handle component
@@ -42,8 +33,8 @@ This is a React TypeScript mindmap memo application built with Create React App.
 
 Core types in `src/types/index.ts`:
 
-- **MemoBlock**: Individual memo with title, content, tags, connections array, position, and optional size. Contains both legacy `content` field and new `blocks` array for rich content
-- **ContentBlock**: Notion-style content blocks with 10 types: text, callout, checklist, image, file, bookmark, quote, code, table, sheets
+- **MemoBlock**: Individual memo with title, content, tags, connections array, position, and optional size. Contains `blocks` array for rich content
+- **ContentBlock**: Notion-style content blocks with 8 types: text, callout, checklist, image, file, bookmark, quote, code
 - **CategoryBlock**: Hierarchical container for organizing memos and other categories with title, position, size, children array, parentId, and isExpanded state
 - **Page**: Contains arrays of memos and categories with id and name
 - **AppState**: Global application state interface
@@ -52,7 +43,7 @@ Core types in `src/types/index.ts`:
 
 The application implements a Notion-inspired block-based content editor:
 
-- **ContentBlock Types**: 10 distinct block types each with specific properties and rendering logic: text, callout, checklist, image, file, bookmark, quote, code, table, sheets
+- **ContentBlock Types**: 8 distinct block types each with specific properties and rendering logic: text, callout, checklist, image, file, bookmark, quote, code
 - **Block Components**: Individual components in `src/components/blocks/` for each block type
 - **ContentBlockComponent**: Wrapper component that renders appropriate block type and handles common functionality
 - **Block Selection**: Multi-select blocks with drag selection, keyboard shortcuts (Ctrl+A, Delete), and context menu
@@ -95,18 +86,6 @@ The application implements a comprehensive undo/redo system for canvas operation
 - **History Storage**: Canvas actions stored with snapshots of page state for reliable restoration
 - **Auto-cleanup**: Deleted memos/categories automatically removed from quick navigation list
 
-### Advanced Table System
-
-The application includes a sophisticated table system designed for business process management:
-
-- **Column-Based Typing**: Each table column has a fixed type (text, number, date, checkbox, select, formula) that applies to all cells in that column
-- **Data Registry**: Global named data system using @dataName syntax (e.g., "@예산_총액") for cross-table references and formula dependencies
-- **Formula Engine**: Business-specific functions including PROGRESS(), STATUS(), DEADLINE(), WORKDAYS(), APPROVAL(), LATEST(), PREVIOUS(), SUM_BY()
-- **Real-time Updates**: Data registry subscribes to changes and automatically updates dependent cells and formulas
-- **Column Type Management**: Click column headers to change column types; type changes automatically convert existing cell values
-- **Horizontal Scrolling**: Tables automatically add horizontal scroll when content exceeds container width
-- **Context Menu UI**: Column type selector appears as positioned context menu rather than modal dialog
-
 ### Advanced Features
 
 - **Canvas Interaction**: Pan, zoom, drag selection with visual feedback boxes
@@ -137,13 +116,14 @@ The application includes a sophisticated table system designed for business proc
 
 ### Category System Implementation Details
 
-- **Area Rendering**: Category areas only render when `hasChildren && isExpanded` (Canvas.tsx:645)
+- **Area Rendering**: Category areas only render when `hasChildren && isExpanded`
 - **Position Synchronization**: Category drag uses absolute positioning with stored original positions to prevent cumulative movement errors
 - **Memo Position Cache**: `dragStartMemoPositions` ref stores original memo positions on drag start, cleared on drag end
 - **Children Movement**: When category moves, children calculate new position as `originalPosition + totalDelta` (not cumulative)
-- **Drop Positioning**: When memos are dropped onto categories, they are positioned at `category.position.y + 200px`
 - **Area Colors**: Semi-transparent colors assigned based on category ID hash using predefined color palette
 - **Cache System**: `draggedCategoryAreas` state caches area size and original position during drag to maintain fixed dimensions; cache is cleared on drag end to allow natural area resizing based on memo positions
+- **Drag State Management**: Uses custom hooks (`useDragState`) to manage drag-related state separately from main application state
+- **Area Calculation**: Uses utility functions (`categoryAreaUtils.ts`) for consistent area boundary calculations across components
 
 ### Collision Detection System
 
@@ -165,29 +145,21 @@ The application implements a sophisticated collision detection system using unif
 
 The application implements Shift+drag functionality for adding/removing memos and categories to/from category hierarchies:
 
-- **Shift Key Detection**: Global keyboard event listeners track Shift key state (App.tsx:197-220)
-- **Dynamic Mode Switching**: Shift key can be pressed before or during drag; mode switches dynamically (Canvas.tsx:843-886)
+- **Shift Key Detection**: Global keyboard event listeners track Shift key state
+- **Dynamic Mode Switching**: Shift key can be pressed before or during drag; mode switches dynamically
 - **Visual Movement During Drag**: During Shift+drag, categories and all child elements move together visually through actual position updates
-- **Position Restoration on Drop**: On drop, all positions are restored to original locations using `dragStartMemoPositions` and `dragStartCategoryPositions` refs (App.tsx:1340-1402)
-- **Parent-Child Update Only**: Shift drop only changes `parentId` relationships, not positions (App.tsx:1344)
-- **Cache Management**: All caches (`draggedCategoryAreas`, `dragStartMemoPositions`, `dragStartCategoryPositions`) are cleared after Shift drop (App.tsx:1416, Canvas.tsx:935)
+- **Position Restoration on Drop**: On drop, all positions are restored to original locations using `dragStartMemoPositions` and `dragStartCategoryPositions` refs
+- **Parent-Child Update Only**: Shift drop only changes `parentId` relationships, not positions
+- **Cache Management**: All caches (`draggedCategoryAreas`, `dragStartMemoPositions`, `dragStartCategoryPositions`) are cleared after Shift drop
 - **Visual Hints**: Shows "💡 Shift를 누르면 카테고리에 추가" hint when dragging without Shift; green border and "+" icon when Shift is pressed
 - **Area Freezing**: During Shift+drag, category areas are cached (`shiftDragAreaCache`) to prevent size changes as dragged items move
 - **Memo Parent-Child**: `handleShiftDrop` handles adding/removing memos to/from categories based on overlap with frozen area bounds
 - **Category Parent-Child**: `handleShiftDropCategory` handles adding/removing categories to/from other categories
 - **Auto-Expand**: Target categories automatically expand when items are added to them (only on add, not on remove)
 - **Excluding Dragged Item**: Area calculations exclude the currently dragged item to prevent false overlaps (`pageWithoutDraggingMemo`, `pageWithoutDraggingCategory`)
-
-### Table System Architecture
-
-- **Column-Based Type System**: TableColumn interface defines column properties including type, options, validation
-- **Dual Data Structure**: Tables maintain both legacy `headers`/`rows` arrays and enhanced `columns`/`cells` arrays for backward compatibility
-- **Data Registry Manager**: Global singleton (`src/utils/dataRegistry.ts`) manages named data points with dependency tracking
-- **Formula Engine**: Separate class (`src/utils/formulaEngine.ts`) handles @dataName references and business-specific functions
-- **Cell Editor Component**: Type-aware cell editing with autocomplete for @dataName references and formula helper
-- **Column Type Selector**: Context menu positioned at click location for adding columns and changing existing column types
-- **Type Conversion**: Automatic value conversion when changing column types (e.g., text → number uses parseFloat())
-- **Table Scrolling**: Wrapper div with `overflowX: 'auto'` and `minWidth: 'max-content'` on table for horizontal scrolling
+- **UI Mode Toggle**: Application supports two modes for managing parent-child relationships:
+  1. **Shift+Drag Mode** (default): Hold Shift while dragging to add/remove items to/from categories
+  2. **Button UI Mode**: Click on category block to open a UI panel showing all items in that category, with buttons to add/remove children directly
 
 ## Development Guidelines
 
@@ -231,16 +203,25 @@ The application implements Shift+drag functionality for adding/removing memos an
    - 같은 패턴의 문제가 다른 곳에 없는지 확인
    - 해결 방법을 이 문서에 기록
 
+7. **App.tsx의 비대화 방지 (CRITICAL)**
+   - **절대 금지**: App.tsx에 모든 상태를 두는 방식 사용 금지
+   - **새로운 기능 제작 시**: 반드시 커스텀 훅으로 제작 (유틸 함수는 유틸 함수로 제작)
+   - **App.tsx의 역할**: 훅을 호출하고 조합하는 역할만 수행, 기능 자체의 코드가 작성되어서는 안 됨
+   - **아키텍처 패턴**:
+     1. 커스텀 훅으로 상태와 관리 로직 작성 (`src/hooks/`)
+     2. 훅에서 반환된 상태와 함수들을 Context에 담아 전역적으로 제공
+     3. 하위 컴포넌트에서는 useContext 훅을 사용해 props 전달 없이 바로 상태에 접근
+   - **훅 문서화**: 새로운 훅을 만들 때마다 해당 훅의 목적, 사용법, 반환값을 문서화
+   - **예시**:
+     - `useDragState.ts` - 드래그 관련 상태 관리
+     - `usePanelState.ts` - 패널 상태 관리
+     - `useSelectionHandlers.ts` - 선택 관련 핸들러
+
 ### Specific Implementation Guidelines
 
 - **File Management**: Always prefer editing existing files to creating new ones; never create files unless absolutely necessary
-- **Table System**: When working with tables, remember the dual data structure - maintain both legacy arrays and enhanced objects
 - **Error Handling**: Use proper TypeScript error handling with `error instanceof Error ? error.message : 'Unknown error'` pattern
-- **Function Parameters**: Ensure all function calls have correct number of parameters (e.g., updateBlock requires 4 parameters: headers, rows, cells, columns)
-- **Data Registry**: Use global data registry for cross-table references; remember @dataName syntax for formula references
 - **Context Menus**: Position context menus using getBoundingClientRect() and pass position props for proper placement
-- **Google Sheets Safety**: Always validate array data before using .map() - check `Array.isArray()` and filter non-arrays to prevent runtime errors
-- **Range Detection**: Use clipboard-based detection for Google Sheets ranges; implement fallback UI for manual range input when automatic detection fails
 - **Category Drag Operations**: Always use absolute positioning (originalPosition + totalDelta) rather than cumulative deltas to prevent position drift
 - **Collision Detection**: Use unified collision resolution function (`resolveAreaCollisions`) to prevent duplicate logic and infinite loops
 - **Shift+Drag Operations**: When implementing Shift+drag features, remember to: (1) disable collision detection, (2) freeze area bounds using cache, (3) exclude dragged item from area calculations, (4) use frozen cached bounds for overlap detection
