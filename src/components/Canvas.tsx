@@ -23,7 +23,8 @@ interface CanvasProps {
   onDeleteSelected: () => void; // 통합 삭제 핸들러
   onDisconnectMemo: () => void;
   onMemoPositionChange: (memoId: string, position: { x: number; y: number }) => void;
-  onCategoryPositionChange: (categoryId: string, position: { x: number; y: number }) => void; // 카테고리 위치 변경
+  onCategoryPositionChange: (categoryId: string, position: { x: number; y: number }) => void; // 카테고리 위치 변경 (전체 이동)
+  onCategoryLabelPositionChange: (categoryId: string, position: { x: number; y: number }) => void; // 카테고리 라벨만 이동
   onMemoSizeChange: (memoId: string, size: { width: number; height: number }) => void;
   onCategorySizeChange: (categoryId: string, size: { width: number; height: number }) => void; // 카테고리 크기 변경
   onCategoryUpdate: (category: CategoryBlock) => void; // 카테고리 업데이트
@@ -98,6 +99,7 @@ const Canvas: React.FC<CanvasProps> = ({
   onDisconnectMemo,
   onMemoPositionChange,
   onCategoryPositionChange,
+  onCategoryLabelPositionChange,
   onMemoSizeChange,
   onCategorySizeChange,
   onCategoryUpdate,
@@ -865,6 +867,7 @@ const Canvas: React.FC<CanvasProps> = ({
               : (isShiftDragTarget ? '3px solid rgba(16, 185, 129, 0.6)' : (isDragHovered ? '3px solid rgba(59, 130, 246, 0.6)' : '2px dashed rgba(139, 92, 246, 0.3)')),
             borderRadius: '12px',
             pointerEvents: 'auto',
+            cursor: 'move',
             zIndex: -1,
             transform: (isShiftDragTarget || isParentBeingLeftBehind || isDragHovered) ? 'scale(1.02)' : 'scale(1)',
             transition: 'all 0.2s ease',
@@ -874,6 +877,132 @@ const Canvas: React.FC<CanvasProps> = ({
           }}
           onDrop={(e) => handleDropOnCategoryArea(e, category.id)}
           onDragOver={handleCategoryAreaDragOver}
+          onMouseDown={(e) => {
+            if (e.button === 0 && !isConnecting) {
+              // 영역 드래그 시작 - 카테고리 전체를 이동
+              e.stopPropagation();
+              setIsDraggingCategoryArea(category.id);
+
+              let startX = e.clientX;
+              let startY = e.clientY;
+              const originalCategoryPosition = { x: category.position.x, y: category.position.y };
+              let hasMoved = false;
+              let isShiftMode = isShiftPressed;
+
+              // 초기 Shift 상태에 따라 캐시 설정
+              if (isShiftMode) {
+                if (currentPage && shiftDragAreaCacheRef?.current && Object.keys(shiftDragAreaCacheRef.current).length === 0) {
+                  currentPage.categories?.forEach(cat => {
+                    if (cat.isExpanded) {
+                      const catArea = calculateCategoryAreaWithColor(cat);
+                      if (catArea) {
+                        shiftDragAreaCacheRef.current[cat.id] = catArea;
+                      }
+                    }
+                  });
+                }
+              } else {
+                if (!draggedCategoryAreas[category.id]) {
+                  const currentArea = area || calculateCategoryAreaWithColor(category);
+                  if (currentArea) {
+                    setDraggedCategoryAreas(prev => ({
+                      ...prev,
+                      [category.id]: {
+                        area: currentArea,
+                        originalPosition: { x: category.position.x, y: category.position.y }
+                      }
+                    }));
+                  }
+                }
+              }
+
+              const handleMouseMove = (moveEvent: MouseEvent) => {
+                hasMoved = true;
+                const currentShiftState = moveEvent.shiftKey;
+
+                if (currentShiftState !== isShiftMode) {
+                  isShiftMode = currentShiftState;
+
+                  if (isShiftMode) {
+                    if (currentPage && shiftDragAreaCacheRef?.current && Object.keys(shiftDragAreaCacheRef.current).length === 0) {
+                      currentPage.categories?.forEach(cat => {
+                        if (cat.isExpanded) {
+                          const catArea = calculateCategoryAreaWithColor(cat);
+                          if (catArea) {
+                            shiftDragAreaCacheRef.current[cat.id] = catArea;
+                          }
+                        }
+                      });
+                    }
+                    setDraggedCategoryAreas(prev => {
+                      const newAreas = { ...prev };
+                      delete newAreas[category.id];
+                      return newAreas;
+                    });
+                  } else {
+                    if (!draggedCategoryAreas[category.id]) {
+                      const currentArea = area || calculateCategoryAreaWithColor(category);
+                      if (currentArea) {
+                        setDraggedCategoryAreas(prev => ({
+                          ...prev,
+                          [category.id]: {
+                            area: currentArea,
+                            originalPosition: { x: category.position.x, y: category.position.y }
+                          }
+                        }));
+                      }
+                    }
+                    if (shiftDragAreaCacheRef?.current) {
+                      shiftDragAreaCacheRef.current = {};
+                    }
+                  }
+                }
+
+                const deltaX = (moveEvent.clientX - startX) / canvasScale;
+                const deltaY = (moveEvent.clientY - startY) / canvasScale;
+
+                const newPosition = {
+                  x: originalCategoryPosition.x + deltaX,
+                  y: originalCategoryPosition.y + deltaY
+                };
+
+                onCategoryPositionChange(category.id, newPosition);
+
+                if (isShiftMode) {
+                  setShiftDragInfo({
+                    categoryId: category.id,
+                    offset: { x: deltaX, y: deltaY }
+                  });
+                } else {
+                  setShiftDragInfo(null);
+                }
+              };
+
+              const handleMouseUp = () => {
+                setIsDraggingCategoryArea(null);
+                setShiftDragInfo(null);
+
+                if (hasMoved) {
+                  const finalPosition = {
+                    x: originalCategoryPosition.x + ((window.event as MouseEvent).clientX - startX) / canvasScale,
+                    y: originalCategoryPosition.y + ((window.event as MouseEvent).clientY - startY) / canvasScale
+                  };
+
+                  onCategoryPositionDragEnd?.(category.id, finalPosition);
+
+                  if (isShiftMode) {
+                    onShiftDropCategory?.(category, finalPosition);
+                  }
+                }
+
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+              };
+
+              document.addEventListener('mousemove', handleMouseMove);
+              document.addEventListener('mouseup', handleMouseUp);
+            }
+          }}
           onMouseUp={(e) => {
             // 연결 모드일 때 영역 어디에나 연결선을 놓으면 연결
             if (isConnecting && connectingFromId && connectingFromId !== category.id) {
@@ -1138,165 +1267,37 @@ const Canvas: React.FC<CanvasProps> = ({
           }}
           onMouseDown={(e) => {
             if (e.button === 0) {
-              // 드래그 시작
-              setIsDraggingCategoryArea(category.id);
+              // 라벨 드래그 시작 - 라벨만 이동
+              e.stopPropagation();
 
               let startX = e.clientX;
               let startY = e.clientY;
-              const originalCategoryPosition = { x: category.position.x, y: category.position.y };
-              console.log('[Canvas 라벨] 드래그 시작 - categoryId:', category.id, '원본 위치:', originalCategoryPosition);
+              const originalLabelPosition = { x: category.position.x, y: category.position.y };
               let hasMoved = false;
-              let isShiftMode = isShiftPressed; // 초기 Shift 상태
-
-              // 초기 Shift 상태에 따라 캐시 설정
-              if (isShiftMode) {
-                // 모든 카테고리 영역 크기 캐싱 (Shift+드래그 중엔 모든 영역이 고정됨)
-                if (currentPage && shiftDragAreaCacheRef?.current && Object.keys(shiftDragAreaCacheRef.current).length === 0) {
-                  currentPage.categories?.forEach(cat => {
-                    if (cat.isExpanded) {
-                      const catArea = calculateCategoryAreaWithColor(cat);
-                      if (catArea) {
-                        shiftDragAreaCacheRef.current[cat.id] = catArea;
-                      }
-                    }
-                  });
-                }
-              } else {
-                // 일반 드래그: 캐시가 없을 때만 영역 크기 저장
-                if (!draggedCategoryAreas[category.id]) {
-                  const currentArea = area || calculateCategoryAreaWithColor(category);
-                  if (currentArea) {
-                    setDraggedCategoryAreas(prev => ({
-                      ...prev,
-                      [category.id]: {
-                        area: currentArea,
-                        originalPosition: { x: category.position.x, y: category.position.y }
-                      }
-                    }));
-                  }
-                }
-              }
 
               const handleMouseMove = (moveEvent: MouseEvent) => {
                 hasMoved = true;
-                console.log('[Canvas 라벨] handleMouseMove - categoryId:', category.id);
-
-                // 드래그 중 Shift 키 상태 확인 (실시간으로 변경 가능)
-                const currentShiftState = moveEvent.shiftKey;
-
-                // Shift 모드가 변경되었을 때
-                if (currentShiftState !== isShiftMode) {
-                  isShiftMode = currentShiftState;
-
-                  if (isShiftMode) {
-                    // Shift 모드로 전환: 모든 영역 캐싱
-                    if (currentPage && shiftDragAreaCacheRef?.current && Object.keys(shiftDragAreaCacheRef.current).length === 0) {
-                      currentPage.categories?.forEach(cat => {
-                        if (cat.isExpanded) {
-                          const catArea = calculateCategoryAreaWithColor(cat);
-                          if (catArea) {
-                            shiftDragAreaCacheRef.current[cat.id] = catArea;
-                          }
-                        }
-                      });
-                    }
-                    // 일반 모드 캐시 제거
-                    setDraggedCategoryAreas(prev => {
-                      const newAreas = { ...prev };
-                      delete newAreas[category.id];
-                      return newAreas;
-                    });
-                  } else {
-                    // 일반 모드로 전환: 영역 캐싱
-                    if (!draggedCategoryAreas[category.id]) {
-                      const currentArea = area || calculateCategoryAreaWithColor(category);
-                      if (currentArea) {
-                        setDraggedCategoryAreas(prev => ({
-                          ...prev,
-                          [category.id]: {
-                            area: currentArea,
-                            originalPosition: { x: category.position.x, y: category.position.y }
-                          }
-                        }));
-                      }
-                    }
-                    // Shift 모드 캐시 제거
-                    if (shiftDragAreaCacheRef?.current) {
-                      shiftDragAreaCacheRef.current = {};
-                    }
-                  }
-                }
 
                 const deltaX = (moveEvent.clientX - startX) / canvasScale;
                 const deltaY = (moveEvent.clientY - startY) / canvasScale;
 
-                const newPosition = {
-                  x: originalCategoryPosition.x + deltaX,
-                  y: originalCategoryPosition.y + deltaY
+                const newLabelPosition = {
+                  x: originalLabelPosition.x + deltaX,
+                  y: originalLabelPosition.y + deltaY
                 };
 
-                // Shift 모드든 일반 모드든 항상 위치 업데이트 (하위 요소들도 함께 이동)
-                onCategoryPositionChange(category.id, newPosition);
-
-                // Shift 모드일 때는 추가로 오프셋 저장
-                if (isShiftMode) {
-                  setShiftDragInfo({
-                    categoryId: category.id,
-                    offset: { x: deltaX, y: deltaY }
-                  });
-                } else {
-                  setShiftDragInfo(null);
-                }
+                // 라벨만 이동
+                onCategoryLabelPositionChange(category.id, newLabelPosition);
               };
 
-              const handleMouseUp = (upEvent: MouseEvent) => {
-                console.log('[Canvas 라벨] handleMouseUp - categoryId:', category.id, 'timestamp:', Date.now());
+              const handleMouseUp = () => {
                 document.removeEventListener('mousemove', handleMouseMove);
                 document.removeEventListener('mouseup', handleMouseUp);
-                console.log('[Canvas 라벨] 이벤트 리스너 제거 완료 - categoryId:', category.id);
-
-                // 최종 위치 계산
-                const deltaX = (upEvent.clientX - startX) / canvasScale;
-                const deltaY = (upEvent.clientY - startY) / canvasScale;
-                const finalPosition = {
-                  x: originalCategoryPosition.x + deltaX,
-                  y: originalCategoryPosition.y + deltaY
-                };
-                console.log('[Canvas 라벨] 최종 위치 계산:', finalPosition, 'categoryId:', category.id);
-
-                if (hasMoved && isShiftMode) {
-                  // Shift 모드였으면: drop 처리 (부모-자식 관계 변경)
-                  onShiftDropCategory?.(category, finalPosition);
-                } else {
-                  // 일반 드롭: 최종 위치를 전달
-                  onCategoryPositionDragEnd?.(category.id, finalPosition);
-                }
-
-                // 드래그 종료 - 캐시 및 임시 위치 제거
-                setIsDraggingCategoryArea(null);
-                setShiftDragInfo(null); // Shift 드래그 정보 클리어
-
-                if (isShiftMode && shiftDragAreaCacheRef?.current) {
-                  shiftDragAreaCacheRef.current = {};
-                }
-
-                // Canvas 로컬 캐시는 약간의 딜레이 후 제거 (React 리렌더링 대기)
-                setTimeout(() => {
-                  console.log('[Canvas 라벨] 캐시 제거 전 - categoryId:', category.id, 'cached:', draggedCategoryAreas[category.id]);
-                  setDraggedCategoryAreas(prev => {
-                    const newAreas = { ...prev };
-                    const removed = newAreas[category.id];
-                    delete newAreas[category.id];
-                    console.log('[Canvas 라벨] 캐시 제거 완료 - categoryId:', category.id, 'removed:', removed);
-                    return newAreas;
-                  });
-                }, 50);
               };
 
               document.addEventListener('mousemove', handleMouseMove);
               document.addEventListener('mouseup', handleMouseUp);
               e.preventDefault();
-              e.stopPropagation();
             }
           }}
         >

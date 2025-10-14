@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Page, MemoBlock, DataRegistry, MemoDisplaySize, ImportanceLevel, CategoryBlock, CanvasHistory, CanvasAction, CanvasActionType, QuickNavItem } from './types';
+import { Page, MemoBlock, DataRegistry, MemoDisplaySize, ImportanceLevel, CategoryBlock, QuickNavItem } from './types';
 import { globalDataRegistry } from './utils/dataRegistry';
-
+import { STORAGE_KEYS, DEFAULT_PAGES } from './constants/defaultData';
+import { loadFromStorage, saveToStorage } from './utils/storageUtils';
+import { useCanvasHistory } from './hooks/useCanvasHistory';
 import { calculateCategoryArea, CategoryArea, clearCollisionDirections, centerCanvasOnPosition } from './utils/categoryAreaUtils';
 import { resolveUnifiedCollisions } from './utils/collisionUtils';
 import {
@@ -16,316 +18,6 @@ import {
 import LeftPanel from './components/LeftPanel';
 import RightPanel from './components/RightPanel';
 import Canvas from './components/Canvas';
-
-// localStorage 키 상수
-const STORAGE_KEYS = {
-  PAGES: 'mindmap-memo-pages',
-  CURRENT_PAGE_ID: 'mindmap-memo-current-page-id',
-  PANEL_SETTINGS: 'mindmap-memo-panel-settings',
-  QUICK_NAV_ITEMS: 'mindmap-memo-quick-nav-items'
-};
-
-// 기본 데이터
-const DEFAULT_PAGES: Page[] = (() => {
-  const pageId = '1';
-
-  // 튜토리얼 메모들
-  const tutorialMemos: MemoBlock[] = [
-    // 1. 단축키 설명
-    {
-      id: `${pageId}-memo-shortcuts`,
-      title: '⌨️ 단축키',
-      content: '',
-      blocks: [
-        {
-          id: `${pageId}-shortcuts-1`,
-          type: 'text',
-          content: 'Ctrl+Z\n실행취소'
-        },
-        {
-          id: `${pageId}-shortcuts-2`,
-          type: 'text',
-          content: 'Ctrl+Shift+Z\n다시실행'
-        },
-        {
-          id: `${pageId}-shortcuts-3`,
-          type: 'text',
-          content: 'Delete\n선택한 메모 삭제'
-        },
-        {
-          id: `${pageId}-shortcuts-4`,
-          type: 'text',
-          content: 'Alt + 스크롤\n캔버스 확대/축소'
-        },
-        {
-          id: `${pageId}-shortcuts-5`,
-          type: 'text',
-          content: 'Spacebar + 드래그\n캔버스 이동'
-        }
-      ],
-      tags: ['튜토리얼'],
-      connections: [],
-      position: { x: 150, y: 150 },
-      displaySize: 'medium' as MemoDisplaySize,
-      parentId: `${pageId}-tutorial-category`
-    },
-    // 2. 메모 블록과 카테고리 영역
-    {
-      id: `${pageId}-memo-canvas`,
-      title: '📦 메모 블록과 카테고리',
-      content: '',
-      blocks: [
-        {
-          id: `${pageId}-canvas-1`,
-          type: 'text',
-          content: '메모 블록\n드래그로 이동하고, 테두리 모서리를 클릭하여 다른 메모와 연결선을 생성하세요'
-        },
-        {
-          id: `${pageId}-canvas-2`,
-          type: 'text',
-          content: '카테고리 영역\n메모를 담는 컨테이너입니다. Shift+드래그로 메모를 카테고리에 추가하거나 제거하세요'
-        },
-        {
-          id: `${pageId}-canvas-3`,
-          type: 'text',
-          content: '카테고리 중첩\n카테고리 안에 다른 카테고리를 넣어 계층 구조를 만들 수 있습니다'
-        },
-        {
-          id: `${pageId}-canvas-4`,
-          type: 'text',
-          content: '카테고리 연결\n카테고리끼리도 연결선을 생성하여 관계를 표현할 수 있습니다'
-        },
-        {
-          id: `${pageId}-canvas-5`,
-          type: 'text',
-          content: '카테고리 확장/축소\n카테고리 블록을 클릭하면 영역을 펼치거나 접을 수 있습니다'
-        }
-      ],
-      tags: ['튜토리얼'],
-      connections: [],
-      position: { x: 450, y: 150 },
-      displaySize: 'medium' as MemoDisplaySize,
-      parentId: `${pageId}-tutorial-category`
-    },
-    // 3. 오른쪽 탭 (메모 편집)
-    {
-      id: `${pageId}-memo-rightpanel`,
-      title: '📝 우측 패널 - 메모 편집',
-      content: '',
-      blocks: [
-        {
-          id: `${pageId}-right-1`,
-          type: 'text',
-          content: '텍스트 입력\n메모를 선택하면 우측 패널에서 제목과 내용을 편집할 수 있습니다'
-        },
-        {
-          id: `${pageId}-right-2`,
-          type: 'text',
-          content: '파일 첨부\n이미지나 파일을 드래그앤드롭으로 업로드하거나 우클릭-파일첨부로 파일을 업로드하세요'
-        },
-        {
-          id: `${pageId}-right-3`,
-          type: 'text',
-          content: '중요도 부여\n텍스트를 드래그하거나 파일, 이미지, URL을 우클릭해 중요도를 부여하여 분류하세요'
-        }
-      ],
-      tags: ['튜토리얼'],
-      connections: [],
-      position: { x: 750, y: 150 },
-      displaySize: 'medium' as MemoDisplaySize,
-      parentId: `${pageId}-tutorial-category`
-    },
-    // 4. 우측 패널 (카테고리 편집)
-    {
-      id: `${pageId}-memo-rightpanel-category`,
-      title: '📂 우측 패널 - 카테고리 편집',
-      content: '',
-      blocks: [
-        {
-          id: `${pageId}-right-cat-1`,
-          type: 'text',
-          content: '제목 수정\n카테고리를 선택하면 우측 패널에서 카테고리 제목을 편집할 수 있습니다'
-        },
-        {
-          id: `${pageId}-right-cat-2`,
-          type: 'text',
-          content: '하위 메모 목록\n카테고리에 포함된 모든 하위 메모 목록이 표시되며, 클릭하여 빠르게 이동할 수 있습니다'
-        },
-        {
-          id: `${pageId}-right-cat-3`,
-          type: 'text',
-          content: '연결된 카테고리\n연결선으로 연결된 다른 카테고리 목록이 표시되며, 클릭하여 빠르게 이동할 수 있습니다'
-        }
-      ],
-      tags: ['튜토리얼'],
-      connections: [],
-      position: { x: 1050, y: 150 },
-      displaySize: 'medium' as MemoDisplaySize,
-      parentId: `${pageId}-tutorial-category`
-    },
-    // 5. 왼쪽 탭 (페이지와 검색)
-    {
-      id: `${pageId}-memo-leftpanel`,
-      title: '🔍 좌측 패널 - 페이지와 검색',
-      content: '',
-      blocks: [
-        {
-          id: `${pageId}-left-1`,
-          type: 'text',
-          content: '페이지 관리\n좌측 패널에서 페이지를 추가하거나 삭제하세요. 각 페이지는 독립적인 캔버스입니다'
-        },
-        {
-          id: `${pageId}-left-2`,
-          type: 'text',
-          content: '통합 검색\n좌측 상단 돋보기 아이콘으로 모든 페이지의 메모와 카테고리를 검색할 수 있습니다'
-        },
-        {
-          id: `${pageId}-left-3`,
-          type: 'text',
-          content: '검색 필터\n검색 결과를 메모 또는 카테고리로 필터링하여 원하는 항목만 표시할 수 있습니다'
-        }
-      ],
-      tags: ['튜토리얼'],
-      connections: [],
-      position: { x: 150, y: 450 },
-      displaySize: 'medium' as MemoDisplaySize,
-      parentId: `${pageId}-tutorial-category`
-    },
-    // 6. 캔버스 뷰 기능
-    {
-      id: `${pageId}-memo-canvasview`,
-      title: '🎨 캔버스 뷰 기능',
-      content: '',
-      blocks: [
-        {
-          id: `${pageId}-view-1`,
-          type: 'text',
-          content: '단축 이동\n메모나 카테고리를 우클릭하여 단축 이동 목록에 추가하고, 우측 상단의 단축 이동 버튼을 클릭해 빠르게 이동하세요'
-        },
-        {
-          id: `${pageId}-view-2`,
-          type: 'text',
-          content: '중요도 필터\n캔버스 좌측 상단의 중요도 필터를 통해 특정 중요도의 메모만 표시할 수 있습니다'
-        },
-        {
-          id: `${pageId}-view-3`,
-          type: 'text',
-          content: '줌과 팬\n마우스 휠로 확대/축소하고, 빈 공간을 드래그하여 캔버스를 이동하세요'
-        },
-        {
-          id: `${pageId}-view-4`,
-          type: 'text',
-          content: '메모 생성\n캔버스 하단의 "메모 추가" 버튼으로 새로운 메모 블록을 생성하세요'
-        },
-        {
-          id: `${pageId}-view-5`,
-          type: 'text',
-          content: '카테고리 생성\n캔버스 하단의 "카테고리 추가" 버튼으로 새로운 카테고리 영역을 생성하세요'
-        },
-        {
-          id: `${pageId}-view-6`,
-          type: 'text',
-          content: '연결 해제\n캔버스 하단의 "연결 해제" 버튼을 켜고 연결선을 클릭하여 메모 간 연결을 제거하세요'
-        }
-      ],
-      tags: ['튜토리얼'],
-      connections: [],
-      position: { x: 450, y: 450 },
-      displaySize: 'medium' as MemoDisplaySize,
-      parentId: `${pageId}-tutorial-category`
-    },
-    // 7. 기타 사항
-    {
-      id: `${pageId}-memo-etc`,
-      title: '📢 기타 사항',
-      content: '',
-      blocks: [
-        {
-          id: `${pageId}-etc-1`,
-          type: 'text',
-          content: '아직 프로토타입이므로 기기 브라우저에 저장되는 방식이며 시크릿 모드를 사용하시면 저장이 되지 않습니다.\n또 다른 기기로 이용하시면 내용이 기존 기기에 적은 내용이 공유되지 않으니 유의하시기 바랍니다.'
-        },
-        {
-          id: `${pageId}-etc-2`,
-          type: 'text',
-          content: '추후 이용자가 늘면 로그인 기능을 추가해 어떤 기기에서든 내용이 공유되도록 추가하겠습니다.'
-        },
-        {
-          id: `${pageId}-etc-3`,
-          type: 'text',
-          content: '앱을 사용하시며 불편한 점이나 의견 있으신 경우 @movee.diary로 DM주시면 감사하겠습니다!',
-          importanceRanges: [{
-            start: 0,
-            end: 55,
-            level: 'critical' as ImportanceLevel
-          }]
-        }
-      ],
-      tags: ['튜토리얼'],
-      connections: [],
-      position: { x: 750, y: 450 },
-      displaySize: 'medium' as MemoDisplaySize,
-      parentId: `${pageId}-tutorial-category`
-    }
-  ];
-
-  // 튜토리얼 카테고리 생성
-  const tutorialCategory: CategoryBlock = {
-    id: `${pageId}-tutorial-category`,
-    title: '📖 사용 방법',
-    tags: [],
-    connections: [],
-    position: { x: 100, y: 100 },
-    size: { width: 1300, height: 700 },
-    children: tutorialMemos.map(memo => memo.id),
-    parentId: undefined,
-    isExpanded: true
-  };
-
-  return [
-    {
-      id: pageId,
-      name: '페이지 1',
-      memos: tutorialMemos,
-      categories: [tutorialCategory]
-    }
-  ];
-})();
-
-// localStorage에서 데이터 로드 및 마이그레이션
-const loadFromStorage = <T,>(key: string, defaultValue: T): T => {
-  try {
-    const stored = localStorage.getItem(key);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-
-      // 페이지 데이터인 경우 categories 필드 마이그레이션
-      if (key === STORAGE_KEYS.PAGES && Array.isArray(parsed)) {
-        return parsed.map((page: any) => ({
-          ...page,
-          categories: (page.categories || []).map((category: any) => ({
-            ...category,
-            connections: category.connections || [] // connections 필드도 마이그레이션
-          }))
-        })) as T;
-      }
-
-      return parsed;
-    }
-  } catch (error) {
-    console.error(`localStorage 로드 오류 (${key}):`, error);
-  }
-  return defaultValue;
-};
-
-// localStorage에 데이터 저장
-const saveToStorage = (key: string, data: any): void => {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (error) {
-    console.error(`localStorage 저장 오류 (${key}):`, error);
-  }
-};
 
 const App: React.FC = () => {
   // 브라우저 기본 Ctrl/Command + 휠 줌 차단 (전역)
@@ -422,6 +114,26 @@ const App: React.FC = () => {
   }, []);
 
 
+  // 카테고리 라벨만 이동 (영역은 변경하지 않음)
+  const updateCategoryLabelPosition = (categoryId: string, position: { x: number; y: number }) => {
+    setPages(prev => prev.map(page => {
+      if (page.id !== currentPageId) return page;
+
+      return {
+        ...page,
+        categories: page.categories?.map(cat => {
+          if (cat.id === categoryId) {
+            return {
+              ...cat,
+              position
+            };
+          }
+          return cat;
+        }) || []
+      };
+    }));
+  };
+
   // 카테고리 드래그 종료 시 드롭 감지 및 캐시 제거
   const handleCategoryPositionDragEnd = (categoryId: string, finalPosition: { x: number; y: number }) => {
     console.log('[App] handleCategoryPositionDragEnd - categoryId:', categoryId, 'finalPosition:', finalPosition);
@@ -469,24 +181,15 @@ const App: React.FC = () => {
     shiftDragAreaCache.current = {}; // Shift 드래그 캐시도 클리어
   };
 
-  // Canvas history for undo/redo functionality
-  const [canvasHistory, setCanvasHistory] = useState<CanvasHistory>(() => {
-    const currentPage = pages.find(p => p.id === currentPageId);
-    return {
-      past: [],
-      present: currentPage ? {
-        type: 'memo_create',
-        timestamp: Date.now(),
-        pageSnapshot: {
-          memos: [...currentPage.memos],
-          categories: [...(currentPage.categories || [])]
-        },
-        description: 'Initial state'
-      } : null,
-      future: [],
-      maxHistorySize: 50
-    };
-  });
+  // Canvas history for undo/redo functionality - using custom hook
+  const {
+    canvasHistory,
+    canUndo,
+    canRedo,
+    saveCanvasState,
+    undoCanvasAction,
+    redoCanvasAction
+  } = useCanvasHistory({ pages, currentPageId, setPages });
   const [dragLineEnd, setDragLineEnd] = useState<{ x: number; y: number } | null>(null);
 
   // 중요도 필터 상태
@@ -622,96 +325,7 @@ const App: React.FC = () => {
     }
   }, [pages, currentPageId]);
 
-  // Canvas History Management Functions
-  const saveCanvasState = React.useCallback((actionType: CanvasActionType, description: string) => {
-    const currentPage = pages.find(p => p.id === currentPageId);
-    if (!currentPage) return;
-
-    const newAction: CanvasAction = {
-      type: actionType,
-      timestamp: Date.now(),
-      pageSnapshot: {
-        memos: [...currentPage.memos],
-        categories: [...(currentPage.categories || [])]
-      },
-      description
-    };
-
-    setCanvasHistory(prev => {
-      const newPast = prev.present ? [...prev.past, prev.present] : prev.past;
-
-      // Limit history size
-      const trimmedPast = newPast.length >= prev.maxHistorySize
-        ? newPast.slice(-prev.maxHistorySize + 1)
-        : newPast;
-
-      return {
-        ...prev,
-        past: trimmedPast,
-        present: newAction,
-        future: [] // Clear future when new action is performed
-      };
-    });
-  }, [pages, currentPageId]);
-
-  const canUndo = canvasHistory.past.length > 0;
-  const canRedo = canvasHistory.future.length > 0;
-
-  const undoCanvasAction = React.useCallback(() => {
-    console.log('⬅️ undoCanvasAction called', { canUndo, historyLength: canvasHistory.past.length });
-    if (!canUndo || !canvasHistory.present) return;
-
-    const previousAction = canvasHistory.past[canvasHistory.past.length - 1];
-
-    // Restore the page state from the previous action
-    setPages(prev => prev.map(page =>
-      page.id === currentPageId
-        ? {
-            ...page,
-            memos: [...previousAction.pageSnapshot.memos],
-            categories: [...previousAction.pageSnapshot.categories]
-          }
-        : page
-    ));
-
-    // Update history
-    setCanvasHistory(prev => ({
-      ...prev,
-      past: prev.past.slice(0, -1),
-      present: previousAction,
-      future: prev.present ? [prev.present, ...prev.future] : prev.future
-    }));
-
-  }, [canUndo, canvasHistory, currentPageId]);
-
-  const redoCanvasAction = React.useCallback(() => {
-    console.log('➡️ redoCanvasAction called', { canRedo, futureLength: canvasHistory.future.length });
-    if (!canRedo) return;
-
-    const nextAction = canvasHistory.future[0];
-
-    // Restore the page state from the next action
-    setPages(prev => prev.map(page =>
-      page.id === currentPageId
-        ? {
-            ...page,
-            memos: [...nextAction.pageSnapshot.memos],
-            categories: [...nextAction.pageSnapshot.categories]
-          }
-        : page
-    ));
-
-    // Update history
-    setCanvasHistory(prev => ({
-      ...prev,
-      past: prev.present ? [...prev.past, prev.present] : prev.past,
-      present: nextAction,
-      future: prev.future.slice(1)
-    }));
-
-  }, [canRedo, canvasHistory, currentPageId]);
-
-  // Canvas keyboard shortcuts for undo/redo
+  // ESC 키로 모든 선택 해제
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Only handle shortcuts when not typing in input fields
@@ -732,22 +346,11 @@ const App: React.FC = () => {
         setDragHoveredCategoryIds([]);
         return;
       }
-
-      // Canvas undo/redo shortcuts
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-        console.log('🔄 Undo triggered from keyboard');
-        e.preventDefault();
-        undoCanvasAction();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
-        console.log('🔄 Redo triggered from keyboard');
-        e.preventDefault();
-        redoCanvasAction();
-      }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [undoCanvasAction, redoCanvasAction]);
+  }, []);
 
   // localStorage 자동 저장 - 페이지 데이터
   useEffect(() => {
@@ -4207,6 +3810,7 @@ const App: React.FC = () => {
         onDisconnectMemo={disconnectMemo}
         onMemoPositionChange={updateMemoPosition}
         onCategoryPositionChange={updateCategoryPosition}
+        onCategoryLabelPositionChange={updateCategoryLabelPosition}
         onMemoSizeChange={updateMemoSize}
         onCategorySizeChange={updateCategorySize}
         onMemoDisplaySizeChange={updateMemoDisplaySize}
