@@ -12,7 +12,8 @@
       "Bash(Stop-Process -Id 18852 -Force)",
       "Bash(taskkill:*)",
       "Bash(Stop-Process -Name node -Force)",
-      "Bash(Stop-Process -Name \"node\" -Force -ErrorAction SilentlyContinue)"
+      "Bash(Stop-Process -Name \"node\" -Force -ErrorAction SilentlyContinue)",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": []

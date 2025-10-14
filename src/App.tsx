@@ -15,6 +15,9 @@ import { useQuickNavHandlers } from './hooks/useQuickNavHandlers';
 import { usePanelHandlers } from './hooks/usePanelHandlers';
 import { useCategoryHandlers } from './hooks/useCategoryHandlers';
 import { usePageHandlers } from './hooks/usePageHandlers';
+import { useCollisionHandlers } from './hooks/useCollisionHandlers';
+import { useShiftDragHandlers } from './hooks/useShiftDragHandlers';
+import { useCategoryPositionHandlers } from './hooks/useCategoryPositionHandlers';
 import { calculateCategoryArea, CategoryArea } from './utils/categoryAreaUtils';
 import { resolveUnifiedCollisions } from './utils/collisionUtils';
 import {
@@ -115,6 +118,12 @@ const App: React.FC = () => {
     shiftDropProcessedMemos,
     dragStartMemoPositions,
     dragStartCategoryPositions,
+    lastDragTime,
+    lastDragPosition,
+    categoryExitTimers,
+    categoryPositionTimers,
+    previousFramePosition,
+    cacheCreationStarted,
     clearCategoryCache: clearCategoryCacheFromHook
   } = dragState;
 
@@ -335,6 +344,37 @@ const App: React.FC = () => {
     deletePage
   } = pageHandlers;
 
+  // ===== 충돌 검사 핸들러 =====
+  const collisionHandlers = useCollisionHandlers({
+    pages,
+    setPages,
+    currentPageId
+  });
+
+  const {
+    pushAwayConflictingMemos
+  } = collisionHandlers;
+
+  // ===== Shift 드래그 핸들러 =====
+  const shiftDragHandlers = useShiftDragHandlers({
+    pages,
+    setPages,
+    currentPageId,
+    selectedCategoryIds,
+    draggedCategoryAreas,
+    dragStartMemoPositions,
+    dragStartCategoryPositions,
+    toggleCategoryExpanded,
+    saveCanvasState,
+    clearCategoryCache: clearCategoryCacheFromHook
+  });
+
+  const {
+    handleShiftDropCategory,
+    handleShiftDrop,
+    handleCategoryAreaShiftDrop
+  } = shiftDragHandlers;
+
   // 캔버스 이동 감지 (2단계 - canvas-pan)
   React.useEffect(() => {
     if (tutorialState.isActive && tutorialState.currentStep === 2) {
@@ -390,112 +430,35 @@ const App: React.FC = () => {
   // clearCategoryCache는 useDragState에서 가져온 것을 사용
   const clearCategoryCache = clearCategoryCacheFromHook;
 
+  // ===== 카테고리 위치 핸들러 =====
+  const categoryPositionHandlers = useCategoryPositionHandlers({
+    pages,
+    setPages,
+    currentPageId,
+    selectedCategoryIds,
+    draggedCategoryAreas,
+    dragStartMemoPositions,
+    dragStartCategoryPositions,
+    shiftDragAreaCache,
+    previousFramePosition,
+    cacheCreationStarted,
+    clearCategoryCache
+  });
 
-  // 카테고리 라벨만 이동 (영역은 변경하지 않음)
-  const updateCategoryLabelPosition = (categoryId: string, position: { x: number; y: number }) => {
-    setPages(prev => prev.map(page => {
-      if (page.id !== currentPageId) return page;
+  const {
+    updateCategoryLabelPosition,
+    handleCategoryPositionDragEnd,
+    updateCategoryPositions: updateCategoryPositionsFromHook
+  } = categoryPositionHandlers;
 
-      return {
-        ...page,
-        categories: page.categories?.map(cat => {
-          if (cat.id === categoryId) {
-            return {
-              ...cat,
-              position
-            };
-          }
-          return cat;
-        }) || []
-      };
-    }));
-  };
-
-  // 카테고리 드래그 종료 시 드롭 감지 및 캐시 제거
-  const handleCategoryPositionDragEnd = (categoryId: string, finalPosition: { x: number; y: number }) => {
-    console.log('[App] handleCategoryPositionDragEnd - categoryId:', categoryId, 'finalPosition:', finalPosition);
-
-    const currentPage = pages.find(p => p.id === currentPageId);
-    if (!currentPage || !currentPage.categories) {
-      clearCategoryCache(categoryId);
-      previousFramePosition.current.delete(categoryId);
-      return;
-    }
-
-    // 드랍 시점의 카테고리 및 하위 메모 위치 로그
-    const childMemos = currentPage.memos.filter(m => m.parentId === categoryId);
-    console.log('[App] 드랍 시 카테고리 최종 위치:', { x: Math.round(finalPosition.x), y: Math.round(finalPosition.y) });
-    console.log('[App] 드랍 시 하위 메모 위치:', childMemos.map(m => ({ id: m.id, x: Math.round(m.position.x), y: Math.round(m.position.y) })));
-
-    // 상대적 위치 계산
-    if (childMemos.length > 0) {
-      const relativeMemoPos = childMemos.map(m => ({
-        id: m.id,
-        relX: Math.round(m.position.x - finalPosition.x),
-        relY: Math.round(m.position.y - finalPosition.y)
-      }));
-      console.log('[App] 카테고리 기준 상대 위치:', relativeMemoPos);
-    }
-
-    // Shift 드래그는 별도 처리 (이미 handleShiftDropCategory에서 처리됨)
-    // 일반 드래그로는 종속 관계를 변경하지 않음 (위치만 밀어냄)
-
-    // 드래그 종료 후 캐시 제거 - 메모 위치에 따라 자연스럽게 크기 조정
-    // 다중 선택된 모든 카테고리의 캐시도 함께 제거
-    const isMultiSelected = selectedCategoryIds.includes(categoryId);
-    const categoriesToClear = isMultiSelected ? selectedCategoryIds : [categoryId];
-
-    categoriesToClear.forEach(catId => {
-      clearCategoryCache(catId);
-      previousFramePosition.current.delete(catId);
-      cacheCreationStarted.current.delete(catId);
-    });
-
-    // 드래그 종료 시 모든 위치 캐시 초기화
-    dragStartMemoPositions.current.clear();
-    dragStartCategoryPositions.current.clear();
-
-    shiftDragAreaCache.current = {}; // Shift 드래그 캐시도 클리어
-  };
-
-  const [dragLineEnd, setDragLineEnd] = useState<{ x: number; y: number } | null>(null);
-
-  // 중요도 필터 상태
-  const [activeImportanceFilters, setActiveImportanceFilters] = useState<Set<ImportanceLevel>>(
-    new Set(['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'] as ImportanceLevel[])
-  );
-  const [showGeneralContent, setShowGeneralContent] = useState<boolean>(true);
-  const [isDragSelecting, setIsDragSelecting] = useState<boolean>(false);
-  const [dragSelectStart, setDragSelectStart] = useState<{ x: number; y: number } | null>(null);
-  const [dragSelectEnd, setDragSelectEnd] = useState<{ x: number; y: number } | null>(null);
-  const [dragHoveredMemoIds, setDragHoveredMemoIds] = useState<string[]>([]);
-  const [dragHoveredCategoryIds, setDragHoveredCategoryIds] = useState<string[]>([]);
-  const [isDragSelectingWithShift, setIsDragSelectingWithShift] = useState<boolean>(false);
-  const [isRightPanelFullscreen, setIsRightPanelFullscreen] = useState<boolean>(false);
-
-  // 빠른 드래그 안정화를 위한 상태
-  const lastDragTime = React.useRef<Map<string, number>>(new Map());
-  const lastDragPosition = React.useRef<Map<string, { x: number; y: number }>>(new Map());
-  const categoryExitTimers = React.useRef<Map<string, NodeJS.Timeout>>(new Map());
-
-  // 충돌 검사 디바운스를 위한 상태
-  const collisionCheckTimers = React.useRef<Map<string, NodeJS.Timeout>>(new Map());
-  const lastCollisionCheck = React.useRef<Map<string, number>>(new Map());
-  const collisionCheckCount = React.useRef<Map<string, number>>(new Map()); // 충돌 검사 횟수 추적
-  const [dataRegistry, setDataRegistry] = useState<DataRegistry>({});
-  const [isDraggingMemo, setIsDraggingMemo] = useState<boolean>(false);
-  const [draggingMemoId, setDraggingMemoId] = useState<string | null>(null);
-  const [isDraggingCategory, setIsDraggingCategory] = useState<boolean>(false);
-  const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
-
-  // Initialize data registry
+  // ===== Data Registry 초기화 =====
   useEffect(() => {
-    globalDataRegistry.setRegistry(dataRegistry);
+    globalDataRegistry.setRegistry(appState.dataRegistry);
     const unsubscribe = globalDataRegistry.subscribe(() => {
-      setDataRegistry({ ...globalDataRegistry.getRegistry() });
+      appState.setDataRegistry({ ...globalDataRegistry.getRegistry() });
     });
     return unsubscribe;
-  }, [dataRegistry]);
+  }, [appState.dataRegistry, appState.setDataRegistry]);
 
   // 컴포넌트 언마운트 시 타이머 정리
   useEffect(() => {
@@ -511,12 +474,6 @@ const App: React.FC = () => {
         clearTimeout(timer);
       });
       categoryPositionTimers.current.clear();
-
-      // 충돌 검사 타이머 정리
-      collisionCheckTimers.current.forEach((timer) => {
-        clearTimeout(timer);
-      });
-      collisionCheckTimers.current.clear();
     };
   }, []);
 
@@ -607,11 +564,11 @@ const App: React.FC = () => {
         setSelectedMemoIds([]);
         setSelectedCategoryIds([]);
         // 드래그 선택 UI도 초기화
-        setIsDragSelecting(false);
-        setDragSelectStart(null);
-        setDragSelectEnd(null);
-        setDragHoveredMemoIds([]);
-        setDragHoveredCategoryIds([]);
+        appState.setIsDragSelecting(false);
+        appState.setDragSelectStart(null);
+        appState.setDragSelectEnd(null);
+        appState.setDragHoveredMemoIds([]);
+        appState.setDragHoveredCategoryIds([]);
         return;
       }
     };
@@ -669,740 +626,11 @@ const App: React.FC = () => {
 
 
 
-  // 충돌하는 메모블록 밀어내기 함수
-  const pushAwayConflictingMemos = React.useCallback((categoryArea: { x: number; y: number; width: number; height: number }, categoryId: string, page: Page) => {
 
-    const conflictingMemos = page.memos.filter(memo => {
-      // 현재 카테고리에 속한 메모는 제외 (이미 올바른 위치에 있음)
-      if (memo.parentId === categoryId) {
-        return false;
-      }
 
-      // 메모와 카테고리 영역의 충돌 검사
-      const memoWidth = memo.size?.width || 200;
-      const memoHeight = memo.size?.height || 95;
-      const memoBounds = {
-        left: memo.position.x,
-        top: memo.position.y,
-        right: memo.position.x + memoWidth,
-        bottom: memo.position.y + memoHeight
-      };
 
-      const areaBounds = {
-        left: categoryArea.x,
-        top: categoryArea.y,
-        right: categoryArea.x + categoryArea.width,
-        bottom: categoryArea.y + categoryArea.height
-      };
 
-      // 실제 겹침 여부 확인 (여백 없이 정확한 충돌 감지)
-      const isOverlapping = !(memoBounds.right <= areaBounds.left ||
-                              memoBounds.left >= areaBounds.right ||
-                              memoBounds.bottom <= areaBounds.top ||
-                              memoBounds.top >= areaBounds.bottom);
-
-      if (isOverlapping) {
-      }
-
-      return isOverlapping;
-    });
-
-
-    // 충돌하는 메모들을 영역 밖으로 밀어내기 (겹침 영역 기반)
-    conflictingMemos.forEach(memo => {
-      const memoWidth = memo.size?.width || 200;
-      const memoHeight = memo.size?.height || 95;
-
-      const memoBounds = {
-        left: memo.position.x,
-        top: memo.position.y,
-        right: memo.position.x + memoWidth,
-        bottom: memo.position.y + memoHeight
-      };
-
-      const areaBounds = {
-        left: categoryArea.x,
-        top: categoryArea.y,
-        right: categoryArea.x + categoryArea.width,
-        bottom: categoryArea.y + categoryArea.height
-      };
-
-      // 겹침 영역 계산
-      const overlapLeft = Math.max(memoBounds.left, areaBounds.left);
-      const overlapTop = Math.max(memoBounds.top, areaBounds.top);
-      const overlapRight = Math.min(memoBounds.right, areaBounds.right);
-      const overlapBottom = Math.min(memoBounds.bottom, areaBounds.bottom);
-
-      const overlapWidth = overlapRight - overlapLeft;
-      const overlapHeight = overlapBottom - overlapTop;
-
-
-      let newX = memo.position.x;
-      let newY = memo.position.y;
-      const safetyMargin = 5; // 최소 여백
-
-      // 정확한 픽셀 단위 밀어내기: 겹치는 만큼만 이동
-      if (overlapWidth <= overlapHeight) {
-        // 가로 방향으로 밀어내기 (겹치는 픽셀만큼만)
-        const memoCenterX = memo.position.x + memoWidth / 2;
-        const areaCenterX = categoryArea.x + categoryArea.width / 2;
-
-        if (memoCenterX > areaCenterX) {
-          // 오른쪽으로 밀어내기: 겹치는 폭만큼
-          newX = memo.position.x + overlapWidth + safetyMargin;
-        } else {
-          // 왼쪽으로 밀어내기: 겹치는 폭만큼
-          newX = memo.position.x - overlapWidth - safetyMargin;
-        }
-      } else {
-        // 세로 방향으로 밀어내기 (겹치는 픽셀만큼만)
-        const memoCenterY = memo.position.y + memoHeight / 2;
-        const areaCenterY = categoryArea.y + categoryArea.height / 2;
-
-        if (memoCenterY > areaCenterY) {
-          // 아래쪽으로 밀어내기: 겹치는 높이만큼
-          newY = memo.position.y + overlapHeight + safetyMargin;
-        } else {
-          // 위쪽으로 밀어내기: 겹치는 높이만큼
-          newY = memo.position.y - overlapHeight - safetyMargin;
-        }
-      }
-
-      const newPosition = { x: newX, y: newY };
-
-      // 즉시 상태 업데이트
-      setPages(prevPages => prevPages.map(p =>
-        p.id === currentPageId
-          ? {
-              ...p,
-              memos: p.memos.map(m =>
-                m.id === memo.id
-                  ? { ...m, position: newPosition }
-                  : m
-              )
-            }
-          : p
-      ));
-    });
-  }, [currentPageId]);
-
-  // 충돌하는 카테고리 영역 밀어내기 함수
-  const pushAwayConflictingCategories = React.useCallback((movingCategoryId: string, movingCategoryArea: { x: number; y: number; width: number; height: number }, page: Page) => {
-
-    // 카테고리 배열이 없으면 빈 배열로 초기화
-    const categories = page.categories || [];
-    if (categories.length === 0) {
-      return;
-    }
-
-    const conflictingCategories = categories.filter(category => {
-      if (category.id === movingCategoryId) return false;
-      if (category.parentId === movingCategoryId || movingCategoryId === category.parentId) return false;
-
-      const otherArea = calculateCategoryArea(category, page);
-      if (!otherArea) {
-        return false;
-      }
-
-      // 실제 영역 간 충돌 검사 (여백 없이 정확한 충돌 감지)
-      const isOverlapping = !(movingCategoryArea.x + movingCategoryArea.width <= otherArea.x ||
-                              movingCategoryArea.x >= otherArea.x + otherArea.width ||
-                              movingCategoryArea.y + movingCategoryArea.height <= otherArea.y ||
-                              movingCategoryArea.y >= otherArea.y + otherArea.height);
-
-      if (isOverlapping) {
-      }
-
-      return isOverlapping;
-    });
-
-
-    // 충돌하는 카테고리들과 그 하위 요소들을 밀어내기
-    conflictingCategories.forEach(category => {
-      const categoryWidth = category.size?.width || 200;
-      const categoryHeight = category.size?.height || 80;
-
-      const movingCenterX = movingCategoryArea.x + movingCategoryArea.width / 2;
-      const movingCenterY = movingCategoryArea.y + movingCategoryArea.height / 2;
-      const categoryCenterX = category.position.x + categoryWidth / 2;
-      const categoryCenterY = category.position.y + categoryHeight / 2;
-
-      const deltaX = categoryCenterX - movingCenterX;
-      const deltaY = categoryCenterY - movingCenterY;
-      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
-      let offsetX: number, offsetY: number;
-
-      // 겹침 영역 기반 밀어내기 계산
-      const movingBounds = {
-        left: movingCategoryArea.x,
-        top: movingCategoryArea.y,
-        right: movingCategoryArea.x + movingCategoryArea.width,
-        bottom: movingCategoryArea.y + movingCategoryArea.height
-      };
-
-      const categoryBounds = {
-        left: category.position.x,
-        top: category.position.y,
-        right: category.position.x + categoryWidth,
-        bottom: category.position.y + categoryHeight
-      };
-
-      // 겹침 영역 계산
-      const overlapLeft = Math.max(movingBounds.left, categoryBounds.left);
-      const overlapTop = Math.max(movingBounds.top, categoryBounds.top);
-      const overlapRight = Math.min(movingBounds.right, categoryBounds.right);
-      const overlapBottom = Math.min(movingBounds.bottom, categoryBounds.bottom);
-
-      const overlapWidth = overlapRight - overlapLeft;
-      const overlapHeight = overlapBottom - overlapTop;
-
-
-      const safetyMargin = 10; // 최소 여백
-
-      if (distance === 0) {
-        // 중심이 같은 경우 오른쪽으로 밀어내기
-        offsetX = movingCategoryArea.width + safetyMargin;
-        offsetY = 0;
-      } else {
-        // 정확한 픽셀 단위 밀어내기: 겹치는 만큼만 이동
-        if (overlapWidth <= overlapHeight) {
-          // 가로 방향으로 밀어내기 (겹치는 픽셀만큼만)
-          if (categoryCenterX > movingCenterX) {
-            // 오른쪽으로 밀어내기: 겹치는 폭 + 최소 여백
-            offsetX = overlapWidth + safetyMargin;
-            offsetY = 0;
-          } else {
-            // 왼쪽으로 밀어내기: 겹치는 폭 + 최소 여백
-            offsetX = -(overlapWidth + safetyMargin);
-            offsetY = 0;
-          }
-        } else {
-          // 세로 방향으로 밀어내기 (겹치는 픽셀만큼만)
-          if (categoryCenterY > movingCenterY) {
-            // 아래쪽으로 밀어내기: 겹치는 높이 + 최소 여백
-            offsetX = 0;
-            offsetY = overlapHeight + safetyMargin;
-          } else {
-            // 위쪽으로 밀어내기: 겹치는 높이 + 최소 여백
-            offsetX = 0;
-            offsetY = -(overlapHeight + safetyMargin);
-          }
-        }
-      }
-
-      const newCategoryPosition = {
-        x: category.position.x + offsetX,
-        y: category.position.y + offsetY
-      };
-
-      // 카테고리와 하위 요소들을 함께 이동 (즉시 상태 업데이트)
-      setPages(prevPages => prevPages.map(page => {
-        if (page.id !== currentPageId) return page;
-
-        // 하위 메모들도 함께 이동
-        const updatedMemos = page.memos.map(memo =>
-          memo.parentId === category.id
-            ? {
-                ...memo,
-                position: {
-                  x: memo.position.x + offsetX,
-                  y: memo.position.y + offsetY
-                }
-              }
-            : memo
-        );
-
-        // 하위 카테고리들도 함께 이동
-        const updatedCategories = (page.categories || []).map(cat =>
-          cat.id === category.id
-            ? { ...cat, position: newCategoryPosition }
-            : cat.parentId === category.id
-            ? {
-                ...cat,
-                position: {
-                  x: cat.position.x + offsetX,
-                  y: cat.position.y + offsetY
-                }
-              }
-            : cat
-        );
-
-        return {
-          ...page,
-          memos: updatedMemos,
-          categories: updatedCategories
-        };
-      }));
-    });
-  }, [currentPageId]);
-
-  // 통합 충돌 감지 및 밀어내기 함수 (10번 제한)
-  const pushAwayConflictingBlocks = React.useCallback((categoryArea: { x: number; y: number; width: number; height: number }, categoryId: string, page: Page) => {
-    // 10번 제한 안전장치
-    const currentCount = collisionCheckCount.current.get(categoryId) || 0;
-    if (currentCount >= 10) {
-      return;
-    }
-    collisionCheckCount.current.set(categoryId, currentCount + 1);
-
-    // 무한 충돌 방지 - 최근 1초 내에 충돌 검사를 했으면 스킵
-    const now = Date.now();
-    const lastCheck = lastCollisionCheck.current.get(categoryId) || 0;
-    if (now - lastCheck < 1000) {
-      return;
-    }
-    lastCollisionCheck.current.set(categoryId, now);
-
-    // 10초 후 카운터 리셋
-    setTimeout(() => {
-      collisionCheckCount.current.set(categoryId, 0);
-    }, 10000);
-
-
-    // 1. 먼저 다른 카테고리 영역과의 충돌 검사 및 해결
-    pushAwayConflictingCategories(categoryId, categoryArea, page);
-
-    // 2. 그 다음 메모블록과의 충돌 검사 및 해결
-    pushAwayConflictingMemos(categoryArea, categoryId, page);
-
-  }, [currentPageId, pushAwayConflictingCategories, pushAwayConflictingMemos, collisionCheckCount, lastCollisionCheck]);
-
-
-
-
-
-
-
-  // Shift 드래그로 카테고리에 카테고리 추가
-  const handleShiftDropCategory = (draggedCategory: CategoryBlock, position: { x: number; y: number }, currentPage: Page, cachedAreas?: {[categoryId: string]: any}) => {
-    // 카테고리 찾기
-    const categoryWidth = draggedCategory.size?.width || 200;
-    const categoryHeight = draggedCategory.size?.height || 80;
-    const categoryBounds = {
-      left: position.x,
-      top: position.y,
-      right: position.x + categoryWidth,
-      bottom: position.y + categoryHeight
-    };
-
-    const isOverlapping = (bounds1: any, bounds2: any, margin = 20) => {
-      return !(bounds1.right + margin < bounds2.left ||
-               bounds1.left - margin > bounds2.right ||
-               bounds1.bottom + margin < bounds2.top ||
-               bounds1.top - margin > bounds2.bottom);
-    };
-
-    // 드래그 중인 카테고리와 그 모든 하위 카테고리들을 제외한 페이지 데이터 생성
-    const getAllDescendantIds = (categoryId: string): string[] => {
-      const descendants: string[] = [categoryId];
-      const children = (currentPage.categories || []).filter(c => c.parentId === categoryId);
-      children.forEach(child => {
-        descendants.push(...getAllDescendantIds(child.id));
-      });
-      return descendants;
-    };
-
-    const excludedIds = getAllDescendantIds(draggedCategory.id);
-    const pageWithoutDraggingCategory = {
-      ...currentPage,
-      categories: (currentPage.categories || []).filter(c => !excludedIds.includes(c.id)),
-      memos: currentPage.memos.filter(m => !excludedIds.includes(m.parentId || ''))
-    };
-
-    // 타겟 카테고리 찾기 (자기 자신과 자신의 하위는 이미 pageWithoutDraggingCategory에서 제외됨)
-    // 겹치는 모든 카테고리 찾기
-    const overlappingCategories = pageWithoutDraggingCategory.categories?.filter(category => {
-
-      // 1. 카테고리 블록과의 겹침 체크
-      const catWidth = category.size?.width || 200;
-      const catHeight = category.size?.height || 80;
-      const catBounds = {
-        left: category.position.x,
-        top: category.position.y,
-        right: category.position.x + catWidth,
-        bottom: category.position.y + catHeight
-      };
-
-      if (isOverlapping(categoryBounds, catBounds, 20)) {
-        return true;
-      }
-
-      // 2. 카테고리 영역과의 겹침 체크
-      if (category.isExpanded) {
-        let categoryArea;
-
-        // 캐시된 영역이 있으면 사용
-        if (cachedAreas && cachedAreas[category.id]) {
-          categoryArea = cachedAreas[category.id];
-        } else {
-          // 캐시 없으면 드래그 중인 카테고리를 제외하고 계산
-          categoryArea = calculateCategoryArea(category, pageWithoutDraggingCategory);
-        }
-
-        if (categoryArea) {
-          const areaBounds = {
-            left: categoryArea.x,
-            top: categoryArea.y,
-            right: categoryArea.x + categoryArea.width,
-            bottom: categoryArea.y + categoryArea.height
-          };
-          if (isOverlapping(categoryBounds, areaBounds, 20)) {
-            return true;
-          }
-        }
-      }
-
-      return false;
-    }) || [];
-
-    // 겹치는 카테고리 중에서 가장 깊은 레벨(가장 하위) 카테고리 선택
-    let targetCategory: CategoryBlock | null = null;
-
-    if (overlappingCategories.length > 0) {
-      // 각 카테고리의 깊이를 계산
-      const categoriesWithDepth = overlappingCategories.map(category => {
-        let depth = 0;
-        let checkParent = category.parentId;
-        while (checkParent) {
-          depth++;
-          const parentCat = currentPage.categories?.find(c => c.id === checkParent);
-          checkParent = parentCat?.parentId;
-        }
-        return { category, depth };
-      });
-
-      // 깊이가 가장 큰 카테고리 선택 (같은 깊이면 첫 번째)
-      const deepest = categoriesWithDepth.reduce((max, item) =>
-        item.depth > max.depth ? item : max
-      );
-
-      targetCategory = deepest.category;
-    }
-
-    // 카테고리 변경 처리
-    const newParentId = targetCategory ? targetCategory.id : undefined;
-    const parentChanged = draggedCategory.parentId !== newParentId;
-
-    // 다중 선택된 카테고리들도 함께 종속
-    const categoriesToMove = selectedCategoryIds.includes(draggedCategory.id)
-      ? [draggedCategory.id, ...selectedCategoryIds.filter(id => id !== draggedCategory.id)]
-      : [draggedCategory.id];
-
-    if (parentChanged) {
-      setPages(pages.map(p => {
-        if (p.id === currentPageId) {
-          // 원래 위치 정보 가져오기 (드래그 시작 시 저장된 위치)
-          const originalMemoPositions = dragStartMemoPositions.current.get(draggedCategory.id);
-          const originalCategoryPositions = dragStartCategoryPositions.current.get(draggedCategory.id);
-
-          // 부모 카테고리의 children 업데이트
-          let updatedCategories = (p.categories || []).map(category => {
-            // 드래그된 카테고리들의 parentId만 변경하고 위치는 원래대로
-            if (categoriesToMove.includes(category.id)) {
-              const originalPos = draggedCategoryAreas[category.id]?.originalPosition;
-              return {
-                ...category,
-                parentId: newParentId,
-                position: originalPos || category.position  // 원래 위치로 복원
-              };
-            }
-
-            // 하위 카테고리들도 원래 위치로 복원
-            if (originalCategoryPositions) {
-              const originalPos = originalCategoryPositions.get(category.id);
-              if (originalPos) {
-                category = { ...category, position: originalPos };
-              }
-            }
-
-            // 이전 부모들에서 제거 (다중 선택된 카테고리들 모두)
-            if (categoriesToMove.some(catId => {
-              const cat = p.categories?.find(c => c.id === catId);
-              return cat?.parentId === category.id;
-            })) {
-              return {
-                ...category,
-                children: (category.children || []).filter(id => !categoriesToMove.includes(id))
-              };
-            }
-
-            // 새 부모에 추가 (다중 선택된 카테고리들 모두)
-            if (category.id === newParentId) {
-              const currentChildren = category.children || [];
-              const newChildren = [...currentChildren, ...categoriesToMove.filter(id => !currentChildren.includes(id))];
-              return {
-                ...category,
-                children: newChildren,
-                isExpanded: true  // 자동 확장
-              };
-            }
-
-            return category;
-          });
-
-          // 하위 메모들도 원래 위치로 복원
-          let updatedMemos = p.memos;
-          if (originalMemoPositions) {
-            updatedMemos = p.memos.map(memo => {
-              const originalPos = originalMemoPositions.get(memo.id);
-              if (originalPos) {
-                return { ...memo, position: originalPos };
-              }
-              return memo;
-            });
-          }
-
-          return {
-            ...p,
-            categories: updatedCategories,
-            memos: updatedMemos
-          };
-        }
-        return p;
-      }));
-
-      // Shift 드래그로 카테고리에 넣을 때만 펼침 (빼낼 때는 펼치지 않음)
-      if (targetCategory && newParentId && !targetCategory.isExpanded) {
-        toggleCategoryExpanded(targetCategory.id);
-      }
-
-      const targetName = targetCategory ? `카테고리 ${targetCategory.title}` : '최상위';
-      saveCanvasState('move_to_category', `Shift 드래그로 카테고리 이동: ${draggedCategory.title} → ${targetName} (모든 하위 항목 포함)`);
-
-      // 드롭 후 캐시 클리어 (중요!)
-      clearCategoryCache(draggedCategory.id);
-    } else {
-      // 같은 카테고리 내에서 위치만 변경
-      setPages(pages.map(p => {
-        if (p.id === currentPageId) {
-          return {
-            ...p,
-            categories: (p.categories || []).map(category =>
-              category.id === draggedCategory.id
-                ? { ...category, position }
-                : category
-            )
-          };
-        }
-        return p;
-      }));
-    }
-  };
-
-  // Shift 드래그로 카테고리에 새 메모 추가
-  const handleShiftDrop = (draggedMemo: MemoBlock, position: { x: number; y: number }, currentPage: Page, cachedAreas?: {[categoryId: string]: any}) => {
-    // 카테고리 찾기
-    const memoWidth = draggedMemo.size?.width || 200;
-    const memoHeight = draggedMemo.size?.height || 95;
-    const memoBounds = {
-      left: position.x,
-      top: position.y,
-      right: position.x + memoWidth,
-      bottom: position.y + memoHeight
-    };
-
-    const isOverlapping = (bounds1: any, bounds2: any, margin = 20) => {
-      return !(bounds1.right + margin < bounds2.left ||
-               bounds1.left - margin > bounds2.right ||
-               bounds1.bottom + margin < bounds2.top ||
-               bounds1.top - margin > bounds2.bottom);
-    };
-
-    // 드래그 중인 메모를 제외한 페이지 데이터 생성
-    const pageWithoutDraggingMemo = {
-      ...currentPage,
-      memos: currentPage.memos.filter(m => m.id !== draggedMemo.id)
-    };
-
-    // 카테고리 블록과 영역 모두 체크 - 겹치는 모든 카테고리 찾기
-    const overlappingCategories = currentPage.categories?.filter(category => {
-      // 1. 카테고리 블록과의 겹침 체크
-      const categoryWidth = category.size?.width || 200;
-      const categoryHeight = category.size?.height || 80;
-      const categoryBounds = {
-        left: category.position.x,
-        top: category.position.y,
-        right: category.position.x + categoryWidth,
-        bottom: category.position.y + categoryHeight
-      };
-
-      if (isOverlapping(memoBounds, categoryBounds, 20)) {
-        return true;
-      }
-
-      // 2. 카테고리 영역과의 겹침 체크
-      if (category.isExpanded) {
-        let categoryArea;
-
-        // 캐시된 영역이 있으면 사용 (드래그 중인 메모 제외된 고정 영역)
-        if (cachedAreas && cachedAreas[category.id]) {
-          categoryArea = cachedAreas[category.id];
-        } else {
-          // 캐시 없으면 드래그 중인 메모를 제외하고 계산
-          categoryArea = calculateCategoryArea(category, pageWithoutDraggingMemo);
-        }
-
-        if (categoryArea) {
-          const areaBounds = {
-            left: categoryArea.x,
-            top: categoryArea.y,
-            right: categoryArea.x + categoryArea.width,
-            bottom: categoryArea.y + categoryArea.height
-          };
-          if (isOverlapping(memoBounds, areaBounds, 20)) {
-            return true;
-          }
-        }
-      }
-
-      return false;
-    }) || [];
-
-    // 겹치는 카테고리 중에서 가장 깊은 레벨(가장 하위) 카테고리 선택
-    // 깊이(depth)를 계산하여 가장 깊은 것을 선택
-    let targetCategory: CategoryBlock | null = null;
-
-    if (overlappingCategories.length > 0) {
-      // 각 카테고리의 깊이를 계산
-      const categoriesWithDepth = overlappingCategories.map(category => {
-        let depth = 0;
-        let checkParent = category.parentId;
-        while (checkParent) {
-          depth++;
-          const parentCat = currentPage.categories?.find(c => c.id === checkParent);
-          checkParent = parentCat?.parentId;
-        }
-        return { category, depth };
-      });
-
-      // 깊이가 가장 큰 카테고리 선택 (같은 깊이면 첫 번째)
-      const deepest = categoriesWithDepth.reduce((max, item) =>
-        item.depth > max.depth ? item : max
-      );
-
-      targetCategory = deepest.category;
-    }
-
-    // 카테고리 변경 처리
-    const newParentId = targetCategory ? targetCategory.id : undefined;
-    const parentChanged = draggedMemo.parentId !== newParentId;
-
-    console.log('[handleShiftDrop] 함수 호출됨 - draggedMemo:', draggedMemo.id, 'draggedMemo.parentId:', draggedMemo.parentId, 'newParentId:', newParentId, 'parentChanged:', parentChanged);
-
-    if (parentChanged) {
-      // 원래 위치 가져오기 (드래그 시작 시 저장된 위치)
-      const originalMemoPositions = dragStartMemoPositions.current.get(draggedMemo.id);
-
-      // 다중 선택된 메모들도 함께 종속
-      const memosToMove = selectedMemoIds.includes(draggedMemo.id)
-        ? [draggedMemo.id, ...selectedMemoIds.filter(id => id !== draggedMemo.id)]
-        : [draggedMemo.id];
-
-      console.log('[handleShiftDrop] setPages 호출 시작 - 이동할 메모:', memosToMove);
-      setPages(prev => {
-        console.log('[handleShiftDrop] setPages 콜백 실행');
-        return prev.map(p => {
-          if (p.id === currentPageId) {
-          // 메모의 parentId만 변경하고 위치는 원래대로 복원
-          const updatedMemos = p.memos.map(memo => {
-            if (memosToMove.includes(memo.id)) {
-              const originalPos = originalMemoPositions?.get(memo.id);
-              console.log('[handleShiftDrop] parentId 변경:', memo.id, '이전:', memo.parentId, '→ 새로운:', newParentId);
-              return {
-                ...memo,
-                parentId: newParentId,
-                position: originalPos || memo.position  // 원래 위치로 복원
-              };
-            }
-            return memo;
-          });
-
-          // 카테고리의 children 배열 업데이트 (그리고 필요시 expand)
-          const updatedCategories = (p.categories || []).map(category => {
-            // 이전 부모에서 제거 (모든 이동 메모)
-            if (memosToMove.some(memoId => {
-              const memo = p.memos.find(m => m.id === memoId);
-              return memo?.parentId === category.id;
-            })) {
-              console.log('[handleShiftDrop] 이전 부모 children 업데이트:', category.id);
-              return {
-                ...category,
-                children: (category.children || []).filter(id => !memosToMove.includes(id))
-              };
-            }
-            // 새 부모에 추가 + expand
-            if (category.id === newParentId) {
-              const currentChildren = category.children || [];
-              const newChildren = [...currentChildren, ...memosToMove.filter(id => !currentChildren.includes(id))];
-              console.log('[handleShiftDrop] 새 부모 children 업데이트:', category.id, 'before:', currentChildren, 'after:', newChildren);
-              return {
-                ...category,
-                children: newChildren,
-                isExpanded: true  // 여기서 expand 처리
-              };
-            }
-            return category;
-          });
-
-            return {
-              ...p,
-              memos: updatedMemos,
-              categories: updatedCategories
-            };
-          }
-          return p;
-        });
-      });
-
-      const targetName = targetCategory ? `카테고리 ${targetCategory.title}` : '최상위';
-      saveCanvasState('move_to_category', `Shift 드래그로 메모 이동: ${draggedMemo.title} → ${targetName}`);
-
-      // Shift 드래그로 처리된 메모 플래그 설정 (detectCategoryOnDrop에서 중복 처리 방지)
-      shiftDropProcessedMemos.current.add(draggedMemo.id);
-      // 잠시 후 플래그 제거 (다음 드래그를 위해)
-      setTimeout(() => {
-        shiftDropProcessedMemos.current.delete(draggedMemo.id);
-      }, 100);
-
-      // Shift 드래그 후 타이머 클리어 (일반 드래그 타이머와 충돌 방지)
-      const existingTimer = categoryExitTimers.current.get(draggedMemo.id);
-      if (existingTimer) {
-        console.log('[handleShiftDrop] 기존 타이머 클리어:', draggedMemo.id);
-        clearTimeout(existingTimer);
-        categoryExitTimers.current.delete(draggedMemo.id);
-      } else {
-        console.log('[handleShiftDrop] 클리어할 타이머 없음:', draggedMemo.id);
-      }
-    } else {
-      // 같은 카테고리 내에서 위치만 변경
-      setPages(prev => prev.map(p => {
-        if (p.id === currentPageId) {
-          return {
-            ...p,
-            memos: p.memos.map(memo =>
-              memo.id === draggedMemo.id
-                ? { ...memo, position }
-                : memo
-            )
-          };
-        }
-        return p;
-      }));
-    }
-  };
-
-  // 카테고리 영역 Shift+드래그 drop 처리 (Canvas에서 호출)
-  const handleCategoryAreaShiftDrop = (category: CategoryBlock, position: { x: number; y: number }) => {
-    const currentPage = pages.find(p => p.id === currentPageId);
-    if (!currentPage) return;
-
-    // 캐시된 영역이 있으면 사용
-    const cachedAreas = shiftDragAreaCache.current;
-
-    // handleShiftDropCategory 재사용
-    handleShiftDropCategory(category, position, currentPage, cachedAreas);
-  };
+  // ===== 기존 Shift 드래그 핸들러들은 useShiftDragHandlers로 이동됨 =====
 
   // 카테고리 드래그 완료 시 카테고리 블록 겹침 감지 (Shift 드래그)
   const detectCategoryDropForCategory = (categoryId: string, position: { x: number; y: number }) => {
@@ -1624,15 +852,7 @@ const App: React.FC = () => {
     }
   };
 
-  // 카테고리 위치 업데이트 히스토리 타이머 관리
-  const categoryPositionTimers = React.useRef<Map<string, NodeJS.Timeout>>(new Map());
-
-  // 이전 프레임 위치 저장 (프레임 간 delta 계산용)
-  const previousFramePosition = React.useRef<Map<string, {x: number, y: number}>>(new Map());
-
-  // 캐시 생성 추적 (동기적으로)
-  const cacheCreationStarted = React.useRef<Set<string>>(new Set());
-
+  // 카테고리 위치 업데이트 함수
   const updateCategoryPosition = (categoryId: string, position: { x: number; y: number }) => {
     console.log('[App] updateCategoryPosition 호출 - categoryId:', categoryId, 'position:', position, 'timestamp:', Date.now());
 
@@ -2652,37 +1872,37 @@ const App: React.FC = () => {
         isDisconnectMode={isDisconnectMode}
         connectingFromId={connectingFromId}
         connectingFromDirection={connectingFromDirection}
-        dragLineEnd={dragLineEnd}
+        dragLineEnd={appState.dragLineEnd}
         onStartConnection={startConnection}
         onConnectMemos={connectMemos}
         onCancelConnection={cancelConnection}
         onRemoveConnection={removeConnection}
         onUpdateDragLine={updateDragLine}
-        isDragSelecting={isDragSelecting}
-        dragSelectStart={dragSelectStart}
-        dragSelectEnd={dragSelectEnd}
-        dragHoveredMemoIds={dragHoveredMemoIds}
-        dragHoveredCategoryIds={dragHoveredCategoryIds}
+        isDragSelecting={appState.isDragSelecting}
+        dragSelectStart={appState.dragSelectStart}
+        dragSelectEnd={appState.dragSelectEnd}
+        dragHoveredMemoIds={appState.dragHoveredMemoIds}
+        dragHoveredCategoryIds={appState.dragHoveredCategoryIds}
         onDragSelectStart={handleDragSelectStart}
         onDragSelectMove={handleDragSelectMove}
         onDragSelectEnd={handleDragSelectEnd}
-        activeImportanceFilters={activeImportanceFilters}
+        activeImportanceFilters={appState.activeImportanceFilters}
         onToggleImportanceFilter={toggleImportanceFilter}
-        showGeneralContent={showGeneralContent}
-        onToggleGeneralContent={() => setShowGeneralContent(!showGeneralContent)}
+        showGeneralContent={appState.showGeneralContent}
+        onToggleGeneralContent={() => appState.setShowGeneralContent(!appState.showGeneralContent)}
         canUndo={canUndo}
         canRedo={canRedo}
         onUndo={undoCanvasAction}
         onRedo={redoCanvasAction}
-        isDraggingMemo={isDraggingMemo}
-        draggingMemoId={draggingMemoId}
+        isDraggingMemo={appState.isDraggingMemo}
+        draggingMemoId={appState.draggingMemoId}
         onMemoDragStart={(memoId: string) => {
-          setIsDraggingMemo(true);
-          setDraggingMemoId(memoId);
+          appState.setIsDraggingMemo(true);
+          appState.setDraggingMemoId(memoId);
         }}
         onMemoDragEnd={() => {
-          setIsDraggingMemo(false);
-          setDraggingMemoId(null);
+          appState.setIsDraggingMemo(false);
+          appState.setDraggingMemoId(null);
           // 드래그 완료 후 충돌 검사 - 주석 처리 (무한 반복 문제)
           // setTimeout(() => {
           //   const currentPage = pages.find(p => p.id === currentPageId);
@@ -2703,12 +1923,12 @@ const App: React.FC = () => {
         isShiftPressed={isShiftPressed}
         shiftDragAreaCacheRef={shiftDragAreaCache}
         onShiftDropCategory={handleCategoryAreaShiftDrop}
-        isDraggingCategory={isDraggingCategory}
+        isDraggingCategory={appState.isDraggingCategory}
         onCategoryDragStart={() => {
-          setIsDraggingCategory(true);
+          appState.setIsDraggingCategory(true);
         }}
         onCategoryDragEnd={() => {
-          setIsDraggingCategory(false);
+          appState.setIsDraggingCategory(false);
           // 드래그 완료 후 충돌 검사 - 일단 주석 처리 (영역 크기 변경 문제 해결)
           // setTimeout(() => {
           //   const currentPage = pages.find(p => p.id === currentPageId);
@@ -3077,10 +2297,10 @@ const App: React.FC = () => {
           onFocusMemo={focusOnMemo}
           width={rightPanelWidth}
           onResize={handleRightPanelResize}
-          isFullscreen={isRightPanelFullscreen}
+          isFullscreen={panelState.isRightPanelFullscreen}
           onToggleFullscreen={toggleRightPanelFullscreen}
-          activeImportanceFilters={activeImportanceFilters}
-          showGeneralContent={showGeneralContent}
+          activeImportanceFilters={appState.activeImportanceFilters}
+          showGeneralContent={appState.showGeneralContent}
           onResetFilters={resetFiltersToDefault}
         />
       )}
