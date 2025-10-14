@@ -13,7 +13,9 @@ import { useConnectionHandlers } from './hooks/useConnectionHandlers';
 import { useTutorialHandlers } from './hooks/useTutorialHandlers';
 import { useQuickNavHandlers } from './hooks/useQuickNavHandlers';
 import { usePanelHandlers } from './hooks/usePanelHandlers';
-import { calculateCategoryArea, CategoryArea, centerCanvasOnPosition } from './utils/categoryAreaUtils';
+import { useCategoryHandlers } from './hooks/useCategoryHandlers';
+import { usePageHandlers } from './hooks/usePageHandlers';
+import { calculateCategoryArea, CategoryArea } from './utils/categoryAreaUtils';
 import { resolveUnifiedCollisions } from './utils/collisionUtils';
 import {
   canAddCategoryAsChild,
@@ -295,6 +297,43 @@ const App: React.FC = () => {
     handleTutorialComplete,
     canProceedTutorial
   } = tutorialHandlers;
+
+  // ===== 카테고리 핸들러 =====
+  const categoryHandlers = useCategoryHandlers({
+    pages,
+    setPages,
+    currentPageId,
+    leftPanelWidth,
+    rightPanelOpen,
+    rightPanelWidth,
+    canvasScale,
+    setCanvasOffset,
+    setQuickNavItems,
+    saveCanvasState
+  });
+
+  const {
+    addCategory,
+    updateCategory,
+    deleteCategory,
+    toggleCategoryExpanded,
+    updateCategorySize,
+    moveToCategory
+  } = categoryHandlers;
+
+  // ===== 페이지 핸들러 =====
+  const pageHandlers = usePageHandlers({
+    pages,
+    setPages,
+    currentPageId,
+    setCurrentPageId
+  });
+
+  const {
+    addPage,
+    updatePageName,
+    deletePage
+  } = pageHandlers;
 
   // 캔버스 이동 감지 (2단계 - canvas-pan)
   React.useEffect(() => {
@@ -626,299 +665,8 @@ const App: React.FC = () => {
     : selectedCategoryIds;
   const selectedCategories = currentPage?.categories?.filter(category => allSelectedCategoryIds.includes(category.id)) || [];
 
-  const addPage = () => {
-    const pageId = Date.now().toString();
 
-    // 튜토리얼 메모들
-    const tutorialMemos: MemoBlock[] = [
-      // 1. 단축키 설명
-      {
-        id: `${pageId}-memo-shortcuts`,
-        title: '⌨️ 단축키',
-        content: '',
-        blocks: [
-          {
-            id: `${pageId}-shortcuts-1`,
-            type: 'text',
-            content: 'Ctrl+Z\n실행취소'
-          },
-          {
-            id: `${pageId}-shortcuts-2`,
-            type: 'text',
-            content: 'Ctrl+Shift+Z\n다시실행'
-          },
-          {
-            id: `${pageId}-shortcuts-3`,
-            type: 'text',
-            content: 'Delete\n선택한 메모 삭제'
-          },
-          {
-            id: `${pageId}-shortcuts-4`,
-            type: 'text',
-            content: 'Alt + 스크롤\n캔버스 확대/축소'
-          },
-          {
-            id: `${pageId}-shortcuts-5`,
-            type: 'text',
-            content: 'Spacebar + 드래그\n캔버스 이동'
-          }
-        ],
-        tags: ['튜토리얼'],
-        connections: [],
-        position: { x: 150, y: 150 },
-        displaySize: 'medium',
-        parentId: `${pageId}-tutorial-category`
-      },
-      // 2. 메모 블록과 카테고리 영역
-      {
-        id: `${pageId}-memo-canvas`,
-        title: '📦 메모 블록과 카테고리',
-        content: '',
-        blocks: [
-          {
-            id: `${pageId}-canvas-1`,
-            type: 'text',
-            content: '메모 블록\n드래그로 이동하고, 테두리 모서리를 클릭하여 다른 메모와 연결선을 생성하세요'
-          },
-          {
-            id: `${pageId}-canvas-2`,
-            type: 'text',
-            content: '카테고리 영역\n메모를 담는 컨테이너입니다. Shift+드래그로 메모를 카테고리에 추가하거나 제거하세요'
-          },
-          {
-            id: `${pageId}-canvas-3`,
-            type: 'text',
-            content: '카테고리 중첩\n카테고리 안에 다른 카테고리를 넣어 계층 구조를 만들 수 있습니다'
-          },
-          {
-            id: `${pageId}-canvas-4`,
-            type: 'text',
-            content: '카테고리 연결\n카테고리끼리도 연결선을 생성하여 관계를 표현할 수 있습니다'
-          },
-          {
-            id: `${pageId}-canvas-5`,
-            type: 'text',
-            content: '카테고리 확장/축소\n카테고리 블록을 클릭하면 영역을 펼치거나 접을 수 있습니다'
-          }
-        ],
-        tags: ['튜토리얼'],
-        connections: [],
-        position: { x: 450, y: 150 },
-        displaySize: 'medium',
-        parentId: `${pageId}-tutorial-category`
-      },
-      // 3. 오른쪽 탭 (메모 편집)
-      {
-        id: `${pageId}-memo-rightpanel`,
-        title: '📝 우측 패널 - 메모 편집',
-        content: '',
-        blocks: [
-          {
-            id: `${pageId}-right-1`,
-            type: 'text',
-            content: '텍스트 입력\n메모를 선택하면 우측 패널에서 제목과 내용을 편집할 수 있습니다'
-          },
-          {
-            id: `${pageId}-right-2`,
-            type: 'text',
-            content: '파일 첨부\n이미지나 파일을 드래그앤드롭으로 업로드하거나 우클릭-파일첨부로 파일을 업로드하세요'
-          },
-          {
-            id: `${pageId}-right-3`,
-            type: 'text',
-            content: '중요도 부여\n텍스트를 드래그하거나 파일, 이미지, URL을 우클릭해 중요도를 부여하여 분류하세요'
-          }
-        ],
-        tags: ['튜토리얼'],
-        connections: [],
-        position: { x: 750, y: 150 },
-        displaySize: 'medium',
-        parentId: `${pageId}-tutorial-category`
-      },
-      // 4. 우측 패널 (카테고리 편집)
-      {
-        id: `${pageId}-memo-rightpanel-category`,
-        title: '📂 우측 패널 - 카테고리 편집',
-        content: '',
-        blocks: [
-          {
-            id: `${pageId}-right-cat-1`,
-            type: 'text',
-            content: '제목 수정\n카테고리를 선택하면 우측 패널에서 카테고리 제목을 편집할 수 있습니다'
-          },
-          {
-            id: `${pageId}-right-cat-2`,
-            type: 'text',
-            content: '하위 메모 목록\n카테고리에 포함된 모든 하위 메모 목록이 표시되며, 클릭하여 빠르게 이동할 수 있습니다'
-          },
-          {
-            id: `${pageId}-right-cat-3`,
-            type: 'text',
-            content: '연결된 카테고리\n연결선으로 연결된 다른 카테고리 목록이 표시되며, 클릭하여 빠르게 이동할 수 있습니다'
-          }
-        ],
-        tags: ['튜토리얼'],
-        connections: [],
-        position: { x: 1050, y: 150 },
-        displaySize: 'medium',
-        parentId: `${pageId}-tutorial-category`
-      },
-      // 5. 왼쪽 탭 (페이지와 검색)
-      {
-        id: `${pageId}-memo-leftpanel`,
-        title: '🔍 좌측 패널 - 페이지와 검색',
-        content: '',
-        blocks: [
-          {
-            id: `${pageId}-left-1`,
-            type: 'text',
-            content: '페이지 관리\n좌측 패널에서 페이지를 추가하거나 삭제하세요. 각 페이지는 독립적인 캔버스입니다'
-          },
-          {
-            id: `${pageId}-left-2`,
-            type: 'text',
-            content: '통합 검색\n좌측 상단 돋보기 아이콘으로 모든 페이지의 메모와 카테고리를 검색할 수 있습니다'
-          },
-          {
-            id: `${pageId}-left-3`,
-            type: 'text',
-            content: '검색 필터\n검색 결과를 메모 또는 카테고리로 필터링하여 원하는 항목만 표시할 수 있습니다'
-          }
-        ],
-        tags: ['튜토리얼'],
-        connections: [],
-        position: { x: 150, y: 450 },
-        displaySize: 'medium',
-        parentId: `${pageId}-tutorial-category`
-      },
-      // 6. 캔버스 뷰 기능
-      {
-        id: `${pageId}-memo-canvasview`,
-        title: '🎨 캔버스 뷰 기능',
-        content: '',
-        blocks: [
-          {
-            id: `${pageId}-view-1`,
-            type: 'text',
-            content: '단축 이동\n메모나 카테고리를 우클릭하여 단축 이동 목록에 추가하고, 우측 상단의 단축 이동 버튼을 클릭해 빠르게 이동하세요'
-          },
-          {
-            id: `${pageId}-view-2`,
-            type: 'text',
-            content: '중요도 필터\n캔버스 좌측 상단의 중요도 필터를 통해 특정 중요도의 메모만 표시할 수 있습니다'
-          },
-          {
-            id: `${pageId}-view-3`,
-            type: 'text',
-            content: '줌과 팬\n마우스 휠로 확대/축소하고, 빈 공간을 드래그하여 캔버스를 이동하세요'
-          },
-          {
-            id: `${pageId}-view-4`,
-            type: 'text',
-            content: '메모 생성\n캔버스 하단의 "메모 추가" 버튼으로 새로운 메모 블록을 생성하세요'
-          },
-          {
-            id: `${pageId}-view-5`,
-            type: 'text',
-            content: '카테고리 생성\n캔버스 하단의 "카테고리 추가" 버튼으로 새로운 카테고리 영역을 생성하세요'
-          },
-          {
-            id: `${pageId}-view-6`,
-            type: 'text',
-            content: '연결 해제\n캔버스 하단의 "연결 해제" 버튼을 켜고 연결선을 클릭하여 메모 간 연결을 제거하세요'
-          }
-        ],
-        tags: ['튜토리얼'],
-        connections: [],
-        position: { x: 450, y: 450 },
-        displaySize: 'medium',
-        parentId: `${pageId}-tutorial-category`
-      },
-      // 7. 기타 사항
-      {
-        id: `${pageId}-memo-etc`,
-        title: '📢 기타 사항',
-        content: '',
-        blocks: [
-          {
-            id: `${pageId}-etc-1`,
-            type: 'text',
-            content: '아직 프로토타입이므로 기기 브라우저에 저장되는 방식이며 시크릿 모드를 사용하시면 저장이 되지 않습니다.\n또 다른 기기로 이용하시면 내용이 기존 기기에 적은 내용이 공유되지 않으니 유의하시기 바랍니다.'
-          },
-          {
-            id: `${pageId}-etc-2`,
-            type: 'text',
-            content: '추후 이용자가 늘면 로그인 기능을 추가해 어떤 기기에서든 내용이 공유되도록 추가하겠습니다.'
-          },
-          {
-            id: `${pageId}-etc-3`,
-            type: 'text',
-            content: '앱을 사용하시며 불편한 점이나 의견 있으신 경우 @movee.diary로 DM주시면 감사하겠습니다!',
-            importanceRanges: [{
-              start: 0,
-              end: 55,
-              level: 'critical'
-            }]
-          }
-        ],
-        tags: ['튜토리얼'],
-        connections: [],
-        position: { x: 750, y: 450 },
-        displaySize: 'medium',
-        parentId: `${pageId}-tutorial-category`
-      }
-    ];
 
-    // 튜토리얼 카테고리 생성
-    const tutorialCategory: CategoryBlock = {
-      id: `${pageId}-tutorial-category`,
-      title: '📖 사용 방법',
-      tags: [],
-      connections: [],
-      position: { x: 100, y: 100 },
-      size: { width: 1300, height: 700 },
-      children: tutorialMemos.map(memo => memo.id),
-      parentId: undefined,
-      isExpanded: true
-    };
-
-    const newPage: Page = {
-      id: pageId,
-      name: `페이지 ${pages.length + 1}`,
-      memos: tutorialMemos,
-      categories: [tutorialCategory]
-    };
-    setPages(prev => [...prev, newPage]);
-  };
-
-  const updatePageName = (pageId: string, newName: string) => {
-    setPages(prev => prev.map(page => 
-      page.id === pageId 
-        ? { ...page, name: newName }
-        : page
-    ));
-  };
-
-  const deletePage = (pageId: string) => {
-    if (pages.length <= 1) {
-      alert('마지막 페이지는 삭제할 수 없습니다.');
-      return;
-    }
-    
-    setPages(prev => prev.filter(page => page.id !== pageId));
-    
-    // 삭제된 페이지가 현재 페이지인 경우 첫 번째 페이지로 이동
-    if (currentPageId === pageId) {
-      const remainingPages = pages.filter(page => page.id !== pageId);
-      if (remainingPages.length > 0) {
-        setCurrentPageId(remainingPages[0].id);
-      }
-    }
-    
-    // 선택된 메모 초기화
-    setSelectedMemoId(null);
-    setSelectedMemoIds([]);
-  };
 
 
   // 충돌하는 메모블록 밀어내기 함수
@@ -1221,276 +969,10 @@ const App: React.FC = () => {
   }, [currentPageId, pushAwayConflictingCategories, pushAwayConflictingMemos, collisionCheckCount, lastCollisionCheck]);
 
 
-  // calculateCategoryArea는 이제 utils/categoryAreaUtils.ts에서 import
-
-  // Category management functions
-  const addCategory = (position?: { x: number; y: number }) => {
-    const originalPosition = position || { x: 300, y: 200 };
-    let newPosition = { ...originalPosition };
-
-    // 영역과 겹치지 않는 위치 찾기
-    if (position) {
-      const currentPage = pages.find(p => p.id === currentPageId);
-      if (currentPage?.categories) {
-        // 새 카테고리의 실제 영역 크기 (최소 크기)
-        const newCategoryWidth = 400;
-        const newCategoryHeight = 250;
-        let isOverlapping = true;
-        let adjustedY = newPosition.y;
-        const moveStep = 300; // 충분히 밀어내기 위한 이동 거리
-
-        while (isOverlapping && adjustedY > -2000) {
-          isOverlapping = false;
-
-          for (const category of currentPage.categories) {
-            if (category.isExpanded) {
-              const area = calculateCategoryArea(category, currentPage);
-              if (area) {
-                // 새 카테고리 영역과 기존 영역이 겹치는지 확인
-                const newCatLeft = newPosition.x;
-                const newCatRight = newPosition.x + newCategoryWidth;
-                const newCatTop = adjustedY;
-                const newCatBottom = adjustedY + newCategoryHeight;
-
-                const areaLeft = area.x;
-                const areaRight = area.x + area.width;
-                const areaTop = area.y;
-                const areaBottom = area.y + area.height;
-
-                // 겹침 여유 공간 추가 (20px 간격)
-                const margin = 20;
-                if (!(newCatRight + margin < areaLeft || newCatLeft - margin > areaRight ||
-                      newCatBottom + margin < areaTop || newCatTop - margin > areaBottom)) {
-                  // 겹침 - 위로 충분히 이동
-                  isOverlapping = true;
-                  adjustedY -= moveStep;
-                  break;
-                }
-              }
-            }
-          }
-        }
-
-        newPosition = { x: newPosition.x, y: adjustedY };
-      }
-    }
-
-    const newCategory: CategoryBlock = {
-      id: Date.now().toString(),
-      title: 'New Category',
-      tags: [],
-      connections: [],
-      position: newPosition,
-      originalPosition: newPosition, // 초기 위치 저장
-      isExpanded: true,
-      children: []
-    };
-
-    setPages(prev => prev.map(page =>
-      page.id === currentPageId
-        ? { ...page, categories: [...(page.categories || []), newCategory] }
-        : page
-    ));
-
-    // 위치가 변경된 경우 캔버스를 새 위치로 자동 이동
-    if (position && (newPosition.x !== originalPosition.x || newPosition.y !== originalPosition.y)) {
-      // 카테고리의 중심점 계산 (블록 중심이 화면 중앙에 오도록)
-      const categoryCenterX = newPosition.x + 100; // 카테고리 너비의 절반
-      const categoryCenterY = newPosition.y + 30; // 카테고리 높이의 절반
-
-      // 캔버스 크기 (윈도우 크기 기준, 좌우 패널 제외)
-      const canvasWidth = window.innerWidth - (leftPanelWidth + (rightPanelOpen ? rightPanelWidth : 0));
-      const canvasHeight = window.innerHeight;
-
-      const newOffset = centerCanvasOnPosition(
-        { x: categoryCenterX, y: categoryCenterY },
-        canvasWidth,
-        canvasHeight,
-        canvasScale
-      );
-
-      setCanvasOffset(newOffset);
-    }
-
-    // Save canvas state for undo/redo
-    setTimeout(() => saveCanvasState('category_create', `카테고리 생성: ${newCategory.title}`), 0);
-  };
-
-  const updateCategory = (category: CategoryBlock) => {
-    setPages(prev => prev.map(page =>
-      page.id === currentPageId
-        ? {
-            ...page,
-            categories: (page.categories || []).map(cat =>
-              cat.id === category.id
-                ? category
-                : cat
-            )
-          }
-        : page
-    ));
-  };
-
-  const deleteCategory = (categoryId: string) => {
-    // 삭제된 카테고리의 제목 가져오기
-    const deletedCategory = pages.find(p => p.id === currentPageId)?.categories?.find(c => c.id === categoryId);
-    const categoryTitle = deletedCategory?.title || '카테고리';
-
-    setPages(prev => prev.map(page => {
-      if (page.id === currentPageId) {
-        const categoryToDelete = (page.categories || []).find(c => c.id === categoryId);
-        if (categoryToDelete) {
-          // Move children to top level
-          const updatedMemos = page.memos.map(memo => ({
-            ...memo,
-            parentId: memo.parentId === categoryId ? undefined : memo.parentId,
-            connections: memo.connections.filter(connId => connId !== categoryId) // 삭제된 카테고리로의 연결 제거
-          }));
-          const updatedCategories = (page.categories || [])
-            .filter(c => c.id !== categoryId)
-            .map(c => ({
-              ...c,
-              parentId: c.parentId === categoryId ? undefined : c.parentId,
-              connections: c.connections.filter(connId => connId !== categoryId), // 삭제된 카테고리로의 연결 제거
-              children: c.children.filter(childId => childId !== categoryId) // 자식 목록에서도 제거
-            }));
-
-          return { ...page, memos: updatedMemos, categories: updatedCategories };
-        }
-      }
-      return page;
-    }));
-
-    // 단축 이동 목록에서 삭제된 카테고리 제거
-    setQuickNavItems(prev => prev.filter(item => item.targetId !== categoryId));
-
-    // 실행 취소를 위한 상태 저장
-    setTimeout(() => saveCanvasState('category_delete', `카테고리 삭제: ${categoryTitle}`), 0);
-  };
-
-  const toggleCategoryExpanded = (categoryId: string) => {
-    setPages(prev => prev.map(page => {
-      if (page.id !== currentPageId) return page;
-
-      const targetCategory = page.categories.find(c => c.id === categoryId);
-      if (!targetCategory) return page;
-
-      const newExpandedState = !targetCategory.isExpanded;
-
-      // 모든 하위 카테고리 ID 수집 (재귀적으로)
-      const getAllDescendantCategoryIds = (catId: string): string[] => {
-        const childCategories = page.categories.filter(c => c.parentId === catId);
-        return childCategories.flatMap(child => [child.id, ...getAllDescendantCategoryIds(child.id)]);
-      };
-
-      const descendantIds = getAllDescendantCategoryIds(categoryId);
-      const affectedIds = [categoryId, ...descendantIds];
-
-      return {
-        ...page,
-        categories: page.categories.map(category =>
-          affectedIds.includes(category.id)
-            ? { ...category, isExpanded: newExpandedState }
-            : category
-        )
-      };
-    }));
-  };
-
-  const moveToCategory = (itemId: string, categoryId: string | null) => {
-
-    setPages(prev => prev.map(page => {
-      if (page.id === currentPageId) {
-        // Determine if item is memo or category
-        const isMemo = page.memos.some(memo => memo.id === itemId);
-        const isCategory = (page.categories || []).some(cat => cat.id === itemId);
 
 
-        if (isMemo) {
-          const targetCategory = categoryId ? (page.categories || []).find(cat => cat.id === categoryId) : null;
 
-          const updatedMemos = page.memos.map(memo => {
-            if (memo.id === itemId) {
-              let newPosition = memo.position;
 
-              // 카테고리에 종속시킬 때 위치를 카테고리 블록 아래로 조정
-              if (categoryId && targetCategory) {
-                newPosition = {
-                  x: targetCategory.position.x + 30,
-                  y: targetCategory.position.y + 200
-                };
-
-              }
-
-              console.log('[moveToCategory] parentId 변경:', itemId, '이전:', memo.parentId, '→ 새로운:', categoryId || undefined);
-              return { ...memo, parentId: categoryId || undefined, position: newPosition };
-            }
-            return memo;
-          });
-          const updatedCategories = (page.categories || []).map(category => {
-            if (categoryId && category.id === categoryId) {
-              const newChildren = category.children.includes(itemId)
-                ? category.children
-                : [...category.children, itemId];
-              return {
-                ...category,
-                children: newChildren,
-                isExpanded: true // 메모 추가 시 자동으로 확장 상태로 변경
-              };
-            }
-            // Remove from other categories
-            return {
-              ...category,
-              children: category.children.filter(childId => childId !== itemId)
-            };
-          });
-          return { ...page, memos: updatedMemos, categories: updatedCategories };
-        } else if (isCategory) {
-          const updatedCategories = (page.categories || []).map(category => {
-            if (category.id === itemId) {
-              return { ...category, parentId: categoryId || undefined };
-            }
-            if (categoryId && category.id === categoryId) {
-              const newChildren = category.children.includes(itemId)
-                ? category.children
-                : [...category.children, itemId];
-              return {
-                ...category,
-                children: newChildren,
-                isExpanded: true // 카테고리 추가 시 자동으로 확장 상태로 변경
-              };
-            }
-            // Remove from other categories
-            const filteredChildren = category.children.filter(childId => childId !== itemId);
-            if (filteredChildren.length !== category.children.length) {
-            }
-            return {
-              ...category,
-              children: filteredChildren
-            };
-          });
-          return { ...page, categories: updatedCategories };
-        }
-      }
-      return page;
-    }));
-
-    // 메모를 카테고리에 추가한 경우 해당 카테고리의 캐시 제거 (영역 재계산을 위해)
-    if (categoryId) {
-      setDraggedCategoryAreas(prev => {
-        const newAreas = { ...prev };
-        delete newAreas[categoryId];
-        return newAreas;
-      });
-    }
-
-    // moveToCategory에서는 충돌 검사를 하지 않음 (무한 루프 방지)
-    // 충돌 검사는 드래그 완료 시에만 수행됨
-
-    // Save canvas state for undo/redo
-    const targetName = categoryId ? `카테고리 ${categoryId}` : '최상위';
-    setTimeout(() => saveCanvasState('move_to_category', `종속 변경: ${itemId} → ${targetName}`), 0);
-  };
 
   // Shift 드래그로 카테고리에 카테고리 추가
   const handleShiftDropCategory = (draggedCategory: CategoryBlock, position: { x: number; y: number }, currentPage: Page, cachedAreas?: {[categoryId: string]: any}) => {
@@ -2787,20 +2269,6 @@ const App: React.FC = () => {
     categoryPositionTimers.current.set(categoryId, newTimer);
   };
 
-  const updateCategorySize = (categoryId: string, size: { width: number; height: number }) => {
-    setPages(prev => prev.map(page =>
-      page.id === currentPageId
-        ? {
-            ...page,
-            categories: (page.categories || []).map(category =>
-              category.id === categoryId
-                ? { ...category, size }
-                : category
-            )
-          }
-        : page
-    ));
-  };
 
   // 통합 삭제 함수 - 현재 선택된 아이템(메모 또는 카테고리) 삭제
   const deleteSelectedItem = () => {
