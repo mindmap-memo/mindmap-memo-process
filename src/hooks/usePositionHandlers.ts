@@ -64,12 +64,10 @@ export const usePositionHandlers = ({
       if (prevPos) {
         frameDeltaX = position.x - prevPos.x;
         frameDeltaY = position.y - prevPos.y;
-        console.log(`[프레임 Delta] 카테고리 ${categoryId.substring(0,8)}: 이전=(${prevPos.x.toFixed(2)}, ${prevPos.y.toFixed(2)}), 현재=(${position.x.toFixed(2)}, ${position.y.toFixed(2)}), delta=(${frameDeltaX.toFixed(2)}, ${frameDeltaY.toFixed(2)})`);
       } else {
         // 첫 프레임이면 전체 delta 사용
         frameDeltaX = deltaX;
         frameDeltaY = deltaY;
-        console.log(`[프레임 Delta] 카테고리 ${categoryId.substring(0,8)}: 첫 프레임, delta=(${frameDeltaX.toFixed(2)}, ${frameDeltaY.toFixed(2)})`);
       }
 
       // 현재 위치를 이전 프레임으로 저장

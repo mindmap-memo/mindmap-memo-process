@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Page, QuickNavItem, ImportanceLevel, DataRegistry } from '../types';
 import { STORAGE_KEYS, DEFAULT_PAGES } from '../constants/defaultData';
 import { loadFromStorage } from '../utils/storageUtils';
@@ -87,6 +87,12 @@ export const useAppState = () => {
 
   // ===== Shift 키 상태 =====
   const [isShiftPressed, setIsShiftPressed] = useState<boolean>(false);
+  const isShiftPressedRef = useRef<boolean>(false);
+
+  // Shift 키 상태가 변경될 때마다 ref 업데이트
+  useEffect(() => {
+    isShiftPressedRef.current = isShiftPressed;
+  }, [isShiftPressed]);
 
   // ===== Data Registry =====
   const [dataRegistry, setDataRegistry] = useState<DataRegistry>({});
@@ -163,6 +169,7 @@ export const useAppState = () => {
     // Shift 키
     isShiftPressed,
     setIsShiftPressed,
+    isShiftPressedRef,
 
     // Data Registry
     dataRegistry,

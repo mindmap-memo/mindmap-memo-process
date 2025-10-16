@@ -67,7 +67,8 @@ const App: React.FC = () => {
     connectingFromDirection,
     setConnectingFromDirection,
     isShiftPressed,
-    setIsShiftPressed
+    setIsShiftPressed,
+    isShiftPressedRef
   } = appState;
 
   const panelState = usePanelState();
@@ -403,7 +404,7 @@ const App: React.FC = () => {
   const { detectCategoryOnDrop, detectCategoryDropForCategory } = useCategoryDrop({
     pages,
     currentPageId,
-    isShiftPressed,
+    isShiftPressedRef,
     shiftDropProcessedMemos,
     lastDragTime,
     lastDragPosition,

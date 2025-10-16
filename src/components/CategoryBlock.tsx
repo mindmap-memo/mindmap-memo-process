@@ -34,6 +34,7 @@ interface CategoryBlockProps {
   isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
   isDragTarget?: boolean; // 드래그 타겟인지 여부
   isCategoryBeingDragged?: boolean; // 카테고리가 드래그 중인지 여부
+  isShiftPressed?: boolean; // Shift 키가 눌려있는지 여부
 }
 
 const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
@@ -66,7 +67,8 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   onAddQuickNav,
   isQuickNavExists,
   isDragTarget = false,
-  isCategoryBeingDragged = false
+  isCategoryBeingDragged = false,
+  isShiftPressed = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(category.title);
@@ -397,12 +399,15 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   const isHighlighted = isDragOver || (isMemoBeingDragged && isHovered) || (isCategoryBeingDragged && isHovered);
   const isTagMode = hasChildren && !isHighlighted; // 하위 아이템이 있으면 태그로 표시 (하이라이트 시 제외)
 
+  // Shift+드래그 스타일 적용
+  const isShiftDragging = isDraggingPosition && isShiftPressed;
+
   const categoryStyle: React.CSSProperties = {
     width: isTagMode ? 'auto' : '100%', // 태그 모드면 auto, 아니면 전체 너비
     minWidth: isTagMode ? '80px' : '200px', // 태그 모드면 작게
     minHeight: isTagMode ? '32px' : '80px', // 태그 모드면 작게
-    backgroundColor: isHighlighted ? '#581c87' : (isSelected ? '#7c3aed' : '#8b5cf6'),
-    border: isHighlighted ? '3px solid #4c1d95' : (isSelected ? '2px solid #6d28d9' : '1px solid #7c3aed'),
+    backgroundColor: isShiftDragging ? '#10b981' : (isHighlighted ? '#581c87' : (isSelected ? '#7c3aed' : '#8b5cf6')),
+    border: isShiftDragging ? '2px solid #059669' : (isHighlighted ? '3px solid #4c1d95' : (isSelected ? '2px solid #6d28d9' : '1px solid #7c3aed')),
     borderRadius: isTagMode ? '16px' : '8px', // 태그 모드면 더 둥글게
     padding: isTagMode ? '6px 12px' : '16px', // 태그 모드면 작게
     boxShadow: isDragging ? '0 8px 16px rgba(0,0,0,0.3)' : (isHighlighted ? '0 6px 20px rgba(139, 92, 246, 0.6)' : '0 2px 8px rgba(0,0,0,0.1)'),
@@ -560,6 +565,10 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
             onClick={handleTitleClick}
             title="클릭하여 편집"
           >
+            {/* Shift+드래그 시 + 아이콘 표시 */}
+            {isShiftDragging && (
+              <span style={{ color: 'white', fontSize: '18px', fontWeight: 'bold', marginRight: '4px' }}>+</span>
+            )}
             {category.title}
           </div>
         )}
@@ -735,6 +744,28 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         </div>
       )}
       </div>
+
+      {/* 드래그 중 힌트 UI - 카테고리 오른쪽에 고정 */}
+      {isDraggingPosition && !isShiftPressed && (
+        <div
+          style={{
+            position: 'absolute',
+            left: (category.size?.width || 200) + 10,
+            top: 0,
+            backgroundColor: '#374151',
+            color: 'white',
+            padding: '8px 12px',
+            borderRadius: '6px',
+            fontSize: '12px',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            zIndex: 1000,
+            pointerEvents: 'none'
+          }}
+        >
+          SHIFT + 드래그로 메모나 카테고리를 다른 카테고리 영역에 종속, 제거하세요
+        </div>
+      )}
 
       {/* 컨텍스트 메뉴 */}
       {contextMenu && (

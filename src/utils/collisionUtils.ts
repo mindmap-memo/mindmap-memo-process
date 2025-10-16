@@ -150,8 +150,6 @@ export function resolveUnifiedCollisions(
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     let hasCollision = false;
 
-    console.log(`\n[충돌 검사] === Iteration ${iteration + 1}/${maxIterations} 시작 ===`);
-
     // 현재 iteration의 최신 위치로 collidables 다시 계산
     const collidables = getCollidableObjects();
 
@@ -193,8 +191,6 @@ export function resolveUnifiedCollisions(
 
               totalPushX = pushDirX * Math.min(frameDeltaX, overlapX);
               totalPushY = pushDirY * Math.min(frameDeltaY, overlapY);
-
-              console.log(`[충돌 감지] ${other.type} ${other.id.substring(0,8)} → ${current.type} ${current.id.substring(0,8)}: pushDir=(${pushDirection.x.toFixed(2)}, ${pushDirection.y.toFixed(2)}), frameDelta=(${frameDelta.x.toFixed(2)}, ${frameDelta.y.toFixed(2)}), 결과=(${totalPushX.toFixed(2)}, ${totalPushY.toFixed(2)})`);
             } else {
               // 겹침 기반 밀어내기: 충돌이 완전히 해소될 때까지 (기존 동작)
               totalPushX = pushDirection.x;
@@ -211,21 +207,13 @@ export function resolveUnifiedCollisions(
 
       // 밀어내기 적용
       if (totalPushX !== 0 || totalPushY !== 0) {
-        console.log(`[충돌] ${current.type} ${current.id.substring(0,8)} 밀림: pushX=${totalPushX.toFixed(2)}, pushY=${totalPushY.toFixed(2)}, frameDelta=${frameDelta ? `(${frameDelta.x.toFixed(2)}, ${frameDelta.y.toFixed(2)})` : 'null'}`);
-
         if (current.type === 'memo' && current.originalMemo) {
-          const oldPos = updatedMemos.find(m => m.id === current.id)?.position;
-          console.log(`  - 메모 이전 위치: (${oldPos?.x.toFixed(2)}, ${oldPos?.y.toFixed(2)}) → 새 위치: (${(oldPos!.x + totalPushX).toFixed(2)}, ${(oldPos!.y + totalPushY).toFixed(2)})`);
-
           updatedMemos = updatedMemos.map(memo =>
             memo.id === current.id
               ? { ...memo, position: { x: memo.position.x + totalPushX, y: memo.position.y + totalPushY } }
               : memo
           );
         } else if (current.type === 'area' && current.originalCategory) {
-          const oldPos = updatedCategories.find(c => c.id === current.id)?.position;
-          console.log(`  - 영역 이전 위치: (${oldPos?.x.toFixed(2)}, ${oldPos?.y.toFixed(2)}) → 새 위치: (${(oldPos!.x + totalPushX).toFixed(2)}, ${(oldPos!.y + totalPushY).toFixed(2)})`);
-
           // 카테고리 이동
           updatedCategories = updatedCategories.map(cat =>
             cat.id === current.id
@@ -268,10 +256,7 @@ export function resolveUnifiedCollisions(
       }
     }
 
-    console.log(`[충돌 검사] Iteration ${iteration + 1} 완료: 충돌 ${hasCollision ? '있음' : '없음'}`);
-
     if (!hasCollision) {
-      console.log(`[충돌 검사] === 충돌 없음, 종료 ===\n`);
       break;
     }
   }

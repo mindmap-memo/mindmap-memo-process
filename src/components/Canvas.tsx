@@ -1019,6 +1019,8 @@ const Canvas: React.FC<CanvasProps> = ({
 
                   if (isShiftMode) {
                     onShiftDropCategory?.(category, finalPosition);
+                    // 카테고리 드롭 감지 (카테고리-카테고리 종속 처리)
+                    onDetectCategoryDropForCategory?.(category.id, finalPosition);
                   }
                 }
 
@@ -1269,6 +1271,10 @@ const Canvas: React.FC<CanvasProps> = ({
       const labelX = area?.x || category.position.x;
       const labelY = area?.y || category.position.y;
 
+      // Shift+드래그 중인지 확인
+      const isCurrentCategoryBeingDragged = isDraggingCategory && draggingCategoryId === category.id;
+      const isShiftDragging = isCurrentCategoryBeingDragged && isShiftPressed;
+
       areas.push(
         <div
           key={`label-${category.id}`}
@@ -1277,7 +1283,7 @@ const Canvas: React.FC<CanvasProps> = ({
             position: 'absolute',
             top: `${labelY}px`,
             left: `${labelX}px`,
-            backgroundColor: '#8b5cf6',
+            backgroundColor: isShiftDragging ? '#10b981' : '#8b5cf6',
             color: 'white',
             padding: '6px 12px',
             borderRadius: '8px',
@@ -1289,7 +1295,8 @@ const Canvas: React.FC<CanvasProps> = ({
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            zIndex: 10
+            zIndex: 10,
+            border: isShiftDragging ? '2px solid #059669' : 'none'
           }}
           onClick={() => onCategorySelect(category.id)}
           onDoubleClick={() => {
@@ -1352,6 +1359,9 @@ const Canvas: React.FC<CanvasProps> = ({
             }
           }}
         >
+          {isShiftDragging && (
+            <span style={{ fontSize: '18px', fontWeight: 'bold', marginRight: '-4px' }}>+</span>
+          )}
           <span>{category.title}</span>
           <button
             style={{
@@ -1373,6 +1383,31 @@ const Canvas: React.FC<CanvasProps> = ({
           </button>
         </div>
       );
+
+      // Shift가 눌리지 않은 상태에서 드래그 중일 때 힌트 UI 표시
+      if (isCurrentCategoryBeingDragged && !isShiftPressed) {
+        areas.push(
+          <div
+            key={`hint-${category.id}`}
+            style={{
+              position: 'absolute',
+              left: `${labelX + (category.size?.width || 200) + 10}px`,
+              top: `${labelY}px`,
+              backgroundColor: '#374151',
+              color: 'white',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              fontSize: '12px',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+              zIndex: 1000,
+              pointerEvents: 'none'
+            }}
+          >
+            💡 Shift를 누르면 카테고리에 추가
+          </div>
+        );
+      }
     }
 
     // 하위 카테고리들의 영역도 재귀적으로 렌더링
@@ -1592,7 +1627,6 @@ const Canvas: React.FC<CanvasProps> = ({
 
     // 스페이스바가 눌린 상태에서는 항상 팬 모드 (메모 블록 위에서도)
     if (isSpacePressed && !isConnecting) {
-      console.log('[Pan Start] Space key - mouse:', { x: e.clientX, y: e.clientY }, 'offset:', canvasOffset);
       setIsPanning(true);
       setPanStart({
         x: e.clientX,
@@ -1620,7 +1654,6 @@ const Canvas: React.FC<CanvasProps> = ({
 
     if (isCanvasBackground && !isConnecting) {
       if (currentTool === 'pan') {
-        console.log('[Pan Start] Pan tool - mouse:', { x: e.clientX, y: e.clientY }, 'offset:', canvasOffset);
         setIsPanning(true);
         setPanStart({
           x: e.clientX,
@@ -1700,15 +1733,11 @@ const Canvas: React.FC<CanvasProps> = ({
         x: panStart.offsetX + deltaX,
         y: panStart.offsetY + deltaY
       };
-      console.log('[Pan Move] delta:', { deltaX, deltaY }, 'panStart:', panStart, 'newOffset:', newOffset);
       setCanvasOffset(newOffset);
     }
   };
 
   const handleMouseUp = () => {
-    if (isPanning) {
-      console.log('[Pan End] Final offset:', canvasOffset);
-    }
     setIsPanning(false);
     setDragTargetCategoryId(null); // Shift 드래그 종료 시 타겟 초기화
   };
@@ -1854,8 +1883,6 @@ const Canvas: React.FC<CanvasProps> = ({
   // 키보드 이벤트 처리
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      console.log('Canvas keydown:', e.key, e.code, e.ctrlKey, e.shiftKey);
-
       // Ctrl+Z (Undo) / Ctrl+Shift+Z (Redo)
       if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault();

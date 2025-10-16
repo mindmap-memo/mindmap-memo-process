@@ -21,7 +21,7 @@ import { calculateCategoryArea, CategoryArea } from '../utils/categoryAreaUtils'
 interface UseCategoryDropProps {
   pages: Page[];
   currentPageId: string;
-  isShiftPressed: boolean;
+  isShiftPressedRef: React.MutableRefObject<boolean>;
   shiftDropProcessedMemos: React.MutableRefObject<Set<string>>;
   lastDragTime: React.MutableRefObject<Map<string, number>>;
   lastDragPosition: React.MutableRefObject<Map<string, { x: number; y: number }>>;
@@ -36,7 +36,7 @@ interface UseCategoryDropProps {
 export const useCategoryDrop = ({
   pages,
   currentPageId,
-  isShiftPressed,
+  isShiftPressedRef,
   shiftDropProcessedMemos,
   lastDragTime,
   lastDragPosition,
@@ -61,31 +61,40 @@ export const useCategoryDrop = ({
    * 카테고리 드래그 완료 시 카테고리 블록 겹침 감지 (Shift 드래그)
    */
   const detectCategoryDropForCategory = useCallback((categoryId: string, position: { x: number; y: number }) => {
+    const isShiftPressed = isShiftPressedRef.current;
+    console.log('[detectCategoryDropForCategory] 호출됨 - categoryId:', categoryId, 'position:', position, 'isShiftPressed:', isShiftPressed);
+
     const currentPage = pages.find(p => p.id === currentPageId);
     if (!currentPage || !currentPage.categories) {
+      console.log('[detectCategoryDropForCategory] currentPage 또는 categories 없음');
       return;
     }
 
     const draggedCategory = currentPage.categories.find(c => c.id === categoryId);
     if (!draggedCategory) {
+      console.log('[detectCategoryDropForCategory] draggedCategory 없음:', categoryId);
       return;
     }
 
+    console.log('[detectCategoryDropForCategory] draggedCategory 찾음:', draggedCategory.title);
+
     // Shift 키가 눌려있으면 카테고리-카테고리 종속 모드
     if (isShiftPressed) {
+      console.log('[detectCategoryDropForCategory] Shift 눌림 - handleShiftDropCategory 호출');
       handleShiftDropCategory(draggedCategory, position, currentPage, shiftDragAreaCache.current);
+    } else {
+      console.log('[detectCategoryDropForCategory] Shift 안 눌림 - 처리 안 함');
     }
-  }, [pages, currentPageId, isShiftPressed, shiftDragAreaCache, handleShiftDropCategory]);
+  }, [pages, currentPageId, isShiftPressedRef, shiftDragAreaCache, handleShiftDropCategory]);
 
   /**
    * 드래그 완료 시 카테고리 블록 겹침 감지
    */
   const detectCategoryOnDrop = useCallback((memoId: string, position: { x: number; y: number }) => {
-    console.log('[detectCategoryOnDrop] 호출됨 - memoId:', memoId, 'isShiftPressed:', isShiftPressed, 'processed:', shiftDropProcessedMemos.current.has(memoId));
+    const isShiftPressed = isShiftPressedRef.current;
 
     // Shift 드래그로 이미 처리된 메모면 중복 처리 방지
     if (shiftDropProcessedMemos.current.has(memoId)) {
-      console.log('[detectCategoryOnDrop] Shift 드래그로 이미 처리됨, 스킵:', memoId);
       return;
     }
 
@@ -237,10 +246,7 @@ export const useCategoryDrop = ({
               const finalStillInArea = isOverlapping(currentMemoBounds, categoryAreaBounds, 0);
 
               if (!finalStillInArea) {
-                console.log('[categoryExitTimer] 타이머 실행 - 영역 이탈 확인, moveToCategory 호출:', memoId);
                 moveToCategory(memoId, null);
-              } else {
-                console.log('[categoryExitTimer] 타이머 실행 - 여전히 영역 안에 있음, 유지:', memoId);
               }
 
               categoryExitTimers.current.delete(memoId);
@@ -261,7 +267,7 @@ export const useCategoryDrop = ({
   }, [
     pages,
     currentPageId,
-    isShiftPressed,
+    isShiftPressedRef,
     shiftDropProcessedMemos,
     lastDragTime,
     lastDragPosition,
