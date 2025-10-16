@@ -650,19 +650,7 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
       };
     } else {
       // 캐시된 영역이 없으면 동적 계산
-      if (recentlyDraggedCategoryRef.current === category.id) {
-        console.log('[renderSingleCategoryArea] 캐시 없음 - 동적 계산 시작');
-      }
-
       area = calculateCategoryAreaWithColor(category);
-
-      // 최근 드래그한 카테고리만 로그 출력
-      if (recentlyDraggedCategoryRef.current === category.id) {
-        console.log('[renderSingleCategoryArea] 동적 계산 완료:', {
-          영역크기: area ? `${area.width}x${area.height}` : 'null',
-          영역좌표: area ? `(${area.x}, ${area.y})` : 'null'
-        });
-      }
 
       // 하위 카테고리인데 자식이 없어서 area가 null인 경우, 기본 영역 생성
       if (!area && category.parentId) {
@@ -922,19 +910,6 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
                     const mouseY = (clientY - rect.top - canvasOffset.y) / canvasScale;
 
                     const mousePointerPosition = { x: mouseX, y: mouseY };
-
-                    console.log('[카테고리 드롭] 좌표 정보:', {
-                      clientX,
-                      clientY,
-                      rectLeft: rect.left,
-                      rectTop: rect.top,
-                      canvasOffsetX: canvasOffset.x,
-                      canvasOffsetY: canvasOffset.y,
-                      canvasScale,
-                      mousePointerPosition,
-                      finalPosition,
-                      categoryTitle: category.title
-                    });
 
                     onCategoryPositionDragEnd?.(category.id, finalPosition);
 

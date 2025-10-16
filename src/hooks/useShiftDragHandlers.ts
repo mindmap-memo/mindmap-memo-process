@@ -35,16 +35,6 @@ export const useShiftDragHandlers = ({
              bounds1.bottom + margin < bounds2.top ||
              bounds1.top - margin > bounds2.bottom);
 
-    if (overlaps) {
-      console.log('[isOverlapping] 겹침 감지:', {
-        bounds1,
-        bounds2,
-        margin,
-        xOverlap: !(bounds1.right + margin < bounds2.left || bounds1.left - margin > bounds2.right),
-        yOverlap: !(bounds1.bottom + margin < bounds2.top || bounds1.top - margin > bounds2.bottom)
-      });
-    }
-
     return overlaps;
   }, []);
 
@@ -89,13 +79,6 @@ export const useShiftDragHandlers = ({
     currentPage: Page,
     cachedAreas?: {[categoryId: string]: any}
   ) => {
-    console.log('[Shift Drop Category] 함수 시작:', {
-      draggedCategoryId: draggedCategory.id,
-      draggedCategoryTitle: draggedCategory.title,
-      receivedPosition: position,
-      draggedCategoryCurrentPosition: draggedCategory.position
-    });
-
     // 카테고리 찾기
     const categoryWidth = draggedCategory.size?.width || 200;
     const categoryHeight = draggedCategory.size?.height || 80;
@@ -106,10 +89,12 @@ export const useShiftDragHandlers = ({
       bottom: position.y + categoryHeight
     };
 
-    console.log('[Shift Drop Category] 카테고리 경계:', categoryBounds);
-
-    // 드래그 중인 카테고리와 그 모든 하위 카테고리들을 제외한 페이지 데이터 생성
+    // 드래그 중인 카테고리와 그 모든 하위 카테고리들 + 현재 부모 카테고리를 제외한 페이지 데이터 생성
     const excludedIds = getAllDescendantIds(draggedCategory.id, currentPage);
+    // 현재 부모도 제외 (빠져나올 때 부모에 추가 UI가 계속 뜨는 것 방지)
+    if (draggedCategory.parentId) {
+      excludedIds.push(draggedCategory.parentId);
+    }
     const pageWithoutDraggingCategory = {
       ...currentPage,
       categories: (currentPage.categories || []).filter(c => !excludedIds.includes(c.id)),
@@ -118,12 +103,6 @@ export const useShiftDragHandlers = ({
 
     // 타겟 카테고리 찾기 (자기 자신과 자신의 하위는 이미 pageWithoutDraggingCategory에서 제외됨)
     // 겹치는 모든 카테고리 찾기
-    console.log('[Shift Drop Category] 검사할 카테고리들:', pageWithoutDraggingCategory.categories?.map(c => ({
-      id: c.id,
-      title: c.title,
-      position: c.position
-    })));
-
     const overlappingCategories = pageWithoutDraggingCategory.categories?.filter(category => {
 
       // 1. 카테고리 블록과의 점 충돌 체크 (마우스 포인터 기반)
@@ -136,8 +115,6 @@ export const useShiftDragHandlers = ({
         bottom: category.position.y + catHeight
       };
 
-      console.log(`[Shift Drop Category] 카테고리 "${category.title}" 블록 경계:`, catBounds);
-
       // 마우스 포인터(드롭 위치)가 카테고리 블록 안에 있는지 체크
       const isPointerInBlock = (
         position.x >= catBounds.left &&
@@ -147,7 +124,6 @@ export const useShiftDragHandlers = ({
       );
 
       if (isPointerInBlock) {
-        console.log(`[Shift Drop Category] ✅ 포인터가 카테고리 "${category.title}" 블록 안에 있음!`);
         return true;
       }
 
@@ -181,7 +157,6 @@ export const useShiftDragHandlers = ({
           );
 
           if (isPointerInArea) {
-            console.log(`[Shift Drop Category] ✅ 포인터가 카테고리 "${category.title}" 영역 안에 있음!`);
             return true;
           }
         }
@@ -197,29 +172,13 @@ export const useShiftDragHandlers = ({
     if (targetCategory) {
       const targetDescendants = getAllDescendantIds(draggedCategory.id, currentPage);
       if (targetDescendants.includes(targetCategory.id)) {
-        console.log('[Shift Drop Category] 순환 종속 방지 - 타겟이 드래그된 카테고리의 하위입니다');
         targetCategory = null;  // 순환 종속 방지
       }
     }
 
-    console.log('[Shift Drop Category] 겹침 감지 결과:', {
-      draggedCategoryId: draggedCategory.id,
-      draggedCategoryTitle: draggedCategory.title,
-      draggedCategoryParentId: draggedCategory.parentId,
-      overlappingCategoriesCount: overlappingCategories.length,
-      overlappingCategories: overlappingCategories.map(c => ({ id: c.id, title: c.title })),
-      targetCategory: targetCategory ? { id: targetCategory.id, title: targetCategory.title } : null
-    });
-
     // 카테고리 변경 처리
     const newParentId = targetCategory ? targetCategory.id : undefined;
     const parentChanged = draggedCategory.parentId !== newParentId;
-
-    console.log('[Shift Drop Category] 종속 판정:', {
-      newParentId,
-      currentParentId: draggedCategory.parentId,
-      parentChanged
-    });
 
     // 다중 선택된 카테고리들도 함께 종속
     const categoriesToMove = selectedCategoryIds.includes(draggedCategory.id)
@@ -236,29 +195,9 @@ export const useShiftDragHandlers = ({
           // 총 이동량 계산 (드래그 시작 위치 → 드롭 위치)
           // draggedCategoryAreas에 저장된 원본 위치 사용 (드래그 중 업데이트된 position이 아닌)
           const cachedData = draggedCategoryAreas.current[draggedCategory.id];
-          console.log('[Shift Drop Category] draggedCategoryAreas 확인:', {
-            categoryId: draggedCategory.id,
-            draggedCategoryAreasKeys: Object.keys(draggedCategoryAreas.current),
-            allCachedData: draggedCategoryAreas.current,
-            cachedData,
-            hasCache: !!cachedData,
-            isDifferentRef: draggedCategory.id in draggedCategoryAreas.current
-          });
           const originalCategoryPos = cachedData?.originalPosition || draggedCategory.position;
           const totalDeltaX = position.x - originalCategoryPos.x;
           const totalDeltaY = position.y - originalCategoryPos.y;
-
-          console.log('[Shift Drop Category] 드롭 시작:', {
-            draggedCategoryId: draggedCategory.id,
-            draggedCategoryTitle: draggedCategory.title,
-            dropPosition: position,
-            draggedCategoryCurrentPos: draggedCategory.position,
-            cachedOriginalPos: cachedData?.originalPosition,
-            originalCategoryPos,
-            totalDelta: { x: totalDeltaX, y: totalDeltaY },
-            originalMemoPositionsSize: originalMemoPositions?.size,
-            originalCategoryPositionsSize: originalCategoryPositions?.size
-          });
 
           // 부모 카테고리의 children 업데이트
           let updatedCategories = (p.categories || []).map(category => {
@@ -280,13 +219,6 @@ export const useShiftDragHandlers = ({
                       x: originalPos.x + totalDeltaX,
                       y: originalPos.y + totalDeltaY
                     };
-                    console.log('[Shift Drop Category] 다중 선택 카테고리 위치 계산:', {
-                      categoryId: category.id,
-                      categoryTitle: category.title,
-                      originalPos,
-                      totalDelta: { x: totalDeltaX, y: totalDeltaY },
-                      newPos
-                    });
                     return {
                       ...category,
                       parentId: newParentId,
@@ -309,13 +241,6 @@ export const useShiftDragHandlers = ({
                   x: originalPos.x + totalDeltaX,
                   y: originalPos.y + totalDeltaY
                 };
-                console.log('[Shift Drop Category] 하위 카테고리 위치 계산:', {
-                  categoryId: category.id,
-                  categoryTitle: category.title,
-                  originalPos,
-                  totalDelta: { x: totalDeltaX, y: totalDeltaY },
-                  newPos
-                });
                 return {
                   ...category,
                   position: newPos
@@ -357,13 +282,6 @@ export const useShiftDragHandlers = ({
                   x: originalPos.x + totalDeltaX,
                   y: originalPos.y + totalDeltaY
                 };
-                console.log('[Shift Drop Category] 하위 메모 위치 계산:', {
-                  memoId: memo.id,
-                  memoTitle: memo.title,
-                  originalPos,
-                  totalDelta: { x: totalDeltaX, y: totalDeltaY },
-                  newPos
-                });
                 return {
                   ...memo,
                   position: newPos
@@ -416,13 +334,6 @@ export const useShiftDragHandlers = ({
           const originalCategoryPos = cachedData?.originalPosition || draggedCategory.position;
           const totalDeltaX = position.x - originalCategoryPos.x;
           const totalDeltaY = position.y - originalCategoryPos.y;
-
-          console.log('[Shift Drop Category] 종속 안 함 - 위치만 변경:', {
-            draggedCategoryId: draggedCategory.id,
-            dropPosition: position,
-            originalPos: originalCategoryPos,
-            totalDelta: { x: totalDeltaX, y: totalDeltaY }
-          });
 
           // 하위 메모들도 함께 이동
           const updatedMemos = p.memos.map(memo => {

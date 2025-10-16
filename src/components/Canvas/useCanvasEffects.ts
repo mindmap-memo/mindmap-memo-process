@@ -510,6 +510,25 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
   // 9. Shift 드래그 중 마우스 위치로 영역 충돌 감지
   useEffect(() => {
     if (isShiftPressed && (isDraggingMemo || isDraggingCategory || isDraggingCategoryArea) && currentPage) {
+      // 드래그 시작 시의 부모 ID를 고정 (드래그 중 변경되지 않도록)
+      let initialParentId: string | null = null;
+      let draggingItemName: string = '';
+
+      if (isDraggingMemo && draggingMemoId) {
+        const draggingMemo = currentPage.memos.find(m => m.id === draggingMemoId);
+        initialParentId = draggingMemo?.parentId || null;
+        draggingItemName = draggingMemo?.title || '메모';
+      } else if ((isDraggingCategory && draggingCategoryId) || isDraggingCategoryArea) {
+        const categoryId = draggingCategoryId || isDraggingCategoryArea;
+        if (categoryId) {
+          const draggingCategory = currentPage.categories?.find(c => c.id === categoryId);
+          initialParentId = draggingCategory?.parentId || null;
+          draggingItemName = draggingCategory?.title || '카테고리';
+        }
+      }
+
+      console.log('[Shift UI] 드래그 시작 - 초기 부모 고정:', draggingItemName, '| 초기 부모 ID:', initialParentId);
+
       let lastUpdateTime = 0;
       const throttleDelay = 50; // 50ms마다 한 번만 업데이트
 
@@ -527,38 +546,51 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
         const mouseX = (e.clientX - rect.left - (canvasOffset?.x || 0)) / (canvasScale || 1);
         const mouseY = (e.clientY - rect.top - (canvasOffset?.y || 0)) / (canvasScale || 1);
 
-        // 드래그 중인 아이템의 현재 부모 ID 확인
-        let draggingItemParentId: string | null = null;
-
-        if (isDraggingMemo && draggingMemoId) {
-          const draggingMemo = currentPage.memos.find(m => m.id === draggingMemoId);
-          draggingItemParentId = draggingMemo?.parentId || null;
-        } else if ((isDraggingCategory && draggingCategoryId) || isDraggingCategoryArea) {
-          const categoryId = draggingCategoryId || isDraggingCategoryArea;
-          if (categoryId) {
-            const draggingCategory = currentPage.categories?.find(c => c.id === categoryId);
-            draggingItemParentId = draggingCategory?.parentId || null;
-          }
-        }
-
         // 모든 카테고리 영역과 충돌 검사 - 겹치는 모든 영역 찾기
         const overlappingCategories: CategoryBlock[] = [];
 
         // 드래그 중인 카테고리 ID 확인
         const draggingCategoryIdCurrent = draggingCategoryId || isDraggingCategoryArea;
 
+        // 드래그 중인 항목을 제외한 페이지 데이터 생성 (영역 계산 시 사용)
+        // 메모: 드래그 중인 메모만 제외
+        // 카테고리: 드래그 중인 카테고리만 제외 (부모는 제외하지 않음)
+        const pageForAreaCalculation: Page = isDraggingMemo && draggingMemoId
+          ? {
+              ...currentPage,
+              memos: currentPage.memos.filter(m => m.id !== draggingMemoId)
+            }
+          : draggingCategoryIdCurrent
+          ? {
+              ...currentPage,
+              categories: (currentPage.categories || []).filter(c => c.id !== draggingCategoryIdCurrent)
+            }
+          : currentPage;
+
         for (const category of (currentPage.categories || [])) {
           if (!category.isExpanded) continue;
 
-          // 직계 부모는 제외 (현재 부모는 "빼기" UI로 처리되므로)
-          if (category.id === draggingItemParentId) continue;
+          // 드래그 중인 자기 자신 제외
+          if (category.id === draggingCategoryIdCurrent) {
+            continue;
+          }
 
-          const area = calculateCategoryArea(category, currentPage);
+          // 드래그 시작 시의 부모는 제외 (고정된 초기 부모만 제외)
+          if (category.id === initialParentId) {
+            console.log('[Shift UI] 초기 부모 카테고리 제외:', category.title, category.id);
+            continue;
+          }
+
+          // 영역 계산 시 드래그 중인 항목을 제외한 데이터 사용
+          const area = calculateCategoryArea(category, pageForAreaCalculation);
           if (!area) continue;
 
           // 마우스가 영역 안에 있는지 확인
-          if (mouseX >= area.x && mouseX <= area.x + area.width &&
-              mouseY >= area.y && mouseY <= area.y + area.height) {
+          const isInArea = mouseX >= area.x && mouseX <= area.x + area.width &&
+              mouseY >= area.y && mouseY <= area.y + area.height;
+
+          if (isInArea) {
+            console.log('[Shift UI] 겹침 감지:', category.title, `(ID: ${category.id})`);
             overlappingCategories.push(category);
           }
         }
@@ -566,11 +598,15 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
         // 겹치는 영역 중에서 자신을 제외하고 가장 깊은 레벨(가장 하위) 카테고리 선택
         let foundTarget: string | null = null;
 
+        console.log('[Shift UI] 겹친 카테고리 총 개수:', overlappingCategories.length);
+
         if (overlappingCategories.length > 0) {
           // 드래그 중인 카테고리 자신을 제외
           const candidateCategories = overlappingCategories.filter(cat =>
             !(draggingCategoryIdCurrent && cat.id === draggingCategoryIdCurrent)
           );
+
+          console.log('[Shift UI] 자신 제외 후 후보:', candidateCategories.map(c => `${c.title}(${c.id})`));
 
           if (candidateCategories.length > 0) {
             // 각 카테고리의 깊이를 계산
@@ -591,7 +627,10 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
             );
 
             foundTarget = deepest.category.id;
+            console.log('[Shift UI] 최종 타겟:', deepest.category.title, `(ID: ${deepest.category.id}, 깊이: ${deepest.depth})`);
           }
+        } else {
+          console.log('[Shift UI] 겹친 카테고리 없음 - 타겟 없음');
         }
 
         setDragTargetCategoryId(foundTarget);
