@@ -86,7 +86,6 @@ const App: React.FC = () => {
   const dragState = useDragState();
   const {
     draggedCategoryAreas,
-    setDraggedCategoryAreas,
     shiftDragAreaCache,
     shiftDropProcessedMemos,
     dragStartMemoPositions,
@@ -461,7 +460,6 @@ const App: React.FC = () => {
     cacheCreationStarted,
     categoryPositionTimers,
     memoPositionTimers,
-    setDraggedCategoryAreas,
     clearCategoryCache,
     saveCanvasState,
     updateCategoryPositions

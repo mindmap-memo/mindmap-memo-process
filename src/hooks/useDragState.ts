@@ -43,8 +43,9 @@ export const useDragState = () => {
    * 드래그 중인 카테고리의 영역 캐시
    * - 드래그 중에는 영역 크기가 변하지 않도록 고정
    * - 드래그 종료 시 캐시 제거하여 자연스럽게 크기 조정
+   * - ref로 변경: state 업데이트 비동기성 문제 해결
    */
-  const [draggedCategoryAreas, setDraggedCategoryAreas] = useState<{
+  const draggedCategoryAreas = useRef<{
     [categoryId: string]: {
       area: any;
       originalPosition: { x: number; y: number };
@@ -132,11 +133,7 @@ export const useDragState = () => {
    * @param categoryId - 캐시를 제거할 카테고리 ID
    */
   const clearCategoryCache = useCallback((categoryId: string) => {
-    setDraggedCategoryAreas((prev) => {
-      const newAreas = { ...prev };
-      delete newAreas[categoryId];
-      return newAreas;
-    });
+    delete draggedCategoryAreas.current[categoryId];
     dragStartMemoPositions.current.delete(categoryId);
     dragStartCategoryPositions.current.delete(categoryId);
     clearCollisionDirections(); // 충돌 방향 맵 초기화
@@ -168,7 +165,6 @@ export const useDragState = () => {
   return {
     // 영역 캐시
     draggedCategoryAreas,
-    setDraggedCategoryAreas,
     shiftDragAreaCache,
     shiftDropProcessedMemos,
 

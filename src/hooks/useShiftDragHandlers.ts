@@ -1,4 +1,4 @@
-import { useState, useCallback, MutableRefObject } from 'react';
+import { useCallback, MutableRefObject } from 'react';
 import { Page, MemoBlock, CategoryBlock, CanvasActionType } from '../types';
 import { calculateCategoryArea } from '../utils/categoryAreaUtils';
 
@@ -7,7 +7,7 @@ interface UseShiftDragHandlersProps {
   setPages: React.Dispatch<React.SetStateAction<Page[]>>;
   currentPageId: string;
   selectedCategoryIds: string[];
-  draggedCategoryAreas: { [categoryId: string]: any };
+  draggedCategoryAreas: MutableRefObject<{ [categoryId: string]: any }>;
   dragStartMemoPositions: MutableRefObject<Map<string, Map<string, { x: number; y: number }>>>;
   dragStartCategoryPositions: MutableRefObject<Map<string, Map<string, { x: number; y: number }>>>;
   toggleCategoryExpanded: (categoryId: string) => void;
@@ -162,8 +162,31 @@ export const useShiftDragHandlers = ({
           const originalCategoryPositions = dragStartCategoryPositions.current.get(draggedCategory.id);
 
           // 총 이동량 계산 (드래그 시작 위치 → 드롭 위치)
-          const totalDeltaX = position.x - draggedCategory.position.x;
-          const totalDeltaY = position.y - draggedCategory.position.y;
+          // draggedCategoryAreas에 저장된 원본 위치 사용 (드래그 중 업데이트된 position이 아닌)
+          const cachedData = draggedCategoryAreas.current[draggedCategory.id];
+          console.log('[Shift Drop Category] draggedCategoryAreas 확인:', {
+            categoryId: draggedCategory.id,
+            draggedCategoryAreasKeys: Object.keys(draggedCategoryAreas.current),
+            allCachedData: draggedCategoryAreas.current,
+            cachedData,
+            hasCache: !!cachedData,
+            isDifferentRef: draggedCategory.id in draggedCategoryAreas.current
+          });
+          const originalCategoryPos = cachedData?.originalPosition || draggedCategory.position;
+          const totalDeltaX = position.x - originalCategoryPos.x;
+          const totalDeltaY = position.y - originalCategoryPos.y;
+
+          console.log('[Shift Drop Category] 드롭 시작:', {
+            draggedCategoryId: draggedCategory.id,
+            draggedCategoryTitle: draggedCategory.title,
+            dropPosition: position,
+            draggedCategoryCurrentPos: draggedCategory.position,
+            cachedOriginalPos: cachedData?.originalPosition,
+            originalCategoryPos,
+            totalDelta: { x: totalDeltaX, y: totalDeltaY },
+            originalMemoPositionsSize: originalMemoPositions?.size,
+            originalCategoryPositionsSize: originalCategoryPositions?.size
+          });
 
           // 부모 카테고리의 children 업데이트
           let updatedCategories = (p.categories || []).map(category => {
@@ -177,25 +200,53 @@ export const useShiftDragHandlers = ({
                   position: position  // 드롭 위치 사용
                 };
               } else {
-                // 다중 선택된 다른 카테고리들은 현재 위치 유지 (parentId만 변경)
+                // 다중 선택된 다른 카테고리들은 원래 위치 + 총 이동량으로 계산
+                if (originalCategoryPositions && originalCategoryPositions.has(category.id)) {
+                  const originalPos = originalCategoryPositions.get(category.id);
+                  if (originalPos) {
+                    const newPos = {
+                      x: originalPos.x + totalDeltaX,
+                      y: originalPos.y + totalDeltaY
+                    };
+                    console.log('[Shift Drop Category] 다중 선택 카테고리 위치 계산:', {
+                      categoryId: category.id,
+                      categoryTitle: category.title,
+                      originalPos,
+                      totalDelta: { x: totalDeltaX, y: totalDeltaY },
+                      newPos
+                    });
+                    return {
+                      ...category,
+                      parentId: newParentId,
+                      position: newPos
+                    };
+                  }
+                }
                 return {
                   ...category,
                   parentId: newParentId
-                  // position은 변경하지 않음 - 드래그 중 이동한 위치 그대로 유지
                 };
               }
             }
 
-            // 하위 카테고리들은 드래그 중 이동한 위치로 업데이트
-            if (originalCategoryPositions) {
+            // 하위 카테고리들은 원래 위치 + 총 이동량으로 계산
+            if (originalCategoryPositions && originalCategoryPositions.has(category.id)) {
               const originalPos = originalCategoryPositions.get(category.id);
               if (originalPos) {
+                const newPos = {
+                  x: originalPos.x + totalDeltaX,
+                  y: originalPos.y + totalDeltaY
+                };
+                console.log('[Shift Drop Category] 하위 카테고리 위치 계산:', {
+                  categoryId: category.id,
+                  categoryTitle: category.title,
+                  originalPos,
+                  totalDelta: { x: totalDeltaX, y: totalDeltaY },
+                  newPos
+                });
                 return {
                   ...category,
-                  position: {
-                    x: originalPos.x + totalDeltaX,
-                    y: originalPos.y + totalDeltaY
-                  }
+                  position: newPos
                 };
               }
             }
@@ -225,17 +276,25 @@ export const useShiftDragHandlers = ({
             return category;
           });
 
-          // 하위 메모들은 드래그 중 이동한 위치로 업데이트
+          // 하위 메모들은 원래 위치 + 총 이동량으로 계산
           let updatedMemos = p.memos.map(memo => {
-            if (originalMemoPositions) {
+            if (originalMemoPositions && originalMemoPositions.has(memo.id)) {
               const originalPos = originalMemoPositions.get(memo.id);
               if (originalPos) {
+                const newPos = {
+                  x: originalPos.x + totalDeltaX,
+                  y: originalPos.y + totalDeltaY
+                };
+                console.log('[Shift Drop Category] 하위 메모 위치 계산:', {
+                  memoId: memo.id,
+                  memoTitle: memo.title,
+                  originalPos,
+                  totalDelta: { x: totalDeltaX, y: totalDeltaY },
+                  newPos
+                });
                 return {
                   ...memo,
-                  position: {
-                    x: originalPos.x + totalDeltaX,
-                    y: originalPos.y + totalDeltaY
-                  }
+                  position: newPos
                 };
               }
             }
@@ -382,7 +441,7 @@ export const useShiftDragHandlers = ({
       setPages(pages.map(p => {
         if (p.id === currentPageId) {
           // 원래 위치 정보 가져오기 (드래그 시작 시 저장된 위치)
-          const originalPosition = draggedCategoryAreas[draggedMemo.id]?.originalPosition;
+          const originalPosition = draggedCategoryAreas.current[draggedMemo.id]?.originalPosition;
 
           // 부모 카테고리의 children 업데이트
           let updatedCategories = (p.categories || []).map(category => {

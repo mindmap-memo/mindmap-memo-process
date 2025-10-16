@@ -10,14 +10,13 @@ interface UsePositionHandlersProps {
   selectedMemoIds: string[];
   selectedCategoryIds: string[];
   isShiftPressed: boolean;
-  draggedCategoryAreas: { [categoryId: string]: any };
+  draggedCategoryAreas: MutableRefObject<{ [categoryId: string]: any }>;
   dragStartMemoPositions: MutableRefObject<Map<string, Map<string, { x: number; y: number }>>>;
   dragStartCategoryPositions: MutableRefObject<Map<string, Map<string, { x: number; y: number }>>>;
   previousFramePosition: MutableRefObject<Map<string, { x: number; y: number }>>;
   cacheCreationStarted: MutableRefObject<Set<string>>;
   categoryPositionTimers: MutableRefObject<Map<string, NodeJS.Timeout>>;
   memoPositionTimers: MutableRefObject<Map<string, NodeJS.Timeout>>;
-  setDraggedCategoryAreas: React.Dispatch<React.SetStateAction<{ [categoryId: string]: any }>>;
   clearCategoryCache: (categoryId: string) => void;
   saveCanvasState: (actionType: CanvasActionType, description: string) => void;
   updateCategoryPositions: () => void;
@@ -37,7 +36,6 @@ export const usePositionHandlers = ({
   cacheCreationStarted,
   categoryPositionTimers,
   memoPositionTimers,
-  setDraggedCategoryAreas,
   clearCategoryCache,
   saveCanvasState,
   updateCategoryPositions
@@ -77,16 +75,22 @@ export const usePositionHandlers = ({
       if (!cacheCreationStarted.current.has(categoryId) && currentPage) {
         cacheCreationStarted.current.add(categoryId);
 
+        // 원본 위치는 무조건 저장 (영역이 없어도)
+        const originalPos = { x: targetCategory.position.x, y: targetCategory.position.y };
         const currentArea = calculateCategoryArea(targetCategory, currentPage);
-        if (currentArea) {
-          setDraggedCategoryAreas(prev => ({
-            ...prev,
-            [categoryId]: {
-              area: currentArea,
-              originalPosition: { x: targetCategory.position.x, y: targetCategory.position.y }
-            }
-          }));
-        }
+
+        console.log('[Position Handler] draggedCategoryAreas 저장:', {
+          categoryId,
+          originalPos,
+          currentArea,
+          hasArea: !!currentArea
+        });
+
+        // 영역이 있든 없든 원본 위치는 무조건 저장 (Shift 드롭에서 필요)
+        draggedCategoryAreas.current[categoryId] = {
+          area: currentArea,
+          originalPosition: originalPos
+        };
 
         // 모든 하위 카테고리 ID 수집 (재귀적으로)
         const getAllDescendantCategoryIds = (parentId: string): string[] => {
@@ -148,6 +152,17 @@ export const usePositionHandlers = ({
         });
         dragStartCategoryPositions.current.set(categoryId, categoryPositions);
 
+        console.log('[Position Handler] 드래그 시작 - 원본 위치 저장:', {
+          draggedCategoryId: categoryId,
+          memoPositionsCount: memoPositions.size,
+          categoryPositionsCount: categoryPositions.size,
+          savedCategoryPositions: Array.from(categoryPositions.entries()).map(([id, pos]) => ({
+            id,
+            title: currentPage.categories?.find(c => c.id === id)?.title,
+            pos
+          }))
+        });
+
       }
     }
 
@@ -158,7 +173,7 @@ export const usePositionHandlers = ({
       if (!pageTargetCategory) return page;
 
       // 원본 카테고리 위치와 새 위치의 총 델타 계산
-      const cachedData = draggedCategoryAreas[categoryId];
+      const cachedData = draggedCategoryAreas.current[categoryId];
       const totalDeltaX = cachedData ? position.x - cachedData.originalPosition.x : deltaX;
       const totalDeltaY = cachedData ? position.y - cachedData.originalPosition.y : deltaY;
 
@@ -381,7 +396,6 @@ export const usePositionHandlers = ({
     draggedCategoryAreas,
     previousFramePosition,
     cacheCreationStarted,
-    setDraggedCategoryAreas,
     dragStartMemoPositions,
     dragStartCategoryPositions,
     setPages,

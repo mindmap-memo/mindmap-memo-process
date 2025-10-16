@@ -60,42 +60,37 @@ export const useCategoryPositionHandlers = ({
   ) => {
     const currentPage = pages.find(p => p.id === currentPageId);
     if (!currentPage || !currentPage.categories) {
-      clearCategoryCache(categoryId);
-      previousFramePosition.current.delete(categoryId);
+      // Shift 드롭이 완료될 때까지 캐시 클리어를 지연 (500ms)
+      setTimeout(() => {
+        clearCategoryCache(categoryId);
+        previousFramePosition.current.delete(categoryId);
+      }, 500);
       return;
     }
 
-    // 드롭 시점의 카테고리 및 하위 메모 위치 로그
-    const childMemos = currentPage.memos.filter(m => m.parentId === categoryId);
-
-    // 상대적 위치 계산
-    if (childMemos.length > 0) {
-      const relativeMemoPos = childMemos.map(m => ({
-        id: m.id,
-        relX: Math.round(m.position.x - finalPosition.x),
-        relY: Math.round(m.position.y - finalPosition.y)
-      }));
-    }
-
-    // Shift 드래그는 별도 처리 (이미 handleShiftDropCategory에서 처리됨)
-    // 일반 드래그로는 종속 관계를 변경하지 않음 (위치만 밀어냄)
-
     // 드래그 종료 후 캐시 제거 - 메모 위치에 따라 자연스럽게 크기 조정
     // 다중 선택된 모든 카테고리의 캐시도 함께 제거
-    const isMultiSelected = selectedCategoryIds.includes(categoryId);
-    const categoriesToClear = isMultiSelected ? selectedCategoryIds : [categoryId];
+    // ⚠️ Shift 드롭이 완료될 때까지 캐시 클리어를 지연 (500ms)
+    setTimeout(() => {
+      const isMultiSelected = selectedCategoryIds.includes(categoryId);
+      const categoriesToClear = isMultiSelected ? selectedCategoryIds : [categoryId];
 
-    categoriesToClear.forEach(catId => {
-      clearCategoryCache(catId);
-      previousFramePosition.current.delete(catId);
-      cacheCreationStarted.current.delete(catId); // Set의 delete 메서드
-    });
+      categoriesToClear.forEach(catId => {
+        clearCategoryCache(catId);
+        previousFramePosition.current.delete(catId);
+        cacheCreationStarted.current.delete(catId);
+      });
+    }, 500);
 
-    // 드래그 종료 시 모든 위치 캐시 초기화
-    dragStartMemoPositions.current.clear();
-    dragStartCategoryPositions.current.clear();
-
-    shiftDragAreaCache.current = {}; // Shift 드래그 캐시도 클리어
+    // !! 중요: 위치 캐시는 Shift 드롭 처리 후에 클리어되어야 함
+    // handleShiftDropCategory에서 dragStartCategoryPositions를 사용하기 때문
+    // setTimeout으로 충분한 시간 후 클리어 (Shift 드롭 처리가 먼저 완료되도록)
+    setTimeout(() => {
+      dragStartMemoPositions.current.clear();
+      dragStartCategoryPositions.current.clear();
+      shiftDragAreaCache.current = {}; // Shift 드래그 캐시도 클리어
+      console.log('[Category Drag End] 위치 캐시 클리어 완료');
+    }, 500);
   }, [
     pages,
     currentPageId,
