@@ -29,11 +29,23 @@ export const useShiftDragHandlers = ({
 }: UseShiftDragHandlersProps) => {
 
   // 겹침 체크 헬퍼 함수
-  const isOverlapping = useCallback((bounds1: any, bounds2: any, margin = 20) => {
-    return !(bounds1.right + margin < bounds2.left ||
+  const isOverlapping = useCallback((bounds1: any, bounds2: any, margin = 50) => {
+    const overlaps = !(bounds1.right + margin < bounds2.left ||
              bounds1.left - margin > bounds2.right ||
              bounds1.bottom + margin < bounds2.top ||
              bounds1.top - margin > bounds2.bottom);
+
+    if (overlaps) {
+      console.log('[isOverlapping] 겹침 감지:', {
+        bounds1,
+        bounds2,
+        margin,
+        xOverlap: !(bounds1.right + margin < bounds2.left || bounds1.left - margin > bounds2.right),
+        yOverlap: !(bounds1.bottom + margin < bounds2.top || bounds1.top - margin > bounds2.bottom)
+      });
+    }
+
+    return overlaps;
   }, []);
 
   // 모든 하위 카테고리 ID를 재귀적으로 가져오는 함수
@@ -77,6 +89,13 @@ export const useShiftDragHandlers = ({
     currentPage: Page,
     cachedAreas?: {[categoryId: string]: any}
   ) => {
+    console.log('[Shift Drop Category] 함수 시작:', {
+      draggedCategoryId: draggedCategory.id,
+      draggedCategoryTitle: draggedCategory.title,
+      receivedPosition: position,
+      draggedCategoryCurrentPosition: draggedCategory.position
+    });
+
     // 카테고리 찾기
     const categoryWidth = draggedCategory.size?.width || 200;
     const categoryHeight = draggedCategory.size?.height || 80;
@@ -86,6 +105,8 @@ export const useShiftDragHandlers = ({
       right: position.x + categoryWidth,
       bottom: position.y + categoryHeight
     };
+
+    console.log('[Shift Drop Category] 카테고리 경계:', categoryBounds);
 
     // 드래그 중인 카테고리와 그 모든 하위 카테고리들을 제외한 페이지 데이터 생성
     const excludedIds = getAllDescendantIds(draggedCategory.id, currentPage);
@@ -97,9 +118,15 @@ export const useShiftDragHandlers = ({
 
     // 타겟 카테고리 찾기 (자기 자신과 자신의 하위는 이미 pageWithoutDraggingCategory에서 제외됨)
     // 겹치는 모든 카테고리 찾기
+    console.log('[Shift Drop Category] 검사할 카테고리들:', pageWithoutDraggingCategory.categories?.map(c => ({
+      id: c.id,
+      title: c.title,
+      position: c.position
+    })));
+
     const overlappingCategories = pageWithoutDraggingCategory.categories?.filter(category => {
 
-      // 1. 카테고리 블록과의 겹침 체크
+      // 1. 카테고리 블록과의 점 충돌 체크 (마우스 포인터 기반)
       const catWidth = category.size?.width || 200;
       const catHeight = category.size?.height || 80;
       const catBounds = {
@@ -109,11 +136,22 @@ export const useShiftDragHandlers = ({
         bottom: category.position.y + catHeight
       };
 
-      if (isOverlapping(categoryBounds, catBounds, 20)) {
+      console.log(`[Shift Drop Category] 카테고리 "${category.title}" 블록 경계:`, catBounds);
+
+      // 마우스 포인터(드롭 위치)가 카테고리 블록 안에 있는지 체크
+      const isPointerInBlock = (
+        position.x >= catBounds.left &&
+        position.x <= catBounds.right &&
+        position.y >= catBounds.top &&
+        position.y <= catBounds.bottom
+      );
+
+      if (isPointerInBlock) {
+        console.log(`[Shift Drop Category] ✅ 포인터가 카테고리 "${category.title}" 블록 안에 있음!`);
         return true;
       }
 
-      // 2. 카테고리 영역과의 겹침 체크
+      // 2. 카테고리 영역과의 점 충돌 체크 (마우스 포인터 기반)
       // 펼쳐진 카테고리만 영역 체크 (성능 최적화)
       if (category.isExpanded) {
         let categoryArea;
@@ -133,7 +171,17 @@ export const useShiftDragHandlers = ({
             right: categoryArea.x + categoryArea.width,
             bottom: categoryArea.y + categoryArea.height
           };
-          if (isOverlapping(categoryBounds, areaBounds, 20)) {
+
+          // 마우스 포인터가 영역 안에 있는지 체크
+          const isPointerInArea = (
+            position.x >= areaBounds.left &&
+            position.x <= areaBounds.right &&
+            position.y >= areaBounds.top &&
+            position.y <= areaBounds.bottom
+          );
+
+          if (isPointerInArea) {
+            console.log(`[Shift Drop Category] ✅ 포인터가 카테고리 "${category.title}" 영역 안에 있음!`);
             return true;
           }
         }
@@ -143,11 +191,35 @@ export const useShiftDragHandlers = ({
     }) || [];
 
     // 겹치는 카테고리 중에서 가장 깊은 레벨(가장 하위) 카테고리 선택
-    const targetCategory = findDeepestCategory(overlappingCategories, currentPage);
+    let targetCategory = findDeepestCategory(overlappingCategories, currentPage);
+
+    // 순환 종속 방지: 타겟 카테고리가 드래그된 카테고리의 하위인지 확인
+    if (targetCategory) {
+      const targetDescendants = getAllDescendantIds(draggedCategory.id, currentPage);
+      if (targetDescendants.includes(targetCategory.id)) {
+        console.log('[Shift Drop Category] 순환 종속 방지 - 타겟이 드래그된 카테고리의 하위입니다');
+        targetCategory = null;  // 순환 종속 방지
+      }
+    }
+
+    console.log('[Shift Drop Category] 겹침 감지 결과:', {
+      draggedCategoryId: draggedCategory.id,
+      draggedCategoryTitle: draggedCategory.title,
+      draggedCategoryParentId: draggedCategory.parentId,
+      overlappingCategoriesCount: overlappingCategories.length,
+      overlappingCategories: overlappingCategories.map(c => ({ id: c.id, title: c.title })),
+      targetCategory: targetCategory ? { id: targetCategory.id, title: targetCategory.title } : null
+    });
 
     // 카테고리 변경 처리
     const newParentId = targetCategory ? targetCategory.id : undefined;
     const parentChanged = draggedCategory.parentId !== newParentId;
+
+    console.log('[Shift Drop Category] 종속 판정:', {
+      newParentId,
+      currentParentId: draggedCategory.parentId,
+      parentChanged
+    });
 
     // 다중 선택된 카테고리들도 함께 종속
     const categoriesToMove = selectedCategoryIds.includes(draggedCategory.id)
@@ -331,16 +403,68 @@ export const useShiftDragHandlers = ({
         clearCategoryCache(draggedCategory.parentId);
       }
     } else {
-      // 같은 카테고리 내에서 위치만 변경
+      // 같은 카테고리 내에서 위치만 변경 (종속 안 함)
+      // 하지만 하위 메모와 카테고리들도 함께 이동해야 함!
       setPages(pages.map(p => {
         if (p.id === currentPageId) {
+          // 원래 위치 정보 가져오기
+          const originalMemoPositions = dragStartMemoPositions.current.get(draggedCategory.id);
+          const originalCategoryPositions = dragStartCategoryPositions.current.get(draggedCategory.id);
+
+          // 총 이동량 계산
+          const cachedData = draggedCategoryAreas.current[draggedCategory.id];
+          const originalCategoryPos = cachedData?.originalPosition || draggedCategory.position;
+          const totalDeltaX = position.x - originalCategoryPos.x;
+          const totalDeltaY = position.y - originalCategoryPos.y;
+
+          console.log('[Shift Drop Category] 종속 안 함 - 위치만 변경:', {
+            draggedCategoryId: draggedCategory.id,
+            dropPosition: position,
+            originalPos: originalCategoryPos,
+            totalDelta: { x: totalDeltaX, y: totalDeltaY }
+          });
+
+          // 하위 메모들도 함께 이동
+          const updatedMemos = p.memos.map(memo => {
+            if (originalMemoPositions && originalMemoPositions.has(memo.id)) {
+              const originalPos = originalMemoPositions.get(memo.id);
+              if (originalPos) {
+                return {
+                  ...memo,
+                  position: {
+                    x: originalPos.x + totalDeltaX,
+                    y: originalPos.y + totalDeltaY
+                  }
+                };
+              }
+            }
+            return memo;
+          });
+
+          // 하위 카테고리들도 함께 이동
+          const updatedCategories = (p.categories || []).map(category => {
+            if (category.id === draggedCategory.id) {
+              return { ...category, position };
+            }
+            if (originalCategoryPositions && originalCategoryPositions.has(category.id)) {
+              const originalPos = originalCategoryPositions.get(category.id);
+              if (originalPos) {
+                return {
+                  ...category,
+                  position: {
+                    x: originalPos.x + totalDeltaX,
+                    y: originalPos.y + totalDeltaY
+                  }
+                };
+              }
+            }
+            return category;
+          });
+
           return {
             ...p,
-            categories: (p.categories || []).map(category =>
-              category.id === draggedCategory.id
-                ? { ...category, position }
-                : category
-            )
+            memos: updatedMemos,
+            categories: updatedCategories
           };
         }
         return p;

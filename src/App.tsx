@@ -453,6 +453,7 @@ const App: React.FC = () => {
     selectedMemoIds,
     selectedCategoryIds,
     isShiftPressed,
+    isShiftPressedRef,
     draggedCategoryAreas,
     dragStartMemoPositions,
     dragStartCategoryPositions,

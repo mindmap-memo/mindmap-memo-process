@@ -19,6 +19,7 @@ import { clearCollisionDirections } from '../utils/categoryAreaUtils';
  * - `clearCategoryCache`: 특정 카테고리의 모든 캐시 제거
  * - 드래그 종료 시 캐시 정리로 메모리 누수 방지
  *
+ * @param onCacheCleared - 캐시 클리어 시 호출될 콜백 (영역 재계산 트리거용)
  * @returns 드래그 상태, ref, 캐시 관리 함수
  *
  * @example
@@ -28,7 +29,7 @@ import { clearCollisionDirections } from '../utils/categoryAreaUtils';
  *   setDraggedCategoryAreas,
  *   clearCategoryCache,
  *   dragStartMemoPositions
- * } = useDragState();
+ * } = useDragState(() => setAreaUpdateTrigger(prev => prev + 1));
  *
  * // 드래그 시작 시 위치 저장
  * dragStartMemoPositions.current.set(pageId, new Map(memoPositions));
@@ -37,7 +38,7 @@ import { clearCollisionDirections } from '../utils/categoryAreaUtils';
  * clearCategoryCache(categoryId);
  * ```
  */
-export const useDragState = () => {
+export const useDragState = (onCacheCleared?: () => void) => {
   // ===== 카테고리 영역 캐시 =====
   /**
    * 드래그 중인 카테고리의 영역 캐시
@@ -130,6 +131,9 @@ export const useDragState = () => {
    * - 카테고리 위치 캐시
    * - 충돌 방향 맵
    *
+   * **부가 기능:**
+   * - 캐시 클리어 후 콜백 호출로 영역 재계산 트리거
+   *
    * @param categoryId - 캐시를 제거할 카테고리 ID
    */
   const clearCategoryCache = useCallback((categoryId: string) => {
@@ -137,7 +141,12 @@ export const useDragState = () => {
     dragStartMemoPositions.current.delete(categoryId);
     dragStartCategoryPositions.current.delete(categoryId);
     clearCollisionDirections(); // 충돌 방향 맵 초기화
-  }, []);
+
+    // 캐시 클리어 후 콜백 호출 (영역 재계산 트리거)
+    if (onCacheCleared) {
+      onCacheCleared();
+    }
+  }, [onCacheCleared]);
 
   // ===== 컴포넌트 언마운트 시 타이머 정리 =====
   useEffect(() => {

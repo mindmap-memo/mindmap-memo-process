@@ -1,6 +1,6 @@
 import { useCallback, MutableRefObject } from 'react';
 import { Page, CategoryBlock } from '../types';
-import { calculateCategoryArea } from '../utils/categoryAreaUtils';
+import { calculateCategoryArea, clearCollisionDirections } from '../utils/categoryAreaUtils';
 
 interface UseCategoryPositionHandlersProps {
   pages: Page[];
@@ -64,6 +64,8 @@ export const useCategoryPositionHandlers = ({
       setTimeout(() => {
         clearCategoryCache(categoryId);
         previousFramePosition.current.delete(categoryId);
+        cacheCreationStarted.current.delete(categoryId);
+        clearCollisionDirections(); // 충돌 방향 캐시 초기화
       }, 500);
       return;
     }
@@ -80,6 +82,12 @@ export const useCategoryPositionHandlers = ({
         previousFramePosition.current.delete(catId);
         cacheCreationStarted.current.delete(catId);
       });
+
+      // Shift 드래그 캐시도 함께 클리어 (Shift를 눌렀다 뗐을 때 남아있는 캐시 제거)
+      shiftDragAreaCache.current = {};
+
+      // 충돌 방향 캐시 초기화 (Shift를 눌렀다 뗐을 때 남아있는 충돌 판정 제거)
+      clearCollisionDirections();
     }, 500);
 
     // !! 중요: 위치 캐시는 Shift 드롭 처리 후에 클리어되어야 함
@@ -88,7 +96,6 @@ export const useCategoryPositionHandlers = ({
     setTimeout(() => {
       dragStartMemoPositions.current.clear();
       dragStartCategoryPositions.current.clear();
-      shiftDragAreaCache.current = {}; // Shift 드래그 캐시도 클리어
       console.log('[Category Drag End] 위치 캐시 클리어 완료');
     }, 500);
   }, [

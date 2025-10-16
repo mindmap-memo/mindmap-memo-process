@@ -209,6 +209,15 @@ const Canvas: React.FC<CanvasProps> = ({
     renderedCategoryAreas
   } = canvasState;
 
+  // 로컬 clearCategoryCache 생성 (areaUpdateTrigger 증가 포함)
+  const localClearCategoryCache = React.useCallback((categoryId: string) => {
+    if (onClearCategoryCache) {
+      onClearCategoryCache(categoryId);
+    }
+    // 캐시 클리어 후 영역 재계산 트리거
+    setAreaUpdateTrigger(prev => prev + 1);
+  }, [onClearCategoryCache, setAreaUpdateTrigger]);
+
   // Use external state if provided, otherwise use local state
   const canvasOffset = externalCanvasOffset !== undefined ? externalCanvasOffset : localCanvasOffset;
   const setCanvasOffset = externalSetCanvasOffset || setLocalCanvasOffset;
@@ -349,7 +358,7 @@ const Canvas: React.FC<CanvasProps> = ({
     shiftDragAreaCache,
     currentPage,
     setDraggedCategoryAreas,
-    onClearCategoryCache,
+    onClearCategoryCache: localClearCategoryCache,
     setAreaUpdateTrigger,
     isPanning,
     setIsPanning,

@@ -781,7 +781,7 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
             transform: isDragging
               ? `translate(${deltaTransform.x}px, ${deltaTransform.y}px) ${(isShiftDragTarget || isParentBeingLeftBehind || isDragHovered) ? 'scale(1.02)' : 'scale(1)'}`
               : (isShiftDragTarget || isParentBeingLeftBehind || isDragHovered) ? 'scale(1.02)' : 'scale(1)',
-            transition: isAnyDragging ? 'none' : 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, border 0.2s ease',
+            transition: isAnyDragging ? 'none' : 'background-color 0.2s ease, border 0.2s ease',
             willChange: 'transform',
             display: 'flex',
             alignItems: 'center',
@@ -910,12 +910,47 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
                     y: originalCategoryPosition.y + ((upEvent?.clientY || (window.event as MouseEvent).clientY) - startY) / canvasScale
                   };
 
-                  onCategoryPositionDragEnd?.(category.id, finalPosition);
+                  // 마우스 포인터의 실제 위치 (캔버스 좌표계)
+                  const canvasElement = document.getElementById('main-canvas');
+                  if (canvasElement && canvasOffset) {
+                    const rect = canvasElement.getBoundingClientRect();
+                    const clientX = upEvent?.clientX || (window.event as MouseEvent).clientX;
+                    const clientY = upEvent?.clientY || (window.event as MouseEvent).clientY;
 
-                  if (isShiftMode) {
-                    onShiftDropCategory?.(category, finalPosition);
-                    // 카테고리 드롭 감지 (카테고리-카테고리 종속 처리)
-                    onDetectCategoryDropForCategory?.(category.id, finalPosition);
+                    // 캔버스 좌표계로 변환: (클라이언트 좌표 - 캔버스 시작점 - 캔버스 오프셋) / 스케일
+                    const mouseX = (clientX - rect.left - canvasOffset.x) / canvasScale;
+                    const mouseY = (clientY - rect.top - canvasOffset.y) / canvasScale;
+
+                    const mousePointerPosition = { x: mouseX, y: mouseY };
+
+                    console.log('[카테고리 드롭] 좌표 정보:', {
+                      clientX,
+                      clientY,
+                      rectLeft: rect.left,
+                      rectTop: rect.top,
+                      canvasOffsetX: canvasOffset.x,
+                      canvasOffsetY: canvasOffset.y,
+                      canvasScale,
+                      mousePointerPosition,
+                      finalPosition,
+                      categoryTitle: category.title
+                    });
+
+                    onCategoryPositionDragEnd?.(category.id, finalPosition);
+
+                    if (isShiftMode) {
+                      onShiftDropCategory?.(category, finalPosition);
+                      // 카테고리 드롭 감지 (카테고리-카테고리 종속 처리) - 마우스 포인터 위치 전달
+                      onDetectCategoryDropForCategory?.(category.id, mousePointerPosition);
+                    }
+                  } else {
+                    onCategoryPositionDragEnd?.(category.id, finalPosition);
+
+                    if (isShiftMode) {
+                      onShiftDropCategory?.(category, finalPosition);
+                      // fallback: 캔버스 요소를 찾지 못한 경우 finalPosition 사용
+                      onDetectCategoryDropForCategory?.(category.id, finalPosition);
+                    }
                   }
                 }
 

@@ -426,6 +426,9 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
   const handleMouseUp = React.useCallback(() => {
     setIsPanning(false);
     setDragTargetCategoryId(null); // Shift 드래그 종료 시 타겟 초기화
+
+    // 드래그 완료 시 모든 캐시를 완전히 클리어 (Shift를 눌렀다 뗐을 때 남아있는 충돌 판정 제거)
+    // draggedCategoryAreas는 handleCategoryPositionDragEnd에서 처리되므로 여기서는 스킵
   }, [setIsPanning, setDragTargetCategoryId]);
 
   /**

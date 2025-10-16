@@ -10,6 +10,7 @@ interface UsePositionHandlersProps {
   selectedMemoIds: string[];
   selectedCategoryIds: string[];
   isShiftPressed: boolean;
+  isShiftPressedRef: React.MutableRefObject<boolean>;  // Ref 추가
   draggedCategoryAreas: MutableRefObject<{ [categoryId: string]: any }>;
   dragStartMemoPositions: MutableRefObject<Map<string, Map<string, { x: number; y: number }>>>;
   dragStartCategoryPositions: MutableRefObject<Map<string, Map<string, { x: number; y: number }>>>;
@@ -29,6 +30,7 @@ export const usePositionHandlers = ({
   selectedMemoIds,
   selectedCategoryIds,
   isShiftPressed,
+  isShiftPressedRef,
   draggedCategoryAreas,
   dragStartMemoPositions,
   dragStartCategoryPositions,
@@ -338,7 +340,8 @@ export const usePositionHandlers = ({
       });
 
       // 충돌 검사 수행 (Shift 누르면 충돌 검사 건너뛰기)
-      if (!isShiftPressed) {
+      // Ref를 사용하여 드래그 중 Shift 상태 변경을 실시간으로 반영
+      if (!isShiftPressedRef.current) {
         const pageWithUpdates = {
           ...page,
           memos: updatedMemos,
@@ -444,7 +447,8 @@ export const usePositionHandlers = ({
       let restrictedY = false;
 
       // 부모가 없는 메모만 영역 충돌 검사 (Shift 누르면 스킵)
-      if (!movedMemo.parentId && !isShiftPressed) {
+      // Ref를 사용하여 드래그 중 Shift 상태 변경을 실시간으로 반영
+      if (!movedMemo.parentId && !isShiftPressedRef.current) {
         for (const category of categories) {
           const categoryArea = calculateCategoryArea(category, currentPage);
           if (!categoryArea) continue;
@@ -600,7 +604,8 @@ export const usePositionHandlers = ({
       };
 
       // Shift 드래그 중에는 충돌 검사 안 함
-      if (isShiftPressed) {
+      // Ref를 사용하여 드래그 중 Shift 상태 변경을 실시간으로 반영
+      if (isShiftPressedRef.current) {
         return prev.map(page =>
           page.id === currentPageId
             ? updatedPage
