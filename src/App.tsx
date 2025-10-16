@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Page, MemoBlock, DataRegistry, MemoDisplaySize, ImportanceLevel, CategoryBlock, QuickNavItem, TutorialState } from './types';
+import { CategoryBlock, TutorialState } from './types';
 import { globalDataRegistry } from './utils/dataRegistry';
-import { STORAGE_KEYS } from './constants/defaultData';
-import { saveToStorage } from './utils/storageUtils';
 import { useCanvasHistory } from './hooks/useCanvasHistory';
 import { useAppState } from './hooks/useAppState';
 import { usePanelState } from './hooks/usePanelState';
@@ -18,53 +16,22 @@ import { usePageHandlers } from './hooks/usePageHandlers';
 import { useCollisionHandlers } from './hooks/useCollisionHandlers';
 import { useShiftDragHandlers } from './hooks/useShiftDragHandlers';
 import { useCategoryPositionHandlers } from './hooks/useCategoryPositionHandlers';
+import { useGlobalEventHandlers } from './hooks/useGlobalEventHandlers';
+import { useLocalStorage } from './hooks/useLocalStorage';
+import { useTutorialValidation } from './hooks/useTutorialValidation';
+import { useCategoryDrop } from './hooks/useCategoryDrop';
 import { calculateCategoryArea, CategoryArea } from './utils/categoryAreaUtils';
 import { resolveUnifiedCollisions } from './utils/collisionUtils';
-import {
-  canAddCategoryAsChild,
-  addCategoryToParent,
-  addMemoToCategory,
-  isParentChild,
-  getDirectChildMemos,
-  getDirectChildCategories,
-  isAncestor
-} from './utils/categoryHierarchyUtils';
 import { AppProviders } from './contexts';
 import LeftPanel from './components/LeftPanel';
 import RightPanel from './components/RightPanel';
 import Canvas from './components/Canvas';
 import { Tutorial } from './components/Tutorial';
 import { tutorialSteps } from './utils/tutorialSteps';
+import { QuickNavPanel } from './components/QuickNavPanel';
 import styles from './scss/App.module.scss';
 
 const App: React.FC = () => {
-  // 브라우저 기본 Ctrl/Command + 휠 줌 차단 (전역)
-  useEffect(() => {
-    const preventBrowserZoom = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-      }
-    };
-
-    // document 전체에 리스너 추가 (passive: false로 preventDefault 가능하게)
-    document.addEventListener('wheel', preventBrowserZoom, { passive: false });
-
-    return () => {
-      document.removeEventListener('wheel', preventBrowserZoom);
-    };
-  }, []);
-
-  // 한 번만 실행되는 localStorage 마이그레이션 (임시)
-  useEffect(() => {
-    const migrationDone = localStorage.getItem('categories-migration-done');
-    if (!migrationDone) {
-      console.log('🔄 카테고리 마이그레이션을 위해 localStorage 클리어 중...');
-      localStorage.clear();
-      localStorage.setItem('categories-migration-done', 'true');
-      window.location.reload();
-    }
-  }, []);
-
   // ===== 커스텀 훅으로 상태 관리 =====
   const appState = useAppState();
   const {
@@ -377,60 +344,76 @@ const App: React.FC = () => {
     handleCategoryAreaShiftDrop
   } = shiftDragHandlers;
 
-  // 캔버스 이동 감지 (2단계 - canvas-pan)
-  React.useEffect(() => {
-    if (tutorialState.isActive && tutorialState.currentStep === 2) {
-      const dx = Math.abs(canvasOffset.x - initialCanvasOffset.current.x);
-      const dy = Math.abs(canvasOffset.y - initialCanvasOffset.current.y);
-      if (dx > 50 || dy > 50) {
-        setCanvasPanned(true);
-      }
-    }
-  }, [canvasOffset, tutorialState.isActive, tutorialState.currentStep]);
-
-  // 캔버스 줌 감지 (3단계 - canvas-zoom)
-  React.useEffect(() => {
-    if (tutorialState.isActive && tutorialState.currentStep === 3) {
-      const scaleDiff = Math.abs(canvasScale - initialCanvasScale.current);
-      if (scaleDiff > 0.1) {
-        setCanvasZoomed(true);
-      }
-    }
-  }, [canvasScale, tutorialState.isActive, tutorialState.currentStep]);
-
-  // 메모 생성 감지 (4단계 - add-memo)
-  React.useEffect(() => {
-    if (tutorialState.isActive && tutorialState.currentStep === 4) {
-      const currentPage = pages.find(p => p.id === currentPageId);
-      if (currentPage && currentPage.memos.length > initialMemoCount.current) {
-        setMemoCreated(true);
-      }
-    }
-  }, [pages, currentPageId, tutorialState.isActive, tutorialState.currentStep]);
-
-  // 메모 드래그 감지 (5단계 - memo-drag)
-  React.useEffect(() => {
-    if (tutorialState.isActive && tutorialState.currentStep === 5) {
-      const currentPage = pages.find(p => p.id === currentPageId);
-      if (!currentPage) return;
-
-      // 메모 위치가 변경되었는지 확인
-      for (const memo of currentPage.memos) {
-        const initialPos = initialMemoPositions.current.get(memo.id);
-        if (initialPos) {
-          const dx = Math.abs(memo.position.x - initialPos.x);
-          const dy = Math.abs(memo.position.y - initialPos.y);
-          if (dx > 20 || dy > 20) {
-            setMemoDragged(true);
-            break;
-          }
-        }
-      }
-    }
-  }, [pages, currentPageId, tutorialState.isActive, tutorialState.currentStep]);
-
   // clearCategoryCache는 useDragState에서 가져온 것을 사용
   const clearCategoryCache = clearCategoryCacheFromHook;
+
+  // ===== 전역 이벤트 핸들러 =====
+  useGlobalEventHandlers({
+    isShiftPressed,
+    setIsShiftPressed,
+    setSelectedMemoIds,
+    setSelectedCategoryIds,
+    setIsDragSelecting: appState.setIsDragSelecting,
+    setDragSelectStart: appState.setDragSelectStart,
+    setDragSelectEnd: appState.setDragSelectEnd,
+    setDragHoveredMemoIds: appState.setDragHoveredMemoIds,
+    setDragHoveredCategoryIds: appState.setDragHoveredCategoryIds
+  });
+
+  // ===== LocalStorage 자동 저장 =====
+  useLocalStorage({
+    pages,
+    setPages,
+    currentPageId,
+    setCurrentPageId,
+    leftPanelOpen,
+    rightPanelOpen,
+    leftPanelWidth,
+    rightPanelWidth,
+    quickNavItems
+  });
+
+  // ===== 튜토리얼 Validation =====
+  useTutorialValidation({
+    tutorialState,
+    canvasOffset,
+    canvasScale,
+    pages,
+    currentPageId,
+    initialCanvasOffset,
+    initialCanvasScale,
+    initialMemoCount,
+    initialMemoPositions,
+    setCanvasPanned,
+    setCanvasZoomed,
+    setMemoCreated,
+    setMemoDragged
+  });
+
+  // ===== 카테고리 드롭 감지 =====
+  // shiftDragAreaCache를 Map으로 변환하는 헬퍼
+  const shiftDragAreaCacheAsMap = React.useMemo(() => {
+    const map = new Map<string, CategoryArea>();
+    Object.entries(shiftDragAreaCache.current).forEach(([key, value]) => {
+      map.set(key, value);
+    });
+    return map;
+  }, [shiftDragAreaCache.current]);
+
+  const { detectCategoryOnDrop, detectCategoryDropForCategory } = useCategoryDrop({
+    pages,
+    currentPageId,
+    isShiftPressed,
+    shiftDropProcessedMemos,
+    lastDragTime,
+    lastDragPosition,
+    categoryExitTimers,
+    shiftDragAreaCache: { current: shiftDragAreaCacheAsMap } as React.MutableRefObject<Map<string, CategoryArea>>,
+    handleShiftDrop,
+    handleShiftDropCategory,
+    moveToCategory,
+    pushAwayConflictingMemos
+  });
 
   // ===== 카테고리 위치 핸들러 =====
   const categoryPositionHandlers = useCategoryPositionHandlers({
@@ -479,30 +462,6 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Shift 키 상태 감지
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Shift') {
-        console.log('[App] Shift 키 눌림');
-        setIsShiftPressed(true);
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'Shift') {
-        console.log('[App] Shift 키 떼어짐');
-        setIsShiftPressed(false);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, []);
 
   // 카테고리 라벨 위치 자동 업데이트 (영역의 좌상단으로)
   // 메모가 이동할 때만 업데이트
@@ -552,58 +511,6 @@ const App: React.FC = () => {
     }
   }, [pages, currentPageId]);
 
-  // ESC 키로 모든 선택 해제
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Only handle shortcuts when not typing in input fields
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-
-      // ESC: 모든 선택 해제
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        setSelectedMemoIds([]);
-        setSelectedCategoryIds([]);
-        // 드래그 선택 UI도 초기화
-        appState.setIsDragSelecting(false);
-        appState.setDragSelectStart(null);
-        appState.setDragSelectEnd(null);
-        appState.setDragHoveredMemoIds([]);
-        appState.setDragHoveredCategoryIds([]);
-        return;
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // localStorage 자동 저장 - 페이지 데이터
-  useEffect(() => {
-    saveToStorage(STORAGE_KEYS.PAGES, pages);
-  }, [pages]);
-
-  // localStorage 자동 저장 - 현재 페이지 ID
-  useEffect(() => {
-    saveToStorage(STORAGE_KEYS.CURRENT_PAGE_ID, currentPageId);
-  }, [currentPageId]);
-
-  // localStorage 자동 저장 - 패널 설정
-  useEffect(() => {
-    const settings = {
-      leftPanelOpen,
-      rightPanelOpen,
-      leftPanelWidth,
-      rightPanelWidth
-    };
-    saveToStorage(STORAGE_KEYS.PANEL_SETTINGS, settings);
-  }, [leftPanelOpen, rightPanelOpen, leftPanelWidth, rightPanelWidth]);
-
-  // localStorage 자동 저장 - 단축 이동 항목
-  useEffect(() => {
-    saveToStorage(STORAGE_KEYS.QUICK_NAV_ITEMS, quickNavItems);
-  }, [quickNavItems]);
 
   // 현재 페이지 ID가 유효한지 확인하고 수정
   useEffect(() => {
@@ -632,227 +539,6 @@ const App: React.FC = () => {
 
 
 
-  // ===== 기존 Shift 드래그 핸들러들은 useShiftDragHandlers로 이동됨 =====
-
-  // 카테고리 드래그 완료 시 카테고리 블록 겹침 감지 (Shift 드래그)
-  const detectCategoryDropForCategory = (categoryId: string, position: { x: number; y: number }) => {
-    const currentPage = pages.find(p => p.id === currentPageId);
-    if (!currentPage || !currentPage.categories) {
-      return;
-    }
-
-    const draggedCategory = currentPage.categories.find(c => c.id === categoryId);
-    if (!draggedCategory) {
-      return;
-    }
-
-    // Shift 키가 눌려있으면 카테고리-카테고리 종속 모드
-    if (isShiftPressed) {
-      handleShiftDropCategory(draggedCategory, position, currentPage, shiftDragAreaCache.current);
-    }
-  };
-
-  // 드래그 완료 시 카테고리 블록 겹침 감지
-  const detectCategoryOnDrop = (memoId: string, position: { x: number; y: number }) => {
-    console.log('[detectCategoryOnDrop] 호출됨 - memoId:', memoId, 'isShiftPressed:', isShiftPressed, 'processed:', shiftDropProcessedMemos.current.has(memoId));
-
-    // Shift 드래그로 이미 처리된 메모면 중복 처리 방지
-    if (shiftDropProcessedMemos.current.has(memoId)) {
-      console.log('[detectCategoryOnDrop] Shift 드래그로 이미 처리됨, 스킵:', memoId);
-      return;
-    }
-
-    const currentPage = pages.find(p => p.id === currentPageId);
-    if (!currentPage || !currentPage.categories) {
-      return;
-    }
-
-    const draggedMemo = currentPage.memos.find(m => m.id === memoId);
-    if (!draggedMemo) {
-      return;
-    }
-
-    // Shift 키가 눌려있으면 새 메모 복사 모드
-    if (isShiftPressed) {
-      handleShiftDrop(draggedMemo, position, currentPage, shiftDragAreaCache.current);
-      return;
-    }
-
-    // 드래그 속도 계산을 위한 시간과 위치 추적
-    const now = Date.now();
-    const lastTime = lastDragTime.current.get(memoId) || now;
-    const lastPos = lastDragPosition.current.get(memoId) || position;
-    const timeDelta = now - lastTime;
-    const distance = Math.sqrt(
-      Math.pow(position.x - lastPos.x, 2) + Math.pow(position.y - lastPos.y, 2)
-    );
-    const velocity = timeDelta > 0 ? distance / timeDelta : 0;
-
-    // 현재 위치와 시간 업데이트
-    lastDragTime.current.set(memoId, now);
-    lastDragPosition.current.set(memoId, position);
-
-
-
-    // 드래그된 메모의 경계 박스 계산
-    const memoWidth = draggedMemo.size?.width || 200;
-    const memoHeight = draggedMemo.size?.height || 95;
-    const memoBounds = {
-      left: position.x,
-      top: position.y,
-      right: position.x + memoWidth,
-      bottom: position.y + memoHeight
-    };
-
-
-    // 겹침 감지 함수 (여백 포함)
-    const isOverlapping = (bounds1: any, bounds2: any, margin = 20) => {
-      return !(bounds1.right + margin < bounds2.left ||
-               bounds1.left - margin > bounds2.right ||
-               bounds1.bottom + margin < bounds2.top ||
-               bounds1.top - margin > bounds2.bottom);
-    };
-
-    const targetCategory = currentPage.categories.find(category => {
-      // 카테고리의 경계 박스 계산
-      const categoryWidth = category.size?.width || 200;
-      const categoryHeight = category.size?.height || 80;
-      const categoryBounds = {
-        left: category.position.x,
-        top: category.position.y,
-        right: category.position.x + categoryWidth,
-        bottom: category.position.y + categoryHeight
-      };
-
-
-      const overlapping = isOverlapping(memoBounds, categoryBounds, 20);
-
-      return overlapping;
-    });
-
-    if (targetCategory) {
-      // 같은 카테고리로 이동하려는 경우 - 실제 겹침이므로 정상적인 카테고리 내 이동
-      if (draggedMemo.parentId === targetCategory.id) {
-        return;
-      }
-
-      // 다른 카테고리로 이동하는 경우 - 방지 (자식 메모는 자동 이동 금지)
-      if (draggedMemo.parentId && draggedMemo.parentId !== targetCategory.id) {
-        // 자식 메모가 다른 카테고리와 겹치면 밀어내기만 수행하고 이동은 금지
-        const categoryArea = calculateCategoryArea(targetCategory, currentPage);
-        if (categoryArea) {
-          pushAwayConflictingMemos(categoryArea, targetCategory.id, currentPage);
-        }
-        return; // 이동 중단
-      }
-
-      // 메모를 카테고리에 자동으로 추가
-      moveToCategory(memoId, targetCategory.id);
-      return;
-    } else {
-      // 카테고리 블록과 겹치지 않았을 때
-      if (draggedMemo.parentId) {
-        // 현재 소속된 카테고리의 영역에서도 벗어났는지 확인
-        const currentCategory = currentPage.categories.find(cat => cat.id === draggedMemo.parentId);
-
-        if (currentCategory) {
-          // 현재 카테고리의 실제 영역 계산 (하위 메모들 포함)
-          const childMemos = currentPage.memos.filter(memo => memo.parentId === currentCategory.id);
-
-          const categoryWidth = currentCategory.size?.width || 200;
-          const categoryHeight = currentCategory.size?.height || 80;
-
-          let minX = currentCategory.position.x;
-          let minY = currentCategory.position.y;
-          let maxX = currentCategory.position.x + categoryWidth;
-          let maxY = currentCategory.position.y + categoryHeight;
-
-          // 하위 메모들의 경계 포함
-          childMemos.forEach(memo => {
-            const memoWidth = memo.size?.width || 200;
-            const memoHeight = memo.size?.height || 95;
-            minX = Math.min(minX, memo.position.x);
-            minY = Math.min(minY, memo.position.y);
-            maxX = Math.max(maxX, memo.position.x + memoWidth);
-            maxY = Math.max(maxY, memo.position.y + memoHeight);
-          });
-
-          // 적절한 패딩 적용 (빠른 드래그 시 영역 이탈 방지하되 너무 크지 않게)
-          const padding = 70;
-          const categoryAreaBounds = {
-            left: minX - padding,
-            top: minY - padding,
-            right: maxX + padding,
-            bottom: maxY + padding
-          };
-
-          // 현재 카테고리 영역과 겹치는지 확인
-          const stillInArea = isOverlapping(memoBounds, categoryAreaBounds, 0);
-
-          if (!stillInArea) {
-            // 빠른 드래그 시 안정화: 속도가 높으면 지연 처리
-            const velocityThreshold = 1.0; // px/ms
-            const exitDelay = velocity > velocityThreshold ? 300 : 100; // ms
-
-
-            // 기존 타이머가 있으면 취소
-            const existingTimer = categoryExitTimers.current.get(memoId);
-            if (existingTimer) {
-              clearTimeout(existingTimer);
-            }
-
-            // 지연 후 카테고리에서 빼내기
-            const timer = setTimeout(() => {
-              // 지연 시간 후 다시 위치 확인
-              const currentMemo = pages.find(p => p.id === currentPageId)?.memos.find(m => m.id === memoId);
-              if (!currentMemo || !currentMemo.parentId) {
-                categoryExitTimers.current.delete(memoId);
-                return;
-              }
-
-              // 최종 위치에서 다시 영역 체크
-              const currentMemoWidth = currentMemo.size?.width || 200;
-              const currentMemoHeight = currentMemo.size?.height || 95;
-              const currentMemoBounds = {
-                left: currentMemo.position.x,
-                top: currentMemo.position.y,
-                right: currentMemo.position.x + currentMemoWidth,
-                bottom: currentMemo.position.y + currentMemoHeight
-              };
-
-              const isOverlapping = (bounds1: any, bounds2: any, margin = 20) => {
-                return !(bounds1.right + margin < bounds2.left ||
-                         bounds1.left - margin > bounds2.right ||
-                         bounds1.bottom + margin < bounds2.top ||
-                         bounds1.top - margin > bounds2.bottom);
-              };
-
-              const finalStillInArea = isOverlapping(currentMemoBounds, categoryAreaBounds, 0);
-
-              if (!finalStillInArea) {
-                console.log('[categoryExitTimer] 타이머 실행 - 영역 이탈 확인, moveToCategory 호출:', memoId);
-                moveToCategory(memoId, null);
-              } else {
-                console.log('[categoryExitTimer] 타이머 실행 - 여전히 영역 안에 있음, 유지:', memoId);
-              }
-
-              categoryExitTimers.current.delete(memoId);
-            }, exitDelay);
-
-            categoryExitTimers.current.set(memoId, timer);
-          } else {
-            // 영역 내에 있으면 기존 타이머 취소
-            const existingTimer = categoryExitTimers.current.get(memoId);
-            if (existingTimer) {
-              clearTimeout(existingTimer);
-              categoryExitTimers.current.delete(memoId);
-            }
-          }
-        }
-      } else {
-      }
-    }
-  };
 
   // 카테고리 위치 업데이트 함수
   const updateCategoryPosition = (categoryId: string, position: { x: number; y: number }) => {
@@ -2074,121 +1760,18 @@ const App: React.FC = () => {
         )}
       </button>
 
-      {/* 단축 이동 패널 - 작은 네모 버튼들 */}
-      {showQuickNavPanel && (
-        <>
-          {/* 배경 클릭 시 닫기 */}
-          <div
-            className={styles['quick-nav-overlay']}
-            onClick={() => setShowQuickNavPanel(false)}
-          />
-
-          {/* 패널 */}
-          <div
-            className={styles['quick-nav-panel']}
-            style={{
-              right: rightPanelOpen ? `${rightPanelWidth + 20}px` : '20px'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {quickNavItems.length === 0 ? (
-              <div className={styles['quick-nav-empty']}>
-                등록된 단축 이동이 없습니다
-              </div>
-            ) : (
-              <>
-                {/* 메모 단축 이동 */}
-                {quickNavItems.filter(item => item.targetType === 'memo').length > 0 && (
-                  <div className={styles['quick-nav-section']}>
-                    {quickNavItems
-                      .filter(item => item.targetType === 'memo')
-                      .map(item => {
-                        const targetPage = pages.find(p => p.id === item.pageId);
-                        const isCurrentPage = item.pageId === currentPageId;
-
-                        return (
-                          <button
-                            key={item.id}
-                            onClick={() => {
-                              executeQuickNav(item);
-                              setShowQuickNavPanel(false);
-                            }}
-                            className={`${styles['quick-nav-item']} ${styles.memo}`}
-                            title={item.name}
-                          >
-                            <span className={styles['quick-nav-item-name']}>
-                              {item.name}
-                            </span>
-                            {!isCurrentPage && targetPage && (
-                              <span className={styles['quick-nav-item-page']}>
-                                {targetPage.name}
-                              </span>
-                            )}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (window.confirm(`"${item.name}" 단축 이동을 삭제하시겠습니까?`)) {
-                                  deleteQuickNavItem(item.id);
-                                }
-                              }}
-                              className={`${styles['quick-nav-delete-button']} ${styles.memo}`}
-                            >
-                              ×
-                            </button>
-                          </button>
-                        );
-                      })}
-                  </div>
-                )}
-
-                {/* 카테고리 단축 이동 */}
-                {quickNavItems.filter(item => item.targetType === 'category').length > 0 && (
-                  <div className={styles['quick-nav-section']}>
-                    {quickNavItems
-                      .filter(item => item.targetType === 'category')
-                      .map(item => {
-                        const targetPage = pages.find(p => p.id === item.pageId);
-                        const isCurrentPage = item.pageId === currentPageId;
-
-                        return (
-                          <button
-                            key={item.id}
-                            onClick={() => {
-                              executeQuickNav(item);
-                              setShowQuickNavPanel(false);
-                            }}
-                            className={`${styles['quick-nav-item']} ${styles.category}`}
-                            title={item.name}
-                          >
-                            <span className={styles['quick-nav-item-name']}>
-                              {item.name}
-                            </span>
-                            {!isCurrentPage && targetPage && (
-                              <span className={styles['quick-nav-item-page']}>
-                                {targetPage.name}
-                              </span>
-                            )}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (window.confirm(`"${item.name}" 단축 이동을 삭제하시겠습니까?`)) {
-                                  deleteQuickNavItem(item.id);
-                                }
-                              }}
-                              className={`${styles['quick-nav-delete-button']} ${styles.category}`}
-                            >
-                              ×
-                            </button>
-                          </button>
-                        );
-                      })}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </>
-      )}
+      {/* 단축 이동 패널 */}
+      <QuickNavPanel
+        quickNavItems={quickNavItems}
+        pages={pages}
+        currentPageId={currentPageId}
+        rightPanelOpen={rightPanelOpen}
+        rightPanelWidth={rightPanelWidth}
+        showQuickNavPanel={showQuickNavPanel}
+        onTogglePanel={() => setShowQuickNavPanel(!showQuickNavPanel)}
+        onExecuteQuickNav={executeQuickNav}
+        onDeleteQuickNavItem={deleteQuickNavItem}
+      />
 
       {/* 오른쪽 패널 */}
       {rightPanelOpen && (
