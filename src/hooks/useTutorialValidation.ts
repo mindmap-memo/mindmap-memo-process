@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { TutorialState, Page } from '../types';
 
 /**
@@ -13,7 +13,11 @@ import { TutorialState, Page } from '../types';
  * - 메모 생성 (Create)
  * - 메모 드래그 (Drag)
  *
- * @param props - tutorialState, validation setters, refs, 현재 상태들
+ * **내부 상태:**
+ * - canvasPanned, canvasZoomed, memoCreated, memoDragged
+ * - initialCanvasOffset, initialCanvasScale, initialMemoCount, initialMemoPositions
+ *
+ * @param props - tutorialState, 현재 상태들
  */
 
 interface UseTutorialValidationProps {
@@ -22,14 +26,6 @@ interface UseTutorialValidationProps {
   canvasScale: number;
   pages: Page[];
   currentPageId: string;
-  initialCanvasOffset: React.MutableRefObject<{ x: number; y: number }>;
-  initialCanvasScale: React.MutableRefObject<number>;
-  initialMemoCount: React.MutableRefObject<number>;
-  initialMemoPositions: React.MutableRefObject<Map<string, { x: number; y: number }>>;
-  setCanvasPanned: React.Dispatch<React.SetStateAction<boolean>>;
-  setCanvasZoomed: React.Dispatch<React.SetStateAction<boolean>>;
-  setMemoCreated: React.Dispatch<React.SetStateAction<boolean>>;
-  setMemoDragged: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export const useTutorialValidation = ({
@@ -37,16 +33,19 @@ export const useTutorialValidation = ({
   canvasOffset,
   canvasScale,
   pages,
-  currentPageId,
-  initialCanvasOffset,
-  initialCanvasScale,
-  initialMemoCount,
-  initialMemoPositions,
-  setCanvasPanned,
-  setCanvasZoomed,
-  setMemoCreated,
-  setMemoDragged
+  currentPageId
 }: UseTutorialValidationProps) => {
+  // ===== 내부 상태 관리 =====
+  const [canvasPanned, setCanvasPanned] = useState(false);
+  const [canvasZoomed, setCanvasZoomed] = useState(false);
+  const [memoCreated, setMemoCreated] = useState(false);
+  const [memoDragged, setMemoDragged] = useState(false);
+
+  // ===== 초기값 참조 =====
+  const initialCanvasOffset = useRef(canvasOffset);
+  const initialCanvasScale = useRef(canvasScale);
+  const initialMemoPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const initialMemoCount = useRef(0);
   // 캔버스 이동 감지 (2단계 - canvas-pan)
   useEffect(() => {
     if (tutorialState.isActive && tutorialState.currentStep === 2) {
@@ -98,4 +97,20 @@ export const useTutorialValidation = ({
       }
     }
   }, [pages, currentPageId, tutorialState.isActive, tutorialState.currentStep, initialMemoPositions, setMemoDragged]);
+
+  // ===== 반환값 =====
+  return {
+    canvasPanned,
+    setCanvasPanned,
+    canvasZoomed,
+    setCanvasZoomed,
+    memoCreated,
+    setMemoCreated,
+    memoDragged,
+    setMemoDragged,
+    initialCanvasOffset,
+    initialCanvasScale,
+    initialMemoPositions,
+    initialMemoCount
+  };
 };

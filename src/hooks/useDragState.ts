@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import React from 'react';
 import { clearCollisionDirections } from '../utils/categoryAreaUtils';
 
@@ -140,6 +140,29 @@ export const useDragState = () => {
     dragStartMemoPositions.current.delete(categoryId);
     dragStartCategoryPositions.current.delete(categoryId);
     clearCollisionDirections(); // 충돌 방향 맵 초기화
+  }, []);
+
+  // ===== 컴포넌트 언마운트 시 타이머 정리 =====
+  useEffect(() => {
+    return () => {
+      // 모든 카테고리 종료 타이머 정리
+      categoryExitTimers.current.forEach((timer) => {
+        clearTimeout(timer);
+      });
+      categoryExitTimers.current.clear();
+
+      // 카테고리 위치 업데이트 타이머 정리
+      categoryPositionTimers.current.forEach((timer) => {
+        clearTimeout(timer);
+      });
+      categoryPositionTimers.current.clear();
+
+      // 충돌 검사 타이머 정리
+      collisionCheckTimers.current.forEach((timer) => {
+        clearTimeout(timer);
+      });
+      collisionCheckTimers.current.clear();
+    };
   }, []);
 
   return {
