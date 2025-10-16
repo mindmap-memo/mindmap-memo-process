@@ -706,14 +706,17 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
       let isCurrentParent = false;
       let isParentBeingLeftBehind = false;
 
-      if (isShiftPressed && (isDraggingMemo || isDraggingCategory)) {
+      if (isShiftPressed && (isDraggingMemo || isDraggingCategory || isDraggingCategoryArea)) {
         // 드래그 중인 아이템의 현재 부모 ID 확인
         if (isDraggingMemo && draggingMemoId) {
           const draggingMemo = currentPage?.memos.find(m => m.id === draggingMemoId);
           draggingItemParentId = draggingMemo?.parentId || null;
-        } else if (isDraggingCategory && draggingCategoryId) {
-          const draggingCategory = currentPage?.categories?.find(c => c.id === draggingCategoryId);
-          draggingItemParentId = draggingCategory?.parentId || null;
+        } else if ((isDraggingCategory && draggingCategoryId) || isDraggingCategoryArea) {
+          const categoryId = draggingCategoryId || isDraggingCategoryArea;
+          if (categoryId) {
+            const draggingCategory = currentPage?.categories?.find(c => c.id === categoryId);
+            draggingItemParentId = draggingCategory?.parentId || null;
+          }
         }
 
         // 이 카테고리가 드래그 중인 아이템의 현재 부모인지 확인
@@ -728,7 +731,7 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
 
       // 타겟 영역 확인 (추가 UI)
       // 조건: 마우스가 올라간 영역이면서, 현재 부모가 아님
-      const isShiftDragTarget = isShiftPressed && dragTargetCategoryId === category.id && (isDraggingMemo || isDraggingCategory) && !isCurrentParent;
+      const isShiftDragTarget = isShiftPressed && dragTargetCategoryId === category.id && (isDraggingMemo || isDraggingCategory || isDraggingCategoryArea) && !isCurrentParent;
 
       // 드래그 선택 중 하이라이트
       const isDragHovered = dragHoveredCategoryIds.includes(category.id);
@@ -979,7 +982,8 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
               fontWeight: '600',
               pointerEvents: 'none',
               textAlign: 'center',
-              padding: '20px'
+              padding: '20px',
+              userSelect: 'none'
             }}>
               SHIFT + 드래그로 메모나 카테고리를<br/>다른 카테고리 영역에 종속, 제거하세요
             </div>
@@ -1153,8 +1157,8 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
       const labelX = area?.x || category.position.x;
       const labelY = area?.y || category.position.y;
 
-      // Shift+드래그 중인지 확인
-      const isCurrentCategoryBeingDragged = isDraggingCategory && draggingCategoryId === category.id;
+      // Shift+드래그 중인지 확인 (카테고리 블록 드래그 또는 카테고리 영역 드래그)
+      const isCurrentCategoryBeingDragged = (isDraggingCategory && draggingCategoryId === category.id) || (isDraggingCategoryArea === category.id);
       const isShiftDragging = isCurrentCategoryBeingDragged && isShiftPressed;
 
       areas.push(
@@ -1266,30 +1270,6 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
         </div>
       );
 
-      // Shift가 눌리지 않은 상태에서 드래그 중일 때 힌트 UI 표시
-      if (isCurrentCategoryBeingDragged && !isShiftPressed) {
-        areas.push(
-          <div
-            key={`hint-${category.id}`}
-            style={{
-              position: 'absolute',
-              left: `${labelX + (category.size?.width || 200) + 10}px`,
-              top: `${labelY}px`,
-              backgroundColor: '#374151',
-              color: 'white',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              fontSize: '12px',
-              whiteSpace: 'nowrap',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-              zIndex: 1000,
-              pointerEvents: 'none'
-            }}
-          >
-            💡 Shift를 누르면 카테고리에 추가
-          </div>
-        );
-      }
     }
 
     // 하위 카테고리들의 영역도 재귀적으로 렌더링

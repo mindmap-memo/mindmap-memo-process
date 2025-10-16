@@ -509,7 +509,7 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
 
   // 9. Shift 드래그 중 마우스 위치로 영역 충돌 감지
   useEffect(() => {
-    if (isShiftPressed && (isDraggingMemo || isDraggingCategory) && currentPage) {
+    if (isShiftPressed && (isDraggingMemo || isDraggingCategory || isDraggingCategoryArea) && currentPage) {
       let lastUpdateTime = 0;
       const throttleDelay = 50; // 50ms마다 한 번만 업데이트
 
@@ -533,18 +533,24 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
         if (isDraggingMemo && draggingMemoId) {
           const draggingMemo = currentPage.memos.find(m => m.id === draggingMemoId);
           draggingItemParentId = draggingMemo?.parentId || null;
-        } else if (isDraggingCategory && draggingCategoryId) {
-          const draggingCategory = currentPage.categories?.find(c => c.id === draggingCategoryId);
-          draggingItemParentId = draggingCategory?.parentId || null;
+        } else if ((isDraggingCategory && draggingCategoryId) || isDraggingCategoryArea) {
+          const categoryId = draggingCategoryId || isDraggingCategoryArea;
+          if (categoryId) {
+            const draggingCategory = currentPage.categories?.find(c => c.id === categoryId);
+            draggingItemParentId = draggingCategory?.parentId || null;
+          }
         }
 
-        // 모든 카테고리 영역과 충돌 검사 - 겹치는 모든 영역 찾기 (직계 부모 제외)
+        // 모든 카테고리 영역과 충돌 검사 - 겹치는 모든 영역 찾기
         const overlappingCategories: CategoryBlock[] = [];
+
+        // 드래그 중인 카테고리 ID 확인
+        const draggingCategoryIdCurrent = draggingCategoryId || isDraggingCategoryArea;
 
         for (const category of (currentPage.categories || [])) {
           if (!category.isExpanded) continue;
 
-          // 직계 부모는 제외
+          // 직계 부모는 제외 (현재 부모는 "빼기" UI로 처리되므로)
           if (category.id === draggingItemParentId) continue;
 
           const area = calculateCategoryArea(category, currentPage);
@@ -557,29 +563,35 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
           }
         }
 
-        // 겹치는 영역 중에서 가장 깊은 레벨(가장 하위) 카테고리 선택
-        // 깊이(depth)를 계산하여 가장 깊은 것을 선택
+        // 겹치는 영역 중에서 자신을 제외하고 가장 깊은 레벨(가장 하위) 카테고리 선택
         let foundTarget: string | null = null;
 
         if (overlappingCategories.length > 0) {
-          // 각 카테고리의 깊이를 계산
-          const categoriesWithDepth = overlappingCategories.map(category => {
-            let depth = 0;
-            let checkParent = category.parentId;
-            while (checkParent) {
-              depth++;
-              const parentCat = currentPage.categories?.find(c => c.id === checkParent);
-              checkParent = parentCat?.parentId;
-            }
-            return { category, depth };
-          });
-
-          // 깊이가 가장 큰 카테고리 선택 (같은 깊이면 첫 번째)
-          const deepest = categoriesWithDepth.reduce((max, item) =>
-            item.depth > max.depth ? item : max
+          // 드래그 중인 카테고리 자신을 제외
+          const candidateCategories = overlappingCategories.filter(cat =>
+            !(draggingCategoryIdCurrent && cat.id === draggingCategoryIdCurrent)
           );
 
-          foundTarget = deepest.category.id;
+          if (candidateCategories.length > 0) {
+            // 각 카테고리의 깊이를 계산
+            const categoriesWithDepth = candidateCategories.map(category => {
+              let depth = 0;
+              let checkParent = category.parentId;
+              while (checkParent) {
+                depth++;
+                const parentCat = currentPage.categories?.find(c => c.id === checkParent);
+                checkParent = parentCat?.parentId;
+              }
+              return { category, depth };
+            });
+
+            // 깊이가 가장 큰 카테고리 선택 (같은 깊이면 첫 번째)
+            const deepest = categoriesWithDepth.reduce((max, item) =>
+              item.depth > max.depth ? item : max
+            );
+
+            foundTarget = deepest.category.id;
+          }
         }
 
         setDragTargetCategoryId(foundTarget);
@@ -595,6 +607,7 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
     isShiftPressed,
     isDraggingMemo,
     isDraggingCategory,
+    isDraggingCategoryArea,
     draggingMemoId,
     draggingCategoryId,
     currentPage,
