@@ -157,8 +157,14 @@ const App: React.FC = () => {
     setSelectedMemoIds,
     quickNavItems,
     setQuickNavItems,
+    leftPanelWidth,
+    rightPanelOpen,
+    rightPanelWidth,
+    canvasScale,
+    setCanvasOffset,
     saveCanvasState
   });
+
 
   const {
     addMemoBlock,

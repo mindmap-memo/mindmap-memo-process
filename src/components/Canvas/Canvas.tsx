@@ -570,13 +570,45 @@ const Canvas: React.FC<CanvasProps> = ({
         <div className={styles.divider}></div>
         <button
           data-tutorial="add-memo-btn"
-          onClick={() => onAddMemo()}
+          onClick={() => {
+            // 현재 화면 중앙 좌표 계산
+            const canvasElement = document.getElementById('main-canvas');
+            if (canvasElement) {
+              const rect = canvasElement.getBoundingClientRect();
+              const centerX = rect.width / 2;
+              const centerY = rect.height / 2;
+
+              // 캔버스 변환을 고려한 실제 좌표 계산
+              const worldX = (centerX - canvasOffset.x) / canvasScale;
+              const worldY = (centerY - canvasOffset.y) / canvasScale;
+
+              onAddMemo({ x: worldX, y: worldY });
+            } else {
+              onAddMemo();
+            }
+          }}
           className={`${styles['action-button']} ${styles.secondary}`}
         >
           + 메모 생성
         </button>
         <button
-          onClick={() => onAddCategory()}
+          onClick={() => {
+            // 현재 화면 중앙 좌표 계산
+            const canvasElement = document.getElementById('main-canvas');
+            if (canvasElement) {
+              const rect = canvasElement.getBoundingClientRect();
+              const centerX = rect.width / 2;
+              const centerY = rect.height / 2;
+
+              // 캔버스 변환을 고려한 실제 좌표 계산
+              const worldX = (centerX - canvasOffset.x) / canvasScale;
+              const worldY = (centerY - canvasOffset.y) / canvasScale;
+
+              onAddCategory({ x: worldX, y: worldY });
+            } else {
+              onAddCategory();
+            }
+          }}
           className={`${styles['action-button']} ${styles.primary}`}
         >
           + 카테고리 생성

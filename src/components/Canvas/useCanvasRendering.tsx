@@ -737,7 +737,11 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
       const isDragHovered = dragHoveredCategoryIds.includes(category.id);
 
       // 드래그 중인 카테고리는 transform을 사용하여 GPU 가속 활용
+      // 일반 드래그 또는 Shift+드래그 시 GPU 가속 적용
       const isDragging = draggedCategoryAreas[category.id] !== undefined;
+      const isShiftDragging = isShiftPressed && isDraggingCategoryArea === category.id && shiftDragInfo !== null;
+      const isAnyDragging = isDragging || isShiftDragging;
+
       const basePosition = isDragging && draggedCategoryAreas[category.id]
         ? {
             left: draggedCategoryAreas[category.id].area.x,
@@ -776,8 +780,8 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
             transform: isDragging
               ? `translate(${deltaTransform.x}px, ${deltaTransform.y}px) ${(isShiftDragTarget || isParentBeingLeftBehind || isDragHovered) ? 'scale(1.02)' : 'scale(1)'}`
               : (isShiftDragTarget || isParentBeingLeftBehind || isDragHovered) ? 'scale(1.02)' : 'scale(1)',
-            transition: isDragging ? 'none' : 'all 0.2s ease',
-            willChange: isDragging ? 'transform' : 'auto',
+            transition: isAnyDragging ? 'none' : 'all 0.2s ease',
+            willChange: isAnyDragging ? 'transform' : 'auto',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'

@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { MemoBlock, Page, MemoDisplaySize, CanvasActionType } from '../types';
+import { calculateCategoryArea, centerCanvasOnPosition } from '../utils/categoryAreaUtils';
 
 /**
  * useMemoHandlers
@@ -38,6 +39,11 @@ interface UseMemoHandlersProps {
   setSelectedMemoIds: React.Dispatch<React.SetStateAction<string[]>>;
   quickNavItems: any[];
   setQuickNavItems: React.Dispatch<React.SetStateAction<any[]>>;
+  leftPanelWidth: number;
+  rightPanelOpen: boolean;
+  rightPanelWidth: number;
+  canvasScale: number;
+  setCanvasOffset: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
   saveCanvasState?: (actionType: CanvasActionType, description: string) => void;
 }
 
@@ -52,20 +58,77 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
     setSelectedMemoIds,
     quickNavItems,
     setQuickNavItems,
+    leftPanelWidth,
+    rightPanelOpen,
+    rightPanelWidth,
+    canvasScale,
+    setCanvasOffset,
     saveCanvasState
   } = props;
 
   /**
    * 메모 추가
+   * 영역과 겹치지 않는 위치를 자동으로 찾아 배치하고 화면 중앙으로 이동
    */
   const addMemoBlock = useCallback((position?: { x: number; y: number }) => {
+    const originalPosition = position || { x: 100, y: 100 };
+    let newPosition = { ...originalPosition };
+
+    // 영역과 겹치지 않는 위치 찾기
+    if (position) {
+      const currentPage = pages.find(p => p.id === currentPageId);
+      if (currentPage?.categories) {
+        // 새 메모의 실제 크기 (기본 크기)
+        const newMemoWidth = 320;
+        const newMemoHeight = 180;
+        let isOverlapping = true;
+        let adjustedY = newPosition.y;
+        const moveStep = 250; // 충분히 밀어내기 위한 이동 거리
+
+        while (isOverlapping && adjustedY > -2000) {
+          isOverlapping = false;
+
+          for (const category of currentPage.categories) {
+            if (category.isExpanded) {
+              const area = calculateCategoryArea(category, currentPage);
+              if (area) {
+                // 새 메모 영역과 기존 영역이 겹치는지 확인
+                const newMemoLeft = newPosition.x;
+                const newMemoRight = newPosition.x + newMemoWidth;
+                const newMemoTop = adjustedY;
+                const newMemoBottom = adjustedY + newMemoHeight;
+
+                const areaLeft = area.x;
+                const areaRight = area.x + area.width;
+                const areaTop = area.y;
+                const areaBottom = area.y + area.height;
+
+                // 겹침 여유 공간 추가 (20px 간격)
+                const margin = 20;
+                if (!(newMemoRight + margin < areaLeft || newMemoLeft - margin > areaRight ||
+                      newMemoBottom + margin < areaTop || newMemoTop - margin > areaBottom)) {
+                  // 겹침 - 위로 충분히 이동
+                  isOverlapping = true;
+                  adjustedY -= moveStep;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        newPosition = { x: newPosition.x, y: adjustedY };
+      }
+    }
+
     const newMemo: MemoBlock = {
       id: `memo-${Date.now()}`,
       title: '',
       content: '',
       tags: [],
       connections: [],
-      position: position || { x: 100, y: 100 },
+      position: newPosition,
+      displaySize: 'medium',
       blocks: [
         {
           id: `block-${Date.now()}`,
@@ -83,6 +146,26 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
 
     setSelectedMemoId(newMemo.id);
 
+    // 위치가 변경된 경우 캔버스를 새 위치로 자동 이동
+    if (position && (newPosition.x !== originalPosition.x || newPosition.y !== originalPosition.y)) {
+      // 메모의 중심점 계산 (메모 중심이 화면 중앙에 오도록)
+      const memoCenterX = newPosition.x + 160; // 메모 너비의 절반
+      const memoCenterY = newPosition.y + 90; // 메모 높이의 절반
+
+      // 캔버스 크기 (윈도우 크기 기준, 좌우 패널 제외)
+      const canvasWidth = window.innerWidth - (leftPanelWidth + (rightPanelOpen ? rightPanelWidth : 0));
+      const canvasHeight = window.innerHeight;
+
+      const newOffset = centerCanvasOnPosition(
+        { x: memoCenterX, y: memoCenterY },
+        canvasWidth,
+        canvasHeight,
+        canvasScale
+      );
+
+      setCanvasOffset(newOffset);
+    }
+
     if (saveCanvasState) {
       setTimeout(() => {
         saveCanvasState('memo_create', `메모 추가: ${newMemo.id}`);
@@ -90,7 +173,7 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
     }
 
     return newMemo.id;
-  }, [currentPageId, setPages, setSelectedMemoId, saveCanvasState]);
+  }, [pages, currentPageId, leftPanelWidth, rightPanelOpen, rightPanelWidth, canvasScale, setPages, setSelectedMemoId, setCanvasOffset, saveCanvasState]);
 
   /**
    * 메모 업데이트 (범용)
