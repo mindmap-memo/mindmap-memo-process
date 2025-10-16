@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GOOGLE_CONFIG } from '../config/google';
 import { updateGoogleAuthState } from '../utils/googleSheetsAPI';
+import styles from '../scss/components/GoogleAuth.module.scss';
 
 // Google API 및 GIS 타입 선언
 declare global {

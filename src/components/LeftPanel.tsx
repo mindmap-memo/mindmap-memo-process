@@ -1,6 +1,7 @@
 import React from 'react';
 import { Page, MemoBlock, ImportanceLevel, CategoryBlock } from '../types';
 import Resizer from './Resizer';
+import styles from '../scss/components/LeftPanel.module.scss';
 
 type SearchCategory = 'all' | 'title' | 'tags' | 'content' | 'memos' | 'categories';
 
@@ -771,48 +772,15 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
   return (
     <div
       data-tutorial="left-panel"
-      style={{
-        width: `${width}px`,
-        height: '100vh',
-        backgroundColor: '#ffffff',
-        color: '#1f2937',
-        padding: '24px',
-        borderRight: '1px solid #e5e7eb',
-        position: 'relative',
-        overflowY: 'auto',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-      <div style={{ marginBottom: '32px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700', color: '#1f2937' }}>마인드맵</h2>
+      className={styles.leftPanel}
+      style={{ width: `${width}px` }}>
+      <div className={styles.header}>
+        <div className={styles.headerTop}>
+          <h2 className={styles.title}>마인드맵</h2>
           {onStartTutorial && (
             <button
               onClick={onStartTutorial}
-              style={{
-                backgroundColor: '#4A90E2',
-                color: 'white',
-                border: 'none',
-                borderRadius: '50%',
-                width: '32px',
-                height: '32px',
-                cursor: 'pointer',
-                fontSize: '16px',
-                fontWeight: 'bold',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#357ABD';
-                e.currentTarget.style.transform = 'scale(1.05)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#4A90E2';
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
+              className={styles.tutorialButton}
               title="튜토리얼 다시 보기"
             >
               ?
@@ -821,35 +789,20 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
         </div>
 
         {/* 검색 UI */}
-        <div style={{ marginBottom: '16px' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            marginBottom: '8px',
-            gap: '8px'
-          }}>
+        <div className={styles.searchSection}>
+          <div className={styles.searchInputRow}>
             <input
               data-tutorial="search"
               type="text"
               placeholder="메모 검색..."
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '14px',
-                outline: 'none',
-                transition: 'border-color 0.2s ease'
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#3b82f6';
+              className={styles.searchInput}
+              onFocus={() => {
                 setIsSearchFocused(true);
                 setIsSearchMode(true);
               }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = '#d1d5db';
+              onBlur={() => {
                 // 검색 결과 클릭을 위해 blur 처리를 지연
                 setTimeout(() => {
                   setIsSearchFocused(false);
@@ -861,19 +814,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
             {searchQuery && (
               <button
                 onClick={clearSearch}
-                style={{
-                  backgroundColor: '#f3f4f6',
-                  color: '#6b7280',
-                  border: 'none',
-                  borderRadius: '4px',
-                  width: '24px',
-                  height: '24px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
+                className={styles.clearSearchButton}
               >
                 ✕
               </button>
@@ -881,22 +822,10 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
           </div>
 
           {/* 필터 토글 버튼 - 검색창 아래로 이동 */}
-          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '8px' }}>
+          <div className={styles.filterToggleRow}>
             <button
               onClick={() => setShowSearchFilters(!showSearchFilters)}
-              style={{
-                backgroundColor: showSearchFilters ? '#3b82f6' : '#f8f9fa',
-                color: showSearchFilters ? 'white' : '#6b7280',
-                border: '1px solid #e5e7eb',
-                borderRadius: '6px',
-                padding: '6px 10px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                transition: 'all 0.2s ease'
-              }}
+              className={`${styles.filterToggleButton} ${showSearchFilters ? styles.active : styles.inactive}`}
             >
               {/* 엑셀 스타일 필터 아이콘 (와이어프레임) */}
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">

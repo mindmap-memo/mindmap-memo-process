@@ -1,5 +1,6 @@
 import React from 'react';
 import { ContentBlockType } from '../types';
+import styles from '../scss/components/BlockSelector.module.scss';
 
 interface BlockSelectorProps {
   isVisible: boolean;

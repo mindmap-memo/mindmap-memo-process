@@ -35,7 +35,7 @@ import RightPanel from './components/RightPanel';
 import Canvas from './components/Canvas';
 import { Tutorial } from './components/Tutorial';
 import { tutorialSteps } from './utils/tutorialSteps';
-import styles from './App.scss';
+import styles from './scss/App.module.scss';
 
 const App: React.FC = () => {
   // 브라우저 기본 Ctrl/Command + 휠 줌 차단 (전역)

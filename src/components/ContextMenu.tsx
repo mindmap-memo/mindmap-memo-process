@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import styles from '../scss/components/ContextMenu.module.scss';
 
 interface ContextMenuProps {
   position: { x: number; y: number } | null;

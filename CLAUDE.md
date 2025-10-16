@@ -96,8 +96,8 @@ The application implements a comprehensive undo/redo system for canvas operation
 ### Technical Notes
 
 - Uses React 18 with TypeScript
-- **Styling with SCSS**: All component styles are separated into `.scss` files in the same directory as the component. Each component has its own SCSS module (e.g., `Canvas.scss` for `Canvas.tsx`)
-- **SCSS Module Pattern**: Import styles as `import styles from './ComponentName.scss'` and use `className={styles.className}` for type-safe class names
+- **Styling with SCSS**: All component styles are organized in the `src/scss/` directory, mirroring the component structure. Component SCSS files are located in `src/scss/` with paths matching their component locations (e.g., `src/components/Canvas.tsx` → `src/scss/Canvas.scss`, `src/components/blocks/CodeBlock.tsx` → `src/scss/components/blocks/CodeBlock.scss`)
+- **SCSS Module Pattern**: Import styles from `src/scss/` using relative paths: `import styles from '../../scss/ComponentName.scss'` and use `className={styles.className}` for type-safe class names
 - **No Inline Styles**: Avoid inline styles; use SCSS classes for all styling. Only use inline styles for dynamic values that must be calculated at runtime (e.g., positions, transforms, colors that change based on data)
 - Connection lines drawn with SVG overlays
 - ResizeObserver for dynamic memo block sizing
@@ -224,13 +224,18 @@ The application implements Shift+drag functionality for adding/removing memos an
 - **File Management**: Always prefer editing existing files to creating new ones; never create files unless absolutely necessary
 - **Styling Guidelines**:
   - **ALWAYS use SCSS files** for component styling instead of inline styles
-  - Create a `.scss` file next to each component (e.g., `Canvas.tsx` → `Canvas.scss`)
-  - Import as SCSS module: `import styles from './ComponentName.scss'`
+  - All SCSS files are organized in `src/scss/` directory, mirroring the component structure
+  - For components in `src/components/`, create corresponding SCSS in `src/scss/` (e.g., `src/components/Canvas.tsx` → `src/scss/Canvas.scss`)
+  - For nested components, maintain the same path structure (e.g., `src/components/blocks/CodeBlock.tsx` → `src/scss/components/blocks/CodeBlock.scss`)
+  - Import as SCSS module using relative paths: `import styles from '../../scss/ComponentName.scss'`
   - Use className for static styles, inline style only for dynamic runtime values
   - Organize SCSS with nested selectors matching component structure
   - **Dynamic Values Only**: Use inline styles ONLY for values that change at runtime (positions, transforms, sizes, data-driven colors)
   - **Example of proper usage**:
     ```tsx
+    // GOOD - import from src/scss/
+    import styles from '../../scss/Canvas.scss';
+
     // GOOD - dynamic position
     <div className={styles.memoBlock} style={{ left: `${memo.position.x}px`, top: `${memo.position.y}px` }}>
 

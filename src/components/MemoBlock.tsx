@@ -3,6 +3,7 @@ import { MemoBlock as MemoBlockType, MemoDisplaySize, ImportanceLevel, Importanc
 import { checkMemoAreaCollision } from '../utils/collisionUtils';
 import ContextMenu from './ContextMenu';
 import QuickNavModal from './QuickNavModal';
+import styles from '../scss/components/MemoBlock.module.scss';
 
 // 중요도 레벨별 형광펜 스타일 정의 (TextBlock과 동일)
 const getImportanceStyle = (level: ImportanceLevel) => {
@@ -703,17 +704,23 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   }, [memo.title, memo.content, memo.tags, memo.blocks, memo.id, onSizeChange, canvasScale, isDragging]);
 
   return (
-    <div style={{
-      position: 'absolute',
-      left: memo.position.x,
-      top: memo.position.y,
-      width: `${sizeConfig.width}px`,
-      height: 'auto'
-    }}>
+    <div
+      className={styles.memoBlockWrapper}
+      style={{
+        left: memo.position.x,
+        top: memo.position.y,
+        width: `${sizeConfig.width}px`
+      }}
+    >
       {/* 메모 블록 콘텐츠 */}
       <div
         ref={memoRef}
-        className="memo-block-container"
+        className={`${styles.memoBlockContainer} ${
+          isDragging && isShiftPressed ? styles.shiftDragging :
+          isDragHovered ? styles.dragHovered :
+          isSelected ? styles.selected :
+          styles.notSelected
+        } ${isDragging ? styles.dragging : styles.notDragging}`}
         data-memo-block="true"
         onClick={(e) => {
           // 드래그로 이동했다면 클릭 이벤트를 무시
@@ -736,39 +743,17 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         draggable={false}
         style={{
           backgroundColor,
-          border: (isDragging && isShiftPressed) ? '2px solid #10b981' : (isDragHovered ? '2px solid #3b82f6' : (isSelected ? '2px solid #8b5cf6' : '1px solid #e5e7eb')),
-          borderRadius: '12px',
-          padding: '16px',
           width: `${sizeConfig.width}px`,
-          maxHeight: `${sizeConfig.maxHeight}px`,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          cursor: isDragging ? 'grabbing' : 'default',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-          userSelect: 'none',
-          zIndex: 10
+          maxHeight: `${sizeConfig.maxHeight}px`
         }}
       >
-        <div style={{ 
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '8px'
-        }}>
+        <div className={styles.titleContainer}>
           <div
             onDoubleClick={handleTitleDoubleClick}
-            style={{
-            fontWeight: '600',
-            fontSize: '16px',
-            color: memo.title ? '#1f2937' : '#9ca3af',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            flex: 1,
-            cursor: isSelected ? 'text' : 'default'
-          }}>
+            className={`${styles.title} ${memo.title ? styles.withTitle : styles.withoutTitle} ${isSelected ? styles.editable : styles.notEditable}`}
+          >
             {isDragging && isShiftPressed && (
-              <span style={{ color: '#10b981', fontSize: '18px', fontWeight: 'bold' }}>+</span>
+              <span className={styles.shiftDragIcon}>+</span>
             )}
             {!isEditingTitle ? (
               <>📝 {memo.title || '제목을 입력해주세요'}</>
@@ -781,21 +766,12 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
                 onBlur={handleTitleBlur}
                 onKeyDown={handleTitleKeyDown}
                 onMouseDown={(e) => e.stopPropagation()}
-                style={{
-                  flex: 1,
-                  border: '1px solid #8b5cf6',
-                  borderRadius: '4px',
-                  padding: '4px 8px',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  outline: 'none',
-                  backgroundColor: 'white'
-                }}
+                className={styles.titleInput}
               />
             )}
           </div>
           {isSelected && (
-            <div style={{ display: 'flex', gap: '4px' }}>
+            <div className={styles.sizeButtons}>
               {(['small', 'medium', 'large'] as MemoDisplaySize[]).map((size) => (
                 <button
                   key={size}
@@ -803,15 +779,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
                     e.stopPropagation();
                     onDisplaySizeChange?.(memo.id, size);
                   }}
-                  style={{
-                    padding: '2px 6px',
-                    fontSize: '10px',
-                    backgroundColor: memo.displaySize === size ? '#3b82f6' : '#f3f4f6',
-                    color: memo.displaySize === size ? 'white' : '#6b7280',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
-                  }}
+                  className={`${styles.sizeButton} ${memo.displaySize === size ? styles.active : styles.inactive}`}
                 >
                   {size === 'small' ? 'S' : size === 'medium' ? 'M' : 'L'}
                 </button>
@@ -820,20 +788,9 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
           )}
         </div>
         {sizeConfig.showTags && memo.tags.length > 0 && (
-          <div style={{ marginBottom: '8px' }}>
+          <div className={styles.tagsContainer}>
             {memo.tags.map(tag => (
-              <span
-                key={tag}
-                style={{
-                  backgroundColor: '#e5e7eb',
-                  color: '#374151',
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  marginRight: '6px',
-                  fontWeight: '500'
-                }}
-              >
+              <span key={tag} className={styles.tag}>
                 {tag}
               </span>
             ))}
@@ -842,12 +799,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         {sizeConfig.showContent && (
           <div
             onDoubleClick={handleAllBlocksDoubleClick}
-            style={{
-              fontSize: '14px',
-              color: '#6b7280',
-              lineHeight: '1.5',
-              cursor: isSelected ? 'text' : 'default'
-            }}
+            className={`${styles.contentContainer} ${isSelected ? styles.editable : styles.notEditable}`}
           >
             {isEditingAllBlocks ? (
               <textarea
@@ -864,20 +816,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
                 onBlur={handleAllBlocksBlur}
                 onKeyDown={handleAllBlocksKeyDown}
                 onMouseDown={(e) => e.stopPropagation()}
-                style={{
-                  width: '100%',
-                  border: '1px solid #8b5cf6',
-                  borderRadius: '4px',
-                  padding: '8px',
-                  fontSize: '14px',
-                  outline: 'none',
-                  resize: 'none',
-                  fontFamily: 'inherit',
-                  backgroundColor: 'white',
-                  lineHeight: '1.5',
-                  color: '#6b7280',
-                  overflow: 'hidden'
-                }}
+                className={styles.allBlocksTextarea}
               />
             ) : (
               <>
@@ -1099,127 +1038,43 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
           </div>
         )}
       </div>
-      
+
       {/* 연결점들 - 메모 블록 외부에 배치 */}
-      <div 
+      <div
+        className={`${styles.connectionPoint} ${styles.top}`}
         onMouseDown={handleConnectionPointMouseDown}
         onMouseUp={handleConnectionPointMouseUp}
-        style={{ 
-          position: 'absolute', 
-          top: -8, 
-          left: '50%', 
-          transform: 'translateX(-50%)', 
-          width: 16, 
-          height: 16, 
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'crosshair',
-          zIndex: 15
-        }} 
       >
-        <div style={{
-          width: 8,
-          height: 8,
-          backgroundColor: isConnecting && connectingFromId === memo.id ? '#ef4444' : '#8b5cf6',
-          borderRadius: '50%',
-          border: '2px solid white',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-        }} />
+        <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} />
       </div>
-      <div 
+      <div
+        className={`${styles.connectionPoint} ${styles.bottom}`}
         onMouseDown={handleConnectionPointMouseDown}
         onMouseUp={handleConnectionPointMouseUp}
-        style={{ 
-          position: 'absolute', 
-          bottom: -8, 
-          left: '50%', 
-          transform: 'translateX(-50%)', 
-          width: 16, 
-          height: 16, 
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'crosshair',
-          zIndex: 15
-        }} 
       >
-        <div style={{
-          width: 8,
-          height: 8,
-          backgroundColor: isConnecting && connectingFromId === memo.id ? '#ef4444' : '#8b5cf6',
-          borderRadius: '50%',
-          border: '2px solid white',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-        }} />
+        <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} />
       </div>
-      <div 
+      <div
+        className={`${styles.connectionPoint} ${styles.left}`}
         onMouseDown={handleConnectionPointMouseDown}
         onMouseUp={handleConnectionPointMouseUp}
-        style={{ 
-          position: 'absolute', 
-          left: -8, 
-          top: '50%', 
-          transform: 'translateY(-50%)', 
-          width: 16, 
-          height: 16, 
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'crosshair',
-          zIndex: 15
-        }} 
       >
-        <div style={{
-          width: 8,
-          height: 8,
-          backgroundColor: isConnecting && connectingFromId === memo.id ? '#ef4444' : '#8b5cf6',
-          borderRadius: '50%',
-          border: '2px solid white',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-        }} />
+        <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} />
       </div>
-      <div 
+      <div
+        className={`${styles.connectionPoint} ${styles.right}`}
         onMouseDown={handleConnectionPointMouseDown}
         onMouseUp={handleConnectionPointMouseUp}
-        style={{ 
-          position: 'absolute', 
-          right: -8, 
-          top: '50%', 
-          transform: 'translateY(-50%)', 
-          width: 16, 
-          height: 16, 
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'crosshair',
-          zIndex: 15
-        }} 
       >
-        <div style={{
-          width: 8,
-          height: 8,
-          backgroundColor: isConnecting && connectingFromId === memo.id ? '#ef4444' : '#8b5cf6',
-          borderRadius: '50%',
-          border: '2px solid white',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-        }} />
+        <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} />
       </div>
 
       {/* 드래그 중 힌트 UI - 메모 오른쪽에 고정 */}
       {isDragging && !isShiftPressed && (
         <div
+          className={styles.dragHint}
           style={{
-            position: 'absolute',
-            left: sizeConfig.width + 10,
-            top: '50%',
-            transform: 'translateY(-50%)',
-            fontSize: '11px',
-            color: 'rgba(139, 92, 246, 0.4)',
-            fontWeight: '400',
-            whiteSpace: 'nowrap',
-            pointerEvents: 'none',
-            zIndex: 10000
+            left: sizeConfig.width + 10
           }}
         >
           SHIFT + 드래그로 메모나 카테고리를 다른 카테고리 영역에 종속, 제거하세요

@@ -7,7 +7,7 @@ import CategoryBlockComponent from './CategoryBlock';
 import ImportanceFilter from './ImportanceFilter';
 import ContextMenu from './ContextMenu';
 import QuickNavModal from './QuickNavModal';
-import styles from './Canvas.scss';
+import styles from '../scss/components/Canvas.module.scss';
 
 interface CanvasProps {
   currentPage: Page | undefined;
@@ -2106,19 +2106,28 @@ const Canvas: React.FC<CanvasProps> = ({
           renderCategoryWithChildren(category)
         )}
 
-        {/* 드래그 선택 영역 - 메모 블록과 같은 transform 공간 안에 위치 */}
-        {isDragSelecting && dragSelectStart && dragSelectEnd && (
+      </div>
+
+      {/* 드래그 선택 영역 - canvas-content 밖에 배치하여 화면 좌표 직접 사용 */}
+      {isDragSelecting && dragSelectStart && dragSelectEnd && (() => {
+        // 월드 좌표를 화면 좌표로 변환
+        const screenStartX = dragSelectStart.x * canvasScale + canvasOffset.x;
+        const screenStartY = dragSelectStart.y * canvasScale + canvasOffset.y;
+        const screenEndX = dragSelectEnd.x * canvasScale + canvasOffset.x;
+        const screenEndY = dragSelectEnd.y * canvasScale + canvasOffset.y;
+
+        return (
           <div
             className={styles['drag-selection-box']}
             style={{
-              left: `${Math.min(dragSelectStart.x, dragSelectEnd.x)}px`,
-              top: `${Math.min(dragSelectStart.y, dragSelectEnd.y)}px`,
-              width: `${Math.abs(dragSelectEnd.x - dragSelectStart.x)}px`,
-              height: `${Math.abs(dragSelectEnd.y - dragSelectStart.y)}px`
+              left: `${Math.min(screenStartX, screenEndX)}px`,
+              top: `${Math.min(screenStartY, screenEndY)}px`,
+              width: `${Math.abs(screenEndX - screenStartX)}px`,
+              height: `${Math.abs(screenEndY - screenStartY)}px`
             }}
           />
-        )}
-      </div>
+        );
+      })()}
 
 
       {/* 하단 도구 버튼들 */}

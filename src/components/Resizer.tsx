@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import styles from '../scss/components/Resizer.module.scss';
 
 interface ResizerProps {
   onResize: (deltaX: number) => void;

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
+import styles from '../scss/components/QuickNavModal.module.scss';
 
 interface QuickNavModalProps {
   isOpen: boolean;
