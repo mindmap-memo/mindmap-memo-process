@@ -1,0 +1,228 @@
+.canvas {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background-image: radial-gradient(circle, #d1d5db 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-color: #ffffff;
+  touch-action: none;
+
+  &.panning {
+    cursor: grabbing;
+  }
+
+  &.pan-tool {
+    cursor: grab;
+  }
+
+  &.zoom-tool {
+    cursor: crosshair;
+  }
+
+  &.select-tool {
+    cursor: default;
+  }
+}
+
+.canvas-content {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  pointer-events: auto;
+}
+
+.connection-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+
+  &.normal {
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  &.disconnect {
+    pointer-events: auto;
+    z-index: 1;
+  }
+}
+
+.drag-selection-box {
+  position: absolute;
+  background-color: rgba(59, 130, 246, 0.2);
+  border: 2px solid rgba(59, 130, 246, 0.6);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.shift-drag-hint {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(139, 92, 246, 0.95);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 1002;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  animation: fadeIn 0.2s ease;
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+}
+
+.toolbar {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: white;
+  border-radius: 12px;
+  padding: 8px;
+  display: flex;
+  gap: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e1e5e9;
+  z-index: 1000;
+}
+
+.tool-button {
+  border: 1px solid #d1d5db;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+
+  &.active {
+    background-color: #8b5cf6;
+    color: white;
+  }
+
+  &.inactive {
+    background-color: white;
+    color: #6b7280;
+  }
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 44px;
+  background-color: #e5e7eb;
+  margin: 0 4px;
+}
+
+.action-button {
+  padding: 12px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+
+  &.primary {
+    background-color: #8b5cf6;
+    color: white;
+    border: none;
+    font-weight: 600;
+  }
+
+  &.secondary {
+    background-color: white;
+    color: #8b5cf6;
+    border: 2px solid #8b5cf6;
+    font-weight: 600;
+  }
+
+  &.disconnect {
+    border: 1px solid #d1d5db;
+    font-weight: 500;
+
+    &.active {
+      background-color: #fee2e2;
+      color: #dc2626;
+      border-color: #fca5a5;
+    }
+
+    &.inactive {
+      background-color: white;
+      color: #6b7280;
+    }
+  }
+
+  &.delete {
+    background-color: white;
+    border: 1px solid #d1d5db;
+    font-weight: 500;
+
+    &.enabled {
+      color: #ef4444;
+      cursor: pointer;
+    }
+
+    &.disabled {
+      color: #9ca3af;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.undo-redo-controls {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  gap: 8px;
+  z-index: 1000;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(4px);
+}
+
+.undo-redo-button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  &.enabled {
+    background-color: #3b82f6;
+    color: white;
+    cursor: pointer;
+  }
+
+  &.disabled {
+    background-color: #e5e7eb;
+    color: #9ca3af;
+    cursor: not-allowed;
+  }
+}

@@ -96,7 +96,9 @@ The application implements a comprehensive undo/redo system for canvas operation
 ### Technical Notes
 
 - Uses React 18 with TypeScript
-- All styling is inline (no CSS files)
+- **Styling with SCSS**: All component styles are separated into `.scss` files in the same directory as the component. Each component has its own SCSS module (e.g., `Canvas.scss` for `Canvas.tsx`)
+- **SCSS Module Pattern**: Import styles as `import styles from './ComponentName.scss'` and use `className={styles.className}` for type-safe class names
+- **No Inline Styles**: Avoid inline styles; use SCSS classes for all styling. Only use inline styles for dynamic values that must be calculated at runtime (e.g., positions, transforms, colors that change based on data)
 - Connection lines drawn with SVG overlays
 - ResizeObserver for dynamic memo block sizing
 - Bidirectional memo connections (stored in both memo's connections arrays)
@@ -220,6 +222,24 @@ The application implements Shift+drag functionality for adding/removing memos an
 ### Specific Implementation Guidelines
 
 - **File Management**: Always prefer editing existing files to creating new ones; never create files unless absolutely necessary
+- **Styling Guidelines**:
+  - **ALWAYS use SCSS files** for component styling instead of inline styles
+  - Create a `.scss` file next to each component (e.g., `Canvas.tsx` → `Canvas.scss`)
+  - Import as SCSS module: `import styles from './ComponentName.scss'`
+  - Use className for static styles, inline style only for dynamic runtime values
+  - Organize SCSS with nested selectors matching component structure
+  - **Dynamic Values Only**: Use inline styles ONLY for values that change at runtime (positions, transforms, sizes, data-driven colors)
+  - **Example of proper usage**:
+    ```tsx
+    // GOOD - dynamic position
+    <div className={styles.memoBlock} style={{ left: `${memo.position.x}px`, top: `${memo.position.y}px` }}>
+
+    // BAD - static styles inline
+    <div style={{ padding: '10px', backgroundColor: '#fff', borderRadius: '8px' }}>
+
+    // GOOD - static styles in SCSS
+    <div className={styles.container}>
+    ```
 - **Error Handling**: Use proper TypeScript error handling with `error instanceof Error ? error.message : 'Unknown error'` pattern
 - **Context Menus**: Position context menus using getBoundingClientRect() and pass position props for proper placement
 - **Category Drag Operations**: Always use absolute positioning (originalPosition + totalDelta) rather than cumulative deltas to prevent position drift

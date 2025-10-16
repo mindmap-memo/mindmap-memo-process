@@ -13,7 +13,8 @@
       "Bash(taskkill:*)",
       "Bash(Stop-Process -Name node -Force)",
       "Bash(Stop-Process -Name \"node\" -Force -ErrorAction SilentlyContinue)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

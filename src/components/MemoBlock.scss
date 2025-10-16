@@ -1,0 +1,320 @@
+// MemoBlock.scss - 메모 블록 컴포넌트 스타일
+
+.memoBlockWrapper {
+  position: absolute;
+  height: auto;
+}
+
+.memoBlockContainer {
+  border-radius: 12px;
+  padding: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  user-select: none;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+
+  &.selected {
+    background-color: #f3f4f6;
+    border: 2px solid #8b5cf6;
+  }
+
+  &.notSelected {
+    background-color: white;
+    border: 1px solid #e5e7eb;
+  }
+
+  &.dragHovered {
+    border: 2px solid #3b82f6;
+  }
+
+  &.shiftDragging {
+    border: 2px solid #10b981;
+  }
+
+  &.dragging {
+    cursor: grabbing;
+  }
+
+  &.notDragging {
+    cursor: default;
+  }
+}
+
+.titleContainer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.title {
+  font-weight: 600;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+
+  &.withTitle {
+    color: #1f2937;
+  }
+
+  &.withoutTitle {
+    color: #9ca3af;
+  }
+
+  &.editable {
+    cursor: text;
+  }
+
+  &.notEditable {
+    cursor: default;
+  }
+}
+
+.shiftDragIcon {
+  color: #10b981;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.titleInput {
+  flex: 1;
+  border: 1px solid #8b5cf6;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 16px;
+  font-weight: 600;
+  outline: none;
+  background-color: white;
+}
+
+.sizeButtons {
+  display: flex;
+  gap: 4px;
+}
+
+.sizeButton {
+  padding: 2px 6px;
+  font-size: 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+
+  &.active {
+    background-color: #3b82f6;
+    color: white;
+  }
+
+  &.inactive {
+    background-color: #f3f4f6;
+    color: #6b7280;
+  }
+}
+
+.tagsContainer {
+  margin-bottom: 8px;
+}
+
+.tag {
+  background-color: #e5e7eb;
+  color: #374151;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  margin-right: 6px;
+  font-weight: 500;
+}
+
+.contentContainer {
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.5;
+
+  &.editable {
+    cursor: text;
+  }
+
+  &.notEditable {
+    cursor: default;
+  }
+}
+
+.allBlocksTextarea {
+  width: 100%;
+  border: 1px solid #8b5cf6;
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 14px;
+  outline: none;
+  resize: none;
+  font-family: inherit;
+  background-color: white;
+  line-height: 1.5;
+  color: #6b7280;
+  overflow: hidden;
+}
+
+.spacer {
+  opacity: 0.3;
+  font-size: 12px;
+  color: #9ca3af;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.textBlockContent {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.importanceHighlight {
+  padding: 1px 0px;
+  border-radius: 2px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.imageBlock {
+  margin: 4px 0;
+  border-radius: 4px;
+
+  img {
+    max-width: 100%;
+    max-height: 60px;
+    border-radius: 4px;
+    object-fit: cover;
+  }
+}
+
+.imageCaption {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+.calloutBlock {
+  background-color: #f3f4f6;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin: 2px 0;
+  font-size: 12px;
+}
+
+.fileBlock {
+  margin: 4px 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+
+  &.default {
+    background-color: #f8f9fa;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .fileName {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.bookmarkBlock {
+  margin: 4px 0;
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 12px;
+
+  &.default {
+    background-color: #f8f9fa;
+    border: 1px solid #e0e0e0;
+  }
+
+  .bookmarkTitle {
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .bookmarkDescription {
+    font-size: 11px;
+    color: #6c757d;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.connectionPoint {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: crosshair;
+  z-index: 15;
+
+  &.top {
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  &.bottom {
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  &.left {
+    left: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  &.right {
+    right: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .connectionDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+
+    &.default {
+      background-color: #8b5cf6;
+    }
+
+    &.connecting {
+      background-color: #ef4444;
+    }
+  }
+}
+
+.dragHint {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: rgba(139, 92, 246, 0.4);
+  font-weight: 400;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10000;
+}

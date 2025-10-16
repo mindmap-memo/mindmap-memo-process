@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Page, MemoBlock, DataRegistry, MemoDisplaySize, ImportanceLevel, CategoryBlock, QuickNavItem, TutorialState } from './types';
 import { globalDataRegistry } from './utils/dataRegistry';
 import { STORAGE_KEYS } from './constants/defaultData';
@@ -29,11 +29,13 @@ import {
   getDirectChildCategories,
   isAncestor
 } from './utils/categoryHierarchyUtils';
+import { AppProviders } from './contexts';
 import LeftPanel from './components/LeftPanel';
 import RightPanel from './components/RightPanel';
 import Canvas from './components/Canvas';
 import { Tutorial } from './components/Tutorial';
 import { tutorialSteps } from './utils/tutorialSteps';
+import styles from './App.scss';
 
 const App: React.FC = () => {
   // 브라우저 기본 Ctrl/Command + 휠 줌 차단 (전역)
@@ -1540,6 +1542,100 @@ const App: React.FC = () => {
   // 메모 위치 업데이트 히스토리 타이머 관리
   const memoPositionTimers = React.useRef<Map<string, NodeJS.Timeout>>(new Map());
 
+  // ===== Context Values 준비 =====
+  const appStateContextValue = useMemo(() => ({
+    pages,
+    setPages,
+    currentPageId,
+    setCurrentPageId,
+    currentPage,
+    canvasOffset,
+    setCanvasOffset,
+    canvasScale,
+    setCanvasScale,
+    dataRegistry: appState.dataRegistry,
+    setDataRegistry: appState.setDataRegistry,
+    isShiftPressed,
+    setIsShiftPressed
+  }), [pages, setPages, currentPageId, setCurrentPageId, currentPage, canvasOffset, setCanvasOffset,
+      canvasScale, setCanvasScale, appState.dataRegistry, appState.setDataRegistry, isShiftPressed, setIsShiftPressed]);
+
+  const selectionContextValue = useMemo(() => ({
+    selectedMemoId,
+    setSelectedMemoId,
+    selectedMemoIds,
+    setSelectedMemoIds,
+    selectedMemo,
+    selectedMemos,
+    selectedCategoryId,
+    setSelectedCategoryId,
+    selectedCategoryIds,
+    setSelectedCategoryIds,
+    selectedCategory,
+    selectedCategories,
+    isDragSelecting: appState.isDragSelecting,
+    setIsDragSelecting: appState.setIsDragSelecting,
+    dragSelectStart: appState.dragSelectStart,
+    setDragSelectStart: appState.setDragSelectStart,
+    dragSelectEnd: appState.dragSelectEnd,
+    setDragSelectEnd: appState.setDragSelectEnd,
+    dragHoveredMemoIds: appState.dragHoveredMemoIds,
+    setDragHoveredMemoIds: appState.setDragHoveredMemoIds,
+    dragHoveredCategoryIds: appState.dragHoveredCategoryIds,
+    setDragHoveredCategoryIds: appState.setDragHoveredCategoryIds,
+    isDragSelectingWithShift: appState.isDragSelectingWithShift,
+    setIsDragSelectingWithShift: appState.setIsDragSelectingWithShift,
+    activeImportanceFilters: appState.activeImportanceFilters,
+    setActiveImportanceFilters: appState.setActiveImportanceFilters,
+    showGeneralContent: appState.showGeneralContent,
+    setShowGeneralContent: appState.setShowGeneralContent,
+    isDraggingMemo: appState.isDraggingMemo,
+    setIsDraggingMemo: appState.setIsDraggingMemo,
+    draggingMemoId: appState.draggingMemoId,
+    setDraggingMemoId: appState.setDraggingMemoId,
+    isDraggingCategory: appState.isDraggingCategory,
+    setIsDraggingCategory: appState.setIsDraggingCategory
+  }), [selectedMemoId, setSelectedMemoId, selectedMemoIds, setSelectedMemoIds, selectedMemo, selectedMemos,
+      selectedCategoryId, setSelectedCategoryId, selectedCategoryIds, setSelectedCategoryIds,
+      selectedCategory, selectedCategories, appState]);
+
+  const panelContextValue = useMemo(() => ({
+    leftPanelOpen,
+    setLeftPanelOpen,
+    rightPanelOpen,
+    setRightPanelOpen,
+    leftPanelWidth,
+    setLeftPanelWidth,
+    rightPanelWidth,
+    setRightPanelWidth,
+    isRightPanelFullscreen: panelState.isRightPanelFullscreen,
+    setIsRightPanelFullscreen: panelState.setIsRightPanelFullscreen
+  }), [leftPanelOpen, setLeftPanelOpen, rightPanelOpen, setRightPanelOpen,
+      leftPanelWidth, setLeftPanelWidth, rightPanelWidth, setRightPanelWidth,
+      panelState.isRightPanelFullscreen, panelState.setIsRightPanelFullscreen]);
+
+  const connectionContextValue = useMemo(() => ({
+    isConnecting,
+    setIsConnecting,
+    isDisconnectMode,
+    setIsDisconnectMode,
+    connectingFromId,
+    setConnectingFromId,
+    connectingFromDirection,
+    setConnectingFromDirection,
+    dragLineEnd: appState.dragLineEnd,
+    setDragLineEnd: appState.setDragLineEnd
+  }), [isConnecting, setIsConnecting, isDisconnectMode, setIsDisconnectMode,
+      connectingFromId, setConnectingFromId, connectingFromDirection, setConnectingFromDirection,
+      appState.dragLineEnd, appState.setDragLineEnd]);
+
+  const quickNavContextValue = useMemo(() => ({
+    quickNavItems,
+    setQuickNavItems,
+    showQuickNavPanel,
+    setShowQuickNavPanel
+  }), [quickNavItems, setQuickNavItems, showQuickNavPanel, setShowQuickNavPanel]);
+
   const updateMemoPosition = (memoId: string, position: { x: number; y: number }) => {
     // 메모가 이동하면 부모 카테고리의 캐시 제거 (영역 재계산을 위해)
     const currentPage = pages.find(p => p.id === currentPageId);
@@ -1789,15 +1885,16 @@ const App: React.FC = () => {
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      height: '100vh',
-      width: '100vw',
-      backgroundColor: '#ffffff',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    }}>
-      {/* 왼쪽 패널 */}
-      {leftPanelOpen && (
+    <AppProviders
+      appState={appStateContextValue}
+      selection={selectionContextValue}
+      panel={panelContextValue}
+      connection={connectionContextValue}
+      quickNav={quickNavContextValue}
+    >
+      <div className={styles['app-container']}>
+        {/* 왼쪽 패널 */}
+        {leftPanelOpen && (
         <LeftPanel
           pages={pages}
           currentPageId={currentPageId}
@@ -1821,20 +1918,9 @@ const App: React.FC = () => {
       {/* 접기/펼치기 버튼 (왼쪽) */}
       <button
         onClick={() => setLeftPanelOpen(!leftPanelOpen)}
+        className={`${styles['panel-toggle-button']} ${styles.left}`}
         style={{
-          position: 'absolute',
-          left: leftPanelOpen ? `${leftPanelWidth}px` : '0px',
-          top: '50%',
-          transform: 'translateY(-50%)',
-          zIndex: 1000,
-          backgroundColor: 'white',
-          color: '#6b7280',
-          border: '1px solid #d1d5db',
-          padding: '8px 6px',
-          cursor: 'pointer',
-          borderRadius: '0 6px 6px 0',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          transition: 'all 0.2s ease'
+          left: leftPanelOpen ? `${leftPanelWidth}px` : '0px'
         }}
       >
         {leftPanelOpen ? '◀' : '▶'}
@@ -1960,20 +2046,9 @@ const App: React.FC = () => {
       {/* 접기/펼치기 버튼 (오른쪽) */}
       <button
         onClick={() => setRightPanelOpen(!rightPanelOpen)}
+        className={`${styles['panel-toggle-button']} ${styles.right}`}
         style={{
-          position: 'absolute',
-          right: rightPanelOpen ? `${rightPanelWidth}px` : '0px',
-          top: '50%',
-          transform: 'translateY(-50%)',
-          zIndex: 1000,
-          backgroundColor: 'white',
-          color: '#6b7280',
-          border: '1px solid #d1d5db',
-          padding: '8px 6px',
-          cursor: 'pointer',
-          borderRadius: '6px 0 0 6px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          transition: 'all 0.2s ease'
+          right: rightPanelOpen ? `${rightPanelWidth}px` : '0px'
         }}
       >
         {rightPanelOpen ? '▶' : '◀'}
@@ -1983,48 +2058,17 @@ const App: React.FC = () => {
       <button
         data-tutorial="quick-nav-btn"
         onClick={() => setShowQuickNavPanel(!showQuickNavPanel)}
+        className={styles['quick-nav-button']}
         style={{
-          position: 'fixed',
-          top: '20px',
-          right: rightPanelOpen ? `${rightPanelWidth + 20}px` : '20px',
-          zIndex: 1001,
-          backgroundColor: '#8b5cf6',
-          color: 'white',
-          border: 'none',
-          borderRadius: '8px',
-          padding: '10px 16px',
-          cursor: 'pointer',
-          boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)',
-          fontSize: '14px',
-          fontWeight: '600',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          transition: 'all 0.2s ease'
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = '#7c3aed';
-          e.currentTarget.style.transform = 'translateY(-2px)';
-          e.currentTarget.style.boxShadow = '0 6px 16px rgba(139, 92, 246, 0.4)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = '#8b5cf6';
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
+          right: rightPanelOpen ? `${rightPanelWidth + 20}px` : '20px'
         }}
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path d="M8 2L9.5 5.5L13 6L10.5 8.5L11 12L8 10L5 12L5.5 8.5L3 6L6.5 5.5L8 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
         <span>단축 이동</span>
         {quickNavItems.length > 0 && (
-          <span style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.3)',
-            borderRadius: '10px',
-            padding: '2px 8px',
-            fontSize: '12px',
-            fontWeight: '700'
-          }}>
+          <span className={styles['quick-nav-badge']}>
             {quickNavItems.length}
           </span>
         )}
@@ -2035,47 +2079,27 @@ const App: React.FC = () => {
         <>
           {/* 배경 클릭 시 닫기 */}
           <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 1000
-            }}
+            className={styles['quick-nav-overlay']}
             onClick={() => setShowQuickNavPanel(false)}
           />
 
           {/* 패널 */}
           <div
+            className={styles['quick-nav-panel']}
             style={{
-              position: 'fixed',
-              top: '70px',
-              right: rightPanelOpen ? `${rightPanelWidth + 20}px` : '20px',
-              zIndex: 1001,
-              display: 'flex',
-              gap: '12px'
+              right: rightPanelOpen ? `${rightPanelWidth + 20}px` : '20px'
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {quickNavItems.length === 0 ? (
-              <div style={{
-                backgroundColor: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-                padding: '16px 20px',
-                color: '#9ca3af',
-                fontSize: '13px',
-                whiteSpace: 'nowrap'
-              }}>
+              <div className={styles['quick-nav-empty']}>
                 등록된 단축 이동이 없습니다
               </div>
             ) : (
               <>
                 {/* 메모 단축 이동 */}
                 {quickNavItems.filter(item => item.targetType === 'memo').length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div className={styles['quick-nav-section']}>
                     {quickNavItems
                       .filter(item => item.targetType === 'memo')
                       .map(item => {
@@ -2089,49 +2113,14 @@ const App: React.FC = () => {
                               executeQuickNav(item);
                               setShowQuickNavPanel(false);
                             }}
-                            style={{
-                              position: 'relative',
-                              backgroundColor: 'white',
-                              color: '#8b5cf6',
-                              border: '2px solid #8b5cf6',
-                              borderRadius: '8px',
-                              padding: '8px 32px 8px 12px',
-                              cursor: 'pointer',
-                              fontSize: '13px',
-                              fontWeight: '600',
-                              boxShadow: '0 2px 8px rgba(139, 92, 246, 0.2)',
-                              transition: 'all 0.2s ease',
-                              width: '140px',
-                              textAlign: 'left',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'flex-start'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#f3f4f6';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'white';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(139, 92, 246, 0.2)';
-                            }}
+                            className={`${styles['quick-nav-item']} ${styles.memo}`}
                             title={item.name}
                           >
-                            <span style={{
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              width: '100%'
-                            }}>
+                            <span className={styles['quick-nav-item-name']}>
                               {item.name}
                             </span>
                             {!isCurrentPage && targetPage && (
-                              <span style={{ fontSize: '10px', opacity: 0.6 }}>
+                              <span className={styles['quick-nav-item-page']}>
                                 {targetPage.name}
                               </span>
                             )}
@@ -2142,30 +2131,7 @@ const App: React.FC = () => {
                                   deleteQuickNavItem(item.id);
                                 }
                               }}
-                              style={{
-                                position: 'absolute',
-                                right: '6px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                backgroundColor: 'transparent',
-                                color: '#ef4444',
-                                border: 'none',
-                                width: '20px',
-                                height: '20px',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '16px',
-                                borderRadius: '4px',
-                                transition: 'all 0.2s ease'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#fef2f2';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = 'transparent';
-                              }}
+                              className={`${styles['quick-nav-delete-button']} ${styles.memo}`}
                             >
                               ×
                             </button>
@@ -2177,7 +2143,7 @@ const App: React.FC = () => {
 
                 {/* 카테고리 단축 이동 */}
                 {quickNavItems.filter(item => item.targetType === 'category').length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div className={styles['quick-nav-section']}>
                     {quickNavItems
                       .filter(item => item.targetType === 'category')
                       .map(item => {
@@ -2191,49 +2157,14 @@ const App: React.FC = () => {
                               executeQuickNav(item);
                               setShowQuickNavPanel(false);
                             }}
-                            style={{
-                              position: 'relative',
-                              backgroundColor: '#8b5cf6',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '8px',
-                              padding: '8px 32px 8px 12px',
-                              cursor: 'pointer',
-                              fontSize: '13px',
-                              fontWeight: '600',
-                              boxShadow: '0 2px 8px rgba(139, 92, 246, 0.3)',
-                              transition: 'all 0.2s ease',
-                              width: '140px',
-                              textAlign: 'left',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'flex-start'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#7c3aed';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.4)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = '#8b5cf6';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(139, 92, 246, 0.3)';
-                            }}
+                            className={`${styles['quick-nav-item']} ${styles.category}`}
                             title={item.name}
                           >
-                            <span style={{
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              width: '100%'
-                            }}>
+                            <span className={styles['quick-nav-item-name']}>
                               {item.name}
                             </span>
                             {!isCurrentPage && targetPage && (
-                              <span style={{ fontSize: '10px', opacity: 0.8 }}>
+                              <span className={styles['quick-nav-item-page']}>
                                 {targetPage.name}
                               </span>
                             )}
@@ -2244,30 +2175,7 @@ const App: React.FC = () => {
                                   deleteQuickNavItem(item.id);
                                 }
                               }}
-                              style={{
-                                position: 'absolute',
-                                right: '6px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                backgroundColor: 'transparent',
-                                color: 'white',
-                                border: 'none',
-                                width: '20px',
-                                height: '20px',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '16px',
-                                borderRadius: '4px',
-                                transition: 'all 0.2s ease'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = 'transparent';
-                              }}
+                              className={`${styles['quick-nav-delete-button']} ${styles.category}`}
                             >
                               ×
                             </button>
@@ -2316,7 +2224,8 @@ const App: React.FC = () => {
           canProceed={canProceedTutorial()}
         />
       )}
-    </div>
+      </div>
+    </AppProviders>
   );
 };
 

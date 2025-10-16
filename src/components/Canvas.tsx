@@ -7,6 +7,7 @@ import CategoryBlockComponent from './CategoryBlock';
 import ImportanceFilter from './ImportanceFilter';
 import ContextMenu from './ContextMenu';
 import QuickNavModal from './QuickNavModal';
+import styles from './Canvas.scss';
 
 interface CanvasProps {
   currentPage: Page | undefined;
@@ -1984,23 +1985,18 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   }, [isShiftPressed, isDraggingMemo, isDraggingCategory, currentPage, canvasOffset, canvasScale]);
 
+  const canvasClassName = `${styles.canvas} ${
+    isPanning ? styles.panning :
+    (isSpacePressed || currentTool === 'pan') ? styles['pan-tool'] :
+    currentTool === 'zoom' ? styles['zoom-tool'] : styles['select-tool']
+  }`;
+
   return (
     <div
       data-canvas="true"
       data-tutorial="canvas"
       tabIndex={0}
-      style={{
-        flex: 1,
-        position: 'relative',
-        overflow: 'hidden',
-        backgroundImage: 'radial-gradient(circle, #d1d5db 1px, transparent 1px)',
-        backgroundSize: '20px 20px',
-        backgroundColor: '#ffffff',
-        cursor: isPanning ? 'grabbing' :
-                (isSpacePressed || currentTool === 'pan') ? 'grab' :
-                currentTool === 'zoom' ? 'crosshair' : 'default',
-        touchAction: 'none'
-      }}
+      className={canvasClassName}
       onContextMenu={(e) => {
         // 캔버스 배경에서 우클릭 방지
         const target = e.target as Element;
@@ -2039,29 +2035,17 @@ const Canvas: React.FC<CanvasProps> = ({
       onDragOver={handleCanvasDragOver}
     >
       {/* 메모 블록들과 연결선 */}
-      <div style={{
-        transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px) scale(${canvasScale})`,
-        transformOrigin: '0 0',
-        width: '100%',
-        height: '100%',
-        position: 'absolute',
-        pointerEvents: 'auto'
-      }}>
+      <div
+        className={styles['canvas-content']}
+        style={{
+          transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px) scale(${canvasScale})`
+        }}>
         {/* 카테고리 영역들 */}
         {renderCategoryAreas()}
 
         {/* SVG로 연결선 그리기 */}
         <svg
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            overflow: 'visible',
-            pointerEvents: isDisconnectMode ? 'auto' : 'none',
-            zIndex: isDisconnectMode ? 1 : 0
-          }}
+          className={`${styles['connection-svg']} ${isDisconnectMode ? styles.disconnect : styles.normal}`}
         >
           <defs>
             <style>
@@ -2125,17 +2109,12 @@ const Canvas: React.FC<CanvasProps> = ({
         {/* 드래그 선택 영역 - 메모 블록과 같은 transform 공간 안에 위치 */}
         {isDragSelecting && dragSelectStart && dragSelectEnd && (
           <div
+            className={styles['drag-selection-box']}
             style={{
-              position: 'absolute',
               left: `${Math.min(dragSelectStart.x, dragSelectEnd.x)}px`,
               top: `${Math.min(dragSelectStart.y, dragSelectEnd.y)}px`,
               width: `${Math.abs(dragSelectEnd.x - dragSelectStart.x)}px`,
-              height: `${Math.abs(dragSelectEnd.y - dragSelectStart.y)}px`,
-              backgroundColor: 'rgba(59, 130, 246, 0.2)',
-              border: '2px solid rgba(59, 130, 246, 0.6)',
-              borderRadius: '4px',
-              pointerEvents: 'none',
-              zIndex: 1000
+              height: `${Math.abs(dragSelectEnd.y - dragSelectStart.y)}px`
             }}
           />
         )}
@@ -2143,40 +2122,14 @@ const Canvas: React.FC<CanvasProps> = ({
 
 
       {/* 하단 도구 버튼들 */}
-      <div style={{
-        position: 'absolute',
-        bottom: '20px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '8px',
-        display: 'flex',
-        gap: '4px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        border: '1px solid #e1e5e9',
-        zIndex: 1000
-      }}>
+      <div className={styles.toolbar}>
         {/* 도구 버튼들 */}
         <button
           onClick={() => {
             setCurrentTool('select');
             setBaseTool('select');
           }}
-          style={{
-            backgroundColor: currentTool === 'select' ? '#8b5cf6' : 'white',
-            color: currentTool === 'select' ? 'white' : '#6b7280',
-            border: '1px solid #d1d5db',
-            padding: '12px',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '44px',
-            height: '44px'
-          }}
+          className={`${styles['tool-button']} ${currentTool === 'select' ? styles.active : styles.inactive}`}
           title="선택 도구"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -2188,20 +2141,7 @@ const Canvas: React.FC<CanvasProps> = ({
             setCurrentTool('pan');
             setBaseTool('pan');
           }}
-          style={{
-            backgroundColor: currentTool === 'pan' ? '#8b5cf6' : 'white',
-            color: currentTool === 'pan' ? 'white' : '#6b7280',
-            border: '1px solid #d1d5db',
-            padding: '12px',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '44px',
-            height: '44px'
-          }}
+          className={`${styles['tool-button']} ${currentTool === 'pan' ? styles.active : styles.inactive}`}
           title="화면 이동 도구 (Space)"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -2213,20 +2153,7 @@ const Canvas: React.FC<CanvasProps> = ({
             setCurrentTool('zoom');
             setBaseTool('zoom');
           }}
-          style={{
-            backgroundColor: currentTool === 'zoom' ? '#8b5cf6' : 'white',
-            color: currentTool === 'zoom' ? 'white' : '#6b7280',
-            border: '1px solid #d1d5db',
-            padding: '12px',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '44px',
-            height: '44px'
-          }}
+          className={`${styles['tool-button']} ${currentTool === 'zoom' ? styles.active : styles.inactive}`}
           title="확대/축소 도구 (Alt + Scroll)"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -2236,9 +2163,9 @@ const Canvas: React.FC<CanvasProps> = ({
             <line x1="8" y1="11" x2="14" y2="11"/>
           </svg>
         </button>
-        
-        <div style={{ width: '1px', height: '44px', backgroundColor: '#e5e7eb', margin: '0 4px' }}></div>
-        
+
+        <div className={styles['toolbar-divider']}></div>
+
         {/* 기능 버튼들 */}
         <button
           data-tutorial="add-memo-btn"
@@ -2253,17 +2180,7 @@ const Canvas: React.FC<CanvasProps> = ({
               onAddMemo();
             }
           }}
-          style={{
-            backgroundColor: 'white',
-            color: '#8b5cf6',
-            border: '2px solid #8b5cf6',
-            padding: '12px 16px',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '600',
-            transition: 'all 0.2s ease'
-          }}
+          className={`${styles['action-button']} ${styles.secondary}`}
         >
           + 블록 생성
         </button>
@@ -2280,89 +2197,34 @@ const Canvas: React.FC<CanvasProps> = ({
               onAddCategory();
             }
           }}
-          style={{
-            backgroundColor: '#8b5cf6',
-            color: 'white',
-            border: 'none',
-            padding: '12px 16px',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '600',
-            transition: 'all 0.2s ease'
-          }}
+          className={`${styles['action-button']} ${styles.primary}`}
         >
           카테고리 생성
         </button>
         <button
           data-tutorial="disconnect-btn"
           onClick={onDisconnectMemo}
-          style={{
-            backgroundColor: isDisconnectMode ? '#fee2e2' : 'white',
-            color: isDisconnectMode ? '#dc2626' : '#6b7280',
-            border: `1px solid ${isDisconnectMode ? '#fca5a5' : '#d1d5db'}`,
-            padding: '12px 16px',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '500',
-            transition: 'all 0.2s ease'
-          }}
+          className={`${styles['action-button']} ${styles.disconnect} ${isDisconnectMode ? styles.active : styles.inactive}`}
         >
           {isDisconnectMode ? '연결 해제 모드' : '연결 해제'}
         </button>
         <button
           onClick={onDeleteSelected}
           disabled={!selectedMemoId && !selectedCategoryId && selectedMemoIds.length === 0 && selectedCategoryIds.length === 0}
-          style={{
-            backgroundColor: 'white',
-            color: (selectedMemoId || selectedCategoryId || selectedMemoIds.length > 0 || selectedCategoryIds.length > 0) ? '#ef4444' : '#9ca3af',
-            border: '1px solid #d1d5db',
-            padding: '12px 16px',
-            borderRadius: '8px',
-            cursor: (selectedMemoId || selectedCategoryId || selectedMemoIds.length > 0 || selectedCategoryIds.length > 0) ? 'pointer' : 'not-allowed',
-            fontSize: '14px',
-            fontWeight: '500',
-            transition: 'all 0.2s ease'
-          }}
+          className={`${styles['action-button']} ${styles.delete} ${(selectedMemoId || selectedCategoryId || selectedMemoIds.length > 0 || selectedCategoryIds.length > 0) ? styles.enabled : styles.disabled}`}
         >
           삭제 {(selectedMemoIds.length > 0 || selectedCategoryIds.length > 0) && `(${selectedMemoIds.length + selectedCategoryIds.length})`}
         </button>
       </div>
 
       {/* Canvas Undo/Redo Controls */}
-      <div style={{
-        position: 'absolute',
-        top: '10px',
-        left: '10px',
-        display: 'flex',
-        gap: '8px',
-        zIndex: 1000,
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
-        borderRadius: '8px',
-        padding: '8px',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-        backdropFilter: 'blur(4px)'
-      }}>
+      <div className={styles['undo-redo-controls']}>
         <button
           data-tutorial="undo-btn"
           onClick={onUndo}
           disabled={!canUndo}
           title="실행 취소 (Ctrl+Z)"
-          style={{
-            padding: '6px 12px',
-            backgroundColor: canUndo ? '#3b82f6' : '#e5e7eb',
-            color: canUndo ? 'white' : '#9ca3af',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '12px',
-            fontWeight: '500',
-            cursor: canUndo ? 'pointer' : 'not-allowed',
-            transition: 'all 0.2s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px'
-          }}
+          className={`${styles['undo-redo-button']} ${canUndo ? styles.enabled : styles.disabled}`}
         >
           ↶ 실행취소
         </button>
@@ -2370,20 +2232,7 @@ const Canvas: React.FC<CanvasProps> = ({
           onClick={onRedo}
           disabled={!canRedo}
           title="다시 실행 (Ctrl+Shift+Z)"
-          style={{
-            padding: '6px 12px',
-            backgroundColor: canRedo ? '#3b82f6' : '#e5e7eb',
-            color: canRedo ? 'white' : '#9ca3af',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '12px',
-            fontWeight: '500',
-            cursor: canRedo ? 'pointer' : 'not-allowed',
-            transition: 'all 0.2s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px'
-          }}
+          className={`${styles['undo-redo-button']} ${canRedo ? styles.enabled : styles.disabled}`}
         >
           ↷ 다시실행
         </button>

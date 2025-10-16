@@ -1,0 +1,70 @@
+// BlockSelector.scss - 블록 선택기 컴포넌트 스타일
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+  background-color: transparent;
+}
+
+.selector {
+  position: fixed;
+  background-color: white;
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  padding: 8px 0;
+  min-width: 280px;
+  max-width: 320px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.noResults {
+  padding: 16px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.blockItem {
+  padding: 12px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: background-color 0.15s ease;
+  border-radius: 4px;
+  margin: 0 4px;
+
+  &:hover {
+    background-color: #f3f4f6;
+  }
+}
+
+.blockIcon {
+  font-size: 20px;
+  width: 24px;
+  text-align: center;
+}
+
+.blockInfo {
+  flex: 1;
+}
+
+.blockLabel {
+  font-weight: 500;
+  font-size: 14px;
+  color: #1f2937;
+  margin-bottom: 2px;
+}
+
+.blockDescription {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.4;
+}
