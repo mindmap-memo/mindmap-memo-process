@@ -761,6 +761,7 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
           key={`area-${category.id}`}
           data-category-area="true"
           data-category-id={category.id}
+          draggable={false}
           style={{
             position: 'absolute',
             left: `${basePosition.left}px`,
@@ -784,13 +785,18 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
             willChange: isAnyDragging ? 'transform' : 'auto',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            MozUserSelect: 'none',
+            msUserSelect: 'none'
           }}
           onDrop={(e) => handleDropOnCategoryArea(e, category.id)}
           onDragOver={handleCategoryAreaDragOver}
           onMouseDown={(e) => {
             if (e.button === 0 && !isConnecting) {
               // 영역 드래그 시작 - 카테고리 전체를 이동
+              e.preventDefault();
               e.stopPropagation();
               setIsDraggingCategoryArea(category.id);
 
