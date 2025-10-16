@@ -114,6 +114,7 @@ export const useShiftDragHandlers = ({
       }
 
       // 2. 카테고리 영역과의 겹침 체크
+      // 펼쳐진 카테고리만 영역 체크 (성능 최적화)
       if (category.isExpanded) {
         let categoryArea;
 
@@ -308,6 +309,7 @@ export const useShiftDragHandlers = ({
       }
 
       // 2. 카테고리 영역과의 겹침 체크
+      // 펼쳐진 카테고리만 영역 체크 (성능 최적화)
       if (category.isExpanded) {
         let categoryArea;
 

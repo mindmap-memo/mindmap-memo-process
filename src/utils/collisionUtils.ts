@@ -46,6 +46,23 @@ export function resolveUnifiedCollisions(
 
   const movingParentId = movingMemo?.parentId ?? movingCategory?.parentId ?? null;
 
+  // 영역 계산 캐시 (전체 충돌 검사 동안 재사용)
+  const areaCache = new Map<string, CategoryArea>();
+
+  // 카테고리 영역을 캐시와 함께 계산하는 함수
+  const getCachedCategoryArea = (category: CategoryBlock): CategoryArea | null => {
+    const cached = areaCache.get(category.id);
+    if (cached) {
+      return cached;
+    }
+
+    const area = calculateCategoryArea(category, { ...page, memos: updatedMemos, categories: updatedCategories });
+    if (area) {
+      areaCache.set(category.id, area);
+    }
+    return area;
+  };
+
   // 같은 depth의 모든 충돌 가능 객체 수집
   const getCollidableObjects = (): CollidableObject[] => {
     const objects: CollidableObject[] = [];
@@ -82,10 +99,12 @@ export function resolveUnifiedCollisions(
 
       // 같은 부모를 가진 카테고리만 (형제 카테고리)
       if (categoryParent === movingParent) {
-        // expanded된 카테고리는 영역으로 추가 (자식 유무 관계없이)
+        // expanded된 카테고리만 영역으로 추가 (성능 최적화)
+        // 펼쳐진 카테고리는 하위 요소가 없어도 영역을 가짐
         if (!category.isExpanded) return;
 
-        const area = calculateCategoryArea(category, { ...page, memos: updatedMemos, categories: updatedCategories });
+        // 캐시된 영역 가져오기
+        const area = getCachedCategoryArea(category);
         if (area) {
           objects.push({
             id: category.id,

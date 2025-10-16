@@ -45,7 +45,6 @@ export const usePositionHandlers = ({
 
   // 카테고리 위치 업데이트
   const updateCategoryPosition = useCallback((categoryId: string, position: { x: number; y: number }) => {
-    console.log('[App] updateCategoryPosition 호출 - categoryId:', categoryId, 'position:', position, 'timestamp:', Date.now());
 
     // 먼저 현재 카테고리 위치를 찾아서 델타 값 계산 (state 업데이트 전의 원본 위치 기준)
     const currentPage = pages.find(p => p.id === currentPageId);
@@ -76,7 +75,6 @@ export const usePositionHandlers = ({
 
       // 첫 번째 위치 변경 시 드래그 시작으로 간주하고 영역 캐시 및 메모 원본 위치 저장
       if (!cacheCreationStarted.current.has(categoryId) && currentPage) {
-        console.log('[App] 캐시 생성 시작 - categoryId:', categoryId, '원본 위치:', targetCategory.position);
         cacheCreationStarted.current.add(categoryId);
 
         const currentArea = calculateCategoryArea(targetCategory, currentPage);
@@ -268,7 +266,6 @@ export const usePositionHandlers = ({
       // 모든 하위 depth의 카테고리들도 함께 이동 (절대 위치 계산)
       const updatedCategories = (page.categories || []).map(category => {
         if (category.id === categoryId) {
-          console.log('[App setPages] 카테고리 위치 업데이트 - categoryId:', categoryId, 'position:', position);
           return { ...category, position };
         }
 
@@ -515,12 +512,6 @@ export const usePositionHandlers = ({
       const childrenOfSelectedCategories = isMultiSelected
         ? getAllChildrenOfCategories(selectedCategoryIds)
         : { memos: new Set<string>(), categories: new Set<string>() };
-
-      console.log('🔍 선택된 카테고리의 하위 요소:', {
-        selectedCategoryIds,
-        childMemos: Array.from(childrenOfSelectedCategories.memos),
-        childCategories: Array.from(childrenOfSelectedCategories.categories)
-      });
 
       // 메모 위치 업데이트 (다중 선택 시 선택된 모든 메모 + 선택된 카테고리의 하위 메모들 함께 이동)
       const updatedPage = {

@@ -849,6 +849,22 @@ const Canvas: React.FC<CanvasProps> = ({
       // 드래그 선택 중 하이라이트
       const isDragHovered = dragHoveredCategoryIds.includes(category.id);
 
+      // 드래그 중인 카테고리는 transform을 사용하여 GPU 가속 활용
+      const isDragging = draggedCategoryAreas[category.id] !== undefined;
+      const basePosition = isDragging && draggedCategoryAreas[category.id]
+        ? {
+            left: draggedCategoryAreas[category.id].area.x,
+            top: draggedCategoryAreas[category.id].area.y
+          }
+        : { left: area.x, top: area.y };
+
+      const deltaTransform = isDragging && draggedCategoryAreas[category.id]
+        ? {
+            x: area.x - draggedCategoryAreas[category.id].area.x,
+            y: area.y - draggedCategoryAreas[category.id].area.y
+          }
+        : { x: 0, y: 0 };
+
       areas.push(
         <div
           key={`area-${category.id}`}
@@ -856,8 +872,8 @@ const Canvas: React.FC<CanvasProps> = ({
           data-category-id={category.id}
           style={{
             position: 'absolute',
-            left: `${area.x}px`,
-            top: `${area.y}px`,
+            left: `${basePosition.left}px`,
+            top: `${basePosition.top}px`,
             width: `${area.width}px`,
             height: `${area.height}px`,
             backgroundColor: isParentBeingLeftBehind
@@ -870,8 +886,11 @@ const Canvas: React.FC<CanvasProps> = ({
             pointerEvents: 'auto',
             cursor: 'move',
             zIndex: -1,
-            transform: (isShiftDragTarget || isParentBeingLeftBehind || isDragHovered) ? 'scale(1.02)' : 'scale(1)',
-            transition: 'all 0.2s ease',
+            transform: isDragging
+              ? `translate(${deltaTransform.x}px, ${deltaTransform.y}px) ${(isShiftDragTarget || isParentBeingLeftBehind || isDragHovered) ? 'scale(1.02)' : 'scale(1)'}`
+              : (isShiftDragTarget || isParentBeingLeftBehind || isDragHovered) ? 'scale(1.02)' : 'scale(1)',
+            transition: isDragging ? 'none' : 'all 0.2s ease',
+            willChange: isDragging ? 'transform' : 'auto',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
