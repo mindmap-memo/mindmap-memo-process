@@ -781,8 +781,8 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
             transform: isDragging
               ? `translate(${deltaTransform.x}px, ${deltaTransform.y}px) ${(isShiftDragTarget || isParentBeingLeftBehind || isDragHovered) ? 'scale(1.02)' : 'scale(1)'}`
               : (isShiftDragTarget || isParentBeingLeftBehind || isDragHovered) ? 'scale(1.02)' : 'scale(1)',
-            transition: isAnyDragging ? 'none' : 'all 0.2s ease',
-            willChange: isAnyDragging ? 'transform' : 'auto',
+            transition: isAnyDragging ? 'none' : 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, border 0.2s ease',
+            willChange: 'transform',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

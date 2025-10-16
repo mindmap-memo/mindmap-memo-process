@@ -161,23 +161,42 @@ export const useShiftDragHandlers = ({
           const originalMemoPositions = dragStartMemoPositions.current.get(draggedCategory.id);
           const originalCategoryPositions = dragStartCategoryPositions.current.get(draggedCategory.id);
 
+          // 총 이동량 계산 (드래그 시작 위치 → 드롭 위치)
+          const totalDeltaX = position.x - draggedCategory.position.x;
+          const totalDeltaY = position.y - draggedCategory.position.y;
+
           // 부모 카테고리의 children 업데이트
           let updatedCategories = (p.categories || []).map(category => {
-            // 드래그된 카테고리들의 parentId만 변경하고 위치는 원래대로
+            // 드래그된 카테고리들의 parentId만 변경하고 위치는 드롭 위치로
             if (categoriesToMove.includes(category.id)) {
-              const originalPos = draggedCategoryAreas[category.id]?.originalPosition;
-              return {
-                ...category,
-                parentId: newParentId,
-                position: originalPos || category.position  // 원래 위치로 복원
-              };
+              // 드래그된 메인 카테고리는 드롭 위치(position) 사용
+              if (category.id === draggedCategory.id) {
+                return {
+                  ...category,
+                  parentId: newParentId,
+                  position: position  // 드롭 위치 사용
+                };
+              } else {
+                // 다중 선택된 다른 카테고리들은 현재 위치 유지 (parentId만 변경)
+                return {
+                  ...category,
+                  parentId: newParentId
+                  // position은 변경하지 않음 - 드래그 중 이동한 위치 그대로 유지
+                };
+              }
             }
 
-            // 하위 카테고리들도 원래 위치로 복원
+            // 하위 카테고리들은 드래그 중 이동한 위치로 업데이트
             if (originalCategoryPositions) {
               const originalPos = originalCategoryPositions.get(category.id);
               if (originalPos) {
-                category = { ...category, position: originalPos };
+                return {
+                  ...category,
+                  position: {
+                    x: originalPos.x + totalDeltaX,
+                    y: originalPos.y + totalDeltaY
+                  }
+                };
               }
             }
 
@@ -206,17 +225,22 @@ export const useShiftDragHandlers = ({
             return category;
           });
 
-          // 하위 메모들도 원래 위치로 복원
-          let updatedMemos = p.memos;
-          if (originalMemoPositions) {
-            updatedMemos = p.memos.map(memo => {
+          // 하위 메모들은 드래그 중 이동한 위치로 업데이트
+          let updatedMemos = p.memos.map(memo => {
+            if (originalMemoPositions) {
               const originalPos = originalMemoPositions.get(memo.id);
               if (originalPos) {
-                return { ...memo, position: originalPos };
+                return {
+                  ...memo,
+                  position: {
+                    x: originalPos.x + totalDeltaX,
+                    y: originalPos.y + totalDeltaY
+                  }
+                };
               }
-              return memo;
-            });
-          }
+            }
+            return memo;
+          });
 
           return {
             ...p,
@@ -237,6 +261,16 @@ export const useShiftDragHandlers = ({
 
       // 드롭 후 캐시 클리어 (중요!)
       clearCategoryCache(draggedCategory.id);
+
+      // 부모 카테고리의 캐시도 클리어 (새 자식이 추가되었으므로 영역 재계산 필요)
+      if (targetCategory) {
+        clearCategoryCache(targetCategory.id);
+      }
+
+      // 이전 부모 카테고리의 캐시도 클리어 (자식이 제거되었으므로 영역 재계산 필요)
+      if (draggedCategory.parentId) {
+        clearCategoryCache(draggedCategory.parentId);
+      }
     } else {
       // 같은 카테고리 내에서 위치만 변경
       setPages(pages.map(p => {
@@ -402,6 +436,16 @@ export const useShiftDragHandlers = ({
 
       // 드롭 후 캐시 클리어 (중요!)
       clearCategoryCache(draggedMemo.id);
+
+      // 부모 카테고리의 캐시도 클리어 (새 자식이 추가되었으므로 영역 재계산 필요)
+      if (targetCategory) {
+        clearCategoryCache(targetCategory.id);
+      }
+
+      // 이전 부모 카테고리의 캐시도 클리어 (자식이 제거되었으므로 영역 재계산 필요)
+      if (draggedMemo.parentId) {
+        clearCategoryCache(draggedMemo.parentId);
+      }
     } else {
       // 같은 카테고리 내에서 위치만 변경
       setPages(pages.map(p => {
