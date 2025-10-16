@@ -25,13 +25,15 @@ interface CollidableObject {
  * @param page - 현재 페이지
  * @param maxIterations - 최대 반복 횟수
  * @param movingIds - 다중 선택된 모든 메모/카테고리 ID 배열 (선택사항)
+ * @param frameDelta - 이동 중인 객체의 프레임 간 이동 거리 (충돌 당한 객체가 같은 속도로 밀려나도록)
  */
 export function resolveUnifiedCollisions(
   movingId: string,
   movingType: 'memo' | 'area',
   page: Page,
   maxIterations: number = 10,
-  movingIds?: string[]
+  movingIds?: string[],
+  frameDelta?: { x: number; y: number }
 ): CollisionResult {
   let updatedMemos = [...page.memos];
   let updatedCategories = [...(page.categories || [])];
@@ -46,19 +48,31 @@ export function resolveUnifiedCollisions(
 
   const movingParentId = movingMemo?.parentId ?? movingCategory?.parentId ?? null;
 
-  // 영역 계산 캐시 (전체 충돌 검사 동안 재사용)
-  const areaCache = new Map<string, CategoryArea>();
+  // 영역의 크기와 offset을 캐시 (드래그 중 크기는 고정, 위치만 업데이트)
+  const areaOffsetCache = new Map<string, { width: number; height: number; offsetX: number; offsetY: number }>();
 
-  // 카테고리 영역을 캐시와 함께 계산하는 함수
-  const getCachedCategoryArea = (category: CategoryBlock): CategoryArea | null => {
-    const cached = areaCache.get(category.id);
+  // 카테고리 영역을 계산하거나 캐시에서 가져오는 함수
+  const getCategoryAreaBounds = (category: CategoryBlock): CategoryArea | null => {
+    // 이미 캐시된 경우, 현재 카테고리 위치 + 캐시된 offset/크기 사용
+    const cached = areaOffsetCache.get(category.id);
     if (cached) {
-      return cached;
+      return {
+        x: category.position.x + cached.offsetX,
+        y: category.position.y + cached.offsetY,
+        width: cached.width,
+        height: cached.height
+      };
     }
 
+    // 처음 계산: 실제 영역 계산 후 offset과 크기 캐시
     const area = calculateCategoryArea(category, { ...page, memos: updatedMemos, categories: updatedCategories });
     if (area) {
-      areaCache.set(category.id, area);
+      areaOffsetCache.set(category.id, {
+        width: area.width,
+        height: area.height,
+        offsetX: area.x - category.position.x,
+        offsetY: area.y - category.position.y
+      });
     }
     return area;
   };
@@ -92,7 +106,8 @@ export function resolveUnifiedCollisions(
     });
 
     // 영역들 추가 (같은 parentId를 가진 카테고리의 영역)
-    updatedCategories.forEach(category => {
+    // 최신 updatedCategories를 사용하여 현재 위치 반영
+    for (const category of updatedCategories) {
       // null과 undefined를 동일하게 처리 (루트 레벨)
       const categoryParent = category.parentId ?? null;
       const movingParent = movingParentId ?? null;
@@ -101,10 +116,10 @@ export function resolveUnifiedCollisions(
       if (categoryParent === movingParent) {
         // expanded된 카테고리만 영역으로 추가 (성능 최적화)
         // 펼쳐진 카테고리는 하위 요소가 없어도 영역을 가짐
-        if (!category.isExpanded) return;
+        if (!category.isExpanded) continue;
 
-        // 캐시된 영역 가져오기
-        const area = getCachedCategoryArea(category);
+        // 영역 계산 (캐시 사용, 현재 카테고리 위치 기준)
+        const area = getCategoryAreaBounds(category);
         if (area) {
           objects.push({
             id: category.id,
@@ -115,7 +130,7 @@ export function resolveUnifiedCollisions(
           });
         }
       }
-    });
+    }
 
     return objects;
   };
@@ -130,10 +145,15 @@ export function resolveUnifiedCollisions(
     priorityMap.set(movingId, 0);
   }
 
+  // frameDelta 사용 시에도 연쇄 충돌 전파를 위해 iteration 반복
+  // 단, 각 iteration에서는 frameDelta만큼만 밀기 (부드러움 유지)
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     let hasCollision = false;
+
+    console.log(`\n[충돌 검사] === Iteration ${iteration + 1}/${maxIterations} 시작 ===`);
+
+    // 현재 iteration의 최신 위치로 collidables 다시 계산
     const collidables = getCollidableObjects();
-    const originalCollidables = [...collidables];
 
     for (const current of collidables) {
       // 이동 중인 객체들은 밀리지 않음 (다중 선택 포함)
@@ -144,8 +164,8 @@ export function resolveUnifiedCollisions(
       let totalPushY = 0;
       let highestPusherPriority = Infinity;
 
-      // 모든 다른 객체와 충돌 검사
-      for (const other of originalCollidables) {
+      // 모든 다른 객체와 충돌 검사 (최신 위치 사용)
+      for (const other of collidables) {
         if (current.id === other.id) continue;
 
         const otherPriority = priorityMap.get(other.id) ?? Infinity;
@@ -160,8 +180,26 @@ export function resolveUnifiedCollisions(
           hasCollision = true;
 
           if (otherPriority < highestPusherPriority) {
-            totalPushX = pushDirection.x;
-            totalPushY = pushDirection.y;
+            if (frameDelta) {
+              // 프레임 기반 밀어내기: frameDelta만큼만 밀고 종료 (부드러운 이동)
+              const pushDirX = pushDirection.x !== 0 ? Math.sign(pushDirection.x) : 0;
+              const pushDirY = pushDirection.y !== 0 ? Math.sign(pushDirection.y) : 0;
+
+              // frameDelta의 절대값을 사용하되, 겹친 거리를 초과하지 않도록 제한
+              const frameDeltaX = Math.abs(frameDelta.x);
+              const frameDeltaY = Math.abs(frameDelta.y);
+              const overlapX = Math.abs(pushDirection.x);
+              const overlapY = Math.abs(pushDirection.y);
+
+              totalPushX = pushDirX * Math.min(frameDeltaX, overlapX);
+              totalPushY = pushDirY * Math.min(frameDeltaY, overlapY);
+
+              console.log(`[충돌 감지] ${other.type} ${other.id.substring(0,8)} → ${current.type} ${current.id.substring(0,8)}: pushDir=(${pushDirection.x.toFixed(2)}, ${pushDirection.y.toFixed(2)}), frameDelta=(${frameDelta.x.toFixed(2)}, ${frameDelta.y.toFixed(2)}), 결과=(${totalPushX.toFixed(2)}, ${totalPushY.toFixed(2)})`);
+            } else {
+              // 겹침 기반 밀어내기: 충돌이 완전히 해소될 때까지 (기존 동작)
+              totalPushX = pushDirection.x;
+              totalPushY = pushDirection.y;
+            }
             highestPusherPriority = otherPriority;
 
             if (!priorityMap.has(current.id)) {
@@ -173,13 +211,21 @@ export function resolveUnifiedCollisions(
 
       // 밀어내기 적용
       if (totalPushX !== 0 || totalPushY !== 0) {
+        console.log(`[충돌] ${current.type} ${current.id.substring(0,8)} 밀림: pushX=${totalPushX.toFixed(2)}, pushY=${totalPushY.toFixed(2)}, frameDelta=${frameDelta ? `(${frameDelta.x.toFixed(2)}, ${frameDelta.y.toFixed(2)})` : 'null'}`);
+
         if (current.type === 'memo' && current.originalMemo) {
+          const oldPos = updatedMemos.find(m => m.id === current.id)?.position;
+          console.log(`  - 메모 이전 위치: (${oldPos?.x.toFixed(2)}, ${oldPos?.y.toFixed(2)}) → 새 위치: (${(oldPos!.x + totalPushX).toFixed(2)}, ${(oldPos!.y + totalPushY).toFixed(2)})`);
+
           updatedMemos = updatedMemos.map(memo =>
             memo.id === current.id
               ? { ...memo, position: { x: memo.position.x + totalPushX, y: memo.position.y + totalPushY } }
               : memo
           );
         } else if (current.type === 'area' && current.originalCategory) {
+          const oldPos = updatedCategories.find(c => c.id === current.id)?.position;
+          console.log(`  - 영역 이전 위치: (${oldPos?.x.toFixed(2)}, ${oldPos?.y.toFixed(2)}) → 새 위치: (${(oldPos!.x + totalPushX).toFixed(2)}, ${(oldPos!.y + totalPushY).toFixed(2)})`);
+
           // 카테고리 이동
           updatedCategories = updatedCategories.map(cat =>
             cat.id === current.id
@@ -222,7 +268,12 @@ export function resolveUnifiedCollisions(
       }
     }
 
-    if (!hasCollision) break;
+    console.log(`[충돌 검사] Iteration ${iteration + 1} 완료: 충돌 ${hasCollision ? '있음' : '없음'}`);
+
+    if (!hasCollision) {
+      console.log(`[충돌 검사] === 충돌 없음, 종료 ===\n`);
+      break;
+    }
   }
 
   return { updatedCategories, updatedMemos };

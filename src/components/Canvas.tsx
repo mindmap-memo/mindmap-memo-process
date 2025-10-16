@@ -936,7 +936,11 @@ const Canvas: React.FC<CanvasProps> = ({
                 }
               }
 
+              let isDraggingArea = true; // 드래그 상태 추적
+
               const handleMouseMove = (moveEvent: MouseEvent) => {
+                if (!isDraggingArea) return; // 드래그 종료 후 이벤트 무시
+
                 hasMoved = true;
                 const currentShiftState = moveEvent.shiftKey;
 
@@ -998,14 +1002,17 @@ const Canvas: React.FC<CanvasProps> = ({
                 }
               };
 
-              const handleMouseUp = () => {
+              const handleMouseUp = (upEvent?: MouseEvent) => {
+                if (!isDraggingArea) return; // 이미 종료된 경우 중복 실행 방지
+                isDraggingArea = false; // 즉시 드래그 종료 플래그 설정
+
                 setIsDraggingCategoryArea(null);
                 setShiftDragInfo(null);
 
                 if (hasMoved) {
                   const finalPosition = {
-                    x: originalCategoryPosition.x + ((window.event as MouseEvent).clientX - startX) / canvasScale,
-                    y: originalCategoryPosition.y + ((window.event as MouseEvent).clientY - startY) / canvasScale
+                    x: originalCategoryPosition.x + ((upEvent?.clientX || (window.event as MouseEvent).clientX) - startX) / canvasScale,
+                    y: originalCategoryPosition.y + ((upEvent?.clientY || (window.event as MouseEvent).clientY) - startY) / canvasScale
                   };
 
                   onCategoryPositionDragEnd?.(category.id, finalPosition);
@@ -1017,10 +1024,19 @@ const Canvas: React.FC<CanvasProps> = ({
 
                 document.removeEventListener('mousemove', handleMouseMove);
                 document.removeEventListener('mouseup', handleMouseUp);
+                document.removeEventListener('mouseleave', handleMouseLeave);
+              };
+
+              // mouseup 이벤트가 누락되는 경우를 대비한 안전장치
+              const handleMouseLeave = () => {
+                if (isDraggingArea) {
+                  handleMouseUp();
+                }
               };
 
               document.addEventListener('mousemove', handleMouseMove);
               document.addEventListener('mouseup', handleMouseUp);
+              document.addEventListener('mouseleave', handleMouseLeave);
             }
           }}
           onMouseUp={(e) => {
@@ -1294,8 +1310,11 @@ const Canvas: React.FC<CanvasProps> = ({
               let startY = e.clientY;
               const originalLabelPosition = { x: category.position.x, y: category.position.y };
               let hasMoved = false;
+              let isDragging = true;
 
               const handleMouseMove = (moveEvent: MouseEvent) => {
+                if (!isDragging) return; // 드래그 종료 후 이벤트 무시
+
                 hasMoved = true;
 
                 const deltaX = (moveEvent.clientX - startX) / canvasScale;
@@ -1311,12 +1330,24 @@ const Canvas: React.FC<CanvasProps> = ({
               };
 
               const handleMouseUp = () => {
+                isDragging = false; // 즉시 드래그 종료 플래그 설정
                 document.removeEventListener('mousemove', handleMouseMove);
                 document.removeEventListener('mouseup', handleMouseUp);
               };
 
+              // mouseup 이벤트가 누락되는 경우를 대비한 안전장치
+              const handleMouseLeave = () => {
+                if (isDragging) {
+                  isDragging = false;
+                  document.removeEventListener('mousemove', handleMouseMove);
+                  document.removeEventListener('mouseup', handleMouseUp);
+                  document.removeEventListener('mouseleave', handleMouseLeave);
+                }
+              };
+
               document.addEventListener('mousemove', handleMouseMove);
               document.addEventListener('mouseup', handleMouseUp);
+              document.addEventListener('mouseleave', handleMouseLeave);
               e.preventDefault();
             }
           }}
