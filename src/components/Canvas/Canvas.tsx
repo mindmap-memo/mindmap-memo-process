@@ -1,0 +1,692 @@
+import React from 'react';
+import { Page, MemoDisplaySize, ImportanceLevel, CategoryBlock } from '../../types';
+import { isInsideCollapsedCategory } from '../../utils/categoryHierarchyUtils';
+import MemoBlock from '../MemoBlock';
+import ImportanceFilter from '../ImportanceFilter';
+import ContextMenu from '../ContextMenu';
+import QuickNavModal from '../QuickNavModal';
+import { useCanvasState } from './useCanvasState';
+import { useCanvasEffects } from './useCanvasEffects';
+import { useCanvasHandlers } from './useCanvasHandlers';
+import { useCanvasRendering } from './useCanvasRendering';
+import styles from '../../scss/components/Canvas.module.scss';
+
+interface CanvasProps {
+  currentPage: Page | undefined;
+  selectedMemoId: string | null;
+  selectedMemoIds: string[];
+  selectedCategoryId: string | null;
+  selectedCategoryIds: string[];
+  onMemoSelect: (memoId: string, isShiftClick?: boolean) => void;
+  onCategorySelect: (categoryId: string, isShiftClick?: boolean) => void;
+  onAddMemo: (position?: { x: number; y: number }) => void;
+  onAddCategory: (position?: { x: number; y: number }) => void;
+  onDeleteMemo: () => void;
+  onDeleteCategory: (categoryId: string) => void;
+  onDeleteSelected: () => void;
+  onDisconnectMemo: () => void;
+  onMemoPositionChange: (memoId: string, position: { x: number; y: number }) => void;
+  onCategoryPositionChange: (categoryId: string, position: { x: number; y: number }) => void;
+  onCategoryLabelPositionChange: (categoryId: string, position: { x: number; y: number }) => void;
+  onMemoSizeChange: (memoId: string, size: { width: number; height: number }) => void;
+  onCategorySizeChange: (categoryId: string, size: { width: number; height: number }) => void;
+  onCategoryUpdate: (category: CategoryBlock) => void;
+  onCategoryToggleExpanded: (categoryId: string) => void;
+  onMoveToCategory: (itemId: string, categoryId: string | null) => void;
+  onDetectCategoryOnDrop: (memoId: string, position: { x: number; y: number }) => void;
+  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }) => void;
+  onMemoDisplaySizeChange?: (memoId: string, size: MemoDisplaySize) => void;
+  onMemoTitleUpdate?: (memoId: string, title: string) => void;
+  onMemoBlockUpdate?: (memoId: string, blockId: string, content: string) => void;
+  isConnecting: boolean;
+  isDisconnectMode: boolean;
+  connectingFromId: string | null;
+  connectingFromDirection: 'top' | 'bottom' | 'left' | 'right' | null;
+  dragLineEnd: { x: number; y: number } | null;
+  onStartConnection: (memoId: string, direction?: 'top' | 'bottom' | 'left' | 'right') => void;
+  onConnectMemos: (fromId: string, toId: string) => void;
+  onCancelConnection: () => void;
+  onRemoveConnection: (fromId: string, toId: string) => void;
+  onUpdateDragLine: (mousePos: { x: number; y: number }) => void;
+  isDragSelecting: boolean;
+  dragSelectStart: { x: number; y: number } | null;
+  dragSelectEnd: { x: number; y: number } | null;
+  dragHoveredMemoIds: string[];
+  dragHoveredCategoryIds: string[];
+  onDragSelectStart: (position: { x: number; y: number }, isShiftPressed: boolean) => void;
+  onDragSelectMove: (position: { x: number; y: number }) => void;
+  onDragSelectEnd: () => void;
+  activeImportanceFilters: Set<ImportanceLevel>;
+  onToggleImportanceFilter: (level: ImportanceLevel) => void;
+  showGeneralContent: boolean;
+  onToggleGeneralContent: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+  isDraggingMemo?: boolean;
+  draggingMemoId?: string | null;
+  onMemoDragStart?: (memoId: string) => void;
+  onMemoDragEnd?: () => void;
+  isDraggingCategory?: boolean;
+  draggingCategoryId?: string | null;
+  onCategoryDragStart?: () => void;
+  onCategoryDragEnd?: () => void;
+  onCategoryPositionDragEnd?: (categoryId: string, finalPosition: { x: number; y: number }) => void;
+  onClearCategoryCache?: (categoryId: string) => void;
+  isShiftPressed?: boolean;
+  shiftDragAreaCacheRef?: React.MutableRefObject<{[categoryId: string]: any}>;
+  onShiftDropCategory?: (category: CategoryBlock, position: { x: number; y: number }) => void;
+  canvasOffset?: { x: number; y: number };
+  setCanvasOffset?: (offset: { x: number; y: number }) => void;
+  canvasScale?: number;
+  setCanvasScale?: (scale: number) => void;
+  onDeleteMemoById?: (id: string) => void;
+  onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
+  isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
+}
+
+const Canvas: React.FC<CanvasProps> = ({
+  currentPage,
+  selectedMemoId,
+  selectedMemoIds,
+  selectedCategoryId,
+  selectedCategoryIds,
+  onMemoSelect,
+  onCategorySelect,
+  onAddMemo,
+  onAddCategory,
+  onDeleteMemo,
+  onDeleteCategory,
+  onDeleteSelected,
+  onDisconnectMemo,
+  onMemoPositionChange,
+  onCategoryPositionChange,
+  onCategoryLabelPositionChange,
+  onMemoSizeChange,
+  onCategorySizeChange,
+  onCategoryUpdate,
+  onCategoryToggleExpanded,
+  onMoveToCategory,
+  onDetectCategoryOnDrop,
+  onDetectCategoryDropForCategory,
+  onMemoDisplaySizeChange,
+  onMemoTitleUpdate,
+  onMemoBlockUpdate,
+  isConnecting,
+  isDisconnectMode,
+  connectingFromId,
+  connectingFromDirection,
+  dragLineEnd,
+  onStartConnection,
+  onConnectMemos,
+  onCancelConnection,
+  onRemoveConnection,
+  onUpdateDragLine,
+  isDragSelecting,
+  dragSelectStart,
+  dragSelectEnd,
+  dragHoveredMemoIds,
+  dragHoveredCategoryIds,
+  onDragSelectStart,
+  onDragSelectMove,
+  onDragSelectEnd,
+  activeImportanceFilters,
+  onToggleImportanceFilter,
+  showGeneralContent,
+  onToggleGeneralContent,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
+  isDraggingMemo = false,
+  draggingMemoId = null,
+  onMemoDragStart,
+  onMemoDragEnd,
+  isDraggingCategory = false,
+  draggingCategoryId = null,
+  onCategoryDragStart,
+  onCategoryDragEnd,
+  onCategoryPositionDragEnd,
+  onClearCategoryCache,
+  isShiftPressed = false,
+  shiftDragAreaCacheRef,
+  onShiftDropCategory,
+  canvasOffset: externalCanvasOffset,
+  setCanvasOffset: externalSetCanvasOffset,
+  canvasScale: externalCanvasScale,
+  setCanvasScale: externalSetCanvasScale,
+  onDeleteMemoById,
+  onAddQuickNav,
+  isQuickNavExists
+}) => {
+  // ===== Canvas 로컬 상태 (useCanvasState 훅 사용) =====
+  const canvasState = useCanvasState();
+  const {
+    isPanning,
+    setIsPanning,
+    panStart,
+    setPanStart,
+    localCanvasOffset,
+    setLocalCanvasOffset,
+    localCanvasScale,
+    setLocalCanvasScale,
+    currentTool,
+    setCurrentTool,
+    baseTool,
+    setBaseTool,
+    isSpacePressed,
+    setIsSpacePressed,
+    isAltPressed,
+    setIsAltPressed,
+    isMouseOverCanvas,
+    setIsMouseOverCanvas,
+    areaUpdateTrigger,
+    setAreaUpdateTrigger,
+    draggedCategoryAreas,
+    setDraggedCategoryAreas,
+    isDraggingCategoryArea,
+    setIsDraggingCategoryArea,
+    shiftDragInfo,
+    setShiftDragInfo,
+    dragTargetCategoryId,
+    setDragTargetCategoryId,
+    areaContextMenu,
+    setAreaContextMenu,
+    showAreaQuickNavModal,
+    setShowAreaQuickNavModal,
+    globalDragSelecting,
+    setGlobalDragSelecting,
+    globalDragStart,
+    setGlobalDragStart,
+    globalDragWithShift,
+    setGlobalDragWithShift,
+    dragThresholdMet,
+    setDragThresholdMet,
+    justFinishedDragSelection,
+    setJustFinishedDragSelection,
+    shiftDragAreaCache: localShiftDragAreaCache,
+    renderedCategoryAreas
+  } = canvasState;
+
+  // Use external state if provided, otherwise use local state
+  const canvasOffset = externalCanvasOffset !== undefined ? externalCanvasOffset : localCanvasOffset;
+  const setCanvasOffset = externalSetCanvasOffset || setLocalCanvasOffset;
+  const canvasScale = externalCanvasScale !== undefined ? externalCanvasScale : localCanvasScale;
+  const setCanvasScale = externalSetCanvasScale || setLocalCanvasScale;
+
+  // Shift 드래그 중 영역 캐시 (App.tsx에서 전달된 ref 사용하거나 로컬 ref 사용)
+  const shiftDragAreaCache = shiftDragAreaCacheRef || localShiftDragAreaCache;
+
+  // 최근 드래그 종료된 카테고리 ID (영역 계산 로그용)
+  const recentlyDraggedCategoryRef = React.useRef<string | null>(null);
+
+  // ===== useCanvasHandlers 훅 사용 =====
+  const handlers = useCanvasHandlers({
+    currentPage,
+    isConnecting,
+    onMemoPositionChange,
+    onCategoryPositionChange,
+    onCategoryPositionDragEnd,
+    onCategoryDragStart,
+    onCategoryDragEnd,
+    onMoveToCategory,
+    onDetectCategoryDropForCategory,
+    onUpdateDragLine,
+    currentTool,
+    isSpacePressed,
+    isPanning,
+    setIsPanning,
+    panStart,
+    setPanStart,
+    canvasOffset,
+    setCanvasOffset,
+    canvasScale,
+    setCanvasScale,
+    setGlobalDragSelecting,
+    setGlobalDragStart,
+    setGlobalDragWithShift,
+    setDragThresholdMet,
+    draggedCategoryAreas,
+    setDraggedCategoryAreas,
+    setDragTargetCategoryId,
+    calculateCategoryAreaWithColor: () => null, // placeholder, will be provided by rendering hook
+    recentlyDraggedCategoryRef
+  });
+
+  const {
+    handleMemoPositionChange,
+    handleCanvasMouseDown,
+    handleWheel,
+    handleMouseMove,
+    handleMouseUp,
+    handleCanvasDrop,
+    handleCanvasDragOver,
+    handleDropOnCategoryArea,
+    handleCategoryAreaDragOver
+  } = handlers;
+
+  // ===== useCanvasRendering 훅 사용 =====
+  const {
+    calculateCategoryAreaWithColor,
+    renderConnectionLines,
+    renderCategoryAreas
+  } = useCanvasRendering({
+    currentPage,
+    isConnecting,
+    isDisconnectMode,
+    connectingFromId,
+    connectingFromDirection,
+    dragLineEnd,
+    isDraggingMemo,
+    draggingMemoId,
+    isDraggingCategory,
+    draggingCategoryId,
+    isShiftPressed,
+    dragHoveredCategoryIds,
+    draggedCategoryAreas,
+    shiftDragAreaCache,
+    renderedCategoryAreas,
+    shiftDragInfo,
+    dragTargetCategoryId,
+    isDraggingCategoryArea,
+    areaUpdateTrigger,
+    canvasScale,
+    recentlyDraggedCategoryRef,
+    selectedMemoId,
+    selectedMemoIds,
+    selectedCategoryId,
+    selectedCategoryIds,
+    dragHoveredMemoIds,
+    activeImportanceFilters,
+    showGeneralContent,
+    onRemoveConnection,
+    onConnectMemos,
+    onCategorySelect,
+    onMemoSelect,
+    onStartConnection,
+    onCategoryPositionChange,
+    onCategoryLabelPositionChange,
+    onCategoryToggleExpanded,
+    onCategoryPositionDragEnd,
+    onShiftDropCategory,
+    onDetectCategoryDropForCategory,
+    onMemoPositionChange,
+    onMemoSizeChange,
+    onMemoDisplaySizeChange,
+    onMemoTitleUpdate,
+    onMemoBlockUpdate,
+    onDetectCategoryOnDrop,
+    onMemoDragStart,
+    onMemoDragEnd,
+    onDeleteMemoById,
+    onAddQuickNav,
+    isQuickNavExists,
+    setIsDraggingCategoryArea,
+    setShiftDragInfo,
+    setDraggedCategoryAreas,
+    setAreaContextMenu,
+    canvasOffset,
+    handleDropOnCategoryArea,
+    handleCategoryAreaDragOver
+  });
+
+  // ===== useCanvasEffects 훅 사용 =====
+  useCanvasEffects({
+    areaContextMenu,
+    setAreaContextMenu,
+    currentTool,
+    canvasScale,
+    canvasOffset,
+    setCanvasScale,
+    setCanvasOffset,
+    isDraggingMemo,
+    isDraggingCategory,
+    draggingMemoId,
+    draggingCategoryId,
+    isDraggingCategoryArea,
+    isShiftPressed,
+    shiftDragAreaCache,
+    currentPage,
+    setDraggedCategoryAreas,
+    onClearCategoryCache,
+    setAreaUpdateTrigger,
+    isPanning,
+    setIsPanning,
+    panStart,
+    globalDragSelecting,
+    setGlobalDragSelecting,
+    globalDragStart,
+    globalDragWithShift,
+    setGlobalDragWithShift,
+    isDragSelecting,
+    dragThresholdMet,
+    setDragThresholdMet,
+    setJustFinishedDragSelection,
+    onDragSelectStart,
+    onDragSelectMove,
+    onDragSelectEnd,
+    isSpacePressed,
+    setIsSpacePressed,
+    isAltPressed,
+    setIsAltPressed,
+    baseTool,
+    setCurrentTool,
+    isMouseOverCanvas,
+    isConnecting,
+    onCancelConnection,
+    onMemoSelect,
+    canUndo,
+    canRedo,
+    onUndo,
+    onRedo,
+    selectedMemoId,
+    selectedCategoryId,
+    selectedMemoIds,
+    selectedCategoryIds,
+    onDeleteSelected,
+    setDragTargetCategoryId
+  });
+
+  // 모든 메모들 렌더링 (접힌 카테고리 안의 메모는 렌더링 시 제외)
+  const allMemos = currentPage?.memos || [];
+
+  // 드래그 선택 박스 렌더링
+  const renderDragSelectionBox = () => {
+    if (!isDragSelecting || !dragSelectStart || !dragSelectEnd) return null;
+
+    const x = Math.min(dragSelectStart.x, dragSelectEnd.x);
+    const y = Math.min(dragSelectStart.y, dragSelectEnd.y);
+    const width = Math.abs(dragSelectEnd.x - dragSelectStart.x);
+    const height = Math.abs(dragSelectEnd.y - dragSelectStart.y);
+
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          left: `${x}px`,
+          top: `${y}px`,
+          width: `${width}px`,
+          height: `${height}px`,
+          border: '2px solid #3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          pointerEvents: 'none',
+          zIndex: 1000
+        }}
+      />
+    );
+  };
+
+  return (
+    <div
+      id="main-canvas"
+      data-canvas="true"
+      className={styles.canvas}
+      style={{
+        cursor: currentTool === 'pan' ? 'grab' : currentTool === 'zoom' ? 'zoom-in' : 'default',
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        overflow: 'hidden',
+        backgroundColor: '#f9fafb'
+      }}
+      onMouseDown={handleCanvasMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseEnter={() => setIsMouseOverCanvas(true)}
+      onMouseLeave={() => setIsMouseOverCanvas(false)}
+      onWheel={handleWheel}
+      onDrop={handleCanvasDrop}
+      onDragOver={handleCanvasDragOver}
+    >
+      {/* SVG for connection lines */}
+      <svg
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          pointerEvents: isDisconnectMode ? 'auto' : 'none',
+          overflow: 'visible',
+          zIndex: isDisconnectMode ? 100 : 0
+        }}
+      >
+        <defs>
+          <style>
+            {`
+              @keyframes dash {
+                to {
+                  stroke-dashoffset: -20;
+                }
+              }
+            `}
+          </style>
+        </defs>
+        <g transform={`translate(${canvasOffset.x}, ${canvasOffset.y}) scale(${canvasScale})`}>
+          {renderConnectionLines()}
+        </g>
+      </svg>
+
+      {/* Main content container with transform */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px) scale(${canvasScale})`,
+          transformOrigin: '0 0',
+          width: '15000px',
+          height: '15000px',
+          pointerEvents: 'none'
+        }}
+      >
+        <div style={{ position: 'relative', pointerEvents: 'auto' }}>
+          {/* Render category areas (includes areas, labels, and connection points) */}
+          {renderCategoryAreas()}
+
+          {/* Render all memos (including those in categories) */}
+          {allMemos.map(memo => {
+            // 접힌 카테고리 안에 있으면 렌더링하지 않음
+            if (currentPage && isInsideCollapsedCategory(memo.id, currentPage)) {
+              return null;
+            }
+
+            return (
+              <MemoBlock
+                key={memo.id}
+                memo={memo}
+                isSelected={selectedMemoId === memo.id || selectedMemoIds.includes(memo.id)}
+                isDragHovered={dragHoveredMemoIds.includes(memo.id)}
+                onClick={(isShiftClick?: boolean) => onMemoSelect(memo.id, isShiftClick)}
+                onPositionChange={handleMemoPositionChange}
+                onSizeChange={onMemoSizeChange}
+                onDisplaySizeChange={onMemoDisplaySizeChange}
+                onTitleUpdate={onMemoTitleUpdate}
+                onBlockUpdate={onMemoBlockUpdate}
+                onDetectCategoryOnDrop={onDetectCategoryOnDrop}
+                isConnecting={isConnecting}
+                connectingFromId={connectingFromId}
+                onStartConnection={onStartConnection}
+                onConnectMemos={onConnectMemos}
+                canvasScale={canvasScale}
+                canvasOffset={canvasOffset}
+                activeImportanceFilters={activeImportanceFilters}
+                showGeneralContent={showGeneralContent}
+                enableImportanceBackground={true}
+                onDragStart={onMemoDragStart}
+                onDragEnd={onMemoDragEnd}
+                currentPage={currentPage}
+                isDraggingAnyMemo={isDraggingMemo}
+                isShiftPressed={isShiftPressed}
+                onDelete={onDeleteMemoById}
+                onAddQuickNav={onAddQuickNav}
+                isQuickNavExists={isQuickNavExists}
+              />
+            );
+          })}
+
+          {/* Drag selection box */}
+          {renderDragSelectionBox()}
+        </div>
+      </div>
+
+      {/* Toolbar - fixed position */}
+      <div className={styles.toolbar}>
+        <button
+          onClick={() => setCurrentTool('select')}
+          className={`${styles['tool-button']} ${currentTool === 'select' ? styles.active : styles.inactive}`}
+          title="선택 도구"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>
+          </svg>
+        </button>
+        <button
+          onClick={() => {
+            setCurrentTool('pan');
+            setBaseTool('pan');
+          }}
+          className={`${styles['tool-button']} ${currentTool === 'pan' ? styles.active : styles.inactive}`}
+          title="화면 이동 도구 (Space)"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 2l3 3-3 3M2 12l3-3 3 3M12 22l-3-3 3-3M22 12l-3 3-3-3"/>
+          </svg>
+        </button>
+        <button
+          onClick={() => {
+            setCurrentTool('zoom');
+            setBaseTool('zoom');
+          }}
+          className={`${styles['tool-button']} ${currentTool === 'zoom' ? styles.active : styles.inactive}`}
+          title="확대/축소 도구 (Alt + Scroll)"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="M21 21l-4.35-4.35"/>
+          </svg>
+        </button>
+        <div className={styles.divider}></div>
+        <button
+          data-tutorial="add-memo-btn"
+          onClick={() => onAddMemo()}
+          className={`${styles['action-button']} ${styles.secondary}`}
+        >
+          + 메모 생성
+        </button>
+        <button
+          onClick={() => onAddCategory()}
+          className={`${styles['action-button']} ${styles.primary}`}
+        >
+          + 카테고리 생성
+        </button>
+        <button
+          onClick={onDisconnectMemo}
+          className={`${styles['action-button']} ${styles.disconnect} ${isDisconnectMode ? styles.active : styles.inactive}`}
+        >
+          {isDisconnectMode ? '연결 해제 모드' : '연결 해제'}
+        </button>
+        <button
+          onClick={onDeleteSelected}
+          disabled={!selectedMemoId && !selectedCategoryId && selectedMemoIds.length === 0 && selectedCategoryIds.length === 0}
+          className={`${styles['action-button']} ${styles.delete} ${(selectedMemoId || selectedCategoryId || selectedMemoIds.length > 0 || selectedCategoryIds.length > 0) ? styles.enabled : styles.disabled}`}
+        >
+          삭제 {(selectedMemoIds.length > 0 || selectedCategoryIds.length > 0) && `(${selectedMemoIds.length + selectedCategoryIds.length})`}
+        </button>
+      </div>
+
+      {/* Canvas Undo/Redo Controls */}
+      <div className={styles['undo-redo-controls']}>
+        <button
+          data-tutorial="undo-btn"
+          onClick={onUndo}
+          disabled={!canUndo}
+          title="실행 취소 (Ctrl+Z)"
+          className={`${styles['undo-redo-button']} ${canUndo ? styles.enabled : styles.disabled}`}
+        >
+          ↶ 실행취소
+        </button>
+        <button
+          onClick={onRedo}
+          disabled={!canRedo}
+          title="다시 실행 (Ctrl+Shift+Z)"
+          className={`${styles['undo-redo-button']} ${canRedo ? styles.enabled : styles.disabled}`}
+        >
+          ↷ 다시실행
+        </button>
+      </div>
+
+      {/* 확대율 표시 (좌측 하단) */}
+      <div style={{
+        position: 'absolute',
+        left: '20px',
+        bottom: '20px',
+        backgroundColor: 'white',
+        borderRadius: '8px',
+        padding: '8px 12px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        border: '1px solid #e1e5e9',
+        fontSize: '14px',
+        fontWeight: '500',
+        color: '#6b7280',
+        zIndex: 1000,
+        userSelect: 'none'
+      }}>
+        {Math.round(Math.min(canvasScale * 100, 200))}%
+      </div>
+
+      {/* 중요도 필터 UI */}
+      <ImportanceFilter
+        activeFilters={activeImportanceFilters}
+        onToggleFilter={onToggleImportanceFilter}
+        showGeneralContent={showGeneralContent}
+        onToggleGeneralContent={onToggleGeneralContent}
+      />
+
+      {/* 카테고리 영역/라벨 컨텍스트 메뉴 */}
+      {areaContextMenu && (
+        <ContextMenu
+          position={{ x: areaContextMenu.x, y: areaContextMenu.y }}
+          onClose={() => setAreaContextMenu(null)}
+          onSetQuickNav={() => {
+            const category = currentPage?.categories?.find(c => c.id === areaContextMenu.categoryId);
+            if (category) {
+              // 중복 체크
+              if (isQuickNavExists && isQuickNavExists(category.id, 'category')) {
+                alert('이미 단축 이동이 설정되어 있습니다.');
+                setAreaContextMenu(null);
+                return;
+              }
+              setShowAreaQuickNavModal({ categoryId: category.id, categoryName: category.title });
+            }
+            setAreaContextMenu(null);
+          }}
+          onDelete={() => {
+            if (window.confirm('카테고리를 삭제하시겠습니까?')) {
+              onDeleteCategory(areaContextMenu.categoryId);
+            }
+            setAreaContextMenu(null);
+          }}
+        />
+      )}
+
+      {/* 카테고리 영역/라벨 단축 이동 모달 */}
+      {showAreaQuickNavModal && (
+        <QuickNavModal
+          isOpen={true}
+          onClose={() => setShowAreaQuickNavModal(null)}
+          onConfirm={(name) => {
+            if (name.trim() && onAddQuickNav) {
+              onAddQuickNav(name.trim(), showAreaQuickNavModal.categoryId, 'category');
+            }
+            setShowAreaQuickNavModal(null);
+          }}
+          initialName={showAreaQuickNavModal.categoryName}
+        />
+      )}
+    </div>
+  );
+};
+
+export default Canvas;

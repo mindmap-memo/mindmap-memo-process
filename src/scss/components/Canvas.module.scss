@@ -131,7 +131,7 @@
   }
 }
 
-.toolbar-divider {
+.divider {
   width: 1px;
   height: 44px;
   background-color: #e5e7eb;
@@ -189,6 +189,20 @@
       color: #9ca3af;
       cursor: not-allowed;
     }
+  }
+
+  &.add {
+    background-color: #8b5cf6;
+    color: white;
+    border: none;
+    font-weight: 600;
+  }
+
+  &.add-category {
+    background-color: white;
+    color: #8b5cf6;
+    border: 2px solid #8b5cf6;
+    font-weight: 600;
   }
 }
 

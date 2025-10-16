@@ -28,7 +28,7 @@ import { CategoryArea } from './utils/categoryAreaUtils';
 import { AppProviders } from './contexts';
 import LeftPanel from './components/LeftPanel';
 import RightPanel from './components/RightPanel';
-import Canvas from './components/Canvas';
+import Canvas from './components/Canvas/Canvas';
 import { Tutorial } from './components/Tutorial';
 import { tutorialSteps } from './utils/tutorialSteps';
 import { QuickNavPanel } from './components/QuickNavPanel';
@@ -737,11 +737,13 @@ const App: React.FC = () => {
         shiftDragAreaCacheRef={shiftDragAreaCache}
         onShiftDropCategory={handleCategoryAreaShiftDrop}
         isDraggingCategory={appState.isDraggingCategory}
+        draggingCategoryId={appState.draggingCategoryId}
         onCategoryDragStart={() => {
           appState.setIsDraggingCategory(true);
         }}
         onCategoryDragEnd={() => {
           appState.setIsDraggingCategory(false);
+          appState.setDraggingCategoryId(null);
           // 드래그 완료 시 충돌 검사 - 일단 주석 처리 (영역 깜빡임 문제 해결)
           // setTimeout(() => {
           //   const currentPage = pages.find(p => p.id === currentPageId);

@@ -219,6 +219,37 @@ The application implements Shift+drag functionality for adding/removing memos an
      - `usePanelState.ts` - 패널 상태 관리
      - `useSelectionHandlers.ts` - 선택 관련 핸들러
 
+8. **컴포넌트의 비대화 방지 (CRITICAL)**
+   - **문제**: 컴포넌트 파일이 커지면 유지보수가 어려워지고 가독성이 떨어짐
+   - **원칙**: App.tsx와 동일하게 컴포넌트도 로직을 분리해야 함
+   - **컴포넌트 전용 훅 폴더 구조**:
+     - 컴포넌트의 로직을 커스텀 훅으로 분리할 때, 해당 컴포넌트 전용 폴더를 생성
+     - 폴더 안에 컴포넌트 파일과 해당 컴포넌트 전용 훅들을 함께 배치
+     - 예시 구조:
+       ```
+       src/components/
+       ├── Canvas/
+       │   ├── Canvas.tsx              # 컴포넌트 본체
+       │   ├── useCanvasState.ts       # Canvas 전용 상태 관리 훅
+       │   ├── useCanvasHandlers.ts    # Canvas 전용 이벤트 핸들러 훅
+       │   └── useCanvasRendering.ts   # Canvas 전용 렌더링 로직 훅
+       ├── RightPanel/
+       │   ├── RightPanel.tsx
+       │   └── useRightPanelState.ts
+       └── MemoBlock.tsx               # 단순한 컴포넌트는 파일만 존재
+       ```
+   - **적용 기준**:
+     - 컴포넌트 파일이 500줄 이상이면 로직 분리 고려
+     - 복잡한 상태 관리나 이벤트 핸들러가 많으면 훅으로 분리
+     - 여러 useEffect, useState가 있으면 관련 로직끼리 묶어서 훅으로 분리
+   - **전역 훅 vs 컴포넌트 전용 훅**:
+     - **전역 훅** (`src/hooks/`): 여러 컴포넌트에서 공통으로 사용하는 로직
+     - **컴포넌트 전용 훅** (`src/components/ComponentName/`): 특정 컴포넌트에서만 사용하는 로직
+   - **장점**:
+     - 컴포넌트 파일이 간결해져서 가독성 향상
+     - 로직과 UI가 분리되어 테스트 및 유지보수 용이
+     - 관련 파일들이 한 폴더에 모여 있어 찾기 쉬움
+
 ### Specific Implementation Guidelines
 
 - **File Management**: Always prefer editing existing files to creating new ones; never create files unless absolutely necessary
