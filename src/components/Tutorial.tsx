@@ -76,12 +76,16 @@ export const Tutorial: React.FC<TutorialProps> = ({
   const isLastStep = currentStep === steps.length - 1;
 
   // 캔버스 관련 단계인지 확인 (캔버스 dim 해제가 필요한 단계)
-  const canvasSteps = ['canvas-intro', 'canvas-pan', 'canvas-zoom', 'add-memo', 'memo-drag', 'connections', 'disconnect-mode', 'categories', 'category-area', 'undo-redo', 'select-memo'];
+  const canvasSteps = ['canvas-intro', 'canvas-pan', 'canvas-zoom', 'add-memo', 'memo-drag', 'connections', 'disconnect-mode', 'categories', 'category-area', 'undo-redo', 'select-memo', 'core-quick-nav-use'];
   const isCanvasStep = canvasSteps.includes(step.id);
 
   // 인터랙티브 단계인지 확인 (사용자가 직접 조작해야 하는 단계 - 툴팁 우상단 고정용)
-  const interactiveCanvasSteps = ['canvas-pan', 'canvas-zoom', 'add-memo', 'memo-drag', 'connections', 'disconnect-mode', 'categories', 'category-area', 'undo-redo'];
+  const interactiveCanvasSteps = ['canvas-pan', 'canvas-zoom', 'add-memo', 'memo-drag', 'connections', 'disconnect-mode', 'categories', 'category-area', 'undo-redo', 'select-memo'];
   const isInteractiveStep = interactiveCanvasSteps.includes(step.id);
+
+  // 핵심 기능 단계인지 확인 (dim 처리 없음, 툴팁 우측 중단 고정)
+  const coreFeaturesSteps = ['core-intro', 'core-quick-nav-intro', 'core-quick-nav-use', 'core-importance-filter-intro', 'core-importance-filter'];
+  const isCoreFeatureStep = coreFeaturesSteps.includes(step.id);
 
   // 캔버스를 타겟으로 하면서 캔버스 관련 단계인지 확인 (좌우 패널만 dim 처리)
   const isCanvasTarget = step.targetElement === '[data-tutorial="canvas"]' && isCanvasStep;
@@ -90,6 +94,18 @@ export const Tutorial: React.FC<TutorialProps> = ({
   const getTooltipStyle = (): React.CSSProperties => {
     const padding = 20;
     const tooltipWidth = 400;
+
+    // 핵심 기능 단계는 우측 중단에 고정
+    if (isCoreFeatureStep) {
+      return {
+        position: 'fixed',
+        top: '50%',
+        right: `${padding}px`,
+        transform: 'translateY(-50%)',
+        zIndex: 10002,
+        maxWidth: `${tooltipWidth}px`
+      };
+    }
 
     // 인터랙티브 단계는 우상단 모서리에 고정
     if (isInteractiveStep) {
@@ -186,6 +202,9 @@ export const Tutorial: React.FC<TutorialProps> = ({
     const rightPanelSteps = ['right-panel-intro', 'memo-title-tags', 'text-editing', 'file-attachment', 'connection-navigation'];
     if (rightPanelSteps.includes(step.id)) return null;
 
+    // 핵심 기능 단축 이동 단계에서는 커서 표시 안 함
+    if (step.id === 'core-quick-nav-use') return null;
+
     // 타겟 요소의 중앙으로 커서 이동
     return {
       x: highlightPosition.left + highlightPosition.width / 2,
@@ -205,6 +224,9 @@ export const Tutorial: React.FC<TutorialProps> = ({
     // 우측 패널 관련 단계에서는 화살표 표시 안 함
     const rightPanelSteps = ['right-panel-intro', 'memo-title-tags', 'text-editing', 'file-attachment', 'connection-navigation'];
     if (rightPanelSteps.includes(step.id)) return null;
+
+    // 핵심 기능 단축 이동 단계에서는 화살표 표시 안 함
+    if (step.id === 'core-quick-nav-use') return null;
 
     const tooltipStyle = getTooltipStyle();
 
@@ -254,7 +276,8 @@ export const Tutorial: React.FC<TutorialProps> = ({
   return (
     <>
       {/* 하이라이트 영역 (타겟 요소 주변만 dim 처리, 타겟은 클릭 가능) */}
-      {highlightPosition ? (
+      {/* 핵심 기능 단계는 dim 처리 없음 */}
+      {!isCoreFeatureStep && highlightPosition ? (
         <>
           {isCanvasTarget ? (
             // 캔버스를 타겟으로 할 때: 좌우 패널만 dim 처리
@@ -503,8 +526,8 @@ export const Tutorial: React.FC<TutorialProps> = ({
             </svg>
           )}
         </>
-      ) : (
-        /* 하이라이트가 없는 경우 전체 오버레이 */
+      ) : !isCoreFeatureStep ? (
+        /* 하이라이트가 없는 경우 전체 오버레이 (핵심 기능 제외) */
         <div
           style={{
             position: 'fixed',
@@ -517,7 +540,7 @@ export const Tutorial: React.FC<TutorialProps> = ({
             pointerEvents: 'auto'
           }}
         />
-      )}
+      ) : null}
 
       {/* 툴팁 카드 */}
       <div style={getTooltipStyle()}>
@@ -567,14 +590,7 @@ export const Tutorial: React.FC<TutorialProps> = ({
               </button>
             )}
 
-            {isLastStep ? (
-              <button
-                onClick={onComplete}
-                className={`${styles['action-button']} ${styles.primary}`}
-              >
-                시작하기
-              </button>
-            ) : step.id === 'core-features-intro' && onSwitchToCore ? (
+            {step.id === 'core-features-intro' && onSwitchToCore ? (
               // 기본 기능 완료 후 핵심 기능 전환 버튼 (두 개)
               <>
                 <button
@@ -590,6 +606,13 @@ export const Tutorial: React.FC<TutorialProps> = ({
                   {step.nextButtonText || '핵심 기능 배우기'}
                 </button>
               </>
+            ) : isLastStep ? (
+              <button
+                onClick={onComplete}
+                className={`${styles['action-button']} ${styles.primary}`}
+              >
+                시작하기
+              </button>
             ) : (
               <button
                 onClick={canProceed ? onNext : undefined}

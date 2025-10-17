@@ -302,15 +302,133 @@ const App: React.FC = () => {
   const {
     handleStartTutorial,
     handleTutorialNext,
-    handleTutorialSkip,
+    handleTutorialSkip: handleTutorialSkipBase,
     handleTutorialComplete,
     canProceedTutorial
   } = tutorialHandlers;
+
+  // 튜토리얼 건너뛰기 핸들러 (모드별 분기)
+  const handleTutorialSkip = () => {
+    if (tutorialMode === 'basic') {
+      // 기본 기능 모드에서는 19번 "기본 기능 완료" 단계로 이동
+      const coreFeaturesIntroIndex = basicTutorialSteps.findIndex(step => step.id === 'core-features-intro');
+      if (coreFeaturesIntroIndex !== -1) {
+        setTutorialState(prev => ({
+          ...prev,
+          currentStep: coreFeaturesIntroIndex,
+          currentSubStep: 0
+        }));
+      }
+    } else {
+      // 핵심 기능 모드에서는 바로 종료
+      handleTutorialSkipBase();
+    }
+  };
 
   // 기본 기능에서 핵심 기능으로 전환하는 핸들러
   const handleSwitchToCore = () => {
     setTutorialMode('core');
     setTutorialState(prev => ({ ...prev, currentStep: 0, currentSubStep: 0 }));
+
+    // 튜토리얼 페이지에 중요도 설명 메모 자동 생성
+    const tutorialPage = pages.find(p => p.name.startsWith('튜토리얼'));
+    if (tutorialPage) {
+      const timestamp = Date.now();
+      const memoId = `memo-importance-guide-${timestamp}`;
+
+      // 화면 가운데에 메모 배치 (캔버스 offset과 scale 고려)
+      const canvasWidth = window.innerWidth - leftPanelWidth - (rightPanelOpen ? rightPanelWidth : 0);
+      const canvasHeight = window.innerHeight;
+      const memoWidth = 320;
+      const memoHeight = 450;
+
+      // 화면 중앙 좌표를 캔버스 좌표로 변환
+      const centerX = (-canvasOffset.x + canvasWidth / 2) / canvasScale - memoWidth / 2;
+      const centerY = (-canvasOffset.y + canvasHeight / 2) / canvasScale - memoHeight / 2;
+
+      const newMemo: typeof tutorialPage.memos[0] = {
+        id: memoId,
+        title: '중요도 가이드',
+        content: '', // 기존 호환성을 위해 유지
+        tags: ['튜토리얼', '중요도'],
+        displaySize: 'medium' as const, // 기본 표시 크기를 medium으로 설정
+        blocks: [
+          {
+            id: `block-${timestamp}-1`,
+            type: 'text' as const,
+            content: '매우중요\n특히 중요한 내용에 적용하는 중요도입니다.',
+            importanceRanges: [
+              { start: 0, end: 4, level: 'critical' as const }
+            ]
+          },
+          {
+            id: `block-${timestamp}-2`,
+            type: 'text' as const,
+            content: '중요\n중요하지만 매우중요보다는 낮은 우선순위의 내용입니다.',
+            importanceRanges: [
+              { start: 0, end: 2, level: 'important' as const }
+            ]
+          },
+          {
+            id: `block-${timestamp}-3`,
+            type: 'text' as const,
+            content: '의견\n개인적인 생각이나 판단에 적용하는 중요도입니다.',
+            importanceRanges: [
+              { start: 0, end: 2, level: 'opinion' as const }
+            ]
+          },
+          {
+            id: `block-${timestamp}-4`,
+            type: 'text' as const,
+            content: '참고\n참고할 만한 부가 정보에 적용하는 중요도입니다.',
+            importanceRanges: [
+              { start: 0, end: 2, level: 'reference' as const }
+            ]
+          },
+          {
+            id: `block-${timestamp}-5`,
+            type: 'text' as const,
+            content: '질문\n나중에 찾아봐야 할 의문사항에 적용하는 중요도입니다.',
+            importanceRanges: [
+              { start: 0, end: 2, level: 'question' as const }
+            ]
+          },
+          {
+            id: `block-${timestamp}-6`,
+            type: 'text' as const,
+            content: '아이디어\n떠오른 아이디어나 영감에 적용하는 중요도입니다.',
+            importanceRanges: [
+              { start: 0, end: 4, level: 'idea' as const }
+            ]
+          },
+          {
+            id: `block-${timestamp}-7`,
+            type: 'text' as const,
+            content: '데이터\n객관적인 수치나 사실에 적용하는 중요도입니다.',
+            importanceRanges: [
+              { start: 0, end: 3, level: 'data' as const }
+            ]
+          },
+          {
+            id: `block-${timestamp}-8`,
+            type: 'file' as const,
+            name: 'importance-levels.txt',
+            size: 245,
+            url: 'data:text/plain;base64,7KSR7JqU64-EIOugiOuypDog66ek7Jqw7KSR7JqULCDso7zsmrgsIOydmOqyhSwg7LC46rOgLCDsp4jrrLgsIOyVhOydtOuTlOyWtCwg642w7J207YSwCuq4sOyXheuTsOydtOuEsCBpc29tb3JwaGlzbQo=',
+            importance: 'data' as const
+          }
+        ],
+        connections: [],
+        position: { x: centerX, y: centerY },
+        size: { width: memoWidth, height: memoHeight }
+      };
+
+      setPages(prev => prev.map(p =>
+        p.id === tutorialPage.id
+          ? { ...p, memos: [...p.memos, newMemo] }
+          : p
+      ));
+    }
   };
 
   // 튜토리얼 이전 단계 핸들러
