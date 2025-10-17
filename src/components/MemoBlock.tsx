@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MemoBlock as MemoBlockType, MemoDisplaySize, ImportanceLevel, ImportanceRange, Page } from '../types';
-import { checkMemoAreaCollision } from '../utils/collisionUtils';
+import { calculateCategoryArea } from '../utils/categoryAreaUtils';
 import ContextMenu from './ContextMenu';
 import QuickNavModal from './QuickNavModal';
 import styles from '../scss/components/MemoBlock.module.scss';
@@ -240,9 +240,6 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   const lastUpdateTime = React.useRef<number>(0);
   const pendingPosition = React.useRef<{ x: number; y: number } | null>(null);
   const memoRef = React.useRef<HTMLDivElement>(null);
-
-  // 이동 제한 상태 (영역과 충돌 시)
-  const [restrictedDirections, setRestrictedDirections] = useState<{ left: boolean; right: boolean; up: boolean; down: boolean } | null>(null);
 
   // 크기별 스타일 정의
   const getSizeConfig = (size: MemoDisplaySize) => {
@@ -559,37 +556,131 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         y: (e.clientY - dragStart.y - canvasOffset.y) / canvasScale
       };
 
-      // 영역과 충돌 시 이동 제한 적용 (Shift 드래그 시에는 충돌 검사 안 함)
-      if (currentPage && !memo.parentId && !isShiftPressed) {
-        // 이동 시도 전에 충돌 검사
-        const testPage = {
-          ...currentPage,
-          memos: currentPage.memos.map(m => m.id === memo.id ? { ...m, position: newPosition } : m)
-        };
+      // 루트 메모이고 Shift 드래그가 아닐 때, 영역과 충돌하면 방향별 이동 차단
+      if (!memo.parentId && !isShiftPressed && currentPage) {
+        console.log('[BLOCKING] 차단 조건 진입', {
+          memoId: memo.id,
+          parentId: memo.parentId,
+          isShiftPressed,
+          hasCurrentPage: !!currentPage
+        });
 
-        const collisionResult = checkMemoAreaCollision(memo.id, testPage);
+        const deltaX = newPosition.x - memo.position.x;
+        const deltaY = newPosition.y - memo.position.y;
 
-        if (collisionResult.blocked && collisionResult.restrictedDirections) {
-          // 제한된 방향으로 이동 차단
-          const deltaX = newPosition.x - memo.position.x;
-          const deltaY = newPosition.y - memo.position.y;
+        console.log('[BLOCKING] 이동 방향', {
+          deltaX,
+          deltaY,
+          from: memo.position,
+          to: newPosition
+        });
 
-          if (collisionResult.restrictedDirections.left && deltaX < 0) {
-            newPosition.x = memo.position.x; // 왼쪽 이동 차단
+        const categories = currentPage.categories || [];
+        const memoWidth = memo.size?.width || 200;
+        const memoHeight = memo.size?.height || 95;
+
+        console.log('[BLOCKING] 카테고리 검사 시작', {
+          totalCategories: categories.length,
+          memoSize: { width: memoWidth, height: memoHeight }
+        });
+
+        // 카테고리 parentId 상태 확인 (하나씩 로그)
+        categories.forEach(c => {
+          console.log(`[BLOCKING] 카테고리 ${c.id}: parentId=${c.parentId}, isExpanded=${c.isExpanded}`);
+        });
+
+        for (const category of categories) {
+          // 루트 레벨 카테고리만 확인 (parentId가 null 또는 undefined)
+          if (category.parentId != null) {
+            console.log('[BLOCKING] 카테고리 스킵 (하위 카테고리)', category.id);
+            continue;
           }
-          if (collisionResult.restrictedDirections.right && deltaX > 0) {
-            newPosition.x = memo.position.x; // 오른쪽 이동 차단
-          }
-          if (collisionResult.restrictedDirections.up && deltaY < 0) {
-            newPosition.y = memo.position.y; // 위 이동 차단
-          }
-          if (collisionResult.restrictedDirections.down && deltaY > 0) {
-            newPosition.y = memo.position.y; // 아래 이동 차단
+          if (!category.isExpanded) {
+            console.log('[BLOCKING] 카테고리 스킵 (접힘 상태)', category.id);
+            continue;
           }
 
-          setRestrictedDirections(collisionResult.restrictedDirections);
-        } else {
-          setRestrictedDirections(null);
+          const categoryArea = calculateCategoryArea(category, currentPage);
+          if (!categoryArea) {
+            console.log('[BLOCKING] 카테고리 영역 계산 실패', category.id);
+            continue;
+          }
+
+          console.log('[BLOCKING] 카테고리 영역 확인', {
+            categoryId: category.id,
+            area: categoryArea
+          });
+
+          // 새 위치에서 메모의 경계
+          const newMemoBounds = {
+            left: newPosition.x,
+            top: newPosition.y,
+            right: newPosition.x + memoWidth,
+            bottom: newPosition.y + memoHeight
+          };
+
+          const areaBounds = {
+            left: categoryArea.x,
+            top: categoryArea.y,
+            right: categoryArea.x + categoryArea.width,
+            bottom: categoryArea.y + categoryArea.height
+          };
+
+          console.log('[BLOCKING] 경계 계산', {
+            memoBounds: newMemoBounds,
+            areaBounds
+          });
+
+          // 겹침 계산
+          const overlapLeft = Math.max(newMemoBounds.left, areaBounds.left);
+          const overlapTop = Math.max(newMemoBounds.top, areaBounds.top);
+          const overlapRight = Math.min(newMemoBounds.right, areaBounds.right);
+          const overlapBottom = Math.min(newMemoBounds.bottom, areaBounds.bottom);
+
+          const hasOverlap = overlapLeft < overlapRight && overlapTop < overlapBottom;
+          console.log('[BLOCKING] 겹침 검사', {
+            overlapLeft,
+            overlapTop,
+            overlapRight,
+            overlapBottom,
+            hasOverlap
+          });
+
+          // 겹침이 발생하면 해당 방향으로 이동 차단
+          if (hasOverlap) {
+            console.log('[BLOCKING] ⚠️ 충돌 감지! 이동 차단');
+
+            // 어느 방향에서 충돌했는지 판단하고, 해당 방향으로의 이동만 차단 (현재 위치 유지)
+            if (deltaX < 0) {
+              // 왼쪽으로 이동 중 → x 좌표는 현재 메모 위치 유지
+              newPosition.x = memo.position.x;
+              console.log('[BLOCKING] 왼쪽 이동 차단 (현재 위치 유지)');
+            } else if (deltaX > 0) {
+              // 오른쪽으로 이동 중 → x 좌표는 현재 메모 위치 유지
+              newPosition.x = memo.position.x;
+              console.log('[BLOCKING] 오른쪽 이동 차단 (현재 위치 유지)');
+            }
+
+            if (deltaY < 0) {
+              // 위로 이동 중 → y 좌표는 현재 메모 위치 유지
+              newPosition.y = memo.position.y;
+              console.log('[BLOCKING] 위쪽 이동 차단 (현재 위치 유지)');
+            } else if (deltaY > 0) {
+              // 아래로 이동 중 → y 좌표는 현재 메모 위치 유지
+              newPosition.y = memo.position.y;
+              console.log('[BLOCKING] 아래쪽 이동 차단 (현재 위치 유지)');
+            }
+          }
+        }
+      } else {
+        if (memo.parentId) {
+          console.log('[BLOCKING] 차단 조건 불만족: parentId 존재', memo.parentId);
+        }
+        if (isShiftPressed) {
+          console.log('[BLOCKING] 차단 조건 불만족: Shift 키 눌림');
+        }
+        if (!currentPage) {
+          console.log('[BLOCKING] 차단 조건 불만족: currentPage 없음');
         }
       }
 
@@ -602,7 +693,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         lastUpdateTime.current = now;
       }
     }
-  }, [isDragging, dragMoved, dragStart, canvasOffset, canvasScale, onPositionChange, memo.id, memo.position, memo.parentId, currentPage, isShiftPressed, mouseDownPos, DRAG_THRESHOLD, onDragStart]);
+  }, [isDragging, dragMoved, dragStart, canvasOffset, canvasScale, onPositionChange, memo.id, memo.position, memo.parentId, memo.size, currentPage, isShiftPressed, mouseDownPos, DRAG_THRESHOLD, onDragStart]);
 
   const handleMouseUp = React.useCallback((e: MouseEvent) => {
     if (isDragging) {
@@ -625,7 +716,6 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       // 상태 초기화
       pendingPosition.current = null;
       lastUpdateTime.current = 0;
-      setRestrictedDirections(null); // 이동 제한 해제
       setCursorPosition(null); // 커서 위치 리셋
     }
 

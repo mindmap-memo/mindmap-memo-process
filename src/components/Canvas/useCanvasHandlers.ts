@@ -1,6 +1,5 @@
 import React from 'react';
 import { Page, CategoryBlock } from '../../types';
-import { calculateCategoryArea } from '../../utils/categoryAreaUtils';
 
 /**
  * useCanvasHandlers
@@ -143,17 +142,12 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
   } = params;
 
   /**
-   * 경계 체크를 포함한 메모 위치 변경 핸들러
+   * 메모 위치 변경 핸들러 (경계 제한 제거)
    */
   const handleMemoPositionChange = React.useCallback((memoId: string, position: { x: number; y: number }) => {
-    const memo = currentPage?.memos.find(m => m.id === memoId);
-    if (memo) {
-      const constrainedPosition = constrainToBounds(position, memo.size || { width: 200, height: 95 });
-      onMemoPositionChange(memoId, constrainedPosition);
-    } else {
-      onMemoPositionChange(memoId, position);
-    }
-  }, [currentPage, onMemoPositionChange]);
+    // 경계 제한 없이 직접 전달
+    onMemoPositionChange(memoId, position);
+  }, [onMemoPositionChange]);
 
   /**
    * 카테고리 위치 변경 시작 (드래그 시작)

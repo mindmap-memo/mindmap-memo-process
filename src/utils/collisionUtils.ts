@@ -171,6 +171,11 @@ export function resolveUnifiedCollisions(
         // 우선순위가 같거나 높으면 밀리지 않음
         if (currentPriority <= otherPriority) continue;
 
+        // 루트 레벨 메모는 영역을 밀 수 없음 (영역이 메모를 밀어내는 건 OK)
+        if (other.type === 'memo' && current.type === 'area' && !other.parentId) {
+          continue; // 루트 메모가 영역을 밀려고 하면 스킵
+        }
+
         // 충돌 검사
         const pushDirection = calculatePushDirection(other.bounds, current.bounds, other.id, current.id);
 
