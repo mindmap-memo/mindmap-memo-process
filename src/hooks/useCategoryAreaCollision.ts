@@ -58,6 +58,17 @@ export const useCategoryAreaCollision = (props: UseCategoryAreaCollisionProps) =
     // 영역이 변경된 카테고리 찾기
     const changedCategories: string[] = [];
 
+    // 부모 카테고리를 찾는 함수
+    const getAllParents = (categoryId: string): string[] => {
+      const parents: string[] = [];
+      let currentCat = currentPage.categories?.find(c => c.id === categoryId);
+      while (currentCat?.parentId) {
+        parents.push(currentCat.parentId);
+        currentCat = currentPage.categories?.find(c => c.id === currentCat!.parentId);
+      }
+      return parents;
+    };
+
     for (const category of currentPage.categories) {
       // 확장되지 않은 카테고리는 영역이 없으므로 스킵
       if (!category.isExpanded) continue;
@@ -74,6 +85,28 @@ export const useCategoryAreaCollision = (props: UseCategoryAreaCollisionProps) =
           prevArea.width !== area.width ||
           prevArea.height !== area.height) {
         changedCategories.push(category.id);
+
+        // 부모 영역도 변경되었으므로 함께 추가
+        const parents = getAllParents(category.id);
+        parents.forEach(parentId => {
+          if (!changedCategories.includes(parentId)) {
+            changedCategories.push(parentId);
+          }
+          // 부모 영역의 이전 영역도 업데이트
+          const parentCat = currentPage.categories?.find(c => c.id === parentId);
+          if (parentCat?.isExpanded) {
+            const parentArea = calculateCategoryArea(parentCat, currentPage);
+            if (parentArea) {
+              previousAreas.current.set(parentId, {
+                x: parentArea.x,
+                y: parentArea.y,
+                width: parentArea.width,
+                height: parentArea.height
+              });
+            }
+          }
+        });
+
         previousAreas.current.set(category.id, {
           x: area.x,
           y: area.y,

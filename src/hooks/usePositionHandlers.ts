@@ -521,6 +521,79 @@ export const usePositionHandlers = ({
           }
         }
 
+        // 카테고리가 다른 카테고리 내부에 있다면, 모든 상위 카테고리의 영역 변경을 재귀적으로 확인
+        if (pageTargetCategory.parentId) {
+          // 모든 상위 카테고리 ID 수집 (재귀)
+          const getAllParentCategoryIds = (categoryId: string): string[] => {
+            const parentIds: string[] = [categoryId];
+            let currentCat = finalPage.categories?.find(c => c.id === categoryId);
+            while (currentCat?.parentId) {
+              parentIds.push(currentCat.parentId);
+              currentCat = finalPage.categories?.find(c => c.id === currentCat!.parentId);
+            }
+            return parentIds;
+          };
+
+          const allParentIds = getAllParentCategoryIds(pageTargetCategory.parentId);
+
+          // 원본 페이지 상태 가져오기
+          const originalPageState = pages.find(p => p.id === currentPageId);
+          if (originalPageState) {
+            // 영역이 변경된 카테고리만 수집 (한 번만 확인)
+            const changedCategoryIds: string[] = [];
+
+            for (const parentId of allParentIds) {
+              const parentCategory = finalPage.categories?.find(c => c.id === parentId);
+              if (parentCategory?.isExpanded) {
+                // 이전 영역 계산 (최초 originalPage 기준 - 한 번만)
+                const oldArea = calculateCategoryArea(parentCategory, originalPageState);
+                // 새 영역 계산 (현재 finalPage 기준)
+                const newArea = calculateCategoryArea(parentCategory, finalPage);
+
+                if (oldArea && newArea) {
+                  // 영역 위치 또는 크기가 변경되었는지 확인
+                  const areaChanged =
+                    oldArea.x !== newArea.x ||
+                    oldArea.y !== newArea.y ||
+                    oldArea.width !== newArea.width ||
+                    oldArea.height !== newArea.height;
+
+                  if (areaChanged) {
+                    changedCategoryIds.push(parentId);
+                  }
+                }
+              }
+            }
+
+            // 변경된 카테고리가 있으면 충돌 검사 (한 번만 실행)
+            if (changedCategoryIds.length > 0) {
+              // 최상위 변경 카테고리만 선택 (자식이 아닌 것만)
+              const topLevelChanged = changedCategoryIds.filter(id => {
+                return !changedCategoryIds.some(otherId => {
+                  if (otherId === id) return false;
+                  // otherId가 id의 부모인지 확인
+                  let current = finalPage.categories?.find(c => c.id === id);
+                  while (current?.parentId) {
+                    if (current.parentId === otherId) return true;
+                    current = finalPage.categories?.find(c => c.id === current!.parentId);
+                  }
+                  return false;
+                });
+              });
+
+              // 최상위 변경 카테고리만 충돌 검사 (한 번만)
+              for (const parentId of topLevelChanged) {
+                const result = resolveAreaCollisions(parentId, finalPage);
+                finalPage = {
+                  ...finalPage,
+                  categories: result.updatedCategories,
+                  memos: result.updatedMemos
+                };
+              }
+            }
+          }
+        }
+
         return finalPage;
       }
 
@@ -591,60 +664,8 @@ export const usePositionHandlers = ({
       const movedMemo = currentPage.memos.find(m => m.id === memoId);
       if (!movedMemo) return prev;
 
-      // 영역과의 충돌 체크 (방향별)
-      const categories = currentPage.categories || [];
-      const memoWidth = movedMemo.size?.width || 200;
-      const memoHeight = movedMemo.size?.height || 95;
-
-      let restrictedX = false;
-      let restrictedY = false;
-
-      // 부모가 없는 메모만 영역 충돌 검사 (Shift 누르면 스킵)
-      // Ref를 사용하여 드래그 중 Shift 상태 변경을 실시간으로 반영
-      if (!movedMemo.parentId && !isShiftPressedRef.current) {
-        for (const category of categories) {
-          const categoryArea = calculateCategoryArea(category, currentPage);
-          if (!categoryArea) continue;
-
-          // 새 위치에서의 메모 영역
-          const newMemoBounds = {
-            left: position.x,
-            top: position.y,
-            right: position.x + memoWidth,
-            bottom: position.y + memoHeight
-          };
-
-          const areaBounds = {
-            left: categoryArea.x,
-            top: categoryArea.y,
-            right: categoryArea.x + categoryArea.width,
-            bottom: categoryArea.y + categoryArea.height
-          };
-
-          // 겹침 계산
-          const overlapLeft = Math.max(newMemoBounds.left, areaBounds.left);
-          const overlapTop = Math.max(newMemoBounds.top, areaBounds.top);
-          const overlapRight = Math.min(newMemoBounds.right, areaBounds.right);
-          const overlapBottom = Math.min(newMemoBounds.bottom, areaBounds.bottom);
-
-          // 겹침이 있으면
-          if (overlapLeft < overlapRight && overlapTop < overlapBottom) {
-            // X 방향 이동 체크
-            const deltaX = position.x - movedMemo.position.x;
-            if (deltaX !== 0) restrictedX = true;
-
-            // Y 방향 이동 체크
-            const deltaY = position.y - movedMemo.position.y;
-            if (deltaY !== 0) restrictedY = true;
-          }
-        }
-      }
-
-      // 제한된 방향은 원래 위치 유지
-      const finalPosition = {
-        x: restrictedX ? movedMemo.position.x : position.x,
-        y: restrictedY ? movedMemo.position.y : position.y
-      };
+      // 위치 제한 로직 제거 - 충돌 검사는 resolveUnifiedCollisions에서 처리
+      const finalPosition = position;
 
       // 선택된 카테고리의 하위 요소인지 확인하는 함수
       const isDescendantOfSelectedCategory = (itemParentId: string | null | undefined): boolean => {
@@ -780,32 +801,71 @@ export const usePositionHandlers = ({
         memos: collisionResult.updatedMemos
       };
 
-      // 메모가 카테고리 내부에 있다면, 부모 카테고리의 영역이 변경되었는지 확인
+      // 메모가 카테고리 내부에 있다면, 모든 상위 카테고리의 영역 변경을 재귀적으로 확인
       if (movedMemo?.parentId) {
-        const parentCategory = finalPage.categories?.find(c => c.id === movedMemo.parentId);
-        if (parentCategory?.isExpanded) {
-          // 이전 영역 계산
-          const oldArea = calculateCategoryArea(parentCategory, currentPage);
-          // 새 영역 계산
-          const newArea = calculateCategoryArea(parentCategory, finalPage);
+        // 모든 상위 카테고리 ID 수집 (재귀)
+        const getAllParentCategoryIds = (categoryId: string): string[] => {
+          const parentIds: string[] = [categoryId];
+          let currentCat = finalPage.categories?.find(c => c.id === categoryId);
+          while (currentCat?.parentId) {
+            parentIds.push(currentCat.parentId);
+            currentCat = finalPage.categories?.find(c => c.id === currentCat!.parentId);
+          }
+          return parentIds;
+        };
 
-          if (oldArea && newArea) {
-            // 영역 위치 또는 크기가 변경되었는지 확인
-            const areaChanged =
-              oldArea.x !== newArea.x ||
-              oldArea.y !== newArea.y ||
-              oldArea.width !== newArea.width ||
-              oldArea.height !== newArea.height;
+        const allParentIds = getAllParentCategoryIds(movedMemo.parentId);
 
-            if (areaChanged) {
-              // 영역이 변경되었으므로 충돌 검사
-              const result = resolveAreaCollisions(movedMemo.parentId, finalPage);
-              finalPage = {
-                ...finalPage,
-                categories: result.updatedCategories,
-                memos: result.updatedMemos
-              };
+        // 영역이 변경된 카테고리만 수집 (한 번만 확인)
+        const changedCategoryIds: string[] = [];
+
+        for (const parentId of allParentIds) {
+          const parentCategory = finalPage.categories?.find(c => c.id === parentId);
+          if (parentCategory?.isExpanded) {
+            // 이전 영역 계산 (최초 currentPage 기준 - 한 번만)
+            const oldArea = calculateCategoryArea(parentCategory, currentPage);
+            // 새 영역 계산 (현재 finalPage 기준)
+            const newArea = calculateCategoryArea(parentCategory, finalPage);
+
+            if (oldArea && newArea) {
+              // 영역 위치 또는 크기가 변경되었는지 확인
+              const areaChanged =
+                oldArea.x !== newArea.x ||
+                oldArea.y !== newArea.y ||
+                oldArea.width !== newArea.width ||
+                oldArea.height !== newArea.height;
+
+              if (areaChanged) {
+                changedCategoryIds.push(parentId);
+              }
             }
+          }
+        }
+
+        // 변경된 카테고리가 있으면 충돌 검사 (한 번만 실행)
+        if (changedCategoryIds.length > 0) {
+          // 최상위 변경 카테고리만 선택 (자식이 아닌 것만)
+          const topLevelChanged = changedCategoryIds.filter(id => {
+            return !changedCategoryIds.some(otherId => {
+              if (otherId === id) return false;
+              // otherId가 id의 부모인지 확인
+              let current = finalPage.categories?.find(c => c.id === id);
+              while (current?.parentId) {
+                if (current.parentId === otherId) return true;
+                current = finalPage.categories?.find(c => c.id === current!.parentId);
+              }
+              return false;
+            });
+          });
+
+          // 최상위 변경 카테고리만 충돌 검사 (한 번만)
+          for (const parentId of topLevelChanged) {
+            const result = resolveAreaCollisions(parentId, finalPage);
+            finalPage = {
+              ...finalPage,
+              categories: result.updatedCategories,
+              memos: result.updatedMemos
+            };
           }
         }
       }
