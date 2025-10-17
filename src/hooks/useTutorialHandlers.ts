@@ -163,11 +163,16 @@ export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
    * 튜토리얼 건너뛰기
    */
   const handleTutorialSkip = useCallback(() => {
-    // 튜토리얼 페이지 초기화
+    // 튜토리얼 페이지 삭제 및 다른 페이지로 이동
     const tutorialPage = pages.find(p => p.name.startsWith('튜토리얼'));
     if (tutorialPage) {
-      const resetPage = createInitialTutorialPage(tutorialPage.id);
-      setPages(prev => prev.map(p => p.id === tutorialPage.id ? resetPage : p));
+      // 튜토리얼 페이지가 아닌 첫 번째 페이지로 이동
+      const otherPage = pages.find(p => !p.name.startsWith('튜토리얼'));
+      if (otherPage) {
+        setCurrentPageId(otherPage.id);
+      }
+      // 튜토리얼 페이지 삭제
+      setPages(prev => prev.filter(p => !p.name.startsWith('튜토리얼')));
     }
 
     setTutorialState({
@@ -175,22 +180,30 @@ export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
       currentStep: 0,
       completed: true
     });
+
+    // localStorage에 튜토리얼 완료 상태 저장
     localStorage.setItem('tutorial-completed', 'true');
+
     setCanvasPanned(false);
     setCanvasZoomed(false);
     setMemoCreated(false);
     setMemoDragged(false);
-  }, [pages, setPages, setTutorialState, setCanvasPanned, setCanvasZoomed, setMemoCreated, setMemoDragged]);
+  }, [pages, setPages, setCurrentPageId, setTutorialState, setCanvasPanned, setCanvasZoomed, setMemoCreated, setMemoDragged]);
 
   /**
    * 튜토리얼 완료
    */
   const handleTutorialComplete = useCallback(() => {
-    // 튜토리얼 페이지 초기화
+    // 튜토리얼 페이지 삭제 및 다른 페이지로 이동
     const tutorialPage = pages.find(p => p.name.startsWith('튜토리얼'));
     if (tutorialPage) {
-      const resetPage = createInitialTutorialPage(tutorialPage.id);
-      setPages(prev => prev.map(p => p.id === tutorialPage.id ? resetPage : p));
+      // 튜토리얼 페이지가 아닌 첫 번째 페이지로 이동
+      const otherPage = pages.find(p => !p.name.startsWith('튜토리얼'));
+      if (otherPage) {
+        setCurrentPageId(otherPage.id);
+      }
+      // 튜토리얼 페이지 삭제
+      setPages(prev => prev.filter(p => !p.name.startsWith('튜토리얼')));
     }
 
     setTutorialState({
@@ -198,12 +211,15 @@ export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
       currentStep: 0,
       completed: true
     });
+
+    // localStorage에 튜토리얼 완료 상태 저장
     localStorage.setItem('tutorial-completed', 'true');
+
     setCanvasPanned(false);
     setCanvasZoomed(false);
     setMemoCreated(false);
     setMemoDragged(false);
-  }, [pages, setPages, setTutorialState, setCanvasPanned, setCanvasZoomed, setMemoCreated, setMemoDragged]);
+  }, [pages, setPages, setCurrentPageId, setTutorialState, setCanvasPanned, setCanvasZoomed, setMemoCreated, setMemoDragged]);
 
   /**
    * 튜토리얼 전용 페이지 생성 또는 찾기

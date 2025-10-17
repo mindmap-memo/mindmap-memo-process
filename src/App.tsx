@@ -248,6 +248,12 @@ const App: React.FC = () => {
   // 튜토리얼 모드 (core: 핵심 기능 먼저, basic: 기본 기능 나중에)
   const [tutorialMode, setTutorialMode] = useState<'basic' | 'core'>('core');
 
+  // handleStartTutorial을 래핑하여 tutorialMode를 리셋
+  const handleStartTutorialWrapper = () => {
+    setTutorialMode('core'); // 항상 핵심 기능부터 시작
+    handleStartTutorial();
+  };
+
   // 현재 모드에 맞는 튜토리얼 단계 선택
   const currentTutorialSteps = tutorialMode === 'core' ? coreTutorialSteps : basicTutorialSteps;
 
@@ -717,7 +723,7 @@ const App: React.FC = () => {
           onDeleteCategory={deleteCategory}
           onNavigateToMemo={handleNavigateToMemo}
           onNavigateToCategory={handleNavigateToCategory}
-          onStartTutorial={handleStartTutorial}
+          onStartTutorial={handleStartTutorialWrapper}
         />
       )}
 
