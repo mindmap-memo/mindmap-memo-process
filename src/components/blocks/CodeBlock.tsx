@@ -17,12 +17,32 @@ const CodeBlockComponent: React.FC<CodeBlockProps> = ({
   activeImportanceFilters,
   showGeneralContent
 }) => {
+  // Hooks를 먼저 호출
   const [content, setContent] = useState(block.content);
   const [language, setLanguage] = useState(block.language || 'javascript');
   const [isLocalEditing, setIsLocalEditing] = useState(false);
 
+  // 필터링 로직
+  const shouldShow = React.useMemo(() => {
+    // 편집 모드에서는 항상 표시
+    if (isEditing) return true;
+
+    // 중요도가 있는 경우
+    if (block.importance) {
+      return activeImportanceFilters ? activeImportanceFilters.has(block.importance) : true;
+    }
+
+    // 중요도가 없는 경우 (일반 내용)
+    return showGeneralContent !== false;
+  }, [block.importance, activeImportanceFilters, showGeneralContent, isEditing]);
+
   // 중요도 스타일 가져오기
   const importanceStyle = getImportanceStyle(block.importance);
+
+  // 필터링으로 숨겨진 경우 null 반환
+  if (!shouldShow) {
+    return null;
+  }
 
   const handleSave = () => {
     if (onUpdate) {

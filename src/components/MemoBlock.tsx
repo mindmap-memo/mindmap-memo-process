@@ -119,8 +119,16 @@ const isBlockVisible = (block: any, activeImportanceFilters?: Set<ImportanceLeve
     ) || (showGeneralContent !== false && textBlock.importanceRanges.length < textBlock.content.length);
   }
 
-  // 다른 블록 타입들은 기본적으로 표시
-  return true;
+  // 비텍스트 블록(image, file, bookmark, callout, quote, code, table, checklist 등)의 중요도 필터링
+  const blockWithImportance = block as any;
+
+  // 중요도가 있는 경우
+  if (blockWithImportance.importance) {
+    return activeImportanceFilters ? activeImportanceFilters.has(blockWithImportance.importance) : true;
+  }
+
+  // 중요도가 없는 경우 (일반 내용)
+  return showGeneralContent !== false;
 };
 
 // 메모 블록의 가장 높은 중요도를 찾는 함수

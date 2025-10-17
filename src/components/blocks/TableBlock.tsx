@@ -25,8 +25,7 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
   activeImportanceFilters,
   showGeneralContent
 }) => {
-  // 중요도 스타일 가져오기
-  const importanceStyle = getImportanceStyle(block.importance);
+  // 모든 Hooks를 먼저 호출
   const [headers, setHeaders] = useState(block.headers);
   const [rows, setRows] = useState(block.rows);
   const [columns, setColumns] = useState<TableColumn[]>([]);
@@ -53,10 +52,13 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
   const tableRef = useRef<HTMLTableElement>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  const formulaEngine = useMemo(() => 
-    new FormulaEngine(globalDataRegistry.getRegistry()), 
+  const formulaEngine = useMemo(() =>
+    new FormulaEngine(globalDataRegistry.getRegistry()),
     []
   );
+
+  // 중요도 스타일 가져오기
+  const importanceStyle = getImportanceStyle(block.importance);
 
   // 전역 마우스 이벤트 처리 (드래그 선택 완료)
   useEffect(() => {
@@ -766,7 +768,7 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
         isKey: false
       }))
     );
-    
+
     setHeaders(initialHeaders);
     setColumns(initialColumns);
     setRows(initialRows);
@@ -780,6 +782,24 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
         columns: initialColumns
       });
     }
+  }
+
+  // 필터링 체크 (렌더링 단계에서 처리)
+  const shouldShow = (() => {
+    // 편집 모드에서는 항상 표시
+    if (isEditing) return true;
+
+    // 중요도가 있는 경우
+    if (block.importance) {
+      return activeImportanceFilters ? activeImportanceFilters.has(block.importance) : true;
+    }
+
+    // 중요도가 없는 경우 (일반 내용)
+    return showGeneralContent !== false;
+  })();
+
+  if (!shouldShow) {
+    return null;
   }
 
   return (
