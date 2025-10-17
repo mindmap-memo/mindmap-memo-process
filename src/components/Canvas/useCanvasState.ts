@@ -69,6 +69,10 @@ export const useCanvasState = () => {
     categoryName: string;
   } | null>(null);
 
+  // ===== 카테고리 라벨 편집 =====
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryTitle, setEditingCategoryTitle] = useState<string>('');
+
   // ===== 글로벌 드래그 선택 =====
   const [globalDragSelecting, setGlobalDragSelecting] = useState(false);
   const [globalDragStart, setGlobalDragStart] = useState({ x: 0, y: 0 });
@@ -134,6 +138,12 @@ export const useCanvasState = () => {
     setAreaContextMenu,
     showAreaQuickNavModal,
     setShowAreaQuickNavModal,
+
+    // 카테고리 라벨 편집
+    editingCategoryId,
+    setEditingCategoryId,
+    editingCategoryTitle,
+    setEditingCategoryTitle,
 
     // 글로벌 드래그 선택
     globalDragSelecting,

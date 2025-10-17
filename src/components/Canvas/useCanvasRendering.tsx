@@ -104,6 +104,7 @@ interface UseCanvasRenderingParams {
   onDeleteMemoById?: (id: string) => void;
   onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
   isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
+  onCategoryUpdate: (category: CategoryBlock) => void;
 
   // 상태 Setters
   setIsDraggingCategoryArea: (value: string | null) => void;
@@ -115,6 +116,12 @@ interface UseCanvasRenderingParams {
     };
   }>>;
   setAreaContextMenu: (value: { x: number; y: number; categoryId: string } | null) => void;
+
+  // 카테고리 편집 상태
+  editingCategoryId: string | null;
+  setEditingCategoryId: (value: string | null) => void;
+  editingCategoryTitle: string;
+  setEditingCategoryTitle: (value: string) => void;
 
   // 기타
   canvasOffset?: { x: number; y: number };
@@ -174,10 +181,15 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     onDeleteMemoById,
     onAddQuickNav,
     isQuickNavExists,
+    onCategoryUpdate,
     setIsDraggingCategoryArea,
     setShiftDragInfo,
     setDraggedCategoryAreas,
     setAreaContextMenu,
+    editingCategoryId,
+    setEditingCategoryId,
+    editingCategoryTitle,
+    setEditingCategoryTitle,
     canvasOffset,
     handleDropOnCategoryArea,
     handleCategoryAreaDragOver
@@ -1185,6 +1197,9 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
       const isCurrentCategoryBeingDragged = (isDraggingCategory && draggingCategoryId === category.id) || (isDraggingCategoryArea === category.id);
       const isShiftDragging = isCurrentCategoryBeingDragged && isShiftPressed;
 
+      // 편집 모드 여부 확인
+      const isEditing = editingCategoryId === category.id;
+
       areas.push(
         <div
           key={`label-${category.id}`}
@@ -1195,22 +1210,24 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
             left: `${labelX}px`,
             backgroundColor: isShiftDragging ? '#10b981' : '#8b5cf6',
             color: 'white',
-            padding: '6px 12px',
-            borderRadius: '8px',
-            fontSize: '13px',
+            padding: '12px 24px',
+            borderRadius: '12px',
+            fontSize: '26px',
             fontWeight: '600',
             pointerEvents: 'auto',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-            cursor: 'grab',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            cursor: isEditing ? 'text' : 'grab',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: '12px',
             zIndex: 10,
-            border: isShiftDragging ? '2px solid #059669' : 'none'
+            border: isShiftDragging ? '3px solid #059669' : 'none'
           }}
-          onClick={() => onCategorySelect(category.id)}
-          onDoubleClick={() => {
-            // 더블클릭 시 편집 모드로 전환하는 함수 호출
+          onClick={() => !isEditing && onCategorySelect(category.id)}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            setEditingCategoryId(category.id);
+            setEditingCategoryTitle(category.title);
           }}
           onContextMenu={(e) => {
             e.preventDefault();
@@ -1219,6 +1236,10 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
             setAreaContextMenu({ x: e.clientX, y: e.clientY, categoryId: category.id });
           }}
           onMouseDown={(e) => {
+            // 편집 모드일 때는 드래그 방지
+            if (isEditing) {
+              return;
+            }
             if (e.button === 0) {
               // 라벨 드래그 시작 - 라벨만 이동
               e.stopPropagation();
@@ -1273,18 +1294,59 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
           }}
         >
           {isShiftDragging && (
-            <span style={{ fontSize: '18px', fontWeight: 'bold', marginRight: '-4px' }}>+</span>
+            <span style={{ fontSize: '32px', fontWeight: 'bold', marginRight: '-4px' }}>+</span>
           )}
-          <span>{category.title}</span>
+          {isEditing ? (
+            <input
+              type="text"
+              value={editingCategoryTitle}
+              onChange={(e) => setEditingCategoryTitle(e.target.value)}
+              onBlur={() => {
+                if (editingCategoryTitle.trim()) {
+                  onCategoryUpdate({ ...category, title: editingCategoryTitle.trim() });
+                }
+                setEditingCategoryId(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  if (editingCategoryTitle.trim()) {
+                    onCategoryUpdate({ ...category, title: editingCategoryTitle.trim() });
+                  }
+                  setEditingCategoryId(null);
+                } else if (e.key === 'Escape') {
+                  setEditingCategoryId(null);
+                }
+              }}
+              autoFocus
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.2)',
+                border: '2px solid rgba(255,255,255,0.5)',
+                borderRadius: '6px',
+                color: 'white',
+                fontSize: '26px',
+                fontWeight: '600',
+                padding: '4px 8px',
+                outline: 'none',
+                width: 'auto',
+                minWidth: '200px'
+              }}
+            />
+          ) : (
+            <span>{category.title}</span>
+          )}
           <button
             style={{
               background: 'rgba(255,255,255,0.2)',
               border: 'none',
-              borderRadius: '3px',
+              borderRadius: '6px',
               color: 'white',
-              fontSize: '10px',
-              padding: '2px 4px',
-              cursor: 'pointer'
+              fontSize: '20px',
+              padding: '4px 8px',
+              cursor: 'pointer',
+              minWidth: '32px',
+              minHeight: '32px'
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -1341,7 +1403,13 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     onCategoryLabelPositionChange,
     onCategoryToggleExpanded,
     handleDropOnCategoryArea,
-    handleCategoryAreaDragOver
+    handleCategoryAreaDragOver,
+    editingCategoryId,
+    setEditingCategoryId,
+    editingCategoryTitle,
+    setEditingCategoryTitle,
+    onCategoryUpdate,
+    isDraggingCategoryArea
   ]);
 
   /**
