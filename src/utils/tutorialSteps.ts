@@ -41,7 +41,7 @@ export const coreTutorialSteps: TutorialStep[] = [
   {
     id: 'core-importance-filter',
     title: '🌟 핵심 3: 중요도 필터',
-    description: '중요도 필터로 원하는 내용만 선택적으로 볼 수 있습니다.\n\n🎯 지금 바로 해보세요!\n1. 캔버스 좌측 상단의 필터 아이콘 클릭\n2. 특정 중요도 레벨을 클릭하여 켜고 끄기\n3. 비활성화된 중요도의 내용은 캔버스에서 숨겨집니다\n\n필터를 드래그하여 원하는 위치로 이동할 수 있습니다.',
+    description: '중요도 필터로 원하는 내용만 선택적으로 볼 수 있습니다.\n\n🎯 지금 바로 해보세요!\n1. 특정 중요도 레벨을 클릭하여 켜고 끄기\n2. 비활성화된 중요도의 내용은 캔버스에서 숨겨집니다',
     targetElement: '[data-tutorial="importance-filter"]',
     position: 'right',
     action: 'none'
@@ -134,30 +134,7 @@ export const basicTutorialSteps: TutorialStep[] = [
     description: '메모 블록 간의 관계를 연결선으로 표현할 수 있습니다.\n\n🎯 직접 해보세요!\n1. "+ 메모 생성" 버튼으로 메모 하나 더 생성\n2. 메모 블록 가장자리의 작은 원(연결점) 클릭 후 드래그\n3. 연결하고자 하는 메모에 마우스 놓기\n\n연결선이 생성되고 양방향으로 연결됩니다.',
     targetElement: '[data-tutorial="canvas"]',
     position: 'center',
-    action: 'none',
-    subSteps: [
-      {
-        order: 1,
-        description: '"+ 메모 생성" 버튼으로 메모 하나 더 생성',
-        targetElement: '[data-tutorial="add-memo-btn"]',
-        animationType: 'cursor-click',
-        eventType: 'memo-created'
-      },
-      {
-        order: 2,
-        description: '메모 블록 가장자리의 작은 원(연결점) 클릭 후 드래그',
-        targetElement: '.memo-connection-point', // 동적으로 찾을 것
-        animationType: 'cursor-drag',
-        eventType: 'connection-started'
-      },
-      {
-        order: 3,
-        description: '연결하고자 하는 메모에 마우스 놓기',
-        targetElement: '.memo-block', // 동적으로 찾을 것
-        animationType: 'cursor-hover',
-        eventType: 'connection-completed'
-      }
-    ]
+    action: 'none'
   },
   {
     id: 'disconnect-mode',
