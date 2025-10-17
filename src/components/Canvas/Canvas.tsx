@@ -230,6 +230,11 @@ const Canvas: React.FC<CanvasProps> = ({
   // 최근 드래그 종료된 카테고리 ID (영역 계산 로그용)
   const recentlyDraggedCategoryRef = React.useRef<string | null>(null);
 
+  // 선택 해제 함수
+  const handleDeselectAll = React.useCallback(() => {
+    onMemoSelect('', false); // 빈 문자열로 선택 해제
+  }, [onMemoSelect]);
+
   // ===== useCanvasHandlers 훅 사용 =====
   const handlers = useCanvasHandlers({
     currentPage,
@@ -242,6 +247,7 @@ const Canvas: React.FC<CanvasProps> = ({
     onMoveToCategory,
     onDetectCategoryDropForCategory,
     onUpdateDragLine,
+    onDeselectAll: handleDeselectAll,
     currentTool,
     isSpacePressed,
     isPanning,

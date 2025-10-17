@@ -45,6 +45,7 @@ interface UseCanvasHandlersParams {
   onMoveToCategory: (itemId: string, categoryId: string | null) => void;
   onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }) => void;
   onUpdateDragLine: (mousePos: { x: number; y: number }) => void;
+  onDeselectAll?: () => void;
 
   // Canvas state
   currentTool: 'select' | 'pan' | 'zoom';
@@ -119,6 +120,7 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
     onMoveToCategory,
     onDetectCategoryDropForCategory,
     onUpdateDragLine,
+    onDeselectAll,
     currentTool,
     isSpacePressed,
     isPanning,
@@ -330,6 +332,11 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
         e.stopPropagation();
         return;
       }
+
+      // 선택 도구일 때 빈 공간 클릭 시 선택 해제
+      if (currentTool === 'select' && onDeselectAll) {
+        onDeselectAll();
+      }
     }
 
     // 선택 도구이고 연결 모드가 아닐 때 전역 드래그 선택 시작 준비 (캔버스 배경 또는 카테고리 영역에서)
@@ -345,6 +352,7 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
     currentTool,
     isPanning,
     canvasOffset,
+    onDeselectAll,
     setIsPanning,
     setPanStart,
     setGlobalDragSelecting,
