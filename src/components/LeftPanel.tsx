@@ -546,6 +546,40 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
     return childMemos;
   };
 
+  // 메모의 중요도 개수를 계산하는 함수
+  const calculateImportanceCount = (memo: MemoBlock): { total: number; filtered: number } => {
+    let total = 0;
+    let filtered = 0;
+
+    if (!memo.blocks) {
+      return { total, filtered };
+    }
+
+    memo.blocks.forEach(block => {
+      if (block.type === 'text') {
+        const textBlock = block as any;
+        if (textBlock.importanceRanges && textBlock.importanceRanges.length > 0) {
+          textBlock.importanceRanges.forEach((range: any) => {
+            total++;
+            if (searchImportanceFilters.has(range.level)) {
+              filtered++;
+            }
+          });
+        }
+      } else if (block.type === 'file' || block.type === 'image' || block.type === 'bookmark') {
+        const blockWithImportance = block as any;
+        if (blockWithImportance.importance) {
+          total++;
+          if (searchImportanceFilters.has(blockWithImportance.importance)) {
+            filtered++;
+          }
+        }
+      }
+    });
+
+    return { total, filtered };
+  };
+
   // blocks에서 파일/이미지/URL 등의 메타데이터 검색
   const searchBlockMetadata = (block: any, query: string): boolean => {
     switch (block.type) {
@@ -600,7 +634,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
 
     // 검색어가 없으면 중요도 필터만 적용하여 현재 페이지의 모든 메모 반환
     if (!query.trim()) {
-      return currentPageMemos.filter(memo => {
+      const filteredMemos = currentPageMemos.filter(memo => {
         // blocks가 없거나 비어있으면 항상 표시
         if (!memo.blocks || memo.blocks.length === 0) {
           return true;
@@ -626,10 +660,24 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
           return true;
         });
       });
+
+      // 중요도 개수로 정렬 (필터에 체크된 중요도 개수 → 전체 중요도 개수 순)
+      return filteredMemos.sort((a, b) => {
+        const aCount = calculateImportanceCount(a);
+        const bCount = calculateImportanceCount(b);
+
+        // 1순위: 필터에 체크된 중요도 개수 (내림차순)
+        if (bCount.filtered !== aCount.filtered) {
+          return bCount.filtered - aCount.filtered;
+        }
+
+        // 2순위: 전체 중요도 개수 (내림차순)
+        return bCount.total - aCount.total;
+      });
     }
 
     // 검색어가 있으면 텍스트 매칭 + 중요도 필터 적용
-    return currentPageMemos.filter(memo => {
+    const matchedMemos = currentPageMemos.filter(memo => {
       let matchesQuery = false;
 
       switch (category) {
@@ -732,6 +780,20 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
 
       return matchesQuery;
     });
+
+    // 중요도 개수로 정렬 (필터에 체크된 중요도 개수 → 전체 중요도 개수 순)
+    return matchedMemos.sort((a, b) => {
+      const aCount = calculateImportanceCount(a);
+      const bCount = calculateImportanceCount(b);
+
+      // 1순위: 필터에 체크된 중요도 개수 (내림차순)
+      if (bCount.filtered !== aCount.filtered) {
+        return bCount.filtered - aCount.filtered;
+      }
+
+      // 2순위: 전체 중요도 개수 (내림차순)
+      return bCount.total - aCount.total;
+    });
   };
 
   // 카테고리 검색 로직 (중요도 필터 예외)
@@ -824,6 +886,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
           {/* 필터 토글 버튼 - 검색창 아래로 이동 */}
           <div className={styles.filterToggleRow}>
             <button
+              onMouseDown={(e) => e.preventDefault()} // 검색창 blur 방지
               onClick={() => setShowSearchFilters(!showSearchFilters)}
               className={`${styles.filterToggleButton} ${showSearchFilters ? styles.active : styles.inactive}`}
             >
@@ -856,6 +919,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   {['all', 'memos', 'categories', 'title', 'tags', 'content'].map((category) => (
                     <button
                       key={category}
+                      onMouseDown={(e) => e.preventDefault()} // 검색창 blur 방지
                       onClick={() => handleCategoryChange(category as SearchCategory)}
                       style={{
                         padding: '4px 8px',
@@ -887,16 +951,26 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
 
                   {/* 일반 내용 토글 */}
                   <div style={{ marginBottom: '8px' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '12px' }}>
+                    <label
+                      style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '12px' }}
+                      onMouseDown={(e) => e.preventDefault()} // 검색창 blur 방지
+                    >
                       <input
                         type="checkbox"
                         checked={searchShowGeneralContent}
                         onChange={(e) => {
+                          e.stopPropagation();
                           setSearchShowGeneralContent(e.target.checked);
                         }}
+                        onClick={(e) => e.stopPropagation()}
                         style={{ marginRight: '6px' }}
                       />
-                      <span style={{ color: '#6b7280' }}>일반 내용</span>
+                      <span
+                        onClick={() => setSearchShowGeneralContent(!searchShowGeneralContent)}
+                        style={{ color: '#6b7280' }}
+                      >
+                        일반 내용
+                      </span>
                     </label>
                   </div>
 
@@ -918,6 +992,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                     ] as Array<{level: ImportanceLevel, label: string, color: string}>).map(({level, label, color}) => (
                       <button
                         key={level}
+                        onMouseDown={(e) => e.preventDefault()} // 검색창 blur 방지
                         onClick={() => {
                           const newFilters = new Set(searchImportanceFilters);
                           if (newFilters.has(level)) {
@@ -946,6 +1021,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   {/* 전체 선택/해제 버튼 */}
                   <div style={{ display: 'flex', gap: '4px' }}>
                     <button
+                      onMouseDown={(e) => e.preventDefault()} // 검색창 blur 방지
                       onClick={() => {
                         setSearchImportanceFilters(new Set(['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'] as ImportanceLevel[]));
                       }}
@@ -962,6 +1038,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                       전체 선택
                     </button>
                     <button
+                      onMouseDown={(e) => e.preventDefault()} // 검색창 blur 방지
                       onClick={() => {
                         setSearchImportanceFilters(new Set());
                       }}
