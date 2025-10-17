@@ -21,7 +21,7 @@ const getImportanceStyle = (level: ImportanceLevel) => {
     case 'idea':
       return { backgroundColor: '#c8e6c9', color: '#000' }; // 초록 형광펜 - 아이디어
     case 'data':
-      return { backgroundColor: '#ffab91', color: '#000' }; // 코랄 형광펜 - 데이터
+      return { backgroundColor: '#bdbdbd', color: '#000' }; // 진한 회색 형광펜 - 데이터
     default:
       return {};
   }

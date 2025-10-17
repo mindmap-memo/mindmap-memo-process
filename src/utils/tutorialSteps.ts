@@ -213,8 +213,8 @@ export const coreTutorialSteps: TutorialStep[] = [
   // === 핵심 1: 단축 이동 ===
   {
     id: 'core-quick-nav',
-    title: '🌟 핵심 1: 빠른 탐색',
-    description: '자주 사용하는 메모나 카테고리를 즐겨찾기하여 빠르게 이동할 수 있습니다.\n\n🎯 지금 바로 해보세요!\n1. 튜토리얼 페이지의 메모를 우클릭\n2. "빠른 탐색에 추가" 선택\n3. 우측 하단의 ⭐ 버튼 클릭\n\n페이지가 달라도 즉시 이동할 수 있어 편리합니다.',
+    title: '🌟 핵심 1: 단축 이동',
+    description: '자주 사용하는 메모나 카테고리를 즐겨찾기하여 빠르게 이동할 수 있습니다.\n\n🎯 지금 바로 해보세요!\n1. 메모나 카테고리 우클릭\n2. "단축 이동 설정" 선택 후 이름 정하고 확인\n3. 우측 상단의 "단축 이동" 버튼 클릭\n\n자주 보는 메모나 카테고리에 즉시 이동할 수 있어 편리합니다.',
     targetElement: '[data-tutorial="quick-nav-btn"]',
     position: 'left',
     action: 'none'
@@ -233,8 +233,8 @@ export const coreTutorialSteps: TutorialStep[] = [
     id: 'core-importance-filter',
     title: '🌟 핵심 3: 중요도 필터',
     description: '중요도 필터로 원하는 내용만 선택적으로 볼 수 있습니다.\n\n🎯 지금 바로 해보세요!\n1. 캔버스 좌측 상단의 필터 아이콘 클릭\n2. 특정 중요도 레벨을 클릭하여 켜고 끄기\n3. 비활성화된 중요도의 내용은 캔버스에서 숨겨집니다\n\n필터를 드래그하여 원하는 위치로 이동할 수 있습니다.',
-    targetElement: '[data-tutorial="importance-filter"]',
-    position: 'bottom',
+    targetElement: '[data-tutorial="right-panel"]',
+    position: 'left',
     action: 'none'
   },
 

@@ -79,6 +79,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const [contextMenuPosition, setContextMenuPosition] = React.useState({ x: 0, y: 0 });
   const [showImportanceSubmenu, setShowImportanceSubmenu] = React.useState(false);
   const [submenuPosition, setSubmenuPosition] = React.useState<'right' | 'left'>('right');
+  const [submenuTopOffset, setSubmenuTopOffset] = React.useState<number>(0);
 
   // 메모가 변경될 때마다 연결된 메모를 펼침
   React.useEffect(() => {
@@ -787,7 +788,30 @@ const RightPanel: React.FC<RightPanelProps> = ({
     const blocksToUpdate = selectedBlocks.length > 0 ? selectedBlocks : dragSelectedBlocks;
     const updatedBlocks = selectedMemo.blocks?.map(block => {
       if (blocksToUpdate.includes(block.id)) {
-        return { ...block, importance: level } as ContentBlock;
+        // 텍스트 블록인 경우 전체 텍스트에 중요도 범위 적용
+        if (block.type === 'text') {
+          const textBlock = block as TextBlock;
+          const content = textBlock.content || '';
+
+          if (content.length === 0) {
+            // 빈 텍스트면 그냥 반환
+            return block;
+          }
+
+          if (level === 'none') {
+            // 강조 해제: importanceRanges 제거
+            return { ...textBlock, importanceRanges: [] } as ContentBlock;
+          } else {
+            // 전체 텍스트에 중요도 적용
+            return {
+              ...textBlock,
+              importanceRanges: [{ start: 0, end: content.length, level }]
+            } as ContentBlock;
+          }
+        } else {
+          // 다른 블록 타입(이미지, 파일 등)은 기존 방식대로 블록 자체에 중요도 적용
+          return { ...block, importance: level } as ContentBlock;
+        }
       }
       return block;
     }) || [];
@@ -2273,10 +2297,19 @@ const RightPanel: React.FC<RightPanelProps> = ({
                           // 서브메뉴를 열 때 위치 계산
                           const rect = importanceButtonRef.current.getBoundingClientRect();
                           const submenuWidth = 140;
+                          const submenuHeight = 280; // 8개 항목 * 약 34px + 구분선
                           const spaceOnRight = window.innerWidth - rect.right;
+                          const spaceBelow = window.innerHeight - rect.top;
 
                           // 오른쪽에 공간이 충분하면 오른쪽에, 아니면 왼쪽에 표시
                           setSubmenuPosition(spaceOnRight >= submenuWidth + 10 ? 'right' : 'left');
+
+                          // 아래쪽 경계 체크 - 서브메뉴가 화면 아래로 나가면 위로 조정
+                          let topOffset = 0;
+                          if (spaceBelow < submenuHeight + 10) {
+                            topOffset = Math.max(-(submenuHeight - spaceBelow + 10), -(rect.top - 10));
+                          }
+                          setSubmenuTopOffset(topOffset);
                         }
                         setShowImportanceSubmenu(!showImportanceSubmenu);
                       }}
@@ -2309,7 +2342,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                             ? { left: '100%', marginLeft: '4px' }
                             : { right: '100%', marginRight: '4px' }
                           ),
-                          top: 0,
+                          top: submenuTopOffset,
                           backgroundColor: 'white',
                           border: '1px solid #e1e5e9',
                           borderRadius: '8px',
@@ -2458,6 +2491,27 @@ const RightPanel: React.FC<RightPanelProps> = ({
                         >
                           <span style={{ width: '16px', height: '16px', backgroundColor: IMPORTANCE_COLORS.data, borderRadius: '3px', display: 'inline-block' }}></span>
                           {IMPORTANCE_LABELS.data}
+                        </button>
+                        <div style={{ height: '1px', backgroundColor: '#e5e7eb', margin: '4px 8px' }} />
+                        <button
+                          onClick={() => handleApplyImportance('none')}
+                          style={{
+                            width: '100%',
+                            padding: '8px 16px',
+                            border: 'none',
+                            backgroundColor: 'transparent',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            textAlign: 'left',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          <span style={{ width: '16px', height: '16px', backgroundColor: IMPORTANCE_COLORS.none, border: '1px solid #e5e7eb', borderRadius: '3px', display: 'inline-block' }}></span>
+                          {IMPORTANCE_LABELS.none}
                         </button>
                       </div>
                     )}

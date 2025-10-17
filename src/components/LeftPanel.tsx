@@ -21,7 +21,7 @@ const getImportanceStyle = (level: ImportanceLevel) => {
     case 'idea':
       return { backgroundColor: '#c8e6c9', color: '#000' }; // 초록 형광펜 - 아이디어
     case 'data':
-      return { backgroundColor: '#ffab91', color: '#000' }; // 코랄 형광펜 - 데이터
+      return { backgroundColor: '#bdbdbd', color: '#000' }; // 진한 회색 형광펜 - 데이터
     default:
       return {};
   }
@@ -914,7 +914,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                       { level: 'reference', label: '🔵 참고', color: '#81d4fa' },
                       { level: 'question', label: '🟡 질문', color: '#fff59d' },
                       { level: 'idea', label: '🟢 아이디어', color: '#c8e6c9' },
-                      { level: 'data', label: '🟤 데이터', color: '#ffab91' }
+                      { level: 'data', label: '⚫ 데이터', color: '#bdbdbd' }
                     ] as Array<{level: ImportanceLevel, label: string, color: string}>).map(({level, label, color}) => (
                       <button
                         key={level}

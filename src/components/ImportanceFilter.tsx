@@ -17,7 +17,7 @@ const getImportanceStyle = (level: ImportanceLevel) => {
     case 'idea':
       return { backgroundColor: '#c8e6c9', color: '#000' };
     case 'data':
-      return { backgroundColor: '#ffab91', color: '#000' };
+      return { backgroundColor: '#bdbdbd', color: '#000' };
     default:
       return {};
   }
@@ -30,7 +30,7 @@ const IMPORTANCE_LABELS: Record<ImportanceLevel, string> = {
   reference: '🔵 참고',
   question: '🟡 질문',
   idea: '🟢 아이디어',
-  data: '🟤 데이터',
+  data: '⚫ 데이터',
   none: '없음'
 };
 

@@ -18,7 +18,7 @@ export const getImportanceStyle = (level?: ImportanceLevel) => {
     case 'idea':
       return { backgroundColor: '#c8e6c9', borderLeft: '3px solid #4caf50' }; // 초록 형광펜 - 아이디어
     case 'data':
-      return { backgroundColor: '#ffab91', borderLeft: '3px solid #ff5722' }; // 코랄 형광펜 - 데이터
+      return { backgroundColor: '#bdbdbd', borderLeft: '3px solid #616161' }; // 진한 회색 형광펜 - 데이터
     default:
       return {};
   }
@@ -43,7 +43,7 @@ export const IMPORTANCE_COLORS: Record<ImportanceLevel, string> = {
   reference: '#81d4fa',
   question: '#fff59d',
   idea: '#c8e6c9',
-  data: '#ffab91',
+  data: '#bdbdbd',
   none: '#ffffff'
 };
 

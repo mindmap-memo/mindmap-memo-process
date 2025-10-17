@@ -18,7 +18,7 @@ const getImportanceStyle = (level: ImportanceLevel) => {
     case 'idea':
       return { backgroundColor: '#c8e6c9', color: '#000' }; // 초록 형광펜 - 아이디어
     case 'data':
-      return { backgroundColor: '#ffab91', color: '#000' }; // 코랄 형광펜 - 데이터
+      return { backgroundColor: '#bdbdbd', color: '#000' }; // 진한 회색 형광펜 - 데이터
     default:
       return {};
   }
@@ -31,7 +31,7 @@ const IMPORTANCE_LABELS = {
   reference: '🔵 참고',
   question: '🟡 질문',
   idea: '🟢 아이디어',
-  data: '🟤 데이터',
+  data: '⚫ 데이터',
   none: '강조 해제'
 };
 
@@ -454,21 +454,33 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
 
   // 텍스트 선택 처리 (드래그 끝난 후)
   const handleTextSelection = (e: React.MouseEvent) => {
-    if (!isEditing || !canEdit) return;
+    console.log('=== handleTextSelection 호출됨 ===');
+    console.log('isEditing:', isEditing, 'canEdit:', canEdit);
+
+    if (!isEditing || !canEdit) {
+      console.log('편집 모드가 아니거나 편집 불가 -> 종료');
+      return;
+    }
 
     const textarea = textareaRef.current;
-    if (!textarea) return;
+    if (!textarea) {
+      console.log('textarea ref가 없음 -> 종료');
+      return;
+    }
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
 
+    console.log('텍스트 선택 범위:', { start, end });
+
     if (start !== end && end > start) {
+      console.log('텍스트가 선택됨 -> 메뉴 표시 로직 진행');
       // 텍스트가 선택된 경우
       setSelectedRange({ start, end });
 
-      // 메뉴 크기 (8개 항목 * 약 30px + padding)
+      // 메뉴 크기 (8개 항목 * 약 32px + padding)
       const menuWidth = 150;
-      const menuHeight = 240;
+      const menuHeight = 280; // 여유있게 설정
 
       // 화면 크기
       const viewportWidth = window.innerWidth;
@@ -511,10 +523,11 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
         console.log('왼쪽 경계 초과 -> 10px로 보정:', x);
       }
 
-      // 아래쪽 경계 체크 - 화면을 넘어가면 위로 올림
+      // 아래쪽 경계 체크 - 양옆 체크와 동일한 방식
+      console.log('아래쪽 경계 체크:', { y, menuHeight, viewportHeight, 'y+menuHeight': y + menuHeight });
       if (y + menuHeight > viewportHeight) {
         y = viewportHeight - menuHeight - 10;
-        console.log('아래쪽 경계 초과 -> 상단으로 이동:', y);
+        console.log('아래쪽 경계 초과 -> 위로 이동:', y);
       }
 
       // 위쪽 경계 체크
