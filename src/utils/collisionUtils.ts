@@ -280,6 +280,15 @@ export function resolveAreaCollisions(
   let updatedCategories = [...(page.categories || [])];
   let updatedMemos = [...page.memos];
 
+  // 이동 중인 카테고리 찾기
+  const targetMovingCategory = updatedCategories.find(cat => cat.id === movingCategoryId);
+  if (!targetMovingCategory) {
+    return { updatedCategories, updatedMemos };
+  }
+
+  // 이동 중인 카테고리의 부모 ID (null 과 undefined를 동일하게 처리)
+  const movingParentId = targetMovingCategory.parentId ?? null;
+
   // 우선순위 맵: 이동 중인 카테고리가 최고 우선순위 (0)
   const priorityMap = new Map<string, number>();
   priorityMap.set(movingCategoryId, 0);
@@ -298,8 +307,9 @@ export function resolveAreaCollisions(
       // 이동 중인 카테고리는 밀리지 않음
       if (currentCat.id === movingCategoryId) continue;
 
-      // 부모가 있는 카테고리는 충돌 시 밀리지 않음 (부모와 함께 이동)
-      if (currentCat.parentId) continue;
+      // 같은 부모를 가진 형제 카테고리만 충돌 검사 대상 (null과 undefined 동일하게 처리)
+      const currentParentId = currentCat.parentId ?? null;
+      if (currentParentId !== movingParentId) continue;
 
       // 이미 이번 iteration에서 처리된 카테고리는 스킵
       if (processedInThisIteration.has(currentCat.id)) continue;
