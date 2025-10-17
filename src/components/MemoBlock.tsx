@@ -707,9 +707,9 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
     <div
       className={styles.memoBlockWrapper}
       style={{
-        left: memo.position.x,
-        top: memo.position.y,
-        width: `${sizeConfig.width}px`
+        transform: `translate3d(${memo.position.x}px, ${memo.position.y}px, 0)`,
+        width: `${sizeConfig.width}px`,
+        willChange: isDragging ? 'transform' : 'auto'
       }}
     >
       {/* 메모 블록 콘텐츠 */}

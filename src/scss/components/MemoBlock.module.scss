@@ -3,6 +3,11 @@
 .memoBlockWrapper {
   position: absolute;
   height: auto;
+  top: 0;
+  left: 0;
+  // GPU 가속 활성화
+  backface-visibility: hidden;
+  perspective: 1000px;
 }
 
 .memoBlockContainer {

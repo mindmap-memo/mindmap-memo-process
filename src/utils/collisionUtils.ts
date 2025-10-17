@@ -404,15 +404,29 @@ export function resolveAreaCollisions(
     if (!hasCollision) break;
   }
 
-  // 영역-메모블록 충돌 처리: 영역이 부모가 없는 메모블록을 밀어냄
+  // 영역-메모블록 충돌 처리: 영역이 모든 메모블록을 밀어냄
   const movingCategory = updatedCategories.find(cat => cat.id === movingCategoryId);
   if (movingCategory) {
     const movingArea = calculateCategoryArea(movingCategory, { ...page, categories: updatedCategories, memos: updatedMemos });
 
     if (movingArea) {
-      // 부모가 없는 메모들만 대상
+      // 모든 메모를 대상으로 충돌 검사 (depth 무관)
       updatedMemos = updatedMemos.map(memo => {
-        if (memo.parentId) return memo; // 자식 메모는 제외
+        // 이 카테고리의 자식 메모는 제외 (내부 메모는 밀지 않음)
+        if (memo.parentId === movingCategoryId) return memo;
+
+        // 이 카테고리의 하위 카테고리들의 자식 메모도 제외
+        const isDescendantMemo = (memoParentId: string | null | undefined): boolean => {
+          if (!memoParentId) return false;
+          if (memoParentId === movingCategoryId) return true;
+
+          const parentCat = updatedCategories.find(c => c.id === memoParentId);
+          if (!parentCat) return false;
+
+          return isDescendantMemo(parentCat.parentId);
+        };
+
+        if (isDescendantMemo(memo.parentId)) return memo;
 
         const memoWidth = memo.size?.width || 200;
         const memoHeight = memo.size?.height || 95;
@@ -439,22 +453,26 @@ export function resolveAreaCollisions(
 
         if (overlapLeft >= overlapRight || overlapTop >= overlapBottom) return memo;
 
-        const overlapWidth = overlapRight - overlapLeft;
-        const overlapHeight = overlapBottom - overlapTop;
+        // 밀어낼 방향 계산 (영역-영역 충돌과 동일한 로직 사용)
+        const memoBoundsArea: CategoryArea = {
+          x: memoBounds.left,
+          y: memoBounds.top,
+          width: memoBounds.right - memoBounds.left,
+          height: memoBounds.bottom - memoBounds.top
+        };
 
-        // 밀어낼 방향 계산
-        let pushX = 0;
-        let pushY = 0;
+        const areaBoundsArea: CategoryArea = {
+          x: areaBounds.left,
+          y: areaBounds.top,
+          width: areaBounds.right - areaBounds.left,
+          height: areaBounds.bottom - areaBounds.top
+        };
 
-        if (overlapWidth < overlapHeight) {
-          const memoCenterX = (memoBounds.left + memoBounds.right) / 2;
-          const areaCenterX = (areaBounds.left + areaBounds.right) / 2;
-          pushX = memoCenterX < areaCenterX ? -overlapWidth : overlapWidth;
-        } else {
-          const memoCenterY = (memoBounds.top + memoBounds.bottom) / 2;
-          const areaCenterY = (areaBounds.top + areaBounds.bottom) / 2;
-          pushY = memoCenterY < areaCenterY ? -overlapHeight : overlapHeight;
-        }
+        // calculatePushDirection 사용 (영역이 메모를 밀어냄)
+        const pushDirection = calculatePushDirection(areaBoundsArea, memoBoundsArea, movingCategoryId, memo.id);
+
+        const pushX = pushDirection.x;
+        const pushY = pushDirection.y;
 
         return {
           ...memo,

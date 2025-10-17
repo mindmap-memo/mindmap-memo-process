@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { CategoryBlock, Page, MemoBlock, CanvasActionType } from '../types';
 import { calculateCategoryArea, centerCanvasOnPosition } from '../utils/categoryAreaUtils';
+import { resolveAreaCollisions } from '../utils/collisionUtils';
 
 /**
  * useCategoryHandlers
@@ -225,7 +226,7 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
       const descendantIds = getAllDescendantCategoryIds(categoryId);
       const affectedIds = [categoryId, ...descendantIds];
 
-      return {
+      let updatedPage = {
         ...page,
         categories: (page.categories || []).map(category =>
           affectedIds.includes(category.id)
@@ -233,6 +234,21 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
             : category
         )
       };
+
+      // 확장될 때만 충돌 검사 실행 (축소할 때는 충돌 없음)
+      if (newExpandedState) {
+        // 영역이 생성되므로 충돌 검사
+        for (const catId of affectedIds) {
+          const result = resolveAreaCollisions(catId, updatedPage);
+          updatedPage = {
+            ...updatedPage,
+            categories: result.updatedCategories,
+            memos: result.updatedMemos
+          };
+        }
+      }
+
+      return updatedPage;
     }));
   }, [currentPageId, setPages]);
 
@@ -296,7 +312,30 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
             return { ...cat, children: newChildren };
           });
 
-          return { ...page, memos: updatedMemos, categories: updatedCategories };
+          // 영역 크기가 변경되었으므로 충돌 검사 실행
+          let updatedPage = { ...page, memos: updatedMemos, categories: updatedCategories };
+
+          // 변경된 카테고리(들)에 대해 충돌 검사
+          const affectedCategoryIds: string[] = [];
+          if (categoryId) affectedCategoryIds.push(categoryId);
+
+          // 이전 부모 카테고리도 영향 받음
+          const memo = page.memos.find(m => m.id === itemId);
+          if (memo?.parentId) affectedCategoryIds.push(memo.parentId);
+
+          for (const catId of affectedCategoryIds) {
+            const category = updatedPage.categories?.find(c => c.id === catId);
+            if (category?.isExpanded) {
+              const result = resolveAreaCollisions(catId, updatedPage);
+              updatedPage = {
+                ...updatedPage,
+                categories: result.updatedCategories,
+                memos: result.updatedMemos
+              };
+            }
+          }
+
+          return updatedPage;
         }
 
         if (isCategory) {
@@ -317,7 +356,30 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
             return { ...cat, children: newChildren };
           });
 
-          return { ...page, categories: updatedCategories };
+          // 영역 크기가 변경되었으므로 충돌 검사 실행
+          let updatedPage = { ...page, categories: updatedCategories };
+
+          // 변경된 카테고리(들)에 대해 충돌 검사
+          const affectedCategoryIds: string[] = [];
+          if (categoryId) affectedCategoryIds.push(categoryId);
+
+          // 이전 부모 카테고리도 영향 받음
+          const category = page.categories?.find(c => c.id === itemId);
+          if (category?.parentId) affectedCategoryIds.push(category.parentId);
+
+          for (const catId of affectedCategoryIds) {
+            const cat = updatedPage.categories?.find(c => c.id === catId);
+            if (cat?.isExpanded) {
+              const result = resolveAreaCollisions(catId, updatedPage);
+              updatedPage = {
+                ...updatedPage,
+                categories: result.updatedCategories,
+                memos: result.updatedMemos
+              };
+            }
+          }
+
+          return updatedPage;
         }
       }
       return page;
