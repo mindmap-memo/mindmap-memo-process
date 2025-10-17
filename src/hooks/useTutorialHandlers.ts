@@ -40,6 +40,9 @@ interface UseTutorialHandlersProps {
   setPages: React.Dispatch<React.SetStateAction<Page[]>>;
   setCanvasOffset: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
   setCanvasScale: React.Dispatch<React.SetStateAction<number>>;
+  leftPanelWidth: number;
+  rightPanelOpen: boolean;
+  rightPanelWidth: number;
 }
 
 export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
@@ -65,7 +68,10 @@ export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
     setCurrentPageId,
     setPages,
     setCanvasOffset: setCanvasOffsetProp,
-    setCanvasScale: setCanvasScaleProp
+    setCanvasScale: setCanvasScaleProp,
+    leftPanelWidth,
+    rightPanelOpen,
+    rightPanelWidth
   } = props;
 
   /**
@@ -230,11 +236,22 @@ export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
     // 2. 튜토리얼 페이지로 이동
     setCurrentPageId(tutorialPage.id);
 
-    // 3. 캔버스 초기화 (중앙으로)
+    // 3. 중요도 메모 위치 계산 (캔버스 초기화 전에 현재 보이는 화면 중앙 좌표 계산)
+    const canvasWidth = window.innerWidth - leftPanelWidth - (rightPanelOpen ? rightPanelWidth : 0);
+    const canvasHeight = window.innerHeight;
+    const memoWidth = 320;
+    const memoHeight = 450;
+
+    // 현재 보이는 화면 중앙 좌표를 캔버스 좌표로 변환
+    // 중앙에서 150px 오른쪽으로 이동
+    const centerX = (-canvasOffset.x + canvasWidth / 2) / canvasScale - memoWidth / 2 + 150;
+    const centerY = (-canvasOffset.y + canvasHeight / 2) / canvasScale - memoHeight / 2;
+
+    // 4. 캔버스 초기화 (중앙으로)
     setCanvasOffsetProp({ x: 0, y: 0 });
     setCanvasScaleProp(1);
 
-    // 4. 튜토리얼 상태 시작
+    // 5. 튜토리얼 상태 시작
     setTutorialState({
       isActive: true,
       currentStep: 0,
@@ -254,7 +271,94 @@ export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
     tutorialPage.memos.forEach(memo => {
       initialMemoPositions.current.set(memo.id, { x: memo.position.x, y: memo.position.y });
     });
-  }, [getTutorialPage, setCurrentPageId, setCanvasOffsetProp, setCanvasScaleProp, setTutorialState, setCanvasPanned, setCanvasZoomed, setMemoCreated, setMemoDragged, initialCanvasOffset, initialCanvasScale, initialMemoPositions, initialMemoCount, canvasOffset, canvasScale]);
+
+    // 6. 튜토리얼 시작 시 중요도 설명 메모 자동 생성
+    const timestamp = Date.now();
+    const memoId = `memo-importance-guide-${timestamp}`;
+
+    const newMemo: typeof tutorialPage.memos[0] = {
+      id: memoId,
+      title: '중요도 가이드',
+      content: '', // 기존 호환성을 위해 유지
+      tags: ['튜토리얼', '중요도'],
+      displaySize: 'medium' as const, // 기본 표시 크기를 medium으로 설정
+      blocks: [
+        {
+          id: `block-${timestamp}-1`,
+          type: 'text' as const,
+          content: '매우중요\n특히 중요한 내용에 적용하는 중요도입니다.',
+          importanceRanges: [
+            { start: 0, end: 4, level: 'critical' as const }
+          ]
+        },
+        {
+          id: `block-${timestamp}-2`,
+          type: 'text' as const,
+          content: '중요\n중요하지만 매우중요보다는 낮은 우선순위의 내용입니다.',
+          importanceRanges: [
+            { start: 0, end: 2, level: 'important' as const }
+          ]
+        },
+        {
+          id: `block-${timestamp}-3`,
+          type: 'text' as const,
+          content: '의견\n개인적인 생각이나 판단에 적용하는 중요도입니다.',
+          importanceRanges: [
+            { start: 0, end: 2, level: 'opinion' as const }
+          ]
+        },
+        {
+          id: `block-${timestamp}-4`,
+          type: 'text' as const,
+          content: '참고\n참고할 만한 부가 정보에 적용하는 중요도입니다.',
+          importanceRanges: [
+            { start: 0, end: 2, level: 'reference' as const }
+          ]
+        },
+        {
+          id: `block-${timestamp}-5`,
+          type: 'text' as const,
+          content: '질문\n나중에 찾아봐야 할 의문사항에 적용하는 중요도입니다.',
+          importanceRanges: [
+            { start: 0, end: 2, level: 'question' as const }
+          ]
+        },
+        {
+          id: `block-${timestamp}-6`,
+          type: 'text' as const,
+          content: '아이디어\n떠오른 아이디어나 영감에 적용하는 중요도입니다.',
+          importanceRanges: [
+            { start: 0, end: 4, level: 'idea' as const }
+          ]
+        },
+        {
+          id: `block-${timestamp}-7`,
+          type: 'text' as const,
+          content: '데이터\n객관적인 수치나 사실에 적용하는 중요도입니다.',
+          importanceRanges: [
+            { start: 0, end: 3, level: 'data' as const }
+          ]
+        },
+        {
+          id: `block-${timestamp}-8`,
+          type: 'file' as const,
+          name: 'importance-levels.txt',
+          size: 245,
+          url: 'data:text/plain;base64,7KSR7JqU64-EIOugiOuypDog66ek7Jqw7KSR7JqULCDso7zsmrgsIOydmOqyhSwg7LC46rOgLCDsp4jrrLgsIOyVhOydtOuTlOyWtCwg642w7J207YSwCuq4sOyXheuTsOydtOuEsCBpc29tb3JwaGlzbQo=',
+          importance: 'data' as const
+        }
+      ],
+      connections: [],
+      position: { x: centerX, y: centerY },
+      size: { width: memoWidth, height: memoHeight }
+    };
+
+    setPages(prev => prev.map(p =>
+      p.id === tutorialPage.id
+        ? { ...p, memos: [...p.memos, newMemo] }
+        : p
+    ));
+  }, [getTutorialPage, setCurrentPageId, setCanvasOffsetProp, setCanvasScaleProp, setTutorialState, setCanvasPanned, setCanvasZoomed, setMemoCreated, setMemoDragged, initialCanvasOffset, initialCanvasScale, initialMemoPositions, initialMemoCount, canvasOffset, canvasScale, leftPanelWidth, rightPanelOpen, rightPanelWidth, setPages]);
 
   return {
     handleStartTutorial,

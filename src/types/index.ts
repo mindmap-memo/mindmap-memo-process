@@ -296,7 +296,7 @@ export interface TutorialStep {
   title: string;
   description: string;
   targetElement?: string; // CSS selector for highlighting
-  position?: 'top' | 'bottom' | 'left' | 'right' | 'center';
+  position?: 'top' | 'bottom' | 'left' | 'right' | 'center' | 'bottom-right';
   action?: 'click' | 'drag' | 'type' | 'none'; // Required user action
   validation?: () => boolean; // Check if step is completed
   nextButtonText?: string;

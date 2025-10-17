@@ -1,11 +1,79 @@
 import { TutorialStep } from '../types';
 
-// 기본 기능 튜토리얼 (메모 작성 방법 - 먼저 배우기)
-export const basicTutorialSteps: TutorialStep[] = [
+// 핵심 기능 튜토리얼 (메모 관리 효율화 - 먼저 배우기)
+export const coreTutorialSteps: TutorialStep[] = [
   {
     id: 'welcome',
     title: '환영합니다! 👋',
-    description: '마인드맵 메모 앱에 오신 것을 환영합니다.\n\nNotion의 블록 시스템과 마인드맵의 시각화를 결합한 새로운 메모 앱입니다.\n\n먼저 기본 사용법부터 배워보겠습니다!',
+    description: '마인드맵 메모 앱에 오신 것을 환영합니다.\n\n이 메모앱은 "메모를 다시 보는 기능"에 특화된 새로운 메모 앱입니다.\n\n먼저 핵심 기능부터 배워보겠습니다!',
+    position: 'center',
+    action: 'none',
+    nextButtonText: '시작하기'
+  },
+  {
+    id: 'core-intro',
+    title: '🌟 핵심 기능 소개',
+    description: '먼저 메모를 효율적으로 관리하는 핵심 기능들을 배워보겠습니다!\n\n많은 메모를 빠르게 찾고, 중요한 내용을 강조하고, 필터링하는 방법을 알아봅시다.',
+    position: 'center',
+    action: 'none',
+    nextButtonText: '시작하기'
+  },
+
+  // === 핵심 1: 단축 이동 ===
+  {
+    id: 'core-quick-nav',
+    title: '🌟 핵심 1: 단축 이동',
+    description: '자주 사용하는 메모나 카테고리를 즐겨찾기하여 빠르게 이동할 수 있습니다.\n\n🎯 지금 바로 해보세요!\n1. 메모나 카테고리 우클릭\n2. "단축 이동 설정" 선택 후 이름 정하고 확인\n3. 우측 상단의 "단축 이동" 버튼 클릭\n\n자주 보는 메모나 카테고리에 즉시 이동할 수 있어 편리합니다.',
+    targetElement: '[data-tutorial="right-panel"]',
+    position: 'left',
+    action: 'none'
+  },
+
+  // === 핵심 2: 중요도 부여 및 필터 ===
+  {
+    id: 'core-importance',
+    title: '🌟 핵심 2: 중요도 부여',
+    description: '텍스트에 중요도를 부여하여 내용을 분류하고 강조할 수 있습니다.\n\n🎯 지금 바로 해보세요!\n1. 튜토리얼 페이지의 메모를 클릭하여 선택\n2. 우측 패널에서 텍스트를 드래그 OR 파일이나 텍스트 영역 우클릭 -> 중요도 부여 클릭\n3. 나타나는 메뉴에서 원하는 중요도 선택\n\n7가지 레벨: 매우중요(빨강), 중요(주황), 의견(보라), 참고(파랑), 질문(노랑), 아이디어(초록), 데이터(회색)',
+    targetElement: '[data-tutorial="right-panel"]',
+    position: 'left',
+    action: 'none'
+  },
+  {
+    id: 'core-importance-filter',
+    title: '🌟 핵심 3: 중요도 필터',
+    description: '중요도 필터로 원하는 내용만 선택적으로 볼 수 있습니다.\n\n🎯 지금 바로 해보세요!\n1. 캔버스 좌측 상단의 필터 아이콘 클릭\n2. 특정 중요도 레벨을 클릭하여 켜고 끄기\n3. 비활성화된 중요도의 내용은 캔버스에서 숨겨집니다\n\n필터를 드래그하여 원하는 위치로 이동할 수 있습니다.',
+    targetElement: '[data-tutorial="importance-filter"]',
+    position: 'right',
+    action: 'none'
+  },
+
+  // === 핵심 4: 검색 ===
+  {
+    id: 'core-search',
+    title: '🌟 핵심 4: 통합 검색',
+    description: '모든 페이지의 메모와 카테고리를 빠르게 검색할 수 있습니다.\n\n🎯 지금 바로 해보세요!\n1. 좌측 상단의 검색창 클릭\n2. 검색어 입력 (입력 안할 시 해당 페이지의 모든 메모와 카테고리 표시)\n3. 검색 결과 클릭하면 해당 항목으로 이동\n\n필터 : 검색 범위 및 내가 원하는 중요도를 가진 메모만 검색 가능',
+    targetElement: '[data-tutorial="left-panel"]',
+    position: 'right',
+    action: 'none'
+  },
+
+  // === 기본 기능 안내 ===
+  {
+    id: 'basic-features-intro',
+    title: '✅ 핵심 기능 완료!',
+    description: '핵심 기능을 모두 배우셨습니다!\n\n이제 메모를 작성하는 기본 기능들을 배워보시겠어요?\n\n기본 기능 포함:\n• 캔버스 조작 (이동, 확대/축소)\n• 메모/카테고리 생성 및 관리\n• 메모 편집 및 연결',
+    position: 'center',
+    action: 'none',
+    nextButtonText: '기본 기능 배우기'
+  }
+];
+
+// 기본 기능 튜토리얼 (메모 작성 방법 - 나중에 배우기)
+export const basicTutorialSteps: TutorialStep[] = [
+  {
+    id: 'basic-intro',
+    title: '📝 기본 기능 튜토리얼',
+    description: '이제 메모를 작성하고 관리하는 기본 방법을 배워보겠습니다!\n\n캔버스 조작부터 메모 생성, 편집까지 차근차근 알아봅시다.',
     position: 'center',
     action: 'none',
     nextButtonText: '시작하기'
@@ -188,79 +256,19 @@ export const basicTutorialSteps: TutorialStep[] = [
     action: 'none'
   },
 
-  // === 핵심 기능 안내 ===
-  {
-    id: 'core-features-intro',
-    title: '✅ 기본 기능 완료!',
-    description: '메모 작성 방법을 모두 배우셨습니다!\n\n이제 작성한 메모를 더 효율적으로 관리하는 핵심 기능들을 배워보시겠어요?\n\n핵심 기능 포함:\n• 빠른 탐색 (단축 이동)\n• 중요도 부여 및 필터링\n• 통합 검색',
-    position: 'center',
-    action: 'none',
-    nextButtonText: '핵심 기능 배우기'
-  }
-];
-
-// 핵심 기능 튜토리얼 (메모 관리 효율화 - 나중에 배우기)
-export const coreTutorialSteps: TutorialStep[] = [
-  {
-    id: 'core-intro',
-    title: '🌟 핵심 기능 튜토리얼',
-    description: '이제 작성한 메모를 더 효율적으로 관리하는 방법을 배워보겠습니다!\n\n많은 메모를 빠르게 찾고, 중요한 내용을 강조하고, 필터링하는 방법을 알아봅시다.',
-    position: 'center',
-    action: 'none',
-    nextButtonText: '시작하기'
-  },
-
-  // === 핵심 1: 단축 이동 ===
-  {
-    id: 'core-quick-nav',
-    title: '🌟 핵심 1: 단축 이동',
-    description: '자주 사용하는 메모나 카테고리를 즐겨찾기하여 빠르게 이동할 수 있습니다.\n\n🎯 지금 바로 해보세요!\n1. 메모나 카테고리 우클릭\n2. "단축 이동 설정" 선택 후 이름 정하고 확인\n3. 우측 상단의 "단축 이동" 버튼 클릭\n\n자주 보는 메모나 카테고리에 즉시 이동할 수 있어 편리합니다.',
-    targetElement: '[data-tutorial="quick-nav-btn"]',
-    position: 'left',
-    action: 'none'
-  },
-
-  // === 핵심 2: 중요도 부여 및 필터 ===
-  {
-    id: 'core-importance',
-    title: '🌟 핵심 2: 중요도 부여',
-    description: '텍스트에 중요도를 부여하여 내용을 분류하고 강조할 수 있습니다.\n\n🎯 지금 바로 해보세요!\n1. 튜토리얼 페이지의 메모를 클릭하여 선택\n2. 우측 패널에서 텍스트를 드래그\n3. 나타나는 메뉴에서 중요도 선택\n\n7가지 레벨: 매우중요(빨강), 중요(주황), 의견(보라), 참고(파랑), 질문(노랑), 아이디어(초록), 데이터(회색)',
-    targetElement: '[data-tutorial="right-panel"]',
-    position: 'left',
-    action: 'none'
-  },
-  {
-    id: 'core-importance-filter',
-    title: '🌟 핵심 3: 중요도 필터',
-    description: '중요도 필터로 원하는 내용만 선택적으로 볼 수 있습니다.\n\n🎯 지금 바로 해보세요!\n1. 캔버스 좌측 상단의 필터 아이콘 클릭\n2. 특정 중요도 레벨을 클릭하여 켜고 끄기\n3. 비활성화된 중요도의 내용은 캔버스에서 숨겨집니다\n\n필터를 드래그하여 원하는 위치로 이동할 수 있습니다.',
-    targetElement: '[data-tutorial="right-panel"]',
-    position: 'left',
-    action: 'none'
-  },
-
-  // === 핵심 4: 검색 ===
-  {
-    id: 'core-search',
-    title: '🌟 핵심 4: 통합 검색',
-    description: '모든 페이지의 메모와 카테고리를 빠르게 검색할 수 있습니다.\n\n🎯 지금 바로 해보세요!\n1. 좌측 상단의 검색창 클릭\n2. 검색어 입력 (예: "단축키")\n3. 검색 결과 클릭하면 해당 항목으로 이동\n\n• 전체 검색: 제목, 태그, 내용 모두\n• 필터: 메모/카테고리 선택 가능',
-    targetElement: '[data-tutorial="search"]',
-    position: 'bottom',
-    action: 'none'
-  },
-
   // === 완료 ===
   {
     id: 'complete',
     title: '튜토리얼 완료! 🎉',
-    description: '모든 기능을 체험해보셨습니다!\n\n이제 자유롭게 마인드맵 메모 앱을 사용해보세요.\n\n✅ 기본 기능: 캔버스 조작, 메모/카테고리 생성, 편집\n✅ 핵심 기능: 단축 이동, 중요도 필터, 검색\n\n언제든지 좌측 상단의 "?" 버튼으로 튜토리얼을 다시 볼 수 있습니다.',
+    description: '모든 기능을 체험해보셨습니다!\n\n이제 자유롭게 마인드맵 메모 앱을 사용해보세요.\n\n✅ 핵심 기능: 단축 이동, 중요도 필터, 검색\n✅ 기본 기능: 캔버스 조작, 메모/카테고리 생성, 편집\n\n언제든지 좌측 상단의 "?" 버튼으로 튜토리얼을 다시 볼 수 있습니다.',
     position: 'center',
     action: 'none',
     nextButtonText: '시작하기'
   }
 ];
 
-// 전체 튜토리얼 (하위 호환성을 위해 유지)
+// 전체 튜토리얼 (핵심 기능 먼저, 기본 기능 나중에)
 export const tutorialSteps: TutorialStep[] = [
-  ...basicTutorialSteps,
-  ...coreTutorialSteps.slice(1) // 핵심 기능 인트로 제외하고 추가
+  ...coreTutorialSteps,
+  ...basicTutorialSteps.slice(1) // 기본 기능 인트로 제외하고 추가
 ];
