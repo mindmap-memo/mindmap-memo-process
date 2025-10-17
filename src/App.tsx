@@ -123,7 +123,9 @@ const App: React.FC = () => {
     activeImportanceFilters: appState.activeImportanceFilters,
     setActiveImportanceFilters: appState.setActiveImportanceFilters,
     showGeneralContent: appState.showGeneralContent,
-    setShowGeneralContent: appState.setShowGeneralContent
+    setShowGeneralContent: appState.setShowGeneralContent,
+    setCanvasOffset,
+    setCanvasScale
   });
 
   const {

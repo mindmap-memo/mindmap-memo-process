@@ -33,6 +33,8 @@ interface UseSelectionHandlersProps {
   setActiveImportanceFilters: React.Dispatch<React.SetStateAction<Set<ImportanceLevel>>>;
   showGeneralContent: boolean;
   setShowGeneralContent: React.Dispatch<React.SetStateAction<boolean>>;
+  setCanvasOffset?: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
+  setCanvasScale?: React.Dispatch<React.SetStateAction<number>>;
 }
 
 export const useSelectionHandlers = (props: UseSelectionHandlersProps) => {
@@ -60,7 +62,9 @@ export const useSelectionHandlers = (props: UseSelectionHandlersProps) => {
     activeImportanceFilters,
     setActiveImportanceFilters,
     showGeneralContent,
-    setShowGeneralContent
+    setShowGeneralContent,
+    setCanvasOffset,
+    setCanvasScale
   } = props;
 
   const currentPage = pages.find(p => p.id === currentPageId);
@@ -295,11 +299,39 @@ export const useSelectionHandlers = (props: UseSelectionHandlersProps) => {
   // 특정 메모로 화면 이동
   const focusOnMemo = useCallback((memoId: string) => {
     const memo = currentPage?.memos.find(m => m.id === memoId);
-    if (memo) {
-      setSelectedMemoId(memoId);
-      setSelectedMemoIds([]);
+    if (!memo) return;
+
+    // 메모 선택
+    setSelectedMemoId(memoId);
+    setSelectedMemoIds([]);
+
+    // 캔버스를 메모 중심으로 이동
+    if (setCanvasOffset && setCanvasScale) {
+      // Canvas 컨테이너의 실제 크기 가져오기
+      const canvasElement = document.getElementById('main-canvas');
+      if (!canvasElement) return;
+
+      const rect = canvasElement.getBoundingClientRect();
+      const availableWidth = rect.width;
+      const availableHeight = rect.height;
+
+      // 메모 크기
+      const memoWidth = memo.size?.width || 200;
+      const memoHeight = memo.size?.height || 150;
+
+      // 메모 중심 좌표
+      const memoCenterX = memo.position.x + memoWidth / 2;
+      const memoCenterY = memo.position.y + memoHeight / 2;
+
+      // scale을 1로 리셋할 것이므로 scale 1 기준으로 offset 계산
+      const targetScale = 1;
+      const newOffsetX = availableWidth / 2 - memoCenterX * targetScale;
+      const newOffsetY = availableHeight / 2 - memoCenterY * targetScale;
+
+      setCanvasOffset({ x: newOffsetX, y: newOffsetY });
+      setCanvasScale(targetScale); // 초기 줌 레벨로 리셋
     }
-  }, [currentPage, setSelectedMemoId, setSelectedMemoIds]);
+  }, [currentPage, setSelectedMemoId, setSelectedMemoIds, setCanvasOffset, setCanvasScale]);
 
   return {
     handleMemoSelect,

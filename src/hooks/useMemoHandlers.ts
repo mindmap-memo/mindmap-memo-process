@@ -265,7 +265,12 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
 
     setPages(prev => prev.map(page =>
       page.id === currentPageId
-        ? { ...page, memos: page.memos.filter(memo => memo.id !== selectedMemoId) }
+        ? {
+            ...page,
+            memos: page.memos.filter(memo => memo.id !== selectedMemoId),
+            // 단축 이동 목록에서도 삭제된 메모 제거
+            quickNavItems: (page.quickNavItems || []).filter(item => item.targetId !== selectedMemoId)
+          }
         : page
     ));
     setSelectedMemoId(null);

@@ -786,6 +786,10 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
               // 영역 드래그 시작 - 카테고리 전체를 이동
               e.preventDefault();
               e.stopPropagation();
+
+              // 영역 클릭 시 카테고리 선택 (우측 패널 표시)
+              onCategorySelect(category.id);
+
               setIsDraggingCategoryArea(category.id);
 
               let startX = e.clientX;
@@ -1218,6 +1222,9 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
             if (e.button === 0) {
               // 라벨 드래그 시작 - 라벨만 이동
               e.stopPropagation();
+
+              // 라벨 드래그 시작 시 카테고리 선택 (우측 패널 표시)
+              onCategorySelect(category.id);
 
               let startX = e.clientX;
               let startY = e.clientY;
