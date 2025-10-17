@@ -1,6 +1,7 @@
 import { useCallback, MutableRefObject } from 'react';
 import { Page, CategoryBlock } from '../types';
 import { calculateCategoryArea, clearCollisionDirections } from '../utils/categoryAreaUtils';
+import { resolveUnifiedCollisions } from '../utils/collisionUtils';
 
 interface UseCategoryPositionHandlersProps {
   pages: Page[];
@@ -31,6 +32,7 @@ export const useCategoryPositionHandlers = ({
 }: UseCategoryPositionHandlersProps) => {
 
   // 카테고리 라벨만 이동 (영역은 변경하지 않음)
+  // 라벨 위치 변경으로 영역이 확대/축소될 때 충돌 판정 발생
   const updateCategoryLabelPosition = useCallback((
     categoryId: string,
     position: { x: number; y: number }
@@ -38,7 +40,8 @@ export const useCategoryPositionHandlers = ({
     setPages(prev => prev.map(page => {
       if (page.id !== currentPageId) return page;
 
-      return {
+      // 먼저 라벨 위치 업데이트
+      const updatedPage = {
         ...page,
         categories: page.categories?.map(cat => {
           if (cat.id === categoryId) {
@@ -49,6 +52,20 @@ export const useCategoryPositionHandlers = ({
           }
           return cat;
         }) || []
+      };
+
+      // 충돌 판정 적용 (영역 크기 조절로 인한 충돌)
+      const collisionResult = resolveUnifiedCollisions(
+        categoryId,
+        'area',
+        updatedPage,
+        10
+      );
+
+      return {
+        ...updatedPage,
+        categories: collisionResult.updatedCategories,
+        memos: collisionResult.updatedMemos
       };
     }));
   }, [setPages, currentPageId]);

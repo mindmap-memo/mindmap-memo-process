@@ -1276,8 +1276,9 @@ const RightPanel: React.FC<RightPanelProps> = ({
     const isButton = target.tagName === 'BUTTON' || target.closest('button') !== null;
     const isImportanceMenu = target.closest('[data-importance-menu]') !== null;
 
-    // 텍스트 입력 중인 textarea는 제외 (클릭된 것이 textarea인 경우만)
+    // 텍스트 입력 중인 textarea나 input은 제외 (클릭된 것이 textarea 또는 input인 경우만)
     const isClickedTextarea = target.tagName === 'TEXTAREA';
+    const isClickedInput = target.tagName === 'INPUT';
 
 
     // 드래그 완료 직후에는 클릭 이벤트 무시
@@ -1285,7 +1286,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
       return;
     }
 
-    if (!isButton && !isImportanceMenu && selectedMemo?.blocks) {
+    if (!isButton && !isImportanceMenu && !isClickedInput && selectedMemo?.blocks) {
       // 선택된 블록 위를 클릭한 경우인지 확인
       const clickedBlockElement = target.closest('[data-block-id]');
       const clickedBlockId = clickedBlockElement?.getAttribute('data-block-id');
