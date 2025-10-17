@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Analytics } from "@vercel/analytics/react";
 import { TutorialState } from './types';
 import { useCanvasHistory } from './hooks/useCanvasHistory';
 import { useAppState } from './hooks/useAppState';
@@ -948,6 +949,7 @@ const App: React.FC = () => {
         />
       )}
       </div>
+      <Analytics />
     </AppProviders>
   );
 };

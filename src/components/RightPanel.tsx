@@ -1650,8 +1650,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     <span
                       key={index}
                       style={{
-                        backgroundColor: '#ffe0b2',
-                        color: '#e65100',
+                        backgroundColor: '#e5e7eb',
+                        color: '#374151',
                         padding: '4px 8px',
                         borderRadius: '12px',
                         fontSize: '12px',
@@ -1661,7 +1661,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                         gap: '4px'
                       }}
                     >
-                      #{tag}
+                      {tag}
                       <button
                         onClick={() => {
                           const newTags = selectedCategory.tags.filter((_, i) => i !== index);
@@ -1670,11 +1670,10 @@ const RightPanel: React.FC<RightPanelProps> = ({
                         style={{
                           background: 'none',
                           border: 'none',
+                          color: '#6b7280',
                           cursor: 'pointer',
-                          color: '#e65100',
                           fontSize: '14px',
-                          padding: '0',
-                          marginLeft: '2px'
+                          padding: '0'
                         }}
                       >
                         ×
@@ -1686,15 +1685,18 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
               <input
                 type="text"
-                placeholder="태그를 입력하고 Enter를 누르세요..."
+                placeholder="태그를 입력하세요 (Enter로 추가)"
                 style={{
                   width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '6px',
+                  padding: '2px 0',
+                  border: 'none',
+                  borderBottom: '1px solid #e5e7eb',
+                  borderRadius: '0',
                   fontSize: '14px',
+                  backgroundColor: 'transparent',
                   outline: 'none',
-                  transition: 'border-color 0.2s ease'
+                  color: '#6b7280',
+                  transition: 'border-bottom-color 0.2s ease'
                 }}
                 onKeyPress={(e) => {
                   if (e.key === 'Enter' && e.currentTarget.value.trim()) {
@@ -1709,10 +1711,12 @@ const RightPanel: React.FC<RightPanelProps> = ({
                   }
                 }}
                 onFocus={(e) => {
-                  e.target.style.borderColor = '#ff9800';
+                  e.target.style.borderBottomColor = '#3b82f6';
+                  e.target.style.color = '#1f2937';
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = '#e5e7eb';
+                  e.target.style.borderBottomColor = '#e5e7eb';
+                  e.target.style.color = '#6b7280';
                 }}
               />
             </div>

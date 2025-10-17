@@ -203,7 +203,7 @@ export const basicTutorialSteps: TutorialStep[] = [
   {
     id: 'memo-title-tags',
     title: '제목과 태그',
-    description: '메모의 제목과 태그를 입력할 수 있습니다.\n\n🎯 직접 해보세요!\n우측 패널 상단에서:\n• 제목을 입력해보세요\n• 태그를 추가해보세요 (쉼표로 구분)\n\n제목과 태그는 검색할 때 사용됩니다.',
+    description: '메모의 제목과 태그를 입력할 수 있습니다.\n\n🎯 직접 해보세요!\n우측 패널 상단에서:\n• 제목을 입력해보세요\n• 태그를 추가해보세요\n\n제목과 태그는 검색할 때 사용됩니다.',
     targetElement: '[data-tutorial="right-panel"]',
     position: 'left',
     action: 'none'
