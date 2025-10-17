@@ -1,14 +1,13 @@
 import { useEffect } from 'react';
-import { Page, QuickNavItem } from '../types';
+import { Page } from '../types';
 import { STORAGE_KEYS } from '../constants/defaultData';
 import { saveToStorage } from '../utils/storageUtils';
 
 /**
  * localStorage 자동 저장을 관리하는 커스텀 훅
- * - 페이지 데이터 자동 저장
+ * - 페이지 데이터 자동 저장 (quickNavItems 포함)
  * - 현재 페이지 ID 자동 저장
  * - 패널 설정 자동 저장
- * - 단축 이동 항목 자동 저장
  * - 현재 페이지 ID 유효성 검증
  */
 
@@ -21,7 +20,6 @@ interface UseLocalStorageProps {
   rightPanelOpen: boolean;
   leftPanelWidth: number;
   rightPanelWidth: number;
-  quickNavItems: QuickNavItem[];
 }
 
 export const useLocalStorage = ({
@@ -32,8 +30,7 @@ export const useLocalStorage = ({
   leftPanelOpen,
   rightPanelOpen,
   leftPanelWidth,
-  rightPanelWidth,
-  quickNavItems
+  rightPanelWidth
 }: UseLocalStorageProps) => {
   // 한 번만 실행되는 localStorage 마이그레이션 (임시)
   useEffect(() => {
@@ -66,11 +63,6 @@ export const useLocalStorage = ({
     };
     saveToStorage(STORAGE_KEYS.PANEL_SETTINGS, settings);
   }, [leftPanelOpen, rightPanelOpen, leftPanelWidth, rightPanelWidth]);
-
-  // localStorage 자동 저장 - 단축 이동 항목
-  useEffect(() => {
-    saveToStorage(STORAGE_KEYS.QUICK_NAV_ITEMS, quickNavItems);
-  }, [quickNavItems]);
 
   // 현재 페이지 ID가 유효한지 확인하고 수정
   useEffect(() => {

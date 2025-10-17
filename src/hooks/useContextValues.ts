@@ -94,7 +94,6 @@ interface UseContextValuesProps {
 
   // QuickNav
   quickNavItems: QuickNavItem[];
-  setQuickNavItems: React.Dispatch<React.SetStateAction<QuickNavItem[]>>;
   showQuickNavPanel: boolean;
   setShowQuickNavPanel: React.Dispatch<React.SetStateAction<boolean>>;
 }
@@ -209,11 +208,10 @@ export const useContextValues = (props: UseContextValuesProps) => {
   // ===== QuickNav Context =====
   const quickNavContextValue = useMemo(() => ({
     quickNavItems: props.quickNavItems,
-    setQuickNavItems: props.setQuickNavItems,
     showQuickNavPanel: props.showQuickNavPanel,
     setShowQuickNavPanel: props.setShowQuickNavPanel
   }), [
-    props.quickNavItems, props.setQuickNavItems, props.showQuickNavPanel, props.setShowQuickNavPanel
+    props.quickNavItems, props.showQuickNavPanel, props.setShowQuickNavPanel
   ]);
 
   return {

@@ -232,6 +232,7 @@ export interface Page {
   name: string;
   memos: MemoBlock[];
   categories: CategoryBlock[]; // 카테고리 블록들
+  quickNavItems?: QuickNavItem[]; // 페이지별 단축 이동 목록
 }
 
 // Canvas action types for history tracking
@@ -306,6 +307,5 @@ export interface AppState {
   rightPanelOpen: boolean;
   dataRegistry: DataRegistry; // Global data registry for named data
   canvasHistory: CanvasHistory; // Canvas-specific undo/redo history
-  quickNavItems?: QuickNavItem[]; // Quick navigation shortcuts
   tutorialState?: TutorialState; // Tutorial state
 }

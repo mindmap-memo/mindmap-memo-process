@@ -37,8 +37,6 @@ interface UseMemoHandlersProps {
   setSelectedMemoId: React.Dispatch<React.SetStateAction<string | null>>;
   selectedMemoIds: string[];
   setSelectedMemoIds: React.Dispatch<React.SetStateAction<string[]>>;
-  quickNavItems: any[];
-  setQuickNavItems: React.Dispatch<React.SetStateAction<any[]>>;
   leftPanelWidth: number;
   rightPanelOpen: boolean;
   rightPanelWidth: number;
@@ -56,8 +54,6 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
     setSelectedMemoId,
     selectedMemoIds,
     setSelectedMemoIds,
-    quickNavItems,
-    setQuickNavItems,
     leftPanelWidth,
     rightPanelOpen,
     rightPanelWidth,
@@ -291,7 +287,15 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
             ...m,
             connections: m.connections.filter(connId => connId !== memoId)
           }));
-        return { ...page, memos: updatedMemos };
+
+        // Quick Nav에서도 제거 (페이지별)
+        const updatedQuickNavItems = (page.quickNavItems || []).filter(item => item.targetId !== memoId);
+
+        return {
+          ...page,
+          memos: updatedMemos,
+          quickNavItems: updatedQuickNavItems
+        };
       }
       return page;
     }));
@@ -304,13 +308,10 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
       setSelectedMemoId(null);
     }
 
-    // Quick Nav에서 제거
-    setQuickNavItems(prev => prev.filter(item => item.targetId !== memoId));
-
     if (saveCanvasState) {
       saveCanvasState('memo_delete', `메모 삭제: ${memoId}`);
     }
-  }, [currentPageId, setPages, selectedMemoIds, setSelectedMemoIds, selectedMemoId, setSelectedMemoId, quickNavItems, setQuickNavItems, saveCanvasState]);
+  }, [currentPageId, setPages, selectedMemoIds, setSelectedMemoIds, selectedMemoId, setSelectedMemoId, saveCanvasState]);
 
   return {
     addMemoBlock,

@@ -49,9 +49,9 @@ import { calculateCategoryArea } from '../utils/categoryAreaUtils';
 
 interface UseQuickNavHandlersProps {
   pages: Page[];
+  setPages: React.Dispatch<React.SetStateAction<Page[]>>;
   currentPageId: string;
   quickNavItems: QuickNavItem[];
-  setQuickNavItems: React.Dispatch<React.SetStateAction<QuickNavItem[]>>;
   setCurrentPageId: React.Dispatch<React.SetStateAction<string>>;
   setCanvasOffset: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
   setCanvasScale: React.Dispatch<React.SetStateAction<number>>;
@@ -59,9 +59,9 @@ interface UseQuickNavHandlersProps {
 
 export const useQuickNavHandlers = ({
   pages,
+  setPages,
   currentPageId,
   quickNavItems,
-  setQuickNavItems,
   setCurrentPageId,
   setCanvasOffset,
   setCanvasScale
@@ -222,9 +222,21 @@ export const useQuickNavHandlers = ({
         targetType,
         pageId: currentPageId
       };
-      setQuickNavItems((prev) => [...prev, newItem]);
+
+      // 현재 페이지의 quickNavItems 배열에 추가
+      setPages((prevPages) =>
+        prevPages.map((page) => {
+          if (page.id === currentPageId) {
+            return {
+              ...page,
+              quickNavItems: [...(page.quickNavItems || []), newItem]
+            };
+          }
+          return page;
+        })
+      );
     },
-    [quickNavItems, currentPageId, setQuickNavItems]
+    [quickNavItems, currentPageId, setPages]
   );
 
   /**
@@ -244,9 +256,20 @@ export const useQuickNavHandlers = ({
    */
   const deleteQuickNavItem = useCallback(
     (itemId: string) => {
-      setQuickNavItems((prev) => prev.filter((item) => item.id !== itemId));
+      // 현재 페이지의 quickNavItems 배열에서 삭제
+      setPages((prevPages) =>
+        prevPages.map((page) => {
+          if (page.id === currentPageId) {
+            return {
+              ...page,
+              quickNavItems: (page.quickNavItems || []).filter((item) => item.id !== itemId)
+            };
+          }
+          return page;
+        })
+      );
     },
-    [setQuickNavItems]
+    [currentPageId, setPages]
   );
 
   /**

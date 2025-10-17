@@ -55,7 +55,6 @@ const App: React.FC = () => {
     canvasScale,
     setCanvasScale,
     quickNavItems,
-    setQuickNavItems,
     showQuickNavPanel,
     setShowQuickNavPanel,
     isConnecting,
@@ -154,8 +153,6 @@ const App: React.FC = () => {
     setSelectedMemoId,
     selectedMemoIds,
     setSelectedMemoIds,
-    quickNavItems,
-    setQuickNavItems,
     leftPanelWidth,
     rightPanelOpen,
     rightPanelWidth,
@@ -202,9 +199,9 @@ const App: React.FC = () => {
   // ===== Quick Navigation 핸들러 =====
   const quickNavHandlers = useQuickNavHandlers({
     pages,
+    setPages,
     currentPageId,
     quickNavItems,
-    setQuickNavItems,
     setCurrentPageId,
     setCanvasOffset,
     setCanvasScale
@@ -309,7 +306,6 @@ const App: React.FC = () => {
     rightPanelWidth,
     canvasScale,
     setCanvasOffset,
-    setQuickNavItems,
     saveCanvasState
   });
 
@@ -392,8 +388,7 @@ const App: React.FC = () => {
     leftPanelOpen,
     rightPanelOpen,
     leftPanelWidth,
-    rightPanelWidth,
-    quickNavItems
+    rightPanelWidth
   });
 
   // ===== 카테고리 드롭 감지 =====
@@ -484,8 +479,6 @@ const App: React.FC = () => {
     setSelectedCategoryId,
     selectedCategoryIds,
     setSelectedCategoryIds,
-    quickNavItems,
-    setQuickNavItems,
     deleteMemoBlock,
     deleteCategory,
     saveCanvasState
@@ -611,7 +604,6 @@ const App: React.FC = () => {
 
     // QuickNav
     quickNavItems,
-    setQuickNavItems,
     showQuickNavPanel,
     setShowQuickNavPanel
   });

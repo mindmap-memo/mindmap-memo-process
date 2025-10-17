@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Page, QuickNavItem, ImportanceLevel, DataRegistry } from '../types';
 import { STORAGE_KEYS, DEFAULT_PAGES } from '../constants/defaultData';
 import { loadFromStorage } from '../utils/storageUtils';
@@ -59,10 +59,13 @@ export const useAppState = () => {
   const [canvasScale, setCanvasScale] = useState(1);
 
   // ===== 단축 이동 (Quick Navigation) =====
-  const [quickNavItems, setQuickNavItems] = useState<QuickNavItem[]>(() =>
-    loadFromStorage(STORAGE_KEYS.QUICK_NAV_ITEMS, [])
-  );
   const [showQuickNavPanel, setShowQuickNavPanel] = useState(false);
+
+  // 현재 페이지의 quickNavItems를 가져오기 (페이지별 저장)
+  const quickNavItems = useMemo(() => {
+    const currentPage = pages.find(p => p.id === currentPageId);
+    return currentPage?.quickNavItems || [];
+  }, [pages, currentPageId]);
 
   // ===== 중요도 필터 =====
   const [activeImportanceFilters, setActiveImportanceFilters] = useState<Set<ImportanceLevel>>(
@@ -130,7 +133,6 @@ export const useAppState = () => {
 
     // 단축 이동
     quickNavItems,
-    setQuickNavItems,
     showQuickNavPanel,
     setShowQuickNavPanel,
 

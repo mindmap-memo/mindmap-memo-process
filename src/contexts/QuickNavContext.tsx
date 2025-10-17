@@ -3,9 +3,8 @@ import { QuickNavItem } from '../types';
 
 // QuickNav Context 타입 정의
 export interface QuickNavContextType {
-  // 단축 이동 항목들
+  // 단축 이동 항목들 (현재 페이지의 항목만)
   quickNavItems: QuickNavItem[];
-  setQuickNavItems: React.Dispatch<React.SetStateAction<QuickNavItem[]>>;
 
   // 패널 표시 상태
   showQuickNavPanel: boolean;

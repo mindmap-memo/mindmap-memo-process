@@ -27,7 +27,6 @@ interface UseCategoryHandlersProps {
   rightPanelWidth: number;
   canvasScale: number;
   setCanvasOffset: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
-  setQuickNavItems: React.Dispatch<React.SetStateAction<any[]>>;
   saveCanvasState?: (actionType: CanvasActionType, description: string) => void;
 }
 
@@ -41,7 +40,6 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
     rightPanelWidth,
     canvasScale,
     setCanvasOffset,
-    setQuickNavItems,
     saveCanvasState
   } = props;
 
@@ -189,20 +187,25 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
               children: c.children.filter(childId => childId !== categoryId) // 자식 목록에서도 제거
             }));
 
-          return { ...page, memos: updatedMemos, categories: updatedCategories };
+          // 단축 이동 목록에서 삭제된 카테고리 제거 (페이지별)
+          const updatedQuickNavItems = (page.quickNavItems || []).filter(item => item.targetId !== categoryId);
+
+          return {
+            ...page,
+            memos: updatedMemos,
+            categories: updatedCategories,
+            quickNavItems: updatedQuickNavItems
+          };
         }
       }
       return page;
     }));
 
-    // 단축 이동 목록에서 삭제된 카테고리 제거
-    setQuickNavItems(prev => prev.filter(item => item.targetId !== categoryId));
-
     // 실행 취소를 위한 상태 저장
     if (saveCanvasState) {
       setTimeout(() => saveCanvasState('category_delete', `카테고리 삭제: ${categoryTitle}`), 0);
     }
-  }, [pages, currentPageId, setPages, setQuickNavItems, saveCanvasState]);
+  }, [pages, currentPageId, setPages, saveCanvasState]);
 
   /**
    * 카테고리 확장/축소 토글

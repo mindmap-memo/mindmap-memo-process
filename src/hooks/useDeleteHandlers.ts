@@ -13,8 +13,6 @@ interface UseDeleteHandlersProps {
   setSelectedCategoryId: React.Dispatch<React.SetStateAction<string | null>>;
   selectedCategoryIds: string[];
   setSelectedCategoryIds: React.Dispatch<React.SetStateAction<string[]>>;
-  quickNavItems: QuickNavItem[];
-  setQuickNavItems: React.Dispatch<React.SetStateAction<QuickNavItem[]>>;
   deleteMemoBlock: () => void;
   deleteCategory: (categoryId: string) => void;
   saveCanvasState: (actionType: CanvasActionType, description: string) => void;
@@ -32,8 +30,6 @@ export const useDeleteHandlers = ({
   setSelectedCategoryId,
   selectedCategoryIds,
   setSelectedCategoryIds,
-  quickNavItems,
-  setQuickNavItems,
   deleteMemoBlock,
   deleteCategory,
   saveCanvasState
@@ -52,14 +48,13 @@ export const useDeleteHandlers = ({
         return {
           ...page,
           memos: page.memos.filter(memo => !selectedMemoIds.includes(memo.id)),
-          categories: (page.categories || []).filter(cat => !selectedCategoryIds.includes(cat.id))
+          categories: (page.categories || []).filter(cat => !selectedCategoryIds.includes(cat.id)),
+          // 단축 이동 목록에서 삭제된 메모/카테고리 제거 (페이지별)
+          quickNavItems: (page.quickNavItems || []).filter(item =>
+            !selectedMemoIds.includes(item.targetId) && !selectedCategoryIds.includes(item.targetId)
+          )
         };
       }));
-
-      // 단축 이동 목록에서 삭제된 메모/카테고리 제거
-      setQuickNavItems(prev => prev.filter(item =>
-        !selectedMemoIds.includes(item.targetId) && !selectedCategoryIds.includes(item.targetId)
-      ));
 
       // 선택 상태 초기화
       setSelectedMemoIds([]);
@@ -91,7 +86,6 @@ export const useDeleteHandlers = ({
     selectedCategoryId,
     currentPageId,
     setPages,
-    setQuickNavItems,
     setSelectedMemoIds,
     setSelectedCategoryIds,
     setSelectedMemoId,

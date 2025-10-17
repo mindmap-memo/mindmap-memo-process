@@ -270,7 +270,8 @@ export const DEFAULT_PAGES: Page[] = (() => {
       id: pageId,
       name: '페이지 1',
       memos: tutorialMemos,
-      categories: [tutorialCategory]
+      categories: [tutorialCategory],
+      quickNavItems: [] // 빈 단축 이동 목록으로 초기화
     }
   ];
 })();
