@@ -436,6 +436,7 @@ const Canvas: React.FC<CanvasProps> = ({
     <div
       id="main-canvas"
       data-canvas="true"
+      data-tutorial="canvas"
       className={styles.canvas}
       style={{
         cursor: currentTool === 'pan' ? 'grab' : currentTool === 'zoom' ? 'zoom-in' : 'default',

@@ -30,7 +30,7 @@ import LeftPanel from './components/LeftPanel';
 import RightPanel from './components/RightPanel';
 import Canvas from './components/Canvas/Canvas';
 import { Tutorial } from './components/Tutorial';
-import { tutorialSteps } from './utils/tutorialSteps';
+import { coreTutorialSteps, basicTutorialSteps } from './utils/tutorialSteps';
 import { QuickNavPanel } from './components/QuickNavPanel';
 import styles from './scss/App.module.scss';
 
@@ -238,9 +238,16 @@ const App: React.FC = () => {
     return {
       isActive: !completed, // 완료되지 않았으면 자동으로 시작
       currentStep: 0,
-      completed: completed
+      completed: completed,
+      currentSubStep: 0
     };
   });
+
+  // 튜토리얼 모드 (basic: 기본 기능 먼저, core: 핵심 기능 나중에)
+  const [tutorialMode, setTutorialMode] = useState<'basic' | 'core'>('basic');
+
+  // 현재 모드에 맞는 튜토리얼 단계 선택
+  const currentTutorialSteps = tutorialMode === 'basic' ? basicTutorialSteps : coreTutorialSteps;
 
   // ===== 튜토리얼 validation 상태 (훅 내부에서 관리) =====
   const tutorialValidation = useTutorialValidation({
@@ -285,7 +292,11 @@ const App: React.FC = () => {
     canvasOffset,
     canvasScale,
     pages,
-    currentPageId
+    currentPageId,
+    setCurrentPageId,
+    setPages,
+    setCanvasOffset,
+    setCanvasScale
   });
 
   const {
@@ -295,6 +306,54 @@ const App: React.FC = () => {
     handleTutorialComplete,
     canProceedTutorial
   } = tutorialHandlers;
+
+  // 기본 기능에서 핵심 기능으로 전환하는 핸들러
+  const handleSwitchToCore = () => {
+    setTutorialMode('core');
+    setTutorialState(prev => ({ ...prev, currentStep: 0, currentSubStep: 0 }));
+  };
+
+  // 튜토리얼 이전 단계 핸들러
+  const handleTutorialPrev = () => {
+    if (tutorialState.currentStep > 0) {
+      setTutorialState(prev => ({
+        ...prev,
+        currentStep: prev.currentStep - 1,
+        currentSubStep: 0
+      }));
+    }
+  };
+
+  // 서브스텝 이벤트 감지 핸들러
+  const handleSubStepEvent = (eventType: string) => {
+    if (!tutorialState.isActive) return;
+
+    const currentStep = currentTutorialSteps[tutorialState.currentStep];
+    if (!currentStep?.subSteps) return;
+
+    const currentSubStep = tutorialState.currentSubStep || 0;
+    const activeSubStep = currentStep.subSteps[currentSubStep];
+
+    if (activeSubStep && activeSubStep.eventType === eventType) {
+      // 서브스텝 완료
+      const nextSubStep = currentSubStep + 1;
+
+      if (nextSubStep >= currentStep.subSteps.length) {
+        // 마지막 서브스텝이면 다음 단계로
+        setTutorialState(prev => ({
+          ...prev,
+          currentStep: prev.currentStep + 1,
+          currentSubStep: 0
+        }));
+      } else {
+        // 다음 서브스텝으로
+        setTutorialState(prev => ({
+          ...prev,
+          currentSubStep: nextSubStep
+        }));
+      }
+    }
+  };
 
   // ===== 카테고리 핸들러 =====
   const categoryHandlers = useCategoryHandlers({
@@ -659,7 +718,10 @@ const App: React.FC = () => {
         selectedCategoryIds={selectedCategoryIds}
         onMemoSelect={handleMemoSelect}
         onCategorySelect={selectCategory}
-        onAddMemo={addMemoBlock}
+        onAddMemo={(position) => {
+          addMemoBlock(position);
+          handleSubStepEvent('memo-created');
+        }}
         onAddCategory={addCategory}
         onDeleteMemo={deleteMemoBlock}
         onDeleteCategory={deleteCategory}
@@ -683,8 +745,14 @@ const App: React.FC = () => {
         connectingFromId={connectingFromId}
         connectingFromDirection={connectingFromDirection}
         dragLineEnd={appState.dragLineEnd}
-        onStartConnection={startConnection}
-        onConnectMemos={connectMemos}
+        onStartConnection={(memoId, direction) => {
+          startConnection(memoId, direction);
+          handleSubStepEvent('connection-started');
+        }}
+        onConnectMemos={(fromId, toId) => {
+          connectMemos(fromId, toId);
+          handleSubStepEvent('connection-completed');
+        }}
         onCancelConnection={cancelConnection}
         onRemoveConnection={removeConnection}
         onUpdateDragLine={updateDragLine}
@@ -839,11 +907,14 @@ const App: React.FC = () => {
       {/* 튜토리얼 오버레이 */}
       {tutorialState.isActive && (
         <Tutorial
-          steps={tutorialSteps}
+          steps={currentTutorialSteps}
           currentStep={tutorialState.currentStep}
+          currentSubStep={tutorialState.currentSubStep || 0}
           onNext={handleTutorialNext}
+          onPrev={handleTutorialPrev}
           onSkip={handleTutorialSkip}
           onComplete={handleTutorialComplete}
+          onSwitchToCore={handleSwitchToCore}
           canProceed={canProceedTutorial()}
         />
       )}

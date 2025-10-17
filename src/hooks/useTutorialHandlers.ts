@@ -36,6 +36,10 @@ interface UseTutorialHandlersProps {
   canvasScale: number;
   pages: Page[];
   currentPageId: string;
+  setCurrentPageId: React.Dispatch<React.SetStateAction<string>>;
+  setPages: React.Dispatch<React.SetStateAction<Page[]>>;
+  setCanvasOffset: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
+  setCanvasScale: React.Dispatch<React.SetStateAction<number>>;
 }
 
 export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
@@ -57,7 +61,11 @@ export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
     canvasOffset,
     canvasScale,
     pages,
-    currentPageId
+    currentPageId,
+    setCurrentPageId,
+    setPages,
+    setCanvasOffset: setCanvasOffsetProp,
+    setCanvasScale: setCanvasScaleProp
   } = props;
 
   /**
@@ -86,6 +94,19 @@ export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
     // 다른 단계는 자유롭게 진행
     return true;
   }, [tutorialState.currentStep, canvasPanned, canvasZoomed, memoCreated, memoDragged]);
+
+  /**
+   * 튜토리얼 페이지 초기 상태 생성
+   */
+  const createInitialTutorialPage = (pageId: string): Page => {
+    return {
+      id: pageId,
+      name: '튜토리얼',
+      memos: [],
+      categories: [],
+      quickNavItems: []
+    };
+  };
 
   /**
    * 다음 튜토리얼 단계로 진행
@@ -136,6 +157,13 @@ export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
    * 튜토리얼 건너뛰기
    */
   const handleTutorialSkip = useCallback(() => {
+    // 튜토리얼 페이지 초기화
+    const tutorialPage = pages.find(p => p.name.startsWith('튜토리얼'));
+    if (tutorialPage) {
+      const resetPage = createInitialTutorialPage(tutorialPage.id);
+      setPages(prev => prev.map(p => p.id === tutorialPage.id ? resetPage : p));
+    }
+
     setTutorialState({
       isActive: false,
       currentStep: 0,
@@ -146,12 +174,19 @@ export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
     setCanvasZoomed(false);
     setMemoCreated(false);
     setMemoDragged(false);
-  }, [setTutorialState, setCanvasPanned, setCanvasZoomed, setMemoCreated, setMemoDragged]);
+  }, [pages, setPages, setTutorialState, setCanvasPanned, setCanvasZoomed, setMemoCreated, setMemoDragged]);
 
   /**
    * 튜토리얼 완료
    */
   const handleTutorialComplete = useCallback(() => {
+    // 튜토리얼 페이지 초기화
+    const tutorialPage = pages.find(p => p.name.startsWith('튜토리얼'));
+    if (tutorialPage) {
+      const resetPage = createInitialTutorialPage(tutorialPage.id);
+      setPages(prev => prev.map(p => p.id === tutorialPage.id ? resetPage : p));
+    }
+
     setTutorialState({
       isActive: false,
       currentStep: 0,
@@ -162,17 +197,50 @@ export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
     setCanvasZoomed(false);
     setMemoCreated(false);
     setMemoDragged(false);
-  }, [setTutorialState, setCanvasPanned, setCanvasZoomed, setMemoCreated, setMemoDragged]);
+  }, [pages, setPages, setTutorialState, setCanvasPanned, setCanvasZoomed, setMemoCreated, setMemoDragged]);
+
+  /**
+   * 튜토리얼 전용 페이지 생성 또는 찾기
+   */
+  const getTutorialPage = useCallback((): Page => {
+    // 기존에 튜토리얼 페이지가 있는지 확인 (이름이 "튜토리얼"로 시작하는 페이지)
+    const existingTutorialPage = pages.find(p => p.name.startsWith('튜토리얼'));
+
+    if (existingTutorialPage) {
+      return existingTutorialPage;
+    }
+
+    // 없으면 새로 생성
+    const tutorialPageId = `tutorial-${Date.now()}`;
+    const tutorialPage = createInitialTutorialPage(tutorialPageId);
+
+    // 페이지 추가
+    setPages(prev => [...prev, tutorialPage]);
+
+    return tutorialPage;
+  }, [pages, setPages]);
 
   /**
    * 튜토리얼 시작
    */
   const handleStartTutorial = useCallback(() => {
+    // 1. 튜토리얼 페이지 생성 또는 찾기
+    const tutorialPage = getTutorialPage();
+
+    // 2. 튜토리얼 페이지로 이동
+    setCurrentPageId(tutorialPage.id);
+
+    // 3. 캔버스 초기화 (중앙으로)
+    setCanvasOffsetProp({ x: 0, y: 0 });
+    setCanvasScaleProp(1);
+
+    // 4. 튜토리얼 상태 시작
     setTutorialState({
       isActive: true,
       currentStep: 0,
       completed: false
     });
+
     setCanvasPanned(false);
     setCanvasZoomed(false);
     setMemoCreated(false);
@@ -181,15 +249,12 @@ export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
     initialCanvasScale.current = canvasScale;
 
     // 현재 메모 개수와 위치를 저장
-    const currentPage = pages.find(p => p.id === currentPageId);
-    if (currentPage) {
-      initialMemoCount.current = currentPage.memos.length;
-      initialMemoPositions.current.clear();
-      currentPage.memos.forEach(memo => {
-        initialMemoPositions.current.set(memo.id, { x: memo.position.x, y: memo.position.y });
-      });
-    }
-  }, [setTutorialState, setCanvasPanned, setCanvasZoomed, setMemoCreated, setMemoDragged, initialCanvasOffset, initialCanvasScale, initialMemoPositions, initialMemoCount, canvasOffset, canvasScale, pages, currentPageId]);
+    initialMemoCount.current = tutorialPage.memos.length;
+    initialMemoPositions.current.clear();
+    tutorialPage.memos.forEach(memo => {
+      initialMemoPositions.current.set(memo.id, { x: memo.position.x, y: memo.position.y });
+    });
+  }, [getTutorialPage, setCurrentPageId, setCanvasOffsetProp, setCanvasScaleProp, setTutorialState, setCanvasPanned, setCanvasZoomed, setMemoCreated, setMemoDragged, initialCanvasOffset, initialCanvasScale, initialMemoPositions, initialMemoCount, canvasOffset, canvasScale]);
 
   return {
     handleStartTutorial,

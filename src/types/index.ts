@@ -282,6 +282,15 @@ export interface QuickNavItem {
 }
 
 // Tutorial System
+export interface TutorialSubStep {
+  order: number; // 1, 2, 3, ...
+  description: string; // 서브스텝 설명
+  targetElement?: string; // 애니메이션 타겟 (CSS selector)
+  animationType: 'cursor-click' | 'cursor-drag' | 'cursor-hover' | 'highlight' | 'none';
+  eventType: 'memo-created' | 'connection-started' | 'connection-completed' | 'category-created' | 'memo-added-to-category' | 'custom';
+  customValidation?: () => boolean; // 커스텀 이벤트 검증 함수
+}
+
 export interface TutorialStep {
   id: string;
   title: string;
@@ -291,12 +300,14 @@ export interface TutorialStep {
   action?: 'click' | 'drag' | 'type' | 'none'; // Required user action
   validation?: () => boolean; // Check if step is completed
   nextButtonText?: string;
+  subSteps?: TutorialSubStep[]; // 순차적으로 진행되는 서브스텝들
 }
 
 export interface TutorialState {
   isActive: boolean;
   currentStep: number;
   completed: boolean;
+  currentSubStep?: number; // 현재 서브스텝 인덱스 (0부터 시작)
 }
 
 export interface AppState {
