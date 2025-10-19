@@ -1,0 +1,68 @@
+// FileBlock.scss - 파일 블록 컴포넌트 스타일
+
+.fileContainer {
+  padding: 12px;
+  border-radius: 8px;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.3s ease;
+
+  &.default {
+    border: 1px solid #e0e0e0;
+    background-color: #f8f9fa;
+  }
+}
+
+.downloadIcon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  border-radius: 4px;
+  background-color: transparent;
+
+  &.clickable {
+    cursor: pointer;
+
+    &:hover {
+      background-color: #e9ecef;
+    }
+  }
+
+  &.notClickable {
+    cursor: default;
+  }
+
+  svg {
+    width: 24px;
+    height: 24px;
+
+    &.active {
+      stroke: #495057;
+    }
+
+    &.inactive {
+      stroke: #adb5bd;
+    }
+  }
+}
+
+.fileInfo {
+  flex: 1;
+}
+
+.fileName {
+  font-weight: 500;
+  font-size: 14px;
+  color: #212529;
+}
+
+.fileSize {
+  font-size: 12px;
+  color: #6c757d;
+  margin-top: 2px;
+}

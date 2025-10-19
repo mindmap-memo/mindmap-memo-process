@@ -1,0 +1,87 @@
+// BookmarkBlock.scss - 북마크 블록 컴포넌트 스타일
+
+.editContainer {
+  margin-bottom: 8px;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.urlInput,
+.titleInput,
+.descriptionInput {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.descriptionInput {
+  height: 60px;
+  resize: vertical;
+}
+
+.bookmarkContainer {
+  border-radius: 8px;
+  overflow: hidden;
+
+  &.editable {
+    cursor: pointer;
+  }
+
+  &.notEditable {
+    cursor: default;
+  }
+
+  &.default {
+    border: 1px solid #e0e0e0;
+    background-color: white;
+  }
+}
+
+.bookmarkImage {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+}
+
+.bookmarkContent {
+  padding: 12px;
+}
+
+.bookmarkTitle {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+  color: #1a1a1a;
+}
+
+.bookmarkDescription {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.bookmarkFooter {
+  font-size: 12px;
+  color: #888;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  img {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.clickOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  cursor: pointer;
+}

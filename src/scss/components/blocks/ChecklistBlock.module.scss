@@ -1,0 +1,108 @@
+// ChecklistBlock.scss - 체크리스트 블록 컴포넌트 스타일
+
+.checklistContainer {
+  margin-bottom: 8px;
+  border-radius: 4px;
+}
+
+.emptyPlaceholder {
+  padding: 8px;
+  border: 1px dashed #ddd;
+  border-radius: 4px;
+  text-align: center;
+  color: #666;
+  cursor: pointer;
+}
+
+.checklistItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+
+  &:not(:last-child) {
+    border-bottom: 1px solid #f0f0f0;
+  }
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.itemEditRow {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 4px;
+}
+
+.itemInput {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+
+  &.checked {
+    text-decoration: line-through;
+    opacity: 0.6;
+  }
+
+  &.unchecked {
+    text-decoration: none;
+    opacity: 1;
+  }
+}
+
+.deleteButton {
+  padding: 2px 6px;
+  border: 1px solid #ff4444;
+  background-color: #ff4444;
+  color: white;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.itemText {
+  flex: 1;
+  font-size: 14px;
+
+  &.checked {
+    text-decoration: line-through;
+    opacity: 0.6;
+    color: #666;
+  }
+
+  &.unchecked {
+    text-decoration: none;
+    opacity: 1;
+    color: #000;
+  }
+}
+
+.addItemRow {
+  margin-top: 8px;
+  padding: 4px 0;
+  text-align: center;
+}
+
+.addItemButton {
+  padding: 4px 8px;
+  border: 1px dashed #ddd;
+  background-color: transparent;
+  color: #666;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.emptyMessage {
+  padding: 8px;
+  color: #666;
+  font-style: italic;
+  font-size: 14px;
+}

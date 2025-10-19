@@ -1,0 +1,24 @@
+// Resizer.scss - 리사이저 컴포넌트 스타일
+
+.resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  background-color: transparent;
+  z-index: 1000;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+  }
+
+  &.left {
+    right: -2px;
+  }
+
+  &.right {
+    left: -2px;
+  }
+}

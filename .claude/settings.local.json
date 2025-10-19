@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/ghpjj/OneDrive/Desktop/project/mindmap-memo/src/**)",
+      "Read(//c/Users/ghpjj/OneDrive/Desktop/project/mindmap-memo/**)",
+      "Bash(taskkill //F //PID 24968)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
