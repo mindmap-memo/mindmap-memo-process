@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { QuickNavItem, Page } from '../types';
 import { calculateCategoryArea } from '../utils/categoryAreaUtils';
+import { createQuickNavItem, deleteQuickNavItem as deleteQuickNavItemApi } from '../utils/api';
 
 /**
  * useQuickNavHandlers
@@ -200,11 +201,11 @@ export const useQuickNavHandlers = ({
   );
 
   /**
-   * 단축 이동 항목 추가
+   * 단축 이동 항목 추가 (낙관적 업데이트)
    * 중복 체크 수행
    */
   const addQuickNavItem = useCallback(
-    (name: string, targetId: string, targetType: 'memo' | 'category') => {
+    async (name: string, targetId: string, targetType: 'memo' | 'category') => {
       // 중복 체크: 같은 페이지의 같은 타겟에 대한 단축 이동이 이미 있는지 확인
       const isDuplicate = quickNavItems.some(
         (item) => item.targetId === targetId && item.targetType === targetType && item.pageId === currentPageId
@@ -215,26 +216,68 @@ export const useQuickNavHandlers = ({
         return;
       }
 
-      const newItem: QuickNavItem = {
-        id: Date.now().toString(),
+      // 임시 ID로 즉시 UI에 반영 (낙관적 업데이트)
+      const tempId = `temp-${Date.now()}`;
+      const optimisticItem: QuickNavItem = {
+        id: tempId,
         name,
         targetId,
         targetType,
         pageId: currentPageId
       };
 
-      // 현재 페이지의 quickNavItems 배열에 추가
+      // 즉시 UI 업데이트
       setPages((prevPages) =>
         prevPages.map((page) => {
           if (page.id === currentPageId) {
             return {
               ...page,
-              quickNavItems: [...(page.quickNavItems || []), newItem]
+              quickNavItems: [...(page.quickNavItems || []), optimisticItem]
             };
           }
           return page;
         })
       );
+
+      // 백그라운드에서 DB에 저장
+      try {
+        const newItem = await createQuickNavItem({
+          itemId: targetId,
+          type: targetType,
+          pageId: currentPageId,
+          title: name
+        });
+
+        // 실제 ID로 교체
+        setPages((prevPages) =>
+          prevPages.map((page) => {
+            if (page.id === currentPageId) {
+              return {
+                ...page,
+                quickNavItems: (page.quickNavItems || []).map((item) =>
+                  item.id === tempId ? newItem : item
+                )
+              };
+            }
+            return page;
+          })
+        );
+      } catch (error) {
+        console.error('단축 이동 추가 실패:', error);
+        // 실패 시 롤백
+        setPages((prevPages) =>
+          prevPages.map((page) => {
+            if (page.id === currentPageId) {
+              return {
+                ...page,
+                quickNavItems: (page.quickNavItems || []).filter((item) => item.id !== tempId)
+              };
+            }
+            return page;
+          })
+        );
+        alert('단축 이동 추가에 실패했습니다.');
+      }
     },
     [quickNavItems, currentPageId, setPages]
   );
@@ -252,14 +295,18 @@ export const useQuickNavHandlers = ({
   );
 
   /**
-   * 단축 이동 항목 삭제
+   * 단축 이동 항목 삭제 (낙관적 업데이트)
    */
   const deleteQuickNavItem = useCallback(
-    (itemId: string) => {
-      // 현재 페이지의 quickNavItems 배열에서 삭제
+    async (itemId: string) => {
+      // 삭제 전 백업 (롤백용)
+      let deletedItem: QuickNavItem | undefined;
+
+      // 즉시 UI에서 제거 (낙관적 업데이트)
       setPages((prevPages) =>
         prevPages.map((page) => {
           if (page.id === currentPageId) {
+            deletedItem = (page.quickNavItems || []).find((item) => item.id === itemId);
             return {
               ...page,
               quickNavItems: (page.quickNavItems || []).filter((item) => item.id !== itemId)
@@ -268,6 +315,28 @@ export const useQuickNavHandlers = ({
           return page;
         })
       );
+
+      // 백그라운드에서 DB에서 삭제
+      try {
+        await deleteQuickNavItemApi(itemId);
+      } catch (error) {
+        console.error('단축 이동 삭제 실패:', error);
+        // 실패 시 롤백
+        if (deletedItem) {
+          setPages((prevPages) =>
+            prevPages.map((page) => {
+              if (page.id === currentPageId) {
+                return {
+                  ...page,
+                  quickNavItems: [...(page.quickNavItems || []), deletedItem!]
+                };
+              }
+              return page;
+            })
+          );
+        }
+        alert('단축 이동 삭제에 실패했습니다.');
+      }
     },
     [currentPageId, setPages]
   );
