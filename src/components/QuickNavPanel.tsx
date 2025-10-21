@@ -148,7 +148,7 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
                               </>
                             ) : (
                               <>
-                                <span
+                                <div
                                   onClick={() => {
                                     onExecuteQuickNav(item);
                                     onTogglePanel();
@@ -157,12 +157,12 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
                                   title={item.name}
                                 >
                                   {item.name}
-                                </span>
-                                {!isCurrentPage && targetPage && (
-                                  <span className={styles['quick-nav-item-page']}>
-                                    {targetPage.name}
-                                  </span>
-                                )}
+                                  {!isCurrentPage && targetPage && (
+                                    <span className={styles['quick-nav-item-page']}>
+                                      {targetPage.name}
+                                    </span>
+                                  )}
+                                </div>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -243,7 +243,7 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
                               </>
                             ) : (
                               <>
-                                <span
+                                <div
                                   onClick={() => {
                                     onExecuteQuickNav(item);
                                     onTogglePanel();
@@ -252,12 +252,12 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
                                   title={item.name}
                                 >
                                   {item.name}
-                                </span>
-                                {!isCurrentPage && targetPage && (
-                                  <span className={styles['quick-nav-item-page']}>
-                                    {targetPage.name}
-                                  </span>
-                                )}
+                                  {!isCurrentPage && targetPage && (
+                                    <span className={styles['quick-nav-item-page']}>
+                                      {targetPage.name}
+                                    </span>
+                                  )}
+                                </div>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
