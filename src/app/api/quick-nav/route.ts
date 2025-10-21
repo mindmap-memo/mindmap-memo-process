@@ -1,23 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/auth';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-// GET /api/quick-nav - Get all quick nav items for current user
+// GET /api/quick-nav - Get all quick nav items
 export async function GET() {
   try {
-    const session = await auth();
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const items = await sql`
       SELECT
-        id, user_id, type, target_id, page_id, title, created_at
+        id, type, target_id, page_id, title, created_at
       FROM quick_nav_items
-      WHERE user_id = ${session.user.id}
       ORDER BY created_at DESC
     `;
 
@@ -42,12 +34,6 @@ export async function GET() {
 // POST /api/quick-nav - Create new quick nav item
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await request.json();
     const { type, itemId, pageId, title } = body;
 
@@ -61,8 +47,7 @@ export async function POST(request: NextRequest) {
     // Check if item already exists
     const existing = await sql`
       SELECT id FROM quick_nav_items
-      WHERE user_id = ${session.user.id}
-        AND target_id = ${itemId}
+      WHERE target_id = ${itemId}
     `;
 
     if (existing.length > 0) {
@@ -79,13 +64,13 @@ export async function POST(request: NextRequest) {
         id, user_id, type, target_id, page_id, title
       )
       VALUES (
-        ${quickNavId}, ${session.user.id}, ${type}, ${itemId}, ${pageId}, ${title || ''}
+        ${quickNavId}, 'default-user', ${type}, ${itemId}, ${pageId}, ${title || ''}
       )
     `;
 
     const created = await sql`
       SELECT
-        id, user_id, type, target_id, page_id, title, created_at
+        id, type, target_id, page_id, title, created_at
       FROM quick_nav_items
       WHERE id = ${quickNavId}
     `;

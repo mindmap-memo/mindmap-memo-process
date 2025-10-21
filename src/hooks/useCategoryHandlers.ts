@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { CategoryBlock, Page, MemoBlock, CanvasActionType } from '../types';
 import { calculateCategoryArea, centerCanvasOnPosition } from '../utils/categoryAreaUtils';
 import { resolveAreaCollisions } from '../utils/collisionUtils';
+import { createCategory as createCategoryApi } from '../utils/api';
 
 /**
  * useCategoryHandlers
@@ -47,7 +48,7 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
    * 카테고리 추가
    * 영역과 겹치지 않는 위치를 자동으로 찾아 배치
    */
-  const addCategory = useCallback((position?: { x: number; y: number }) => {
+  const addCategory = useCallback(async (position?: { x: number; y: number }) => {
     const originalPosition = position || { x: 300, y: 200 };
     let newPosition = { ...originalPosition };
 
@@ -99,7 +100,7 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
     }
 
     const newCategory: CategoryBlock = {
-      id: Date.now().toString(),
+      id: `category-${Date.now()}`,
       title: 'New Category',
       tags: [],
       connections: [],
@@ -109,11 +110,28 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
       children: []
     };
 
-    setPages(prev => prev.map(page =>
-      page.id === currentPageId
-        ? { ...page, categories: [...(page.categories || []), newCategory] }
-        : page
-    ));
+    try {
+      // Create category in database
+      await createCategoryApi({
+        ...newCategory,
+        pageId: currentPageId
+      });
+
+      // Add to local state
+      setPages(prev => prev.map(page =>
+        page.id === currentPageId
+          ? { ...page, categories: [...(page.categories || []), newCategory] }
+          : page
+      ));
+    } catch (error) {
+      console.error('카테고리 생성 실패:', error);
+      // Fall back to local state only
+      setPages(prev => prev.map(page =>
+        page.id === currentPageId
+          ? { ...page, categories: [...(page.categories || []), newCategory] }
+          : page
+      ));
+    }
 
     // 위치가 변경된 경우 캔버스를 새 위치로 자동 이동
     if (position && (newPosition.x !== originalPosition.x || newPosition.y !== originalPosition.y)) {

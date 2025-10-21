@@ -33,7 +33,20 @@ export const usePageHandlers = ({
    */
   const addPage = useCallback(async () => {
     try {
-      const newPage = await createPage(`페이지 ${pages.length + 1}`);
+      const newId = `page-${Date.now()}`;
+      const newName = `페이지 ${pages.length + 1}`;
+
+      // Create page in database
+      await createPage(newId, newName);
+
+      // Add to local state
+      const newPage = {
+        id: newId,
+        name: newName,
+        memos: [],
+        categories: [],
+        quickNavItems: []
+      };
       setPages((prev) => [...prev, newPage]);
       setCurrentPageId(newPage.id);
     } catch (error) {

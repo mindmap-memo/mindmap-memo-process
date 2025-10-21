@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { MemoBlock, Page, MemoDisplaySize, CanvasActionType } from '../types';
 import { calculateCategoryArea, centerCanvasOnPosition } from '../utils/categoryAreaUtils';
+import { createMemo } from '../utils/api';
 
 /**
  * useMemoHandlers
@@ -66,7 +67,7 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
    * 메모 추가
    * 영역과 겹치지 않는 위치를 자동으로 찾아 배치하고 화면 중앙으로 이동
    */
-  const addMemoBlock = useCallback((position?: { x: number; y: number }) => {
+  const addMemoBlock = useCallback(async (position?: { x: number; y: number }) => {
     const originalPosition = position || { x: 100, y: 100 };
     let newPosition = { ...originalPosition };
 
@@ -134,13 +135,31 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
       ]
     };
 
-    setPages(prev => prev.map(page =>
-      page.id === currentPageId
-        ? { ...page, memos: [...page.memos, newMemo] }
-        : page
-    ));
+    try {
+      // Create memo in database
+      await createMemo({
+        ...newMemo,
+        pageId: currentPageId
+      });
 
-    setSelectedMemoId(newMemo.id);
+      // Add to local state
+      setPages(prev => prev.map(page =>
+        page.id === currentPageId
+          ? { ...page, memos: [...page.memos, newMemo] }
+          : page
+      ));
+
+      setSelectedMemoId(newMemo.id);
+    } catch (error) {
+      console.error('메모 생성 실패:', error);
+      // Fall back to local state only
+      setPages(prev => prev.map(page =>
+        page.id === currentPageId
+          ? { ...page, memos: [...page.memos, newMemo] }
+          : page
+      ));
+      setSelectedMemoId(newMemo.id);
+    }
 
     // 위치가 변경된 경우 캔버스를 새 위치로 자동 이동
     if (position && (newPosition.x !== originalPosition.x || newPosition.y !== originalPosition.y)) {

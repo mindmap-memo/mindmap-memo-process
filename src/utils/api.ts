@@ -16,29 +16,25 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 export async function fetchPages(): Promise<Page[]> {
   const response = await fetch(`${API_BASE}/pages`);
-  const data = await handleResponse<{ pages: any[] }>(response);
+  const data = await handleResponse<{ pages: Page[] }>(response);
 
-  return data.pages.map((p) => ({
-    id: p.id,
-    name: p.name,
-    memos: [],
-    categories: [],
-  }));
+  return data.pages;
 }
 
-export async function createPage(name: string): Promise<Page> {
+export async function createPage(id: string, name: string): Promise<Page> {
   const response = await fetch(`${API_BASE}/pages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ id, name }),
   });
-  const data = await handleResponse<{ page: any }>(response);
+  await handleResponse(response);
 
   return {
-    id: data.page.id,
-    name: data.page.name,
+    id,
+    name,
     memos: [],
     categories: [],
+    quickNavItems: []
   };
 }
 
