@@ -3,6 +3,7 @@ import { CategoryBlock, Page, MemoBlock, CanvasActionType } from '../types';
 import { calculateCategoryArea, centerCanvasOnPosition } from '../utils/categoryAreaUtils';
 import { resolveAreaCollisions } from '../utils/collisionUtils';
 import { createCategory as createCategoryApi } from '../utils/api';
+import { removeInvalidConnectionsAfterHierarchyChange } from '../utils/categoryHierarchyUtils';
 
 /**
  * useCategoryHandlers
@@ -328,6 +329,9 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
           // 영역 크기가 변경되었으므로 충돌 검사 실행
           let updatedPage = { ...page, memos: updatedMemos, categories: updatedCategories };
 
+          // 부모-자식 관계 변경으로 인한 잘못된 연결선 제거
+          updatedPage = removeInvalidConnectionsAfterHierarchyChange(updatedPage, itemId, categoryId || undefined);
+
           // 변경된 카테고리(들)에 대해 충돌 검사
           const affectedCategoryIds: string[] = [];
           if (categoryId) affectedCategoryIds.push(categoryId);
@@ -371,6 +375,9 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
 
           // 영역 크기가 변경되었으므로 충돌 검사 실행
           let updatedPage = { ...page, categories: updatedCategories };
+
+          // 부모-자식 관계 변경으로 인한 잘못된 연결선 제거
+          updatedPage = removeInvalidConnectionsAfterHierarchyChange(updatedPage, itemId, categoryId || undefined);
 
           // 변경된 카테고리(들)에 대해 충돌 검사
           const affectedCategoryIds: string[] = [];

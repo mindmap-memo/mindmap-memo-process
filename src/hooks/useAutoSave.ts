@@ -158,6 +158,9 @@ export const useAutoSave = (
                 title: category.title,
                 position: category.position,
                 size: category.size,
+                connections: category.connections,
+                tags: category.tags,
+                children: category.children,
                 parentId: category.parentId,
                 isExpanded: category.isExpanded,
               });

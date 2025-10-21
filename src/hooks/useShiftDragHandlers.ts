@@ -1,6 +1,7 @@
 import { useCallback, MutableRefObject } from 'react';
 import { Page, MemoBlock, CategoryBlock, CanvasActionType } from '../types';
 import { calculateCategoryArea } from '../utils/categoryAreaUtils';
+import { removeInvalidConnectionsAfterHierarchyChange } from '../utils/categoryHierarchyUtils';
 
 interface UseShiftDragHandlersProps {
   pages: Page[];
@@ -291,11 +292,19 @@ export const useShiftDragHandlers = ({
             return memo;
           });
 
-          return {
+          // 부모-자식 관계 변경으로 인한 잘못된 연결선 제거
+          let updatedPage = {
             ...p,
             categories: updatedCategories,
             memos: updatedMemos
           };
+
+          // 이동된 각 카테고리에 대해 연결선 제거
+          categoriesToMove.forEach(categoryId => {
+            updatedPage = removeInvalidConnectionsAfterHierarchyChange(updatedPage, categoryId, newParentId);
+          });
+
+          return updatedPage;
         }
         return p;
       }));
@@ -503,7 +512,8 @@ export const useShiftDragHandlers = ({
             return category;
           });
 
-          return {
+          // 부모-자식 관계 변경으로 인한 잘못된 연결선 제거
+          let updatedPage = {
             ...p,
             categories: updatedCategories,
             memos: p.memos.map(m =>
@@ -516,6 +526,11 @@ export const useShiftDragHandlers = ({
                 : m
             )
           };
+
+          // 이동된 메모에 대해 연결선 제거
+          updatedPage = removeInvalidConnectionsAfterHierarchyChange(updatedPage, draggedMemo.id, newParentId);
+
+          return updatedPage;
         }
         return p;
       }));
