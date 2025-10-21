@@ -135,31 +135,21 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
       ]
     };
 
-    try {
-      // Create memo in database
-      await createMemo({
-        ...newMemo,
-        pageId: currentPageId
-      });
+    // 즉시 UI 업데이트 (낙관적 업데이트)
+    setPages(prev => prev.map(page =>
+      page.id === currentPageId
+        ? { ...page, memos: [...page.memos, newMemo] }
+        : page
+    ));
+    setSelectedMemoId(newMemo.id);
 
-      // Add to local state
-      setPages(prev => prev.map(page =>
-        page.id === currentPageId
-          ? { ...page, memos: [...page.memos, newMemo] }
-          : page
-      ));
-
-      setSelectedMemoId(newMemo.id);
-    } catch (error) {
-      console.error('메모 생성 실패:', error);
-      // Fall back to local state only
-      setPages(prev => prev.map(page =>
-        page.id === currentPageId
-          ? { ...page, memos: [...page.memos, newMemo] }
-          : page
-      ));
-      setSelectedMemoId(newMemo.id);
-    }
+    // 백그라운드에서 데이터베이스 저장 (비동기, 실패해도 무시)
+    createMemo({
+      ...newMemo,
+      pageId: currentPageId
+    }).catch(error => {
+      console.warn('메모 생성 DB 저장 실패 (UI는 정상 동작):', error);
+    });
 
     // 위치가 변경된 경우 캔버스를 새 위치로 자동 이동
     if (position && (newPosition.x !== originalPosition.x || newPosition.y !== originalPosition.y)) {

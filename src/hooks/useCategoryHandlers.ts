@@ -110,28 +110,20 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
       children: []
     };
 
-    try {
-      // Create category in database
-      await createCategoryApi({
-        ...newCategory,
-        pageId: currentPageId
-      });
+    // 즉시 UI 업데이트 (낙관적 업데이트)
+    setPages(prev => prev.map(page =>
+      page.id === currentPageId
+        ? { ...page, categories: [...(page.categories || []), newCategory] }
+        : page
+    ));
 
-      // Add to local state
-      setPages(prev => prev.map(page =>
-        page.id === currentPageId
-          ? { ...page, categories: [...(page.categories || []), newCategory] }
-          : page
-      ));
-    } catch (error) {
-      console.error('카테고리 생성 실패:', error);
-      // Fall back to local state only
-      setPages(prev => prev.map(page =>
-        page.id === currentPageId
-          ? { ...page, categories: [...(page.categories || []), newCategory] }
-          : page
-      ));
-    }
+    // 백그라운드에서 데이터베이스 저장 (비동기, 실패해도 무시)
+    createCategoryApi({
+      ...newCategory,
+      pageId: currentPageId
+    }).catch(error => {
+      console.warn('카테고리 생성 DB 저장 실패 (UI는 정상 동작):', error);
+    });
 
     // 위치가 변경된 경우 캔버스를 새 위치로 자동 이동
     if (position && (newPosition.x !== originalPosition.x || newPosition.y !== originalPosition.y)) {

@@ -19,6 +19,7 @@ export const useAutoSave = (
   const saveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const previousPagesRef = useRef<Page[]>(pages);
   const isInitialLoad = useRef(true);
+  const isDatabaseAvailable = useRef(true); // 데이터베이스 사용 가능 여부
 
   useEffect(() => {
     // 첫 로드 시에는 저장하지 않음
@@ -28,14 +29,14 @@ export const useAutoSave = (
       return;
     }
 
-    if (!enabled) return;
+    if (!enabled || !isDatabaseAvailable.current) return;
 
     // 이전 타이머 취소
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
-    // 50ms 디바운스 후 저장 (거의 실시간)
+    // 300ms 디바운스 후 저장
     saveTimeoutRef.current = setTimeout(async () => {
       const previousPages = previousPagesRef.current;
 
@@ -52,9 +53,9 @@ export const useAutoSave = (
         if (prevPage.name !== page.name) {
           try {
             await updatePage(page.id, page.name);
-            console.log(`페이지 "${page.name}" 저장됨`);
           } catch (error) {
-            console.error('페이지 저장 실패:', error);
+            console.warn('페이지 저장 실패 (데이터베이스 미사용):', error);
+            isDatabaseAvailable.current = false;
           }
         }
 
@@ -67,14 +68,17 @@ export const useAutoSave = (
           try {
             const { deleteMemo: deleteMemoApi } = await import('../utils/api');
             await deleteMemoApi(memoId);
-            console.log(`메모 "${memoId}" 삭제됨`);
+            console.log(`✅ 메모 "${memoId}" 삭제 성공`);
           } catch (error) {
-            // 404 에러는 이미 삭제된 것이므로 무시 (다른 곳에서 먼저 삭제된 경우)
+            // 404 에러는 이미 삭제된 것이므로 무시
             const errorMessage = error instanceof Error ? error.message : String(error);
             if (errorMessage.includes('404') || errorMessage.includes('not found') || errorMessage.includes('Memo not found')) {
-              // 이미 삭제된 경우이므로 로그만 남기고 계속 진행
+              console.log(`ℹ️ 메모 "${memoId}" 이미 삭제됨 (404)`);
             } else {
-              console.error('메모 삭제 실패:', error);
+              console.error(`❌ 메모 "${memoId}" 삭제 실패:`, error);
+              // 데이터베이스 미사용 시 조용히 실패
+              isDatabaseAvailable.current = false;
+              return;
             }
           }
         }
@@ -104,9 +108,10 @@ export const useAutoSave = (
                 importance: memo.importance,
                 parentId: memo.parentId,
               });
-              console.log(`메모 "${memo.title}" 저장됨`);
             } catch (error) {
-              console.error('메모 저장 실패:', error);
+              // 데이터베이스 미사용 시 조용히 실패
+              isDatabaseAvailable.current = false;
+              return; // 더 이상 저장 시도하지 않음
             }
           }
         }
@@ -120,14 +125,17 @@ export const useAutoSave = (
           try {
             const { deleteCategory: deleteCategoryApi } = await import('../utils/api');
             await deleteCategoryApi(categoryId);
-            console.log(`카테고리 "${categoryId}" 삭제됨`);
+            console.log(`✅ 카테고리 "${categoryId}" 삭제 성공`);
           } catch (error) {
-            // 404 에러는 이미 삭제된 것이므로 무시 (다른 곳에서 먼저 삭제된 경우)
+            // 404 에러는 이미 삭제된 것이므로 무시
             const errorMessage = error instanceof Error ? error.message : String(error);
             if (errorMessage.includes('404') || errorMessage.includes('not found') || errorMessage.includes('Category not found')) {
-              // 이미 삭제된 경우이므로 로그만 남기고 계속 진행
+              console.log(`ℹ️ 카테고리 "${categoryId}" 이미 삭제됨 (404)`);
             } else {
-              console.error('카테고리 삭제 실패:', error);
+              console.error(`❌ 카테고리 "${categoryId}" 삭제 실패:`, error);
+              // 데이터베이스 미사용 시 조용히 실패
+              isDatabaseAvailable.current = false;
+              return;
             }
           }
         }
@@ -153,9 +161,10 @@ export const useAutoSave = (
                 parentId: category.parentId,
                 isExpanded: category.isExpanded,
               });
-              console.log(`카테고리 "${category.title}" 저장됨`);
             } catch (error) {
-              console.error('카테고리 저장 실패:', error);
+              // 데이터베이스 미사용 시 조용히 실패
+              isDatabaseAvailable.current = false;
+              return; // 더 이상 저장 시도하지 않음
             }
           }
         }
@@ -163,7 +172,7 @@ export const useAutoSave = (
 
       // 현재 상태를 이전 상태로 업데이트
       previousPagesRef.current = pages;
-    }, 300); // 300ms 디바운스
+    }, 100); // 100ms 디바운스 (빠른 응답성)
 
     return () => {
       if (saveTimeoutRef.current) {

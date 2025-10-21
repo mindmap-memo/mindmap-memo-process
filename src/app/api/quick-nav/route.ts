@@ -44,17 +44,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if item already exists
+    // Check if item already exists (same target_id, type, and page_id)
     const existing = await sql`
-      SELECT id FROM quick_nav_items
+      SELECT id, type, target_id, page_id, title, created_at
+      FROM quick_nav_items
       WHERE target_id = ${itemId}
+        AND type = ${type}
+        AND page_id = ${pageId}
     `;
 
     if (existing.length > 0) {
-      return NextResponse.json(
-        { error: 'Item already in quick nav' },
-        { status: 409 }
-      );
+      // Return existing item instead of error
+      const item = existing[0];
+      return NextResponse.json({
+        item: {
+          id: item.id,
+          type: item.type,
+          itemId: item.target_id,
+          pageId: item.page_id,
+          title: item.title || '',
+        }
+      }, { status: 200 });
     }
 
     const quickNavId = crypto.randomUUID();

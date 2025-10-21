@@ -290,14 +290,7 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     const area = calculateCategoryArea(category, currentPage, visited);
     if (!area) return null;
 
-    // 최근 드래그한 카테고리만 로그 출력
-    if (recentlyDraggedCategoryRef.current === category.id) {
-      console.log('[calculateCategoryAreaWithColor 호출]', {
-        categoryId: category.id,
-        position: `(${category.position.x}, ${category.position.y})`,
-        계산된영역: `위치(${area.x}, ${area.y}) 크기(${area.width}x${area.height})`
-      });
-    }
+    // 로그 제거됨
 
     return {
       ...area,

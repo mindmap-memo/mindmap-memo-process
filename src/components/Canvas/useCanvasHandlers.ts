@@ -175,9 +175,6 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
    * 카테고리 위치 변경 종료 (드래그 종료)
    */
   const handleCategoryPositionEnd = React.useCallback((categoryId: string, finalPosition: { x: number; y: number }) => {
-    const cachedArea = draggedCategoryAreas[categoryId];
-    console.log('[Canvas] 드래그 종료:', categoryId, '최종 위치:', finalPosition, '캐시된 영역:', cachedArea);
-
     // 최근 드래그한 카테고리 저장 (영역 계산 로그용)
     recentlyDraggedCategoryRef.current = categoryId;
 
@@ -186,11 +183,9 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
 
     // Canvas 로컬 캐시는 약간의 딜레이 후 제거 (React 리렌더링 대기)
     setTimeout(() => {
-      console.log('[Canvas] 캐시 제거 시작:', categoryId);
       setDraggedCategoryAreas(prev => {
         const newAreas = { ...prev };
         delete newAreas[categoryId];
-        console.log('[Canvas] 캐시 제거 완료:', categoryId);
         return newAreas;
       });
 
@@ -367,34 +362,21 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
       const rect = e.currentTarget.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-      console.log('[handleWheel] Mouse position in canvas:', { mouseX, mouseY });
-      console.log('[handleWheel] Canvas rect:', rect);
-
       // 줌 델타 계산 (휠 방향에 따라)
       const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
       const newScale = Math.max(0.01, Math.min(5, canvasScale * zoomFactor));
-      console.log('[handleWheel] Current scale:', canvasScale, '→ New scale:', newScale);
 
       if (newScale !== canvasScale) {
-        console.log('[handleWheel] Before zoom - offset:', canvasOffset, 'scale:', canvasScale);
-
         // 마우스 위치 아래의 월드 좌표 계산 (줌 전)
         const worldX = (mouseX - canvasOffset.x) / canvasScale;
         const worldY = (mouseY - canvasOffset.y) / canvasScale;
-        console.log('[handleWheel] World coords under mouse:', { worldX, worldY });
 
         // 줌 후에도 같은 월드 좌표가 마우스 위치에 있도록 offset 조정
         const newOffsetX = mouseX - worldX * newScale;
         const newOffsetY = mouseY - worldY * newScale;
-        console.log('[handleWheel] After zoom - new offset:', { x: newOffsetX, y: newOffsetY });
 
         setCanvasScale(newScale);
         setCanvasOffset({ x: newOffsetX, y: newOffsetY });
-
-        // 검증: 줌 후 월드 좌표가 같은 화면 위치에 있는지 확인
-        const verifyScreenX = newOffsetX + worldX * newScale;
-        const verifyScreenY = newOffsetY + worldY * newScale;
-        console.log('[handleWheel] Verification - expected mouse pos:', { x: mouseX, y: mouseY }, 'actual:', { x: verifyScreenX, y: verifyScreenY });
       }
     }
   }, [currentTool, canvasScale, canvasOffset, setCanvasScale, setCanvasOffset]);

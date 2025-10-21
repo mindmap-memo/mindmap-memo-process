@@ -209,8 +209,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
     }
   };
 
-  // 블록 관련 핸들러들
-  const handleBlockUpdate = (updatedBlock: ContentBlock) => {
+  // 블록 관련 핸들러들 - useCallback으로 메모이제이션
+  const handleBlockUpdate = React.useCallback((updatedBlock: ContentBlock) => {
     if (selectedMemo) {
       const updatedBlocks = selectedMemo.blocks?.map(block => {
         if (block.id === updatedBlock.id) {
@@ -224,20 +224,33 @@ const RightPanel: React.FC<RightPanelProps> = ({
               ? updatedTextBlock.importanceRanges
               : (textBlock.importanceRanges || []);
 
+            // importanceRanges가 실제로 변경된 경우에만 로그
+            const rangesChanged = JSON.stringify(textBlock.importanceRanges) !== JSON.stringify(finalImportanceRanges);
+            if (rangesChanged) {
+              console.log('[RightPanel] importanceRanges 변경', {
+                blockId: block.id,
+                from: textBlock.importanceRanges,
+                to: finalImportanceRanges
+              });
+            }
 
+            // 완전히 새로운 객체로 생성하여 React가 변경을 확실히 감지하도록 함
             return {
               ...updatedTextBlock,
-              importanceRanges: finalImportanceRanges
+              importanceRanges: finalImportanceRanges.map(range => ({ ...range })) // 배열도 새로 생성
             };
           }
-          return updatedBlock;
+          // 다른 블록도 새로운 객체로 반환
+          return { ...updatedBlock };
         }
-        return block;
+        // 변경되지 않은 블록도 새로운 객체로 반환하여 불변성 유지
+        return { ...block };
       }) || [];
+
       onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
     } else {
     }
-  };
+  }, [selectedMemo, onMemoUpdate]);
 
   const handleBlockDelete = (blockId: string) => {
     if (selectedMemo && selectedMemo.blocks && selectedMemo.blocks.length > 1) {
@@ -598,7 +611,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
     }
   };
 
-  const handleCreateNewBlock = (afterBlockId: string, content: string) => {
+  const handleCreateNewBlock = React.useCallback((afterBlockId: string, content: string) => {
     if (selectedMemo && selectedMemo.blocks) {
       saveToHistory(); // Enter 키로 새 블록 생성 시 히스토리 저장
       const blockIndex = selectedMemo.blocks.findIndex(block => block.id === afterBlockId);
@@ -620,7 +633,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
         }
       }, 50);
     }
-  };
+  }, [selectedMemo, onMemoUpdate]);
 
   const handleInsertBlockAfter = (afterBlockId: string, newBlock: ContentBlock) => {
     if (selectedMemo && selectedMemo.blocks) {

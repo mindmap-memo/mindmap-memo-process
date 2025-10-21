@@ -12,6 +12,9 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
+    console.log(`[서버] 메모 업데이트, id: ${id}`);
+    console.log(`[서버] body.blocks:`, JSON.stringify(body.blocks, null, 2));
+
     // Update memo in database
     await sql`
       UPDATE memos
@@ -30,6 +33,8 @@ export async function PUT(
         updated_at = NOW()
       WHERE id = ${id}
     `;
+
+    console.log(`[서버] 메모 업데이트 완료`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

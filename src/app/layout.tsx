@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { Analytics } from "@vercel/analytics/react"
-import '../scss/App.module.scss'
+import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Mindmap Memo',

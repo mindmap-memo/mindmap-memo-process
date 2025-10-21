@@ -39,7 +39,7 @@ interface ContentBlockProps {
   onResetFilters?: () => void;
 }
 
-const ContentBlockComponent: React.FC<ContentBlockProps> = ({
+const ContentBlockComponent: React.FC<ContentBlockProps> = React.memo(({
   block,
   isEditing = false,
   isSelected = false,
@@ -357,6 +357,18 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
       {renderBlock()}
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  // props가 같으면 true 반환 (리렌더링 하지 않음)
+  // props가 다르면 false 반환 (리렌더링 함)
+  const isSame = (
+    prevProps.block.id === nextProps.block.id &&
+    JSON.stringify(prevProps.block) === JSON.stringify(nextProps.block) &&
+    prevProps.isEditing === nextProps.isEditing &&
+    prevProps.isSelected === nextProps.isSelected &&
+    prevProps.isDragSelected === nextProps.isDragSelected &&
+    prevProps.isDragHovered === nextProps.isDragHovered
+  );
+  return isSame; // true면 리렌더링 안함, false면 리렌더링
+});
 
 export default ContentBlockComponent;

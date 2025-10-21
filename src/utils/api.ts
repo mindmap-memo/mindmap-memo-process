@@ -15,8 +15,12 @@ async function handleResponse<T>(response: Response): Promise<T> {
 // ===== Pages API =====
 
 export async function fetchPages(): Promise<Page[]> {
-  const response = await fetch(`${API_BASE}/pages`);
+  const response = await fetch(`${API_BASE}/pages`, {
+    cache: 'no-store', // 캐시 비활성화
+  });
   const data = await handleResponse<{ pages: Page[] }>(response);
+
+  console.log('[클라이언트] fetchPages 완료, 첫 번째 페이지의 첫 번째 메모 blocks:', JSON.stringify(data.pages[0]?.memos[0]?.blocks, null, 2));
 
   return data.pages;
 }
@@ -163,6 +167,15 @@ export async function createQuickNavItem(item: {
     targetType: data.item.type,
     pageId: data.item.pageId
   };
+}
+
+export async function updateQuickNavItem(id: string, title: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/quick-nav/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  });
+  await handleResponse(response);
 }
 
 export async function deleteQuickNavItem(id: string): Promise<void> {
