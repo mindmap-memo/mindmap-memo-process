@@ -789,7 +789,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
           setShowQuickNavModal(false);
         }}
         onConfirm={handleQuickNavConfirm}
-        initialName={category.title}
+        initialName={category.title || '제목 없는 카테고리'}
       />
     </div>
   );

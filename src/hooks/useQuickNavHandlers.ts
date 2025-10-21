@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { QuickNavItem, Page } from '../types';
 import { calculateCategoryArea } from '../utils/categoryAreaUtils';
-import { createQuickNavItem, deleteQuickNavItem as deleteQuickNavItemApi } from '../utils/api';
+import { createQuickNavItem, updateQuickNavItem as updateQuickNavItemApi, deleteQuickNavItem as deleteQuickNavItemApi } from '../utils/api';
 
 /**
  * useQuickNavHandlers
@@ -295,6 +295,35 @@ export const useQuickNavHandlers = ({
   );
 
   /**
+   * 단축 이동 항목 이름 변경 (낙관적 업데이트)
+   */
+  const updateQuickNavItem = useCallback(
+    async (itemId: string, newName: string) => {
+      // 즉시 UI 업데이트 (낙관적 업데이트)
+      setPages((prevPages) =>
+        prevPages.map((page) => {
+          if (page.id === currentPageId) {
+            return {
+              ...page,
+              quickNavItems: (page.quickNavItems || []).map((item) =>
+                item.id === itemId ? { ...item, name: newName } : item
+              )
+            };
+          }
+          return page;
+        })
+      );
+
+      // 백그라운드에서 DB 업데이트
+      updateQuickNavItemApi(itemId, newName).catch(error => {
+        console.error('단축 이동 이름 변경 실패:', error);
+        alert('이름 변경에 실패했습니다.');
+      });
+    },
+    [currentPageId, setPages]
+  );
+
+  /**
    * 단축 이동 항목 삭제 (낙관적 업데이트)
    */
   const deleteQuickNavItem = useCallback(
@@ -375,6 +404,7 @@ export const useQuickNavHandlers = ({
     handleNavigateToMemo,
     handleNavigateToCategory,
     addQuickNavItem,
+    updateQuickNavItem,
     deleteQuickNavItem,
     executeQuickNav,
     isQuickNavExists

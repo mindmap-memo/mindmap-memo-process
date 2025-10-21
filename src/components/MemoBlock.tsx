@@ -1205,7 +1205,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
           setShowQuickNavModal(false);
         }}
         onConfirm={handleQuickNavConfirm}
-        initialName={memo.title || ''}
+        initialName={memo.title || '제목 없는 메모'}
       />
     </div>
   );

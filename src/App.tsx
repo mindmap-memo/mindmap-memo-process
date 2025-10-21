@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Analytics } from "@vercel/analytics/react";
 import { TutorialState } from './types';
 import { useCanvasHistory } from './hooks/useCanvasHistory';
 import { useAppState } from './hooks/useAppState';
@@ -17,7 +16,7 @@ import { useCollisionHandlers } from './hooks/useCollisionHandlers';
 import { useShiftDragHandlers } from './hooks/useShiftDragHandlers';
 import { useCategoryPositionHandlers } from './hooks/useCategoryPositionHandlers';
 import { useGlobalEventHandlers } from './hooks/useGlobalEventHandlers';
-import { useLocalStorage } from './hooks/useLocalStorage';
+import { useAutoSave } from './hooks/useAutoSave';
 import { useTutorialValidation } from './hooks/useTutorialValidation';
 import { useCategoryDrop } from './hooks/useCategoryDrop';
 import { usePositionHandlers } from './hooks/usePositionHandlers';
@@ -43,6 +42,7 @@ const App: React.FC = () => {
     setPages,
     currentPageId,
     setCurrentPageId,
+    isInitialLoadDone,
     selectedMemoId,
     setSelectedMemoId,
     selectedMemoIds,
@@ -214,6 +214,7 @@ const App: React.FC = () => {
     handleNavigateToMemo,
     handleNavigateToCategory,
     addQuickNavItem,
+    updateQuickNavItem,
     deleteQuickNavItem,
     executeQuickNav,
     isQuickNavExists
@@ -237,7 +238,9 @@ const App: React.FC = () => {
 
   // ===== 튜토리얼 상태 =====
   const [tutorialState, setTutorialState] = useState<TutorialState>(() => {
-    const completed = localStorage.getItem('tutorial-completed') === 'true';
+    const completed = typeof window !== 'undefined'
+      ? localStorage.getItem('tutorial-completed') === 'true'
+      : false;
     return {
       isActive: !completed, // 완료되지 않았으면 자동으로 시작
       currentStep: 0,
@@ -468,17 +471,8 @@ const App: React.FC = () => {
     setDragHoveredCategoryIds: appState.setDragHoveredCategoryIds
   });
 
-  // ===== LocalStorage 자동 저장 =====
-  useLocalStorage({
-    pages,
-    setPages,
-    currentPageId,
-    setCurrentPageId,
-    leftPanelOpen,
-    rightPanelOpen,
-    leftPanelWidth,
-    rightPanelWidth
-  });
+  // ===== 데이터베이스 자동 저장 =====
+  useAutoSave(pages, currentPageId, isInitialLoadDone);
 
   // ===== 카테고리 드롭 감지 =====
   // shiftDragAreaCache를 Map으로 변환하는 래퍼
@@ -697,6 +691,11 @@ const App: React.FC = () => {
     setShowQuickNavPanel
   });
 
+  // 초기 로딩이 완료될 때까지 렌더링하지 않음 (hydration 에러 방지)
+  if (!isInitialLoadDone) {
+    return null;
+  }
+
   return (
     <AppProviders
       appState={appStateContextValue}
@@ -878,26 +877,6 @@ const App: React.FC = () => {
         {rightPanelOpen ? '▶' : '◀'}
       </button>
 
-      {/* 단축 이동 버튼 */}
-      <button
-        data-tutorial="quick-nav-btn"
-        onClick={() => setShowQuickNavPanel(!showQuickNavPanel)}
-        className={styles['quick-nav-button']}
-        style={{
-          right: rightPanelOpen ? `${rightPanelWidth + 20}px` : '20px'
-        }}
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M8 2L9.5 5.5L13 6L10.5 8.5L11 12L8 10L5 12L5.5 8.5L3 6L6.5 5.5L8 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-        <span>단축 이동</span>
-        {quickNavItems.length > 0 && (
-          <span className={styles['quick-nav-badge']}>
-            {quickNavItems.length}
-          </span>
-        )}
-      </button>
-
       {/* 단축 이동 패널 */}
       <QuickNavPanel
         quickNavItems={quickNavItems}
@@ -908,6 +887,7 @@ const App: React.FC = () => {
         showQuickNavPanel={showQuickNavPanel}
         onTogglePanel={() => setShowQuickNavPanel(!showQuickNavPanel)}
         onExecuteQuickNav={executeQuickNav}
+        onUpdateQuickNavItem={updateQuickNavItem}
         onDeleteQuickNavItem={deleteQuickNavItem}
       />
 
@@ -949,7 +929,6 @@ const App: React.FC = () => {
         />
       )}
       </div>
-      <Analytics />
     </AppProviders>
   );
 };

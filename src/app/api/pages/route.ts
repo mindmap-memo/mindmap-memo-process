@@ -33,24 +33,36 @@ export async function GET() {
       ORDER BY created_at ASC
     `;
 
+    // Fetch all quick nav items
+    const quickNavItems = await sql`
+      SELECT
+        id, type, target_id, page_id, title, created_at
+      FROM quick_nav_items
+      ORDER BY created_at DESC
+    `;
+
     // Organize data by page
     const pagesData = pages.map((page: any) => {
       const pageMemos = memos
         .filter((memo: any) => memo.page_id === page.id)
-        .map((memo: any) => ({
-          id: memo.id,
-          title: memo.title || '',
-          blocks: memo.blocks || [],
-          tags: memo.tags || [],
-          connections: memo.connections || [],
-          position: { x: Number(memo.position_x), y: Number(memo.position_y) },
-          size: memo.width && memo.height
-            ? { width: Number(memo.width), height: Number(memo.height) }
-            : undefined,
-          displaySize: memo.display_size || 'medium',
-          importance: memo.importance || undefined,
-          parentId: memo.parent_id || undefined,
-        }));
+        .map((memo: any) => {
+          console.log(`[서버] 메모 로딩, id: ${memo.id}, blocks:`, JSON.stringify(memo.blocks, null, 2));
+          return {
+            id: memo.id,
+            title: memo.title || '',
+            content: '', // 기존 호환성을 위해 빈 문자열로 초기화
+            blocks: memo.blocks || [],
+            tags: memo.tags || [],
+            connections: memo.connections || [],
+            position: { x: Number(memo.position_x), y: Number(memo.position_y) },
+            size: memo.width && memo.height
+              ? { width: Number(memo.width), height: Number(memo.height) }
+              : undefined,
+            displaySize: memo.display_size || 'medium',
+            importance: memo.importance || undefined,
+            parentId: memo.parent_id || undefined,
+          };
+        });
 
       const pageCategories = categories
         .filter((category: any) => category.page_id === page.id)
@@ -71,11 +83,22 @@ export async function GET() {
           parentId: category.parent_id || undefined,
         }));
 
+      const pageQuickNavItems = quickNavItems
+        .filter((item: any) => item.page_id === page.id)
+        .map((item: any) => ({
+          id: item.id,
+          name: item.title || '',
+          targetId: item.target_id,
+          targetType: item.type,
+          pageId: item.page_id
+        }));
+
       return {
         id: page.id,
         name: page.name,
         memos: pageMemos,
         categories: pageCategories,
+        quickNavItems: pageQuickNavItems,
       };
     });
 
