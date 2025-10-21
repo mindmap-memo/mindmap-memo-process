@@ -4,15 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
-- `npm start` - Start development server (http://localhost:3000)
-- `npm run build` - Create production build in `build/` directory
-- `npm test` - Run Jest tests in watch mode
-- `npm run eject` - Eject from Create React App (irreversible)
+- `npm run dev` - Start Next.js development server (http://localhost:3000)
+- `npm run build` - Create production build in `.next/` directory
+- `npm start` - Start production server (after build)
+- `npm run lint` - Run Next.js linter
 - `npx tsc --noEmit` - Type check without compilation
 
 ## Application Architecture
 
-This is a React TypeScript mindmap memo application built with Create React App. The app provides an interactive canvas for creating, connecting, and organizing memo blocks in a mind mapping interface.
+This is a React TypeScript mindmap memo application built with Next.js 15 (App Router). The app provides an interactive canvas for creating, connecting, and organizing memo blocks in a mind mapping interface.
 
 ### Core Architecture
 
@@ -93,11 +93,60 @@ The application implements a comprehensive undo/redo system for canvas operation
 - **Auto-Focus Management**: Automatic focus handling when creating, deleting, or merging blocks
 - **Real-time Visual Feedback**: Drag hover states, selection highlighting, transition animations
 
+### Data Persistence
+
+The application uses **PostgreSQL database (Neon)** for data persistence:
+
+- **Database Schema**: Tables for pages, memos, categories, and quick_nav_items (`create-tables.sql`)
+- **API Layer**: RESTful API endpoints in `src/app/api/` for CRUD operations
+  - `/api/pages` - Fetch all pages with memos and categories
+  - `/api/pages/:id` - Update/delete page
+  - `/api/memos` - Create memo
+  - `/api/memos/:id` - Update/delete memo
+  - `/api/categories` - Create category
+  - `/api/categories/:id` - Update/delete category
+  - `/api/quick-nav` - Manage quick navigation items
+- **Auto-Save**: `useAutoSave` hook automatically saves changes to database with 300ms debounce
+- **Initial Load**: `useAppState` hook loads all data from database on app start
+- **Error Handling**: Falls back to default data if database connection fails
+
+**Important**: All data is stored in the database. Do NOT use localStorage for data persistence.
+
+### Next.js Architecture
+
+This application uses Next.js 15 with the App Router pattern:
+
+- **App Directory**: `src/app/` - Next.js App Router root
+  - `layout.tsx` - Root layout with global styles and analytics
+  - `page.tsx` - Main application page (renders App.tsx)
+  - `globals.css` - Global CSS reset and base styles
+  - `api/` - API Routes directory
+
+- **API Routes**: RESTful endpoints in `src/app/api/`
+  - Server-side only, run on Node.js runtime
+  - Direct database access using Neon serverless driver
+  - Automatic API endpoint generation based on folder structure
+  - All routes follow Next.js App Router conventions with `route.ts` files
+
+- **Client vs Server Components**:
+  - Main app (`App.tsx`) is a Client Component (requires "use client" directive)
+  - API routes are Server Components (default)
+  - All interactive components with hooks/state require "use client" directive
+  - Static components can remain Server Components for better performance
+
+- **Global Styles**:
+  - `src/app/globals.css` - CSS reset, HTML/body base styles (no margin/padding, overflow hidden)
+  - SCSS modules for component-specific styles (`.module.scss` extension)
+  - Global styles only in `globals.css`, all component styles use CSS Modules
+
 ### Technical Notes
 
-- Uses React 18 with TypeScript
-- **Styling with SCSS**: All component styles are organized in the `src/scss/` directory, mirroring the component structure. Component SCSS files are located in `src/scss/` with paths matching their component locations (e.g., `src/components/Canvas.tsx` → `src/scss/Canvas.scss`, `src/components/blocks/CodeBlock.tsx` → `src/scss/components/blocks/CodeBlock.scss`)
-- **SCSS Module Pattern**: Import styles from `src/scss/` using relative paths: `import styles from '../../scss/ComponentName.scss'` and use `className={styles.className}` for type-safe class names
+- Uses React 19 with TypeScript and Next.js 15 (App Router)
+- **Framework**: Next.js with App Router architecture
+- **Database**: PostgreSQL (Neon) for all data persistence
+- **Styling with SCSS**: All component styles are organized in the `src/scss/` directory, mirroring the component structure. Component SCSS files are located in `src/scss/` with paths matching their component locations (e.g., `src/components/Canvas.tsx` → `src/scss/components/Canvas.module.scss`, `src/components/blocks/CodeBlock.tsx` → `src/scss/components/blocks/CodeBlock.module.scss`)
+- **SCSS Module Pattern**: Import styles from `src/scss/` using relative paths: `import styles from '../../scss/components/ComponentName.module.scss'` and use `className={styles.className}` for type-safe class names
+- **SCSS Module Naming**: All SCSS files MUST use `.module.scss` extension for Next.js CSS Modules
 - **No Inline Styles**: Avoid inline styles; use SCSS classes for all styling. Only use inline styles for dynamic values that must be calculated at runtime (e.g., positions, transforms, colors that change based on data)
 - Connection lines drawn with SVG overlays
 - ResizeObserver for dynamic memo block sizing
@@ -256,16 +305,18 @@ The application implements Shift+drag functionality for adding/removing memos an
 - **Styling Guidelines**:
   - **ALWAYS use SCSS files** for component styling instead of inline styles
   - All SCSS files are organized in `src/scss/` directory, mirroring the component structure
-  - For components in `src/components/`, create corresponding SCSS in `src/scss/` (e.g., `src/components/Canvas.tsx` → `src/scss/Canvas.scss`)
-  - For nested components, maintain the same path structure (e.g., `src/components/blocks/CodeBlock.tsx` → `src/scss/components/blocks/CodeBlock.scss`)
-  - Import as SCSS module using relative paths: `import styles from '../../scss/ComponentName.scss'`
+  - For components in `src/components/`, create corresponding SCSS in `src/scss/` (e.g., `src/components/Canvas.tsx` → `src/scss/components/Canvas.module.scss`)
+  - For nested components, maintain the same path structure (e.g., `src/components/blocks/CodeBlock.tsx` → `src/scss/components/blocks/CodeBlock.module.scss`)
+  - **SCSS Module Naming**: All SCSS files MUST use `.module.scss` extension for Next.js CSS Modules
+  - Import as SCSS module using relative paths: `import styles from '../../scss/components/ComponentName.module.scss'`
   - Use className for static styles, inline style only for dynamic runtime values
   - Organize SCSS with nested selectors matching component structure
+  - **Global Styles**: Only `src/app/globals.css` should contain global, non-modular CSS
   - **Dynamic Values Only**: Use inline styles ONLY for values that change at runtime (positions, transforms, sizes, data-driven colors)
   - **Example of proper usage**:
     ```tsx
-    // GOOD - import from src/scss/
-    import styles from '../../scss/Canvas.scss';
+    // GOOD - import SCSS module from src/scss/
+    import styles from '../../scss/components/Canvas.module.scss';
 
     // GOOD - dynamic position
     <div className={styles.memoBlock} style={{ left: `${memo.position.x}px`, top: `${memo.position.y}px` }}>
