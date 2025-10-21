@@ -63,19 +63,35 @@ export const useCategoryDrop = ({
   const detectCategoryDropForCategory = useCallback((categoryId: string, position: { x: number; y: number }) => {
     const isShiftPressed = isShiftPressedRef.current;
 
+    console.log('[detectCategoryDropForCategory] 호출됨', {
+      categoryId,
+      position,
+      isShiftPressed
+    });
+
     const currentPage = pages.find(p => p.id === currentPageId);
     if (!currentPage || !currentPage.categories) {
+      console.log('[detectCategoryDropForCategory] currentPage 또는 categories 없음');
       return;
     }
 
     const draggedCategory = currentPage.categories.find(c => c.id === categoryId);
     if (!draggedCategory) {
+      console.log('[detectCategoryDropForCategory] 드래그된 카테고리 찾지 못함:', categoryId);
       return;
     }
 
+    console.log('[detectCategoryDropForCategory] Shift 체크', {
+      isShiftPressed,
+      willCall: isShiftPressed
+    });
+
     // Shift 키가 눌려있으면 카테고리-카테고리 종속 모드
     if (isShiftPressed) {
+      console.log('[detectCategoryDropForCategory] handleShiftDropCategory 호출');
       handleShiftDropCategory(draggedCategory, position, currentPage, shiftDragAreaCache.current);
+    } else {
+      console.log('[detectCategoryDropForCategory] Shift 안 눌림 - 종료');
     }
   }, [pages, currentPageId, isShiftPressedRef, shiftDragAreaCache, handleShiftDropCategory]);
 

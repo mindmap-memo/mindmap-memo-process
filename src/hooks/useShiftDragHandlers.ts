@@ -49,6 +49,18 @@ export const useShiftDragHandlers = ({
     return descendants;
   }, []);
 
+  // 모든 조상 카테고리 ID를 가져오는 함수
+  const getAllAncestorIds = useCallback((categoryId: string | undefined, currentPage: Page): string[] => {
+    const ancestors: string[] = [];
+    let currentId = categoryId;
+    while (currentId) {
+      ancestors.push(currentId);
+      const parentCategory = currentPage.categories?.find(c => c.id === currentId);
+      currentId = parentCategory?.parentId;
+    }
+    return ancestors;
+  }, []);
+
   // 가장 깊은 레벨의 카테고리 찾기
   const findDeepestCategory = useCallback((overlappingCategories: CategoryBlock[], currentPage: Page): CategoryBlock | null => {
     if (overlappingCategories.length === 0) return null;
@@ -65,10 +77,23 @@ export const useShiftDragHandlers = ({
       return { category, depth };
     });
 
+    console.log('[findDeepestCategory] 깊이 계산 결과:', categoriesWithDepth.map(item => ({
+      id: item.category.id,
+      title: item.category.title,
+      depth: item.depth,
+      parentId: item.category.parentId
+    })));
+
     // 깊이가 가장 큰 카테고리 선택 (같은 깊이면 첫 번째)
     const deepest = categoriesWithDepth.reduce((max, item) =>
       item.depth > max.depth ? item : max
     );
+
+    console.log('[findDeepestCategory] 선택된 카테고리:', {
+      id: deepest.category.id,
+      title: deepest.category.title,
+      depth: deepest.depth
+    });
 
     return deepest.category;
   }, []);
@@ -80,6 +105,13 @@ export const useShiftDragHandlers = ({
     currentPage: Page,
     cachedAreas?: {[categoryId: string]: any}
   ) => {
+    console.log('[Shift Drop Category] 시작', {
+      draggedCategoryId: draggedCategory.id,
+      draggedCategoryTitle: draggedCategory.title,
+      currentParentId: draggedCategory.parentId,
+      position
+    });
+
     // 카테고리 찾기
     const categoryWidth = draggedCategory.size?.width || 200;
     const categoryHeight = draggedCategory.size?.height || 80;
@@ -90,12 +122,10 @@ export const useShiftDragHandlers = ({
       bottom: position.y + categoryHeight
     };
 
-    // 드래그 중인 카테고리와 그 모든 하위 카테고리들 + 현재 부모 카테고리를 제외한 페이지 데이터 생성
+    // 드래그 중인 카테고리와 그 모든 하위 카테고리들을 제외한 페이지 데이터 생성
+    // 현재 부모는 제외하지 않음 - 빠져나올 때도 감지되어야 함
     const excludedIds = getAllDescendantIds(draggedCategory.id, currentPage);
-    // 현재 부모도 제외 (빠져나올 때 부모에 추가 UI가 계속 뜨는 것 방지)
-    if (draggedCategory.parentId) {
-      excludedIds.push(draggedCategory.parentId);
-    }
+
     const pageWithoutDraggingCategory = {
       ...currentPage,
       categories: (currentPage.categories || []).filter(c => !excludedIds.includes(c.id)),
@@ -320,14 +350,16 @@ export const useShiftDragHandlers = ({
       // 드롭 후 캐시 클리어 (중요!)
       clearCategoryCache(draggedCategory.id);
 
-      // 부모 카테고리의 캐시도 클리어 (새 자식이 추가되었으므로 영역 재계산 필요)
+      // 새 부모 카테고리와 모든 조상의 캐시 클리어 (새 자식이 추가되었으므로 영역 재계산 필요)
       if (targetCategory) {
-        clearCategoryCache(targetCategory.id);
+        const newAncestors = getAllAncestorIds(targetCategory.id, currentPage);
+        newAncestors.forEach(ancestorId => clearCategoryCache(ancestorId));
       }
 
-      // 이전 부모 카테고리의 캐시도 클리어 (자식이 제거되었으므로 영역 재계산 필요)
+      // 이전 부모 카테고리와 모든 조상의 캐시 클리어 (자식이 제거되었으므로 영역 재계산 필요)
       if (draggedCategory.parentId) {
-        clearCategoryCache(draggedCategory.parentId);
+        const oldAncestors = getAllAncestorIds(draggedCategory.parentId, currentPage);
+        oldAncestors.forEach(ancestorId => clearCategoryCache(ancestorId));
       }
     } else {
       // 같은 카테고리 내에서 위치만 변경 (종속 안 함)
@@ -403,6 +435,7 @@ export const useShiftDragHandlers = ({
     clearCategoryCache,
     isOverlapping,
     getAllDescendantIds,
+    getAllAncestorIds,
     findDeepestCategory
   ]);
 
@@ -413,6 +446,13 @@ export const useShiftDragHandlers = ({
     currentPage: Page,
     cachedAreas?: {[categoryId: string]: any}
   ) => {
+    console.log('[Shift Drop Memo] 시작', {
+      draggedMemoId: draggedMemo.id,
+      draggedMemoTitle: draggedMemo.title,
+      currentParentId: draggedMemo.parentId,
+      position
+    });
+
     // 카테고리 찾기
     const memoWidth = draggedMemo.size?.width || 200;
     const memoHeight = draggedMemo.size?.height || 95;
@@ -430,7 +470,12 @@ export const useShiftDragHandlers = ({
     };
 
     // 카테고리 블록과 영역 모두 체크 - 겹치는 모든 카테고리 찾기
+    // 현재 부모 카테고리는 제외 (빠져나갈 수 있도록)
     const overlappingCategories = currentPage.categories?.filter(category => {
+      // 현재 부모 카테고리는 타겟에서 제외
+      if (category.id === draggedMemo.parentId) {
+        return false;
+      }
       // 1. 카테고리 블록과의 겹침 체크
       const categoryWidth = category.size?.width || 200;
       const categoryHeight = category.size?.height || 80;
@@ -477,16 +522,27 @@ export const useShiftDragHandlers = ({
     // 겹치는 카테고리 중에서 가장 깊은 레벨(가장 하위) 카테고리 선택
     const targetCategory = findDeepestCategory(overlappingCategories, currentPage);
 
+    console.log('[Shift Drop Memo] 타겟 카테고리:', targetCategory ? {
+      id: targetCategory.id,
+      title: targetCategory.title,
+      parentId: targetCategory.parentId
+    } : null);
+
     // 카테고리 변경 처리
     const newParentId = targetCategory ? targetCategory.id : undefined;
     const parentChanged = draggedMemo.parentId !== newParentId;
 
+    console.log('[Shift Drop Memo] 부모 변경 체크:', {
+      oldParentId: draggedMemo.parentId,
+      newParentId,
+      parentChanged,
+      willExecute: parentChanged
+    });
+
     if (parentChanged) {
+      console.log('[Shift Drop Memo] ✅ 부모 변경 실행 - 메모 이동 처리');
       setPages(pages.map(p => {
         if (p.id === currentPageId) {
-          // 원래 위치 정보 가져오기 (드래그 시작 시 저장된 위치)
-          const originalPosition = draggedCategoryAreas.current[draggedMemo.id]?.originalPosition;
-
           // 부모 카테고리의 children 업데이트
           let updatedCategories = (p.categories || []).map(category => {
             // 이전 부모에서 제거
@@ -521,7 +577,8 @@ export const useShiftDragHandlers = ({
                 ? {
                     ...m,
                     parentId: newParentId,
-                    position: originalPosition || m.position  // 원래 위치로 복원
+                    // 현재 메모 위치 유지 (드래그된 위치)
+                    // position 파라미터는 사용하지 않음 (마우스 포인터 위치이므로)
                   }
                 : m
             )
@@ -541,21 +598,29 @@ export const useShiftDragHandlers = ({
       }
 
       const targetName = targetCategory ? `카테고리 ${targetCategory.title}` : '최상위';
+      console.log('[Shift Drop Memo] ✅ 이동 완료:', {
+        from: draggedMemo.parentId,
+        to: newParentId,
+        targetName
+      });
       saveCanvasState('move_to_category', `Shift 드래그로 메모 이동: ${draggedMemo.title} → ${targetName}`);
 
       // 드롭 후 캐시 클리어 (중요!)
       clearCategoryCache(draggedMemo.id);
 
-      // 부모 카테고리의 캐시도 클리어 (새 자식이 추가되었으므로 영역 재계산 필요)
+      // 새 부모 카테고리와 모든 조상의 캐시 클리어 (새 자식이 추가되었으므로 영역 재계산 필요)
       if (targetCategory) {
-        clearCategoryCache(targetCategory.id);
+        const newAncestors = getAllAncestorIds(targetCategory.id, currentPage);
+        newAncestors.forEach(ancestorId => clearCategoryCache(ancestorId));
       }
 
-      // 이전 부모 카테고리의 캐시도 클리어 (자식이 제거되었으므로 영역 재계산 필요)
+      // 이전 부모 카테고리와 모든 조상의 캐시 클리어 (자식이 제거되었으므로 영역 재계산 필요)
       if (draggedMemo.parentId) {
-        clearCategoryCache(draggedMemo.parentId);
+        const oldAncestors = getAllAncestorIds(draggedMemo.parentId, currentPage);
+        oldAncestors.forEach(ancestorId => clearCategoryCache(ancestorId));
       }
     } else {
+      console.log('[Shift Drop Memo] ❌ 부모 변경 안 함 - 같은 카테고리 내 이동');
       // 같은 카테고리 내에서 위치만 변경
       setPages(pages.map(p => {
         if (p.id === currentPageId) {
@@ -580,6 +645,7 @@ export const useShiftDragHandlers = ({
     saveCanvasState,
     clearCategoryCache,
     isOverlapping,
+    getAllAncestorIds,
     findDeepestCategory
   ]);
 
