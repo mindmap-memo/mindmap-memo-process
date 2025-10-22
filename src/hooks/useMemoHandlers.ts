@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { MemoBlock, Page, MemoDisplaySize, CanvasActionType } from '../types';
 import { calculateCategoryArea, centerCanvasOnPosition } from '../utils/categoryAreaUtils';
-import { createMemo } from '../utils/api';
+import { createMemo, deleteQuickNavItem } from '../utils/api';
 
 /**
  * useMemoHandlers
@@ -281,16 +281,27 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
   const deleteMemoBlock = useCallback(() => {
     if (!selectedMemoId) return;
 
-    setPages(prev => prev.map(page =>
-      page.id === currentPageId
-        ? {
-            ...page,
-            memos: page.memos.filter(memo => memo.id !== selectedMemoId),
-            // 단축 이동 목록에서도 삭제된 메모 제거
-            quickNavItems: (page.quickNavItems || []).filter(item => item.targetId !== selectedMemoId)
-          }
-        : page
-    ));
+    setPages(prev => prev.map(page => {
+      if (page.id === currentPageId) {
+        // 삭제할 메모와 연결된 단축 이동 항목 찾기
+        const quickNavItemsToDelete = (page.quickNavItems || []).filter(item => item.targetId === selectedMemoId);
+
+        // 서버에서 단축 이동 항목 삭제 (백그라운드에서 비동기 실행)
+        quickNavItemsToDelete.forEach(item => {
+          deleteQuickNavItem(item.id).catch(error => {
+            console.warn('단축 이동 항목 삭제 실패 (UI는 정상 동작):', error);
+          });
+        });
+
+        return {
+          ...page,
+          memos: page.memos.filter(memo => memo.id !== selectedMemoId),
+          // 단축 이동 목록에서도 삭제된 메모 제거
+          quickNavItems: (page.quickNavItems || []).filter(item => item.targetId !== selectedMemoId)
+        };
+      }
+      return page;
+    }));
     setSelectedMemoId(null);
 
     if (saveCanvasState) {
@@ -310,6 +321,16 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
             ...m,
             connections: m.connections.filter(connId => connId !== memoId)
           }));
+
+        // 삭제할 메모와 연결된 단축 이동 항목 찾기
+        const quickNavItemsToDelete = (page.quickNavItems || []).filter(item => item.targetId === memoId);
+
+        // 서버에서 단축 이동 항목 삭제 (백그라운드에서 비동기 실행)
+        quickNavItemsToDelete.forEach(item => {
+          deleteQuickNavItem(item.id).catch(error => {
+            console.warn('단축 이동 항목 삭제 실패 (UI는 정상 동작):', error);
+          });
+        });
 
         // Quick Nav에서도 제거 (페이지별)
         const updatedQuickNavItems = (page.quickNavItems || []).filter(item => item.targetId !== memoId);

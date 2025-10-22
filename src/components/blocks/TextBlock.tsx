@@ -160,21 +160,10 @@ const TextBlockComponent: React.FC<TextBlockProps> = React.memo(({
     }
   }, [block.importanceRanges]);
 
-  // 로컬 importanceRanges 변경 감지 (중요도 적용 시에만 로그)
+  // 로컬 importanceRanges 변경 감지 (로그 제거)
   const prevImportanceRangesRef = React.useRef<ImportanceRange[]>([]);
   useEffect(() => {
-    // 길이가 변경되었거나, 내용이 실제로 변경된 경우에만 로그
-    const hasChanged = importanceRanges.length !== prevImportanceRangesRef.current.length ||
-                      JSON.stringify(importanceRanges) !== JSON.stringify(prevImportanceRangesRef.current);
-
-    if (hasChanged && importanceRanges.length > 0) {
-      console.log('[TextBlock] 로컬 importanceRanges 변경 감지', {
-        blockId: block.id,
-        localRanges: importanceRanges,
-        blockRanges: block.importanceRanges
-      });
-      prevImportanceRangesRef.current = importanceRanges;
-    }
+    prevImportanceRangesRef.current = importanceRanges;
   }, [importanceRanges]);
 
   // 편집모드 진입 시 상태 동기화
@@ -262,7 +251,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = React.memo(({
       const updatedContent = beforeCursor;
       setContent(updatedContent);
       if (onUpdate) {
-        onUpdate({ ...block, content: updatedContent });
+        onUpdate({ ...block, content: updatedContent, importanceRanges });
       }
       
       // 새 텍스트 블록 생성 (커서 이후 내용으로)
@@ -342,9 +331,9 @@ const TextBlockComponent: React.FC<TextBlockProps> = React.memo(({
 
     setContent(newContent);
 
-    // 입력 중에도 즉시 부모로 전달하여 상태 동기화
+    // 입력 중에도 즉시 부모로 전달하여 상태 동기화 (importanceRanges 보존)
     if (onUpdate) {
-      onUpdate({ ...block, content: newContent });
+      onUpdate({ ...block, content: newContent, importanceRanges });
     }
   };
 
@@ -533,13 +522,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = React.memo(({
       return;
     }
 
-    console.log('[중요도 적용 시작]', {
-      blockId: block.id,
-      level,
-      selectedRange,
-      currentRanges: importanceRanges
-    });
-
     const ranges = importanceRanges || [];
     const newRange: ImportanceRange = {
       start: selectedRange.start,
@@ -616,20 +598,17 @@ const TextBlockComponent: React.FC<TextBlockProps> = React.memo(({
     // 배열을 완전히 새로운 객체로 만들어서 React가 변경을 확실히 감지하도록 함
     const freshUpdatedRanges = updatedRanges.map(range => ({ ...range }));
 
-    console.log('[로컬 상태 업데이트 전]', { importanceRanges });
-
-    // 로컬 상태 즉시 업데이트
+    // 로컬 상태 즉시 업데이트 - 동기적으로 업데이트되지 않으므로 강제 리렌더링 필요
     setImportanceRanges(freshUpdatedRanges);
 
-    console.log('[로컬 상태 업데이트 후]', { freshUpdatedRanges });
+    // 강제 리렌더링을 위한 상태 업데이트
+    forceUpdate({});
 
     const updatedBlock = {
       ...block,
       content: content, // 현재 입력 중인 content 상태 사용
       importanceRanges: freshUpdatedRanges
     };
-
-    console.log('[부모 컴포넌트로 전달할 블록]', updatedBlock);
 
     if (onUpdate) {
       onUpdate(updatedBlock);
@@ -776,15 +755,8 @@ const TextBlockComponent: React.FC<TextBlockProps> = React.memo(({
     });
   };
 
-  // 렌더링 횟수 추적
-  const renderCountRef = React.useRef(0);
-  renderCountRef.current += 1;
-
   if (isEditing) {
     // 편집 모드
-    if (renderCountRef.current % 10 === 0) {
-      console.log(`[TextBlock 렌더링 횟수] blockId: ${block.id}, 총 ${renderCountRef.current}회`);
-    }
     return (
       <>
         <div style={{

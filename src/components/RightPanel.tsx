@@ -209,48 +209,65 @@ const RightPanel: React.FC<RightPanelProps> = ({
     }
   };
 
-  // 블록 관련 핸들러들 - useCallback으로 메모이제이션
+  // selectedMemo를 ref로 저장하여 항상 최신 값 참조
+  const selectedMemoRef = React.useRef(selectedMemo);
+  React.useEffect(() => {
+    selectedMemoRef.current = selectedMemo;
+  }, [selectedMemo]);
+
+  // 블록 관련 핸들러들 - ref를 사용하여 항상 최신 selectedMemo 참조
   const handleBlockUpdate = React.useCallback((updatedBlock: ContentBlock) => {
-    if (selectedMemo) {
-      const updatedBlocks = selectedMemo.blocks?.map(block => {
-        if (block.id === updatedBlock.id) {
-          // TextBlock의 경우 importanceRanges를 확실히 보존
-          if (block.type === 'text' && updatedBlock.type === 'text') {
-            const textBlock = block as TextBlock;
-            const updatedTextBlock = updatedBlock as TextBlock;
+    // ref에서 최신 selectedMemo 가져오기
+    const currentMemo = selectedMemoRef.current;
 
-            // 업데이트된 블록에 importanceRanges가 있으면 사용, 없으면 원본 보존
-            const finalImportanceRanges = updatedTextBlock.importanceRanges !== undefined
-              ? updatedTextBlock.importanceRanges
-              : (textBlock.importanceRanges || []);
-
-            // importanceRanges가 실제로 변경된 경우에만 로그
-            const rangesChanged = JSON.stringify(textBlock.importanceRanges) !== JSON.stringify(finalImportanceRanges);
-            if (rangesChanged) {
-              console.log('[RightPanel] importanceRanges 변경', {
-                blockId: block.id,
-                from: textBlock.importanceRanges,
-                to: finalImportanceRanges
-              });
-            }
-
-            // 완전히 새로운 객체로 생성하여 React가 변경을 확실히 감지하도록 함
-            return {
-              ...updatedTextBlock,
-              importanceRanges: finalImportanceRanges.map(range => ({ ...range })) // 배열도 새로 생성
-            };
-          }
-          // 다른 블록도 새로운 객체로 반환
-          return { ...updatedBlock };
-        }
-        // 변경되지 않은 블록도 새로운 객체로 반환하여 불변성 유지
-        return { ...block };
-      }) || [];
-
-      onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
-    } else {
+    if (!currentMemo || !currentMemo.blocks) {
+      return;
     }
-  }, [selectedMemo, onMemoUpdate]);
+
+    // 중요: 중요도 업데이트 시에만 디버그 로그 출력
+    const isImportanceUpdate = updatedBlock.type === 'text' && (updatedBlock as any).importanceRanges;
+    if (isImportanceUpdate) {
+      console.log('[RightPanel] 중요도 업데이트', {
+        blockId: updatedBlock.id,
+        totalBlocks: currentMemo.blocks?.length,
+        blockIds: currentMemo.blocks?.map(b => b.id)
+      });
+    }
+
+    const updatedBlocks = currentMemo.blocks.map(block => {
+      if (block.id === updatedBlock.id) {
+        // TextBlock의 경우 importanceRanges를 확실히 보존
+        if (block.type === 'text' && updatedBlock.type === 'text') {
+          const textBlock = block as TextBlock;
+          const updatedTextBlock = updatedBlock as TextBlock;
+
+          // 업데이트된 블록에 importanceRanges가 있으면 사용, 없으면 원본 보존
+          const finalImportanceRanges = updatedTextBlock.importanceRanges !== undefined
+            ? updatedTextBlock.importanceRanges
+            : (textBlock.importanceRanges || []);
+
+          // 완전히 새로운 객체로 생성하여 React가 변경을 확실히 감지하도록 함
+          return {
+            ...updatedTextBlock,
+            importanceRanges: finalImportanceRanges.map(range => ({ ...range })) // 배열도 새로 생성
+          };
+        }
+        // 다른 블록도 새로운 객체로 반환
+        return { ...updatedBlock };
+      }
+      // 변경되지 않은 블록도 새로운 객체로 반환하여 불변성 유지
+      return { ...block };
+    });
+
+    if (isImportanceUpdate) {
+      console.log('[RightPanel] 업데이트 완료', {
+        updatedBlocksLength: updatedBlocks.length,
+        updatedBlockIds: updatedBlocks.map(b => b.id)
+      });
+    }
+
+    onMemoUpdate(currentMemo.id, { blocks: updatedBlocks });
+  }, [onMemoUpdate]);
 
   const handleBlockDelete = (blockId: string) => {
     if (selectedMemo && selectedMemo.blocks && selectedMemo.blocks.length > 1) {

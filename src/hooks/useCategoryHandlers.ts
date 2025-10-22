@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { CategoryBlock, Page, MemoBlock, CanvasActionType } from '../types';
 import { calculateCategoryArea, centerCanvasOnPosition } from '../utils/categoryAreaUtils';
 import { resolveAreaCollisions } from '../utils/collisionUtils';
-import { createCategory as createCategoryApi } from '../utils/api';
+import { createCategory as createCategoryApi, deleteQuickNavItem } from '../utils/api';
 import { removeInvalidConnectionsAfterHierarchyChange } from '../utils/categoryHierarchyUtils';
 
 /**
@@ -197,6 +197,16 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
               connections: c.connections.filter(connId => connId !== categoryId), // 삭제된 카테고리로의 연결 제거
               children: c.children.filter(childId => childId !== categoryId) // 자식 목록에서도 제거
             }));
+
+          // 삭제할 카테고리와 연결된 단축 이동 항목 찾기
+          const quickNavItemsToDelete = (page.quickNavItems || []).filter(item => item.targetId === categoryId);
+
+          // 서버에서 단축 이동 항목 삭제 (백그라운드에서 비동기 실행)
+          quickNavItemsToDelete.forEach(item => {
+            deleteQuickNavItem(item.id).catch(error => {
+              console.warn('단축 이동 항목 삭제 실패 (UI는 정상 동작):', error);
+            });
+          });
 
           // 단축 이동 목록에서 삭제된 카테고리 제거 (페이지별)
           const updatedQuickNavItems = (page.quickNavItems || []).filter(item => item.targetId !== categoryId);
