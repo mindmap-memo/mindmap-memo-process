@@ -284,10 +284,19 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
    * 카테고리 영역 계산 (색상 포함)
    * utils의 calculateCategoryArea를 호출하고 색상을 추가합니다.
    */
-  const calculateCategoryAreaWithColor = React.useCallback((category: CategoryBlock, visited: Set<string> = new Set()) => {
+  const calculateCategoryAreaWithColor = React.useCallback((category: CategoryBlock, visited: Set<string> = new Set(), excludeCategoryId?: string) => {
     if (!currentPage) return null;
 
-    const area = calculateCategoryArea(category, currentPage, visited);
+    // Shift 드래그 중일 때 드래그 중인 카테고리를 제외한 페이지 데이터 생성
+    let pageForCalculation = currentPage;
+    if (excludeCategoryId) {
+      pageForCalculation = {
+        ...currentPage,
+        categories: currentPage.categories?.filter(cat => cat.id !== excludeCategoryId) || []
+      };
+    }
+
+    const area = calculateCategoryArea(category, pageForCalculation, visited);
     if (!area) return null;
 
     // 로그 제거됨
@@ -655,7 +664,17 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
       };
     } else {
       // 캐시된 영역이 없으면 동적 계산
-      area = calculateCategoryAreaWithColor(category);
+      // 드래그 중일 때는 드래그 중인 카테고리를 제외하고 계산 (Shift 여부 관계없이)
+      // 이렇게 하면 Shift를 떼어도 드래그가 끝날 때까지 기존 부모 영역이 고정됨
+      let excludeId: string | undefined = undefined;
+      if ((isDraggingMemo || isDraggingCategory) && draggingCategoryId) {
+        // 카테고리 드래그 중일 때만 제외 (메모 드래그는 카테고리가 아니므로)
+        if (isDraggingCategory) {
+          excludeId = draggingCategoryId;
+        }
+      }
+
+      area = calculateCategoryAreaWithColor(category, new Set(), excludeId);
 
       // 하위 카테고리인데 자식이 없어서 area가 null인 경우, 기본 영역 생성
       if (!area && category.parentId) {
@@ -808,7 +827,8 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
                 if (currentPage && Object.keys(shiftDragAreaCache.current).length === 0) {
                   currentPage.categories?.forEach(cat => {
                     if (cat.isExpanded) {
-                      const catArea = calculateCategoryAreaWithColor(cat);
+                      // 드래그 중인 카테고리를 제외하고 영역 계산
+                      const catArea = calculateCategoryAreaWithColor(cat, new Set(), category.id);
                       if (catArea) {
                         shiftDragAreaCache.current[cat.id] = catArea;
                       }
@@ -845,7 +865,8 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
                     if (currentPage && Object.keys(shiftDragAreaCache.current).length === 0) {
                       currentPage.categories?.forEach(cat => {
                         if (cat.isExpanded) {
-                          const catArea = calculateCategoryAreaWithColor(cat);
+                          // 드래그 중인 카테고리를 제외하고 영역 계산
+                          const catArea = calculateCategoryAreaWithColor(cat, new Set(), category.id);
                           if (catArea) {
                             shiftDragAreaCache.current[cat.id] = catArea;
                           }

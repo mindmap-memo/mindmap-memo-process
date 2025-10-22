@@ -44,6 +44,10 @@ interface UseMemoHandlersProps {
   canvasScale: number;
   setCanvasOffset: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
   saveCanvasState?: (actionType: CanvasActionType, description: string) => void;
+  // Shift 드래그 상태
+  isShiftPressed: boolean;
+  isDraggingMemo: boolean;
+  isDraggingCategory: boolean;
 }
 
 export const useMemoHandlers = (props: UseMemoHandlersProps) => {
@@ -60,7 +64,10 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
     rightPanelWidth,
     canvasScale,
     setCanvasOffset,
-    saveCanvasState
+    saveCanvasState,
+    isShiftPressed,
+    isDraggingMemo,
+    isDraggingCategory
   } = props;
 
   /**
@@ -72,7 +79,9 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
     let newPosition = { ...originalPosition };
 
     // 영역과 겹치지 않는 위치 찾기
-    if (position) {
+    // ⚠️ Shift 드래그 중에는 영역 계산 스킵 (영역이 freeze된 상태)
+    const isShiftDragging = isShiftPressed && (isDraggingMemo || isDraggingCategory);
+    if (position && !isShiftDragging) {
       const currentPage = pages.find(p => p.id === currentPageId);
       if (currentPage?.categories) {
         // 새 메모의 실제 크기 (기본 크기)

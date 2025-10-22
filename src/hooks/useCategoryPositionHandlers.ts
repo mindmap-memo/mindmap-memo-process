@@ -15,6 +15,10 @@ interface UseCategoryPositionHandlersProps {
   previousFramePosition: MutableRefObject<Map<string, { x: number; y: number }>>;
   cacheCreationStarted: MutableRefObject<Set<string>>;
   clearCategoryCache: (categoryId: string) => void;
+  // Shift 드래그 상태
+  isShiftPressed: boolean;
+  isDraggingMemo: boolean;
+  isDraggingCategory: boolean;
 }
 
 export const useCategoryPositionHandlers = ({
@@ -28,7 +32,10 @@ export const useCategoryPositionHandlers = ({
   shiftDragAreaCache,
   previousFramePosition,
   cacheCreationStarted,
-  clearCategoryCache
+  clearCategoryCache,
+  isShiftPressed,
+  isDraggingMemo,
+  isDraggingCategory
 }: UseCategoryPositionHandlersProps) => {
 
   // 카테고리 라벨만 이동 (영역은 변경하지 않음)
@@ -130,6 +137,10 @@ export const useCategoryPositionHandlers = ({
   // 카테고리 라벨 위치 자동 업데이트 (영역의 좌상단으로)
   // 메모가 이동할 때만 업데이트
   const updateCategoryPositions = useCallback(() => {
+    // ⚠️ Shift 드래그 중에는 영역 계산 스킵 (영역이 freeze된 상태)
+    const isShiftDragging = isShiftPressed && (isDraggingMemo || isDraggingCategory);
+    if (isShiftDragging) return;
+
     const currentPage = pages.find(p => p.id === currentPageId);
     if (!currentPage || !currentPage.categories) return;
 
@@ -173,7 +184,7 @@ export const useCategoryPositionHandlers = ({
         return page;
       }));
     }
-  }, [pages, currentPageId, setPages]);
+  }, [pages, currentPageId, setPages, isShiftPressed, isDraggingMemo, isDraggingCategory]);
 
   return {
     updateCategoryLabelPosition,

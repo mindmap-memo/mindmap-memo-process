@@ -161,7 +161,10 @@ const App: React.FC = () => {
     rightPanelWidth,
     canvasScale,
     setCanvasOffset,
-    saveCanvasState
+    saveCanvasState,
+    isShiftPressed: appState.isShiftPressed,
+    isDraggingMemo: appState.isDraggingMemo,
+    isDraggingCategory: appState.isDraggingCategory
   });
 
 
@@ -511,7 +514,10 @@ const App: React.FC = () => {
     shiftDragAreaCache,
     previousFramePosition,
     cacheCreationStarted,
-    clearCategoryCache
+    clearCategoryCache,
+    isShiftPressed: appState.isShiftPressed,
+    isDraggingMemo: appState.isDraggingMemo,
+    isDraggingCategory: appState.isDraggingCategory
   });
 
   const {

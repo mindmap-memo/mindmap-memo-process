@@ -539,55 +539,48 @@ export const usePositionHandlers = ({
           // 원본 페이지 상태 가져오기
           const originalPageState = pages.find(p => p.id === currentPageId);
           if (originalPageState) {
-            // 영역이 변경된 카테고리만 수집 (한 번만 확인)
+            // 영역이 있는 카테고리 수집 (변경 여부와 무관하게 충돌 검사 필요)
             const changedCategoryIds: string[] = [];
 
             for (const parentId of allParentIds) {
               const parentCategory = finalPage.categories?.find(c => c.id === parentId);
               if (parentCategory?.isExpanded) {
-                // 이전 영역 계산 (최초 originalPage 기준 - 한 번만)
-                const oldArea = calculateCategoryArea(parentCategory, originalPageState);
                 // 새 영역 계산 (현재 finalPage 기준)
                 const newArea = calculateCategoryArea(parentCategory, finalPage);
 
-                if (oldArea && newArea) {
-                  // 영역 위치 또는 크기가 변경되었는지 확인
-                  const areaChanged =
-                    oldArea.x !== newArea.x ||
-                    oldArea.y !== newArea.y ||
-                    oldArea.width !== newArea.width ||
-                    oldArea.height !== newArea.height;
-
-                  if (areaChanged) {
-                    changedCategoryIds.push(parentId);
-                  }
+                // 영역이 존재하면 충돌 검사 대상에 추가
+                // (하위요소 드래그 중 방향 전환 시에도 충돌 검사가 누락되지 않도록)
+                if (newArea) {
+                  changedCategoryIds.push(parentId);
                 }
               }
             }
 
-            // 변경된 카테고리가 있으면 충돌 검사 (한 번만 실행)
+            // 변경된 카테고리가 있으면 충돌 검사
             if (changedCategoryIds.length > 0) {
-              // 최상위 변경 카테고리만 선택 (자식이 아닌 것만)
-              const topLevelChanged = changedCategoryIds.filter(id => {
-                return !changedCategoryIds.some(otherId => {
-                  if (otherId === id) return false;
-                  // otherId가 id의 부모인지 확인
-                  let current = finalPage.categories?.find(c => c.id === id);
-                  while (current?.parentId) {
-                    if (current.parentId === otherId) return true;
-                    current = finalPage.categories?.find(c => c.id === current!.parentId);
-                  }
-                  return false;
-                });
-              });
+              // 모든 변경된 카테고리에 대해 충돌 검사
+              // (최상위 필터링 제거 - 하위 카테고리도 같은 부모 내 형제 요소와 충돌할 수 있음)
 
-              // 최상위 변경 카테고리만 충돌 검사 (한 번만)
-              for (const parentId of topLevelChanged) {
-                const result = resolveAreaCollisions(parentId, finalPage);
+              // 모든 변경된 카테고리에 대해 충돌 검사
+              // 영역 드래그와 동일한 방식으로 처리 (resolveUnifiedCollisions 사용)
+              for (const parentId of changedCategoryIds) {
+                const parentCategory = finalPage.categories?.find(c => c.id === parentId);
+                if (!parentCategory) continue;
+
+                // 영역 드래그와 동일하게 통합 충돌 검사 사용
+                const collisionResult = resolveUnifiedCollisions(
+                  parentId,
+                  'area',
+                  finalPage,
+                  10,
+                  [parentId], // 이동 중인 영역으로 취급
+                  { x: frameDeltaX, y: frameDeltaY } // 하위 카테고리 이동 속도 전달
+                );
+
                 finalPage = {
                   ...finalPage,
-                  categories: result.updatedCategories,
-                  memos: result.updatedMemos
+                  categories: collisionResult.updatedCategories,
+                  memos: collisionResult.updatedMemos
                 };
               }
             }
@@ -779,7 +772,9 @@ export const usePositionHandlers = ({
 
       // Shift 드래그 중에는 충돌 검사 안 함
       // Ref를 사용하여 드래그 중 Shift 상태 변경을 실시간으로 반영
+      console.log('[Memo Drag] Shift 상태:', isShiftPressedRef.current);
       if (isShiftPressedRef.current) {
+        console.log('[Memo Drag] Shift 드래그 중 - 충돌 검사 스킵');
         return prev.map(page =>
           page.id === currentPageId
             ? updatedPage
@@ -802,6 +797,7 @@ export const usePositionHandlers = ({
       };
 
       // 메모가 카테고리 내부에 있다면, 모든 상위 카테고리의 영역 변경을 재귀적으로 확인
+      console.log('[Memo Drag] 메모 parentId:', movedMemo?.parentId);
       if (movedMemo?.parentId) {
         // 모든 상위 카테고리 ID 수집 (재귀)
         const getAllParentCategoryIds = (categoryId: string): string[] => {
@@ -815,57 +811,83 @@ export const usePositionHandlers = ({
         };
 
         const allParentIds = getAllParentCategoryIds(movedMemo.parentId);
+        console.log('[Memo Drag] 모든 상위 카테고리 ID:', allParentIds);
 
-        // 영역이 변경된 카테고리만 수집 (한 번만 확인)
+        // 영역이 있는 카테고리 수집 (변경 여부와 무관하게 충돌 검사 필요)
         const changedCategoryIds: string[] = [];
 
         for (const parentId of allParentIds) {
           const parentCategory = finalPage.categories?.find(c => c.id === parentId);
+          console.log('[Memo Drag] 카테고리 확인:', parentId, 'isExpanded:', parentCategory?.isExpanded);
           if (parentCategory?.isExpanded) {
-            // 이전 영역 계산 (최초 currentPage 기준 - 한 번만)
-            const oldArea = calculateCategoryArea(parentCategory, currentPage);
             // 새 영역 계산 (현재 finalPage 기준)
             const newArea = calculateCategoryArea(parentCategory, finalPage);
+            console.log('[Memo Drag] 영역 계산:', parentId, 'area:', newArea);
 
-            if (oldArea && newArea) {
-              // 영역 위치 또는 크기가 변경되었는지 확인
-              const areaChanged =
-                oldArea.x !== newArea.x ||
-                oldArea.y !== newArea.y ||
-                oldArea.width !== newArea.width ||
-                oldArea.height !== newArea.height;
-
-              if (areaChanged) {
-                changedCategoryIds.push(parentId);
-              }
+            // 영역이 존재하면 충돌 검사 대상에 추가
+            // (하위요소 드래그 중 방향 전환 시에도 충돌 검사가 누락되지 않도록)
+            if (newArea) {
+              changedCategoryIds.push(parentId);
             }
           }
         }
 
-        // 변경된 카테고리가 있으면 충돌 검사 (한 번만 실행)
+        // 변경된 카테고리가 있으면 충돌 검사
         if (changedCategoryIds.length > 0) {
-          // 최상위 변경 카테고리만 선택 (자식이 아닌 것만)
-          const topLevelChanged = changedCategoryIds.filter(id => {
-            return !changedCategoryIds.some(otherId => {
-              if (otherId === id) return false;
-              // otherId가 id의 부모인지 확인
-              let current = finalPage.categories?.find(c => c.id === id);
-              while (current?.parentId) {
-                if (current.parentId === otherId) return true;
-                current = finalPage.categories?.find(c => c.id === current!.parentId);
-              }
-              return false;
-            });
-          });
+          console.log('[Memo Drag] 영역 변경 감지:', changedCategoryIds);
 
-          // 최상위 변경 카테고리만 충돌 검사 (한 번만)
-          for (const parentId of topLevelChanged) {
-            const result = resolveAreaCollisions(parentId, finalPage);
+          // 모든 변경된 카테고리에 대해 충돌 검사
+          // (최상위 필터링 제거 - b가 확장되어 a 내부의 d와 충돌할 수 있음)
+          console.log('[Memo Drag] 충돌 검사 대상:', changedCategoryIds);
+
+          // 모든 변경된 카테고리에 대해 충돌 검사
+          // 영역 드래그와 동일한 방식으로 처리 (resolveUnifiedCollisions 사용)
+          for (const parentId of changedCategoryIds) {
+            const parentCategory = finalPage.categories?.find(c => c.id === parentId);
+            if (!parentCategory) {
+              console.log('[Memo Drag] 카테고리를 찾을 수 없음:', parentId);
+              continue;
+            }
+
+            console.log('[Memo Drag] resolveUnifiedCollisions 호출 전:', {
+              parentId,
+              frameDelta: { x: deltaX, y: deltaY },
+              categoriesCount: finalPage.categories?.length,
+              memosCount: finalPage.memos.length
+            });
+
+            // 영역 드래그와 동일하게 통합 충돌 검사 사용
+            const collisionResult = resolveUnifiedCollisions(
+              parentId,
+              'area',
+              finalPage,
+              10,
+              [parentId], // 이동 중인 영역으로 취급
+              { x: deltaX, y: deltaY } // 메모 이동 속도 전달
+            );
+
+            console.log('[Memo Drag] resolveUnifiedCollisions 호출 후:', {
+              parentId,
+              categoriesChanged: collisionResult.updatedCategories.length !== finalPage.categories?.length,
+              memosChanged: collisionResult.updatedMemos.length !== finalPage.memos.length
+            });
+
+            const beforeCategories = finalPage.categories?.length || 0;
+            const beforeMemos = finalPage.memos.length;
+
             finalPage = {
               ...finalPage,
-              categories: result.updatedCategories,
-              memos: result.updatedMemos
+              categories: collisionResult.updatedCategories,
+              memos: collisionResult.updatedMemos
             };
+
+            console.log('[Memo Drag] finalPage 업데이트 완료:', {
+              parentId,
+              categoriesBefore: beforeCategories,
+              categoriesAfter: finalPage.categories?.length || 0,
+              memosBefore: beforeMemos,
+              memosAfter: finalPage.memos.length
+            });
           }
         }
       }

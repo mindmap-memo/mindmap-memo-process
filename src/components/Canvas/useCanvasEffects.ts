@@ -159,12 +159,14 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
     setDragTargetCategoryId
   } = props;
 
-  // 1. Shift 드래그가 끝나면 캐시 클리어
+  // 1. 드래그가 완전히 끝나면 캐시 클리어
+  // 중요: Shift를 떼는 것과 드래그가 끝나는 것은 별개
+  // Shift를 떼도 드래그가 진행 중이면 캐시 유지 (기존 부모 영역 고정)
   useEffect(() => {
-    if (!isDraggingMemo || !isShiftPressed) {
+    if (!isDraggingMemo && !isDraggingCategory) {
       shiftDragAreaCache.current = {};
     }
-  }, [isDraggingMemo, isShiftPressed, shiftDragAreaCache]);
+  }, [isDraggingMemo, isDraggingCategory, shiftDragAreaCache]);
 
   // 2. 컨텍스트 메뉴 외부 클릭 시 닫기
   useEffect(() => {

@@ -470,12 +470,8 @@ export const useShiftDragHandlers = ({
     };
 
     // 카테고리 블록과 영역 모두 체크 - 겹치는 모든 카테고리 찾기
-    // 현재 부모 카테고리는 제외 (빠져나갈 수 있도록)
+    // 현재 부모도 포함해서 검사 (마우스 위치가 여전히 부모 안에 있으면 부모 유지)
     const overlappingCategories = currentPage.categories?.filter(category => {
-      // 현재 부모 카테고리는 타겟에서 제외
-      if (category.id === draggedMemo.parentId) {
-        return false;
-      }
       // 1. 카테고리 블록과의 겹침 체크
       const categoryWidth = category.size?.width || 200;
       const categoryHeight = category.size?.height || 80;
