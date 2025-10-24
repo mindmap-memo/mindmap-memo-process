@@ -51,7 +51,7 @@ interface TextBlockProps {
   onResetFilters?: () => void; // 필터를 기본 상태로 리셋하는 함수
 }
 
-const TextBlockComponent: React.FC<TextBlockProps> = React.memo(({
+const TextBlockComponent: React.FC<TextBlockProps> = ({
   block,
   isEditing = false,
   onUpdate,
@@ -122,7 +122,8 @@ const TextBlockComponent: React.FC<TextBlockProps> = React.memo(({
   const [showImportanceMenu, setShowImportanceMenu] = useState(false);
   const [importanceMenuPosition, setImportanceMenuPosition] = useState({ x: 0, y: 0 });
   const [selectedRange, setSelectedRange] = useState<{ start: number; end: number } | null>(null);
-  const [, forceUpdate] = useState({});
+  const [, forceUpdate] = React.useReducer(x => x + 1, 0); // useReducer로 변경
+  const [backgroundKey, setBackgroundKey] = useState(0); // 배경 레이어 강제 리렌더링용 key
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -135,7 +136,34 @@ const TextBlockComponent: React.FC<TextBlockProps> = React.memo(({
 
   // 외부에서 importanceRanges가 변경되었을 때 로컬 상태 동기화
   useEffect(() => {
-    setImportanceRanges(block.importanceRanges || []);
+    const isSameArray = importanceRanges === block.importanceRanges;
+    const isSameContent = JSON.stringify(importanceRanges) === JSON.stringify(block.importanceRanges);
+
+    console.log('[TextBlock] importanceRanges 동기화:', {
+      blockId: block.id,
+      isSameArray,
+      isSameContent,
+      oldLength: importanceRanges?.length,
+      newLength: block.importanceRanges?.length,
+      oldRanges: importanceRanges,
+      newRanges: block.importanceRanges,
+      oldDetail: importanceRanges?.map(r => ({ start: r.start, end: r.end, level: r.level })),
+      newDetail: block.importanceRanges?.map(r => ({ start: r.start, end: r.end, level: r.level }))
+    });
+
+    // 배열을 복사하여 새로운 참조 생성
+    const newRanges = block.importanceRanges ? [...block.importanceRanges] : [];
+    setImportanceRanges(newRanges);
+
+    // 배열 참조가 다르면 무조건 강제 리렌더링 (내용이 같아도)
+    if (!isSameArray) {
+      setBackgroundKey(prev => prev + 1);
+      forceUpdate();
+      // 다음 틱에서 한 번 더 강제 리렌더링 (React 배치 업데이트 우회)
+      setTimeout(() => {
+        forceUpdate();
+      }, 0);
+    }
   }, [block.importanceRanges]);
 
 
@@ -143,11 +171,11 @@ const TextBlockComponent: React.FC<TextBlockProps> = React.memo(({
 
   // block 전체 변경 시 강제 리렌더링 (특히 importanceRanges)
   useEffect(() => {
-    forceUpdate({});
+    forceUpdate();
     // importanceRanges가 있는데 렌더링이 안되는 경우를 위한 추가 체크
     if (block.importanceRanges && block.importanceRanges.length > 0) {
       setTimeout(() => {
-        forceUpdate({});
+        forceUpdate();
       }, 50);
     }
   }, [block]);
@@ -155,8 +183,8 @@ const TextBlockComponent: React.FC<TextBlockProps> = React.memo(({
   // importanceRanges 전용 감지
   useEffect(() => {
     if (block.importanceRanges && block.importanceRanges.length > 0) {
-      forceUpdate({});
-      setTimeout(() => forceUpdate({}), 10);
+      forceUpdate();
+      setTimeout(() => forceUpdate(), 10);
     }
   }, [block.importanceRanges]);
 
@@ -518,6 +546,12 @@ const TextBlockComponent: React.FC<TextBlockProps> = React.memo(({
 
   // 중요도 적용
   const applyImportance = (level: ImportanceLevel) => {
+    console.log('[TextBlock] applyImportance 시작:', {
+      blockId: block.id,
+      level,
+      selectedRange
+    });
+
     if (!selectedRange) {
       return;
     }
@@ -601,14 +635,35 @@ const TextBlockComponent: React.FC<TextBlockProps> = React.memo(({
     // 로컬 상태 즉시 업데이트 - 동기적으로 업데이트되지 않으므로 강제 리렌더링 필요
     setImportanceRanges(freshUpdatedRanges);
 
-    // 강제 리렌더링을 위한 상태 업데이트
-    forceUpdate({});
+    // 배경 레이어 key 변경으로 강제 재생성
+    setBackgroundKey(prev => prev + 1);
 
-    const updatedBlock = {
-      ...block,
-      content: content, // 현재 입력 중인 content 상태 사용
-      importanceRanges: freshUpdatedRanges
+    // 강제 리렌더링을 위한 상태 업데이트
+    forceUpdate();
+
+    // 즉시 한 번 더 리렌더링 (확실한 업데이트를 위해)
+    setTimeout(() => {
+      forceUpdate();
+    }, 0);
+
+    // 완전히 새로운 블록 객체 생성 (참조 변경을 위해)
+    // importanceRanges도 복사하여 로컬 상태와 다른 배열 참조 생성
+    const updatedBlock: TextBlock = {
+      id: block.id,
+      type: 'text',
+      content: content,
+      importanceRanges: freshUpdatedRanges.map(r => ({ ...r }))
     };
+
+    console.log('[TextBlock] onUpdate 호출:', {
+      blockId: block.id,
+      blockImportanceRanges: block.importanceRanges,
+      localImportanceRanges: importanceRanges,
+      freshUpdatedRanges: freshUpdatedRanges,
+      sameAsBlock: block.importanceRanges === freshUpdatedRanges,
+      sameAsLocal: importanceRanges === freshUpdatedRanges,
+      rangesDetail: freshUpdatedRanges.map(r => ({ start: r.start, end: r.end, level: r.level }))
+    });
 
     if (onUpdate) {
       onUpdate(updatedBlock);
@@ -732,27 +787,34 @@ const TextBlockComponent: React.FC<TextBlockProps> = React.memo(({
     }
 
     return parts.map((part, index) => {
-      const importanceStyle = part.level ? getImportanceStyle(part.level) : {};
+      // 중요도가 없는 부분은 렌더링하지 않음 (배경색만 필요)
+      if (!part.level) {
+        return null;
+      }
+
+      const importanceStyle = getImportanceStyle(part.level);
 
       return (
         <span
-          key={index}
-          style={part.level ? {
+          key={`${backgroundKey}-${index}-${part.level}`}
+          style={{
             backgroundColor: importanceStyle.backgroundColor,
             padding: '1px 0px',
             borderRadius: '2px',
             fontWeight: '500',
-            color: 'transparent', // 텍스트는 투명하게
+            color: 'rgba(0,0,0,0)',
             margin: '0',
-            display: 'inline'
-          } : {
-            color: 'rgba(0,0,0,0.05)' // 일반 텍스트도 거의 투명하게
+            display: 'inline',
+            WebkitTextFillColor: 'rgba(0,0,0,0)',
+            textShadow: 'none',
+            userSelect: 'none',
+            fontSize: '0'
           }}
         >
           {part.text}
         </span>
       );
-    });
+    }).filter(Boolean);
   };
 
   if (isEditing) {
@@ -769,6 +831,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = React.memo(({
           {/* 배경에 스타일된 텍스트 표시 - div는 항상 렌더링, 내용만 조건부 */}
           <div
             data-importance-background="true"
+            key={`bg-${block.id}-${backgroundKey}`}
             style={{
               position: 'absolute',
               top: '2px',
@@ -786,12 +849,10 @@ const TextBlockComponent: React.FC<TextBlockProps> = React.memo(({
               userSelect: 'none' // 선택 불가능하게
             }}
           >
-            {/* 로컬 상태의 importanceRanges를 즉시 반영 */}
-            {importanceRanges.length > 0 ? (
-              (activeImportanceFilters || showGeneralContent !== undefined) ?
-                renderFilteredStyledText(content, importanceRanges, activeImportanceFilters, showGeneralContent) :
-                renderStyledText(content, importanceRanges)
-            ) : null}
+            {/* 로컬 상태의 importanceRanges를 즉시 반영 - 항상 렌더링 */}
+            {(activeImportanceFilters || showGeneralContent !== undefined) ?
+              renderFilteredStyledText(content, importanceRanges, activeImportanceFilters, showGeneralContent) :
+              renderStyledText(content, importanceRanges)}
           </div>
           <textarea
             ref={textareaRef}
@@ -830,21 +891,18 @@ const TextBlockComponent: React.FC<TextBlockProps> = React.memo(({
               backgroundColor: 'transparent',
               outline: 'none',
               lineHeight: '1.4',
-              transition: 'all 0.15s ease',
               color: 'inherit',
               cursor: !canEdit ? 'not-allowed' : 'text'
             }}
             onMouseEnter={(e) => {
-              // 중요도 스타일이 있는 경우 배경색 변경하지 않음
-              if (!isFocused && (!block.importanceRanges || block.importanceRanges.length === 0)) {
+              // 중요도가 없고 포커스되지 않은 경우에만 배경색 변경
+              if (!isFocused && (!importanceRanges || importanceRanges.length === 0)) {
                 e.currentTarget.style.backgroundColor = '#f8f9fa';
               }
             }}
             onMouseLeave={(e) => {
-              // 중요도 스타일이 있는 경우 배경색 변경하지 않음
-              if (!isFocused && (!block.importanceRanges || block.importanceRanges.length === 0)) {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }
+              // 항상 투명으로 복원 (중요도 배경이 보이도록)
+              e.currentTarget.style.backgroundColor = 'transparent';
             }}
           />
         </div>
@@ -1044,19 +1102,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = React.memo(({
       )}
     </div>
   );
-}, (prevProps, nextProps) => {
-  // props가 같으면 true 반환 (리렌더링 하지 않음)
-  // props가 다르면 false 반환 (리렌더링 함)
-
-  // block 객체 자체의 참조 비교로 단순화
-  // importanceRanges 변경 시 block 객체가 새로 생성되므로 참조가 달라짐
-  const isSame = (
-    prevProps.block === nextProps.block &&
-    prevProps.isEditing === nextProps.isEditing &&
-    prevProps.activeImportanceFilters === nextProps.activeImportanceFilters &&
-    prevProps.showGeneralContent === nextProps.showGeneralContent
-  );
-  return isSame; // true면 리렌더링 안함, false면 리렌더링
-});
+};
 
 export default TextBlockComponent;

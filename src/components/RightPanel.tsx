@@ -80,6 +80,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const [showImportanceSubmenu, setShowImportanceSubmenu] = React.useState(false);
   const [submenuPosition, setSubmenuPosition] = React.useState<'right' | 'left'>('right');
   const [submenuTopOffset, setSubmenuTopOffset] = React.useState<number>(0);
+  const [, forceUpdate] = React.useReducer(x => x + 1, 0); // RightPanel 강제 리렌더링용
 
   // 메모가 변경될 때마다 연결된 메모를 펼침
   React.useEffect(() => {
@@ -227,46 +228,46 @@ const RightPanel: React.FC<RightPanelProps> = ({
     // 중요: 중요도 업데이트 시에만 디버그 로그 출력
     const isImportanceUpdate = updatedBlock.type === 'text' && (updatedBlock as any).importanceRanges;
     if (isImportanceUpdate) {
-      console.log('[RightPanel] 중요도 업데이트', {
+      console.log('[RightPanel] handleBlockUpdate - 중요도 업데이트 받음', {
         blockId: updatedBlock.id,
-        totalBlocks: currentMemo.blocks?.length,
-        blockIds: currentMemo.blocks?.map(b => b.id)
+        importanceRanges: (updatedBlock as any).importanceRanges,
+        rangesDetail: (updatedBlock as any).importanceRanges?.map((r: any) => ({ start: r.start, end: r.end, level: r.level })),
+        totalBlocks: currentMemo.blocks?.length
       });
     }
 
     const updatedBlocks = currentMemo.blocks.map(block => {
       if (block.id === updatedBlock.id) {
-        // TextBlock의 경우 importanceRanges를 확실히 보존
-        if (block.type === 'text' && updatedBlock.type === 'text') {
-          const textBlock = block as TextBlock;
-          const updatedTextBlock = updatedBlock as TextBlock;
-
-          // 업데이트된 블록에 importanceRanges가 있으면 사용, 없으면 원본 보존
-          const finalImportanceRanges = updatedTextBlock.importanceRanges !== undefined
-            ? updatedTextBlock.importanceRanges
-            : (textBlock.importanceRanges || []);
-
-          // 완전히 새로운 객체로 생성하여 React가 변경을 확실히 감지하도록 함
-          return {
-            ...updatedTextBlock,
-            importanceRanges: finalImportanceRanges.map(range => ({ ...range })) // 배열도 새로 생성
-          };
+        // updatedBlock을 그대로 사용 (TextBlock에서 이미 완전한 데이터를 전달함)
+        if (isImportanceUpdate) {
+          console.log('[RightPanel] 블록 업데이트:', {
+            blockId: block.id,
+            updatedBlock,
+            updatedImportanceRanges: (updatedBlock as any).importanceRanges
+          });
         }
-        // 다른 블록도 새로운 객체로 반환
-        return { ...updatedBlock };
+
+        // updatedBlock을 그대로 반환 (이미 완전한 데이터)
+        return updatedBlock;
       }
-      // 변경되지 않은 블록도 새로운 객체로 반환하여 불변성 유지
-      return { ...block };
+      // 변경되지 않은 블록은 원본 그대로 반환
+      return block;
     });
 
     if (isImportanceUpdate) {
-      console.log('[RightPanel] 업데이트 완료', {
+      console.log('[RightPanel] onMemoUpdate 호출 전', {
         updatedBlocksLength: updatedBlocks.length,
-        updatedBlockIds: updatedBlocks.map(b => b.id)
+        updatedBlock: updatedBlocks.find(b => b.id === updatedBlock.id)
       });
     }
 
     onMemoUpdate(currentMemo.id, { blocks: updatedBlocks });
+
+    if (isImportanceUpdate) {
+      console.log('[RightPanel] onMemoUpdate 호출 완료');
+      // 중요도 업데이트 시 RightPanel 강제 리렌더링
+      forceUpdate();
+    }
   }, [onMemoUpdate]);
 
   const handleBlockDelete = (blockId: string) => {
