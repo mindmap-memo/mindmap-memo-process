@@ -128,88 +128,38 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   const menuRef = useRef<HTMLDivElement>(null);
 
   // 외부에서 블록 내용이 변경되었을 때 로컬 상태 동기화
+  // 단, 포커스된 상태에서는 외부 변경을 무시 (사용자가 입력 중일 수 있음)
   useEffect(() => {
-    if (block.content !== content) {
-      setContent(block.content);
+    // 포커스된 상태에서는 외부 변경 무시
+    if (isFocused) {
+      return;
     }
-  }, [block.content]);
+
+    // content가 변경되지 않았으면 동기화하지 않음
+    if (block.content === content) {
+      return;
+    }
+
+    setContent(block.content);
+  }, [block.content, isFocused]);
 
   // 외부에서 importanceRanges가 변경되었을 때 로컬 상태 동기화
   useEffect(() => {
-    const isSameArray = importanceRanges === block.importanceRanges;
     const isSameContent = JSON.stringify(importanceRanges) === JSON.stringify(block.importanceRanges);
 
-    console.log('[TextBlock] importanceRanges 동기화:', {
-      blockId: block.id,
-      isSameArray,
-      isSameContent,
-      oldLength: importanceRanges?.length,
-      newLength: block.importanceRanges?.length,
-      oldRanges: importanceRanges,
-      newRanges: block.importanceRanges,
-      oldDetail: importanceRanges?.map(r => ({ start: r.start, end: r.end, level: r.level })),
-      newDetail: block.importanceRanges?.map(r => ({ start: r.start, end: r.end, level: r.level }))
-    });
-
-    // 배열을 복사하여 새로운 참조 생성
-    const newRanges = block.importanceRanges ? [...block.importanceRanges] : [];
-    setImportanceRanges(newRanges);
-
-    // 배열 참조가 다르면 무조건 강제 리렌더링 (내용이 같아도)
-    if (!isSameArray) {
+    // 내용이 다를 때만 업데이트
+    if (!isSameContent) {
+      const newRanges = block.importanceRanges ? [...block.importanceRanges] : [];
+      setImportanceRanges(newRanges);
       setBackgroundKey(prev => prev + 1);
-      forceUpdate();
-      // 다음 틱에서 한 번 더 강제 리렌더링 (React 배치 업데이트 우회)
-      setTimeout(() => {
-        forceUpdate();
-      }, 0);
     }
   }, [block.importanceRanges]);
 
-
-  // 자동 저장 제거 - 블록 단위 히스토리를 위해
-
-  // block 전체 변경 시 강제 리렌더링 (특히 importanceRanges)
-  useEffect(() => {
-    forceUpdate();
-    // importanceRanges가 있는데 렌더링이 안되는 경우를 위한 추가 체크
-    if (block.importanceRanges && block.importanceRanges.length > 0) {
-      setTimeout(() => {
-        forceUpdate();
-      }, 50);
-    }
-  }, [block]);
-
-  // importanceRanges 전용 감지
-  useEffect(() => {
-    if (block.importanceRanges && block.importanceRanges.length > 0) {
-      forceUpdate();
-      setTimeout(() => forceUpdate(), 10);
-    }
-  }, [block.importanceRanges]);
-
-  // 로컬 importanceRanges 변경 감지 (로그 제거)
-  const prevImportanceRangesRef = React.useRef<ImportanceRange[]>([]);
-  useEffect(() => {
-    prevImportanceRangesRef.current = importanceRanges;
-  }, [importanceRanges]);
-
-  // 편집모드 진입 시 상태 동기화
+  // 편집모드 진입 시 포커스만 처리 (동기화는 하지 않음)
   useEffect(() => {
     if (isEditing && textareaRef.current) {
-
-      // 텍스트박스 값이 로컬 content와 다르면 동기화
-      if (textareaRef.current.value !== content) {
-        textareaRef.current.value = content;
-      }
-
-      // 로컬 content가 블록 content와 다르면 동기화
-      if (content !== block.content) {
-        setContent(block.content);
-        if (textareaRef.current) {
-          textareaRef.current.value = block.content;
-        }
-      }
+      // 포커스만 주고, 값은 건드리지 않음
+      // 값 동기화는 외부 block.content 변경 시에만 발생
     }
   }, [isEditing]);
 
@@ -357,9 +307,10 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
       textarea.style.height = `${textarea.scrollHeight}px`;
     }
 
+    // 로컬 상태 즉시 업데이트
     setContent(newContent);
 
-    // 입력 중에도 즉시 부모로 전달하여 상태 동기화 (importanceRanges 보존)
+    // 부모에게도 즉시 알림 (debounce 없이)
     if (onUpdate) {
       onUpdate({ ...block, content: newContent, importanceRanges });
     }
@@ -460,11 +411,16 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   };
 
   const handleBlur = () => {
+    // blur 시 현재 textarea의 실제 값을 가져와서 저장
+    const currentValue = textareaRef.current?.value || '';
+
     setIsFocused(false);
 
     // 내용이 변경되었으면 저장
-    if (content !== block.content && onUpdate) {
-      onUpdate({ ...block, content, importanceRanges });
+    if (currentValue !== block.content && onUpdate) {
+      // 로컬 상태도 업데이트
+      setContent(currentValue);
+      onUpdate({ ...block, content: currentValue, importanceRanges });
 
       // 실제로 내용이 변경되었을 때만 히스토리 저장
       if (onSaveToHistory) {
@@ -546,12 +502,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
 
   // 중요도 적용
   const applyImportance = (level: ImportanceLevel) => {
-    console.log('[TextBlock] applyImportance 시작:', {
-      blockId: block.id,
-      level,
-      selectedRange
-    });
-
     if (!selectedRange) {
       return;
     }
@@ -629,41 +579,17 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
       updatedRanges.push(newRange);
     }
 
-    // 배열을 완전히 새로운 객체로 만들어서 React가 변경을 확실히 감지하도록 함
-    const freshUpdatedRanges = updatedRanges.map(range => ({ ...range }));
-
-    // 로컬 상태 즉시 업데이트 - 동기적으로 업데이트되지 않으므로 강제 리렌더링 필요
-    setImportanceRanges(freshUpdatedRanges);
-
-    // 배경 레이어 key 변경으로 강제 재생성
+    // 로컬 상태 업데이트
+    setImportanceRanges(updatedRanges);
     setBackgroundKey(prev => prev + 1);
 
-    // 강제 리렌더링을 위한 상태 업데이트
-    forceUpdate();
-
-    // 즉시 한 번 더 리렌더링 (확실한 업데이트를 위해)
-    setTimeout(() => {
-      forceUpdate();
-    }, 0);
-
-    // 완전히 새로운 블록 객체 생성 (참조 변경을 위해)
-    // importanceRanges도 복사하여 로컬 상태와 다른 배열 참조 생성
+    // 블록 업데이트
     const updatedBlock: TextBlock = {
       id: block.id,
       type: 'text',
       content: content,
-      importanceRanges: freshUpdatedRanges.map(r => ({ ...r }))
+      importanceRanges: updatedRanges
     };
-
-    console.log('[TextBlock] onUpdate 호출:', {
-      blockId: block.id,
-      blockImportanceRanges: block.importanceRanges,
-      localImportanceRanges: importanceRanges,
-      freshUpdatedRanges: freshUpdatedRanges,
-      sameAsBlock: block.importanceRanges === freshUpdatedRanges,
-      sameAsLocal: importanceRanges === freshUpdatedRanges,
-      rangesDetail: freshUpdatedRanges.map(r => ({ start: r.start, end: r.end, level: r.level }))
-    });
 
     if (onUpdate) {
       onUpdate(updatedBlock);
@@ -671,14 +597,12 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
 
     // 중요도 변경 시 히스토리 저장
     if (onSaveToHistory) {
-      setTimeout(() => onSaveToHistory(), 50); // 약간의 지연으로 업데이트 후 저장
+      setTimeout(() => onSaveToHistory(), 50);
     }
 
-    // 상태를 즉시 업데이트하여 리렌더링 강제
+    // 메뉴 닫기 및 포커스 복원
     setShowImportanceMenu(false);
     setSelectedRange(null);
-
-    // 포커스 복원
     setTimeout(() => {
       if (textareaRef.current) {
         textareaRef.current.focus();
@@ -1025,13 +949,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
 
   // 읽기 모드에서만 제대로 된 색상으로 중요도 표시
   const renderStyledTextForReadMode = (text: string, ranges: ImportanceRange[] = block.importanceRanges || []) => {
-
-    // 배열 내용 자세히 확인
-    if (ranges && ranges.length > 0) {
-      ranges.forEach((range, index) => {
-      });
-    }
-
     if (!ranges || ranges.length === 0) {
       return text;
     }
@@ -1104,4 +1021,5 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   );
 };
 
+// React.memo 제거 - 부모에서 블록 배열 전체가 새로 생성되므로 memo 최적화가 오히려 문제를 일으킴
 export default TextBlockComponent;
