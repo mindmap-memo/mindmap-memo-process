@@ -51,39 +51,40 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
    */
   const addCategory = useCallback(async (position?: { x: number; y: number }) => {
     const originalPosition = position || { x: 300, y: 200 };
-    let newPosition = { ...originalPosition };
+    // 연속 생성 시 미세한 오프셋 추가 (타임스탬프 기반)
+    const offset = (Date.now() % 100) * 2; // 0~200px 랜덤 오프셋
+    let newPosition = { x: originalPosition.x + offset, y: originalPosition.y };
 
-    // 영역과 겹치지 않는 위치 찾기
+    // 영역 및 메모와 겹치지 않는 위치 찾기
     if (position) {
       const currentPage = pages.find(p => p.id === currentPageId);
-      if (currentPage?.categories) {
+      if (currentPage) {
         // 새 카테고리의 실제 영역 크기 (최소 크기)
         const newCategoryWidth = 400;
         const newCategoryHeight = 250;
         let isOverlapping = true;
         let adjustedY = newPosition.y;
         const moveStep = 300; // 충분히 밀어내기 위한 이동 거리
+        const margin = 5; // 겹침 여유 공간 (5px 간격)
 
         while (isOverlapping && adjustedY > -2000) {
           isOverlapping = false;
 
-          for (const category of currentPage.categories) {
+          const newCatLeft = newPosition.x;
+          const newCatRight = newPosition.x + newCategoryWidth;
+          const newCatTop = adjustedY;
+          const newCatBottom = adjustedY + newCategoryHeight;
+
+          // 1. 카테고리 영역과 충돌 검사
+          for (const category of currentPage.categories || []) {
             if (category.isExpanded) {
               const area = calculateCategoryArea(category, currentPage);
               if (area) {
-                // 새 카테고리 영역과 기존 영역이 겹치는지 확인
-                const newCatLeft = newPosition.x;
-                const newCatRight = newPosition.x + newCategoryWidth;
-                const newCatTop = adjustedY;
-                const newCatBottom = adjustedY + newCategoryHeight;
-
                 const areaLeft = area.x;
                 const areaRight = area.x + area.width;
                 const areaTop = area.y;
                 const areaBottom = area.y + area.height;
 
-                // 겹침 여유 공간 추가 (20px 간격)
-                const margin = 20;
                 if (!(newCatRight + margin < areaLeft || newCatLeft - margin > areaRight ||
                       newCatBottom + margin < areaTop || newCatTop - margin > areaBottom)) {
                   // 겹침 - 위로 충분히 이동
@@ -91,6 +92,26 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
                   adjustedY -= moveStep;
                   break;
                 }
+              }
+            }
+          }
+
+          // 2. 메모와 충돌 검사
+          if (!isOverlapping) {
+            for (const memo of currentPage.memos) {
+              const memoWidth = memo.size?.width || 200;
+              const memoHeight = memo.size?.height || 150;
+              const memoLeft = memo.position.x;
+              const memoRight = memo.position.x + memoWidth;
+              const memoTop = memo.position.y;
+              const memoBottom = memo.position.y + memoHeight;
+
+              if (!(newCatRight + margin < memoLeft || newCatLeft - margin > memoRight ||
+                    newCatBottom + margin < memoTop || newCatTop - margin > memoBottom)) {
+                // 겹침 - 위로 충분히 이동
+                isOverlapping = true;
+                adjustedY -= moveStep;
+                break;
               }
             }
           }

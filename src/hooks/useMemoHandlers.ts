@@ -76,41 +76,42 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
    */
   const addMemoBlock = useCallback(async (position?: { x: number; y: number }) => {
     const originalPosition = position || { x: 100, y: 100 };
-    let newPosition = { ...originalPosition };
+    // 연속 생성 시 미세한 오프셋 추가 (타임스탬프 기반)
+    const offset = (Date.now() % 100) * 2; // 0~200px 랜덤 오프셋
+    let newPosition = { x: originalPosition.x + offset, y: originalPosition.y };
 
-    // 영역과 겹치지 않는 위치 찾기
+    // 영역 및 메모와 겹치지 않는 위치 찾기
     // ⚠️ Shift 드래그 중에는 영역 계산 스킵 (영역이 freeze된 상태)
     const isShiftDragging = isShiftPressed && (isDraggingMemo || isDraggingCategory);
     if (position && !isShiftDragging) {
       const currentPage = pages.find(p => p.id === currentPageId);
-      if (currentPage?.categories) {
+      if (currentPage) {
         // 새 메모의 실제 크기 (기본 크기)
         const newMemoWidth = 320;
         const newMemoHeight = 180;
         let isOverlapping = true;
         let adjustedY = newPosition.y;
         const moveStep = 250; // 충분히 밀어내기 위한 이동 거리
+        const margin = 5; // 겹침 여유 공간 (5px 간격)
 
         while (isOverlapping && adjustedY > -2000) {
           isOverlapping = false;
 
-          for (const category of currentPage.categories) {
+          const newMemoLeft = newPosition.x;
+          const newMemoRight = newPosition.x + newMemoWidth;
+          const newMemoTop = adjustedY;
+          const newMemoBottom = adjustedY + newMemoHeight;
+
+          // 1. 카테고리 영역과 충돌 검사
+          for (const category of currentPage.categories || []) {
             if (category.isExpanded) {
               const area = calculateCategoryArea(category, currentPage);
               if (area) {
-                // 새 메모 영역과 기존 영역이 겹치는지 확인
-                const newMemoLeft = newPosition.x;
-                const newMemoRight = newPosition.x + newMemoWidth;
-                const newMemoTop = adjustedY;
-                const newMemoBottom = adjustedY + newMemoHeight;
-
                 const areaLeft = area.x;
                 const areaRight = area.x + area.width;
                 const areaTop = area.y;
                 const areaBottom = area.y + area.height;
 
-                // 겹침 여유 공간 추가 (20px 간격)
-                const margin = 20;
                 if (!(newMemoRight + margin < areaLeft || newMemoLeft - margin > areaRight ||
                       newMemoBottom + margin < areaTop || newMemoTop - margin > areaBottom)) {
                   // 겹침 - 위로 충분히 이동
@@ -118,6 +119,26 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
                   adjustedY -= moveStep;
                   break;
                 }
+              }
+            }
+          }
+
+          // 2. 메모와 충돌 검사
+          if (!isOverlapping) {
+            for (const memo of currentPage.memos) {
+              const memoWidth = memo.size?.width || 200;
+              const memoHeight = memo.size?.height || 150;
+              const memoLeft = memo.position.x;
+              const memoRight = memo.position.x + memoWidth;
+              const memoTop = memo.position.y;
+              const memoBottom = memo.position.y + memoHeight;
+
+              if (!(newMemoRight + margin < memoLeft || newMemoLeft - margin > memoRight ||
+                    newMemoBottom + margin < memoTop || newMemoTop - margin > memoBottom)) {
+                // 겹침 - 위로 충분히 이동
+                isOverlapping = true;
+                adjustedY -= moveStep;
+                break;
               }
             }
           }
