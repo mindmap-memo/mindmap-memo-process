@@ -1048,14 +1048,13 @@ const TextBlockComponent: React.FC<TextBlockProps> = React.memo(({
   // props가 같으면 true 반환 (리렌더링 하지 않음)
   // props가 다르면 false 반환 (리렌더링 함)
 
+  // block 객체 자체의 참조 비교로 단순화
+  // importanceRanges 변경 시 block 객체가 새로 생성되므로 참조가 달라짐
   const isSame = (
-    prevProps.block.id === nextProps.block.id &&
-    prevProps.block.content === nextProps.block.content &&
-    JSON.stringify(prevProps.block.importanceRanges) === JSON.stringify(nextProps.block.importanceRanges) &&
+    prevProps.block === nextProps.block &&
     prevProps.isEditing === nextProps.isEditing &&
     prevProps.activeImportanceFilters === nextProps.activeImportanceFilters &&
     prevProps.showGeneralContent === nextProps.showGeneralContent
-    // onUpdate, onCreateNewBlock, onSaveToHistory 등 함수는 비교하지 않음 (불필요한 리렌더링 방지)
   );
   return isSame; // true면 리렌더링 안함, false면 리렌더링
 });

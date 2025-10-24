@@ -54,7 +54,7 @@ export const useSelectedItems = ({
     if (!currentPage) return undefined;
     return currentPage.memos.find(memo => memo.id === selectedMemoId) ||
            (selectedMemoIds.length === 1 ? currentPage.memos.find(memo => memo.id === selectedMemoIds[0]) : undefined);
-  }, [currentPage, selectedMemoId, selectedMemoIds]);
+  }, [currentPage?.memos, selectedMemoId, selectedMemoIds]);
 
   const selectedMemos = useMemo(() => {
     if (!currentPage) return [];

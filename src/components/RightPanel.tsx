@@ -863,13 +863,28 @@ const RightPanel: React.FC<RightPanelProps> = ({
         if (previousBlock.type === 'text' && currentBlock.type === 'text') {
           saveToHistory(); // 블록 병합 시 히스토리 저장
           const previousContent = (previousBlock as any).content || '';
+          const previousLength = previousContent.length;
           const mergedContent = previousContent + currentContent;
-          
+
+          // 이전 블록과 현재 블록의 importanceRanges 합치기
+          const previousRanges = (previousBlock as any).importanceRanges || [];
+          const currentRanges = (currentBlock as any).importanceRanges || [];
+
+          // 현재 블록의 importanceRanges를 이전 블록 길이만큼 오프셋 적용
+          const offsetCurrentRanges = currentRanges.map((range: any) => ({
+            ...range,
+            start: range.start + previousLength,
+            end: range.end + previousLength
+          }));
+
+          const mergedRanges = [...previousRanges, ...offsetCurrentRanges];
+
           const updatedBlocks = [...selectedMemo.blocks];
-          // 이전 블록의 내용을 합친 내용으로 업데이트
-          updatedBlocks[blockIndex - 1] = { 
-            ...previousBlock, 
-            content: mergedContent 
+          // 이전 블록의 내용을 합친 내용으로 업데이트 (importanceRanges 포함)
+          updatedBlocks[blockIndex - 1] = {
+            ...previousBlock,
+            content: mergedContent,
+            importanceRanges: mergedRanges
           } as any;
           // 현재 블록 제거
           updatedBlocks.splice(blockIndex, 1);
