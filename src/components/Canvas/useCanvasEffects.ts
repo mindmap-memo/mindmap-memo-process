@@ -159,12 +159,14 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
     setDragTargetCategoryId
   } = props;
 
-  // 1. Shift 드래그가 끝나면 캐시 클리어
+  // 1. 드래그가 완전히 끝나면 캐시 클리어
+  // 중요: Shift를 떼는 것과 드래그가 끝나는 것은 별개
+  // Shift를 떼도 드래그가 진행 중이면 캐시 유지 (기존 부모 영역 고정)
   useEffect(() => {
-    if (!isDraggingMemo || !isShiftPressed) {
+    if (!isDraggingMemo && !isDraggingCategory) {
       shiftDragAreaCache.current = {};
     }
-  }, [isDraggingMemo, isShiftPressed, shiftDragAreaCache]);
+  }, [isDraggingMemo, isDraggingCategory, shiftDragAreaCache]);
 
   // 2. 컨텍스트 메뉴 외부 클릭 시 닫기
   useEffect(() => {
@@ -399,13 +401,11 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
 
         if (e.shiftKey) {
           // Ctrl+Shift+Z: Redo
-          console.log('Canvas: Calling onRedo');
           if (canRedo) {
             onRedo();
           }
         } else {
           // Ctrl+Z: Undo
-          console.log('Canvas: Calling onUndo');
           if (canUndo) {
             onUndo();
           }
@@ -527,8 +527,6 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
         }
       }
 
-      console.log('[Shift UI] 드래그 시작 - 초기 부모 고정:', draggingItemName, '| 초기 부모 ID:', initialParentId);
-
       let lastUpdateTime = 0;
       const throttleDelay = 50; // 50ms마다 한 번만 업데이트
 
@@ -577,7 +575,6 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
 
           // 드래그 시작 시의 부모는 제외 (고정된 초기 부모만 제외)
           if (category.id === initialParentId) {
-            console.log('[Shift UI] 초기 부모 카테고리 제외:', category.title, category.id);
             continue;
           }
 
@@ -590,7 +587,6 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
               mouseY >= area.y && mouseY <= area.y + area.height;
 
           if (isInArea) {
-            console.log('[Shift UI] 겹침 감지:', category.title, `(ID: ${category.id})`);
             overlappingCategories.push(category);
           }
         }
@@ -598,15 +594,11 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
         // 겹치는 영역 중에서 자신을 제외하고 가장 깊은 레벨(가장 하위) 카테고리 선택
         let foundTarget: string | null = null;
 
-        console.log('[Shift UI] 겹친 카테고리 총 개수:', overlappingCategories.length);
-
         if (overlappingCategories.length > 0) {
           // 드래그 중인 카테고리 자신을 제외
           const candidateCategories = overlappingCategories.filter(cat =>
             !(draggingCategoryIdCurrent && cat.id === draggingCategoryIdCurrent)
           );
-
-          console.log('[Shift UI] 자신 제외 후 후보:', candidateCategories.map(c => `${c.title}(${c.id})`));
 
           if (candidateCategories.length > 0) {
             // 각 카테고리의 깊이를 계산
@@ -627,10 +619,7 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
             );
 
             foundTarget = deepest.category.id;
-            console.log('[Shift UI] 최종 타겟:', deepest.category.title, `(ID: ${deepest.category.id}, 깊이: ${deepest.depth})`);
           }
-        } else {
-          console.log('[Shift UI] 겹친 카테고리 없음 - 타겟 없음');
         }
 
         setDragTargetCategoryId(foundTarget);

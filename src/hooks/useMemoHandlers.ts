@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { MemoBlock, Page, MemoDisplaySize, CanvasActionType } from '../types';
 import { calculateCategoryArea, centerCanvasOnPosition } from '../utils/categoryAreaUtils';
+import { createMemo, deleteMemo, deleteQuickNavItem } from '../utils/api';
 
 /**
  * useMemoHandlers
@@ -43,6 +44,10 @@ interface UseMemoHandlersProps {
   canvasScale: number;
   setCanvasOffset: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
   saveCanvasState?: (actionType: CanvasActionType, description: string) => void;
+  // Shift 드래그 상태
+  isShiftPressed: boolean;
+  isDraggingMemo: boolean;
+  isDraggingCategory: boolean;
 }
 
 export const useMemoHandlers = (props: UseMemoHandlersProps) => {
@@ -59,48 +64,54 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
     rightPanelWidth,
     canvasScale,
     setCanvasOffset,
-    saveCanvasState
+    saveCanvasState,
+    isShiftPressed,
+    isDraggingMemo,
+    isDraggingCategory
   } = props;
 
   /**
    * 메모 추가
    * 영역과 겹치지 않는 위치를 자동으로 찾아 배치하고 화면 중앙으로 이동
    */
-  const addMemoBlock = useCallback((position?: { x: number; y: number }) => {
+  const addMemoBlock = useCallback(async (position?: { x: number; y: number }) => {
     const originalPosition = position || { x: 100, y: 100 };
-    let newPosition = { ...originalPosition };
+    // 연속 생성 시 미세한 오프셋 추가 (타임스탬프 기반)
+    const offset = (Date.now() % 100) * 2; // 0~200px 랜덤 오프셋
+    let newPosition = { x: originalPosition.x + offset, y: originalPosition.y };
 
-    // 영역과 겹치지 않는 위치 찾기
-    if (position) {
+    // 영역 및 메모와 겹치지 않는 위치 찾기
+    // ⚠️ Shift 드래그 중에는 영역 계산 스킵 (영역이 freeze된 상태)
+    const isShiftDragging = isShiftPressed && (isDraggingMemo || isDraggingCategory);
+    if (position && !isShiftDragging) {
       const currentPage = pages.find(p => p.id === currentPageId);
-      if (currentPage?.categories) {
+      if (currentPage) {
         // 새 메모의 실제 크기 (기본 크기)
         const newMemoWidth = 320;
         const newMemoHeight = 180;
         let isOverlapping = true;
         let adjustedY = newPosition.y;
         const moveStep = 250; // 충분히 밀어내기 위한 이동 거리
+        const margin = 5; // 겹침 여유 공간 (5px 간격)
 
         while (isOverlapping && adjustedY > -2000) {
           isOverlapping = false;
 
-          for (const category of currentPage.categories) {
+          const newMemoLeft = newPosition.x;
+          const newMemoRight = newPosition.x + newMemoWidth;
+          const newMemoTop = adjustedY;
+          const newMemoBottom = adjustedY + newMemoHeight;
+
+          // 1. 카테고리 영역과 충돌 검사
+          for (const category of currentPage.categories || []) {
             if (category.isExpanded) {
               const area = calculateCategoryArea(category, currentPage);
               if (area) {
-                // 새 메모 영역과 기존 영역이 겹치는지 확인
-                const newMemoLeft = newPosition.x;
-                const newMemoRight = newPosition.x + newMemoWidth;
-                const newMemoTop = adjustedY;
-                const newMemoBottom = adjustedY + newMemoHeight;
-
                 const areaLeft = area.x;
                 const areaRight = area.x + area.width;
                 const areaTop = area.y;
                 const areaBottom = area.y + area.height;
 
-                // 겹침 여유 공간 추가 (20px 간격)
-                const margin = 20;
                 if (!(newMemoRight + margin < areaLeft || newMemoLeft - margin > areaRight ||
                       newMemoBottom + margin < areaTop || newMemoTop - margin > areaBottom)) {
                   // 겹침 - 위로 충분히 이동
@@ -108,6 +119,26 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
                   adjustedY -= moveStep;
                   break;
                 }
+              }
+            }
+          }
+
+          // 2. 메모와 충돌 검사
+          if (!isOverlapping) {
+            for (const memo of currentPage.memos) {
+              const memoWidth = memo.size?.width || 200;
+              const memoHeight = memo.size?.height || 150;
+              const memoLeft = memo.position.x;
+              const memoRight = memo.position.x + memoWidth;
+              const memoTop = memo.position.y;
+              const memoBottom = memo.position.y + memoHeight;
+
+              if (!(newMemoRight + margin < memoLeft || newMemoLeft - margin > memoRight ||
+                    newMemoBottom + margin < memoTop || newMemoTop - margin > memoBottom)) {
+                // 겹침 - 위로 충분히 이동
+                isOverlapping = true;
+                adjustedY -= moveStep;
+                break;
               }
             }
           }
@@ -134,13 +165,21 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
       ]
     };
 
+    // 즉시 UI 업데이트 (낙관적 업데이트)
     setPages(prev => prev.map(page =>
       page.id === currentPageId
         ? { ...page, memos: [...page.memos, newMemo] }
         : page
     ));
-
     setSelectedMemoId(newMemo.id);
+
+    // 백그라운드에서 데이터베이스 저장 (비동기, 실패해도 무시)
+    createMemo({
+      ...newMemo,
+      pageId: currentPageId
+    }).catch(error => {
+      console.warn('메모 생성 DB 저장 실패 (UI는 정상 동작):', error);
+    });
 
     // 위치가 변경된 경우 캔버스를 새 위치로 자동 이동
     if (position && (newPosition.x !== originalPosition.x || newPosition.y !== originalPosition.y)) {
@@ -175,15 +214,30 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
    * 메모 업데이트 (범용)
    */
   const updateMemo = useCallback((memoId: string, updates: Partial<MemoBlock>) => {
+    const isBlockUpdate = 'blocks' in updates;
+
     setPages(prev => prev.map(page =>
       page.id === currentPageId
         ? {
             ...page,
-            memos: page.memos.map(memo =>
-              memo.id === memoId
-                ? { ...memo, ...updates }
-                : memo
-            )
+            memos: page.memos.map(memo => {
+              if (memo.id === memoId) {
+                const updatedMemo = { ...memo, ...updates };
+
+                if (isBlockUpdate && updates.blocks) {
+                  console.log('[updateMemo] blocks 업데이트:', {
+                    memoId,
+                    oldBlocks: memo.blocks,
+                    newBlocks: updates.blocks,
+                    sameArray: memo.blocks === updates.blocks,
+                    firstBlockSame: memo.blocks?.[0] === updates.blocks?.[0]
+                  });
+                }
+
+                return updatedMemo;
+              }
+              return memo;
+            })
           }
         : page
     ));
@@ -263,20 +317,38 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
   const deleteMemoBlock = useCallback(() => {
     if (!selectedMemoId) return;
 
-    setPages(prev => prev.map(page =>
-      page.id === currentPageId
-        ? {
-            ...page,
-            memos: page.memos.filter(memo => memo.id !== selectedMemoId),
-            // 단축 이동 목록에서도 삭제된 메모 제거
-            quickNavItems: (page.quickNavItems || []).filter(item => item.targetId !== selectedMemoId)
-          }
-        : page
-    ));
+    const memoIdToDelete = selectedMemoId;
+
+    // 서버에서 메모 삭제
+    deleteMemo(memoIdToDelete).catch(error => {
+      console.error('메모 삭제 API 실패:', error);
+    });
+
+    setPages(prev => prev.map(page => {
+      if (page.id === currentPageId) {
+        // 삭제할 메모와 연결된 단축 이동 항목 찾기
+        const quickNavItemsToDelete = (page.quickNavItems || []).filter(item => item.targetId === memoIdToDelete);
+
+        // 서버에서 단축 이동 항목 삭제 (백그라운드에서 비동기 실행)
+        quickNavItemsToDelete.forEach(item => {
+          deleteQuickNavItem(item.id).catch(error => {
+            console.warn('단축 이동 항목 삭제 실패 (UI는 정상 동작):', error);
+          });
+        });
+
+        return {
+          ...page,
+          memos: page.memos.filter(memo => memo.id !== memoIdToDelete),
+          // 단축 이동 목록에서도 삭제된 메모 제거
+          quickNavItems: (page.quickNavItems || []).filter(item => item.targetId !== memoIdToDelete)
+        };
+      }
+      return page;
+    }));
     setSelectedMemoId(null);
 
     if (saveCanvasState) {
-      saveCanvasState('memo_delete', `메모 삭제: ${selectedMemoId}`);
+      saveCanvasState('memo_delete', `메모 삭제: ${memoIdToDelete}`);
     }
   }, [selectedMemoId, currentPageId, setPages, setSelectedMemoId, saveCanvasState]);
 
@@ -292,6 +364,16 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
             ...m,
             connections: m.connections.filter(connId => connId !== memoId)
           }));
+
+        // 삭제할 메모와 연결된 단축 이동 항목 찾기
+        const quickNavItemsToDelete = (page.quickNavItems || []).filter(item => item.targetId === memoId);
+
+        // 서버에서 단축 이동 항목 삭제 (백그라운드에서 비동기 실행)
+        quickNavItemsToDelete.forEach(item => {
+          deleteQuickNavItem(item.id).catch(error => {
+            console.warn('단축 이동 항목 삭제 실패 (UI는 정상 동작):', error);
+          });
+        });
 
         // Quick Nav에서도 제거 (페이지별)
         const updatedQuickNavItems = (page.quickNavItems || []).filter(item => item.targetId !== memoId);

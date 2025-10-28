@@ -284,20 +284,22 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
    * 카테고리 영역 계산 (색상 포함)
    * utils의 calculateCategoryArea를 호출하고 색상을 추가합니다.
    */
-  const calculateCategoryAreaWithColor = React.useCallback((category: CategoryBlock, visited: Set<string> = new Set()) => {
+  const calculateCategoryAreaWithColor = React.useCallback((category: CategoryBlock, visited: Set<string> = new Set(), excludeCategoryId?: string) => {
     if (!currentPage) return null;
 
-    const area = calculateCategoryArea(category, currentPage, visited);
+    // Shift 드래그 중일 때 드래그 중인 카테고리를 제외한 페이지 데이터 생성
+    let pageForCalculation = currentPage;
+    if (excludeCategoryId) {
+      pageForCalculation = {
+        ...currentPage,
+        categories: currentPage.categories?.filter(cat => cat.id !== excludeCategoryId) || []
+      };
+    }
+
+    const area = calculateCategoryArea(category, pageForCalculation, visited);
     if (!area) return null;
 
-    // 최근 드래그한 카테고리만 로그 출력
-    if (recentlyDraggedCategoryRef.current === category.id) {
-      console.log('[calculateCategoryAreaWithColor 호출]', {
-        categoryId: category.id,
-        position: `(${category.position.x}, ${category.position.y})`,
-        계산된영역: `위치(${area.x}, ${area.y}) 크기(${area.width}x${area.height})`
-      });
-    }
+    // 로그 제거됨
 
     return {
       ...area,
@@ -662,7 +664,17 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
       };
     } else {
       // 캐시된 영역이 없으면 동적 계산
-      area = calculateCategoryAreaWithColor(category);
+      // 드래그 중일 때는 드래그 중인 카테고리를 제외하고 계산 (Shift 여부 관계없이)
+      // 이렇게 하면 Shift를 떼어도 드래그가 끝날 때까지 기존 부모 영역이 고정됨
+      let excludeId: string | undefined = undefined;
+      if ((isDraggingMemo || isDraggingCategory) && draggingCategoryId) {
+        // 카테고리 드래그 중일 때만 제외 (메모 드래그는 카테고리가 아니므로)
+        if (isDraggingCategory) {
+          excludeId = draggingCategoryId;
+        }
+      }
+
+      area = calculateCategoryAreaWithColor(category, new Set(), excludeId);
 
       // 하위 카테고리인데 자식이 없어서 area가 null인 경우, 기본 영역 생성
       if (!area && category.parentId) {
@@ -815,7 +827,8 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
                 if (currentPage && Object.keys(shiftDragAreaCache.current).length === 0) {
                   currentPage.categories?.forEach(cat => {
                     if (cat.isExpanded) {
-                      const catArea = calculateCategoryAreaWithColor(cat);
+                      // 드래그 중인 카테고리를 제외하고 영역 계산
+                      const catArea = calculateCategoryAreaWithColor(cat, new Set(), category.id);
                       if (catArea) {
                         shiftDragAreaCache.current[cat.id] = catArea;
                       }
@@ -852,7 +865,8 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
                     if (currentPage && Object.keys(shiftDragAreaCache.current).length === 0) {
                       currentPage.categories?.forEach(cat => {
                         if (cat.isExpanded) {
-                          const catArea = calculateCategoryAreaWithColor(cat);
+                          // 드래그 중인 카테고리를 제외하고 영역 계산
+                          const catArea = calculateCategoryAreaWithColor(cat, new Set(), category.id);
                           if (catArea) {
                             shiftDragAreaCache.current[cat.id] = catArea;
                           }
@@ -905,6 +919,17 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
                 if (!isDraggingArea) return; // 이미 종료된 경우 중복 실행 방지
                 isDraggingArea = false; // 즉시 드래그 종료 플래그 설정
 
+                // upEvent.shiftKey로 실시간 Shift 상태 확인
+                const wasShiftPressed = upEvent?.shiftKey || isShiftMode;
+
+                console.log('[Area handleMouseUp] 호출됨', {
+                  categoryId: category.id,
+                  hasMoved,
+                  isShiftMode,
+                  upEventShiftKey: upEvent?.shiftKey,
+                  wasShiftPressed
+                });
+
                 setIsDraggingCategoryArea(null);
                 setShiftDragInfo(null);
 
@@ -929,16 +954,16 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
 
                     onCategoryPositionDragEnd?.(category.id, finalPosition);
 
-                    if (isShiftMode) {
-                      onShiftDropCategory?.(category, finalPosition);
-                      // 카테고리 드롭 감지 (카테고리-카테고리 종속 처리) - 마우스 포인터 위치 전달
+                    if (wasShiftPressed) {
+                      console.log('[Area handleMouseUp] Shift 눌림 - detectCategoryDropForCategory 호출');
+                      // 마우스 포인터 위치로 전달 (점 충돌 검사용)
                       onDetectCategoryDropForCategory?.(category.id, mousePointerPosition);
                     }
                   } else {
                     onCategoryPositionDragEnd?.(category.id, finalPosition);
 
-                    if (isShiftMode) {
-                      onShiftDropCategory?.(category, finalPosition);
+                    if (wasShiftPressed) {
+                      console.log('[Area handleMouseUp] Shift 눌림 - detectCategoryDropForCategory 호출 (fallback)');
                       // fallback: 캔버스 요소를 찾지 못한 경우 finalPosition 사용
                       onDetectCategoryDropForCategory?.(category.id, finalPosition);
                     }
@@ -1270,8 +1295,59 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
                 onCategoryLabelPositionChange(category.id, newLabelPosition);
               };
 
-              const handleMouseUp = () => {
+              const handleMouseUp = (upEvent?: MouseEvent) => {
+                console.log('[Label handleMouseUp] 호출됨', {
+                  categoryId: category.id,
+                  hasMoved,
+                  isShiftPressed,
+                  upEventShiftKey: upEvent?.shiftKey,
+                  upEventExists: !!upEvent
+                });
+
                 isDragging = false; // 즉시 드래그 종료 플래그 설정
+
+                // Shift+드래그면 카테고리 드롭 감지 호출
+                // upEvent.shiftKey로 실시간 Shift 키 상태 확인
+                const wasShiftPressed = upEvent?.shiftKey || isShiftPressed;
+
+                console.log('[Label handleMouseUp] Shift 체크', {
+                  wasShiftPressed,
+                  willCallDetect: hasMoved && wasShiftPressed
+                });
+
+                if (hasMoved && wasShiftPressed) {
+                  // 카테고리 라벨의 최종 위치 (라벨 이동용)
+                  const finalLabelPosition = {
+                    x: originalLabelPosition.x + ((upEvent?.clientX || startX) - startX) / canvasScale,
+                    y: originalLabelPosition.y + ((upEvent?.clientY || startY) - startY) / canvasScale
+                  };
+
+                  // 마우스 포인터의 실제 위치 계산 (충돌 검사용)
+                  const canvasElement = document.getElementById('main-canvas');
+                  let mousePointerPosition = finalLabelPosition; // fallback
+
+                  if (canvasElement && canvasOffset && upEvent) {
+                    const rect = canvasElement.getBoundingClientRect();
+                    const clientX = upEvent.clientX;
+                    const clientY = upEvent.clientY;
+
+                    // 캔버스 좌표계로 변환
+                    const mouseX = (clientX - rect.left - canvasOffset.x) / canvasScale;
+                    const mouseY = (clientY - rect.top - canvasOffset.y) / canvasScale;
+
+                    mousePointerPosition = { x: mouseX, y: mouseY };
+                  }
+
+                  console.log('[Label MouseUp] Shift+드래그 종료 - detectCategoryDropForCategory 호출', {
+                    categoryId: category.id,
+                    finalLabelPosition,
+                    mousePointerPosition
+                  });
+
+                  // 마우스 포인터 위치로 전달 (점 충돌 검사용)
+                  onDetectCategoryDropForCategory?.(category.id, mousePointerPosition);
+                }
+
                 document.removeEventListener('mousemove', handleMouseMove);
                 document.removeEventListener('mouseup', handleMouseUp);
               };

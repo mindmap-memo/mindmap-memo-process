@@ -360,3 +360,90 @@ export function isInsideCollapsedCategory(
 
   return false;
 }
+
+/**
+ * 부모-자식 관계 변경으로 인해 제거해야 할 연결선을 찾아 제거
+ *
+ * 규칙:
+ * - 메모/카테고리가 다른 메모/카테고리의 하위로 들어가면, 서로 간의 연결선 제거
+ * - 재귀적으로 모든 조상-후손 관계를 확인
+ *
+ * @param page - 현재 페이지 데이터
+ * @param movedItemId - 이동된 아이템(메모 또는 카테고리) ID
+ * @param newParentId - 새로운 부모 카테고리 ID (undefined면 최상위로 이동)
+ * @returns 연결선이 제거된 페이지 데이터
+ */
+export function removeInvalidConnectionsAfterHierarchyChange(
+  page: Page,
+  movedItemId: string,
+  newParentId: string | undefined
+): Page {
+  if (!newParentId) {
+    // 최상위로 이동한 경우 연결선 제거 불필요
+    return page;
+  }
+
+  // 이동된 아이템의 모든 조상 카테고리 ID 수집
+  const ancestorIds = new Set<string>();
+  let currentParentId: string | undefined = newParentId;
+  const visited = new Set<string>();
+
+  while (currentParentId) {
+    if (visited.has(currentParentId)) {
+      break; // 순환 참조 방지
+    }
+    visited.add(currentParentId);
+    ancestorIds.add(currentParentId);
+
+    const parentCategory = page.categories?.find(c => c.id === currentParentId);
+    currentParentId = parentCategory?.parentId;
+  }
+
+  // 메모 연결선 제거
+  const updatedMemos = page.memos.map(memo => {
+    if (memo.id === movedItemId) {
+      // 이동된 메모의 연결선 중 조상 카테고리와 연결된 것들 제거
+      return {
+        ...memo,
+        connections: memo.connections.filter(connId => !ancestorIds.has(connId))
+      };
+    }
+
+    // 조상 카테고리들의 연결선 중 이동된 메모와 연결된 것들 제거
+    if (ancestorIds.has(memo.id)) {
+      return {
+        ...memo,
+        connections: memo.connections.filter(connId => connId !== movedItemId)
+      };
+    }
+
+    return memo;
+  });
+
+  // 카테고리 연결선 제거
+  const updatedCategories = (page.categories || []).map(category => {
+    if (category.id === movedItemId) {
+      // 이동된 카테고리의 연결선 중 조상 카테고리와 연결된 것들 제거
+      return {
+        ...category,
+        connections: category.connections.filter(connId => !ancestorIds.has(connId))
+      };
+    }
+
+    // 조상 카테고리들의 연결선 중 이동된 카테고리와 연결된 것들 제거
+    if (ancestorIds.has(category.id)) {
+      return {
+        ...category,
+        connections: category.connections.filter(connId => connId !== movedItemId)
+      };
+    }
+
+    return category;
+  });
+
+  return {
+    ...page,
+    memos: updatedMemos,
+    categories: updatedCategories
+  };
+}

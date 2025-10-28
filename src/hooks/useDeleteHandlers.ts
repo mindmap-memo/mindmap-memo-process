@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { Page, QuickNavItem, CanvasActionType } from '../types';
+import { deleteMemo, deleteCategory as deleteCategoryAPI, deleteQuickNavItem } from '../utils/api';
 
 interface UseDeleteHandlersProps {
   pages: Page[];
@@ -42,8 +43,33 @@ export const useDeleteHandlers = ({
       const memoCount = selectedMemoIds.length;
       const categoryCount = selectedCategoryIds.length;
 
+      // 서버에서 선택된 메모들 삭제
+      selectedMemoIds.forEach(memoId => {
+        deleteMemo(memoId).catch(error => {
+          console.error('메모 삭제 API 실패:', memoId, error);
+        });
+      });
+
+      // 서버에서 선택된 카테고리들 삭제
+      selectedCategoryIds.forEach(categoryId => {
+        deleteCategoryAPI(categoryId).catch(error => {
+          console.error('카테고리 삭제 API 실패:', categoryId, error);
+        });
+      });
+
       setPages(prev => prev.map(page => {
         if (page.id !== currentPageId) return page;
+
+        // 삭제할 메모/카테고리와 연결된 단축 이동 항목 찾기
+        const allDeletedIds = [...selectedMemoIds, ...selectedCategoryIds];
+        const quickNavItemsToDelete = (page.quickNavItems || []).filter(item => allDeletedIds.includes(item.targetId));
+
+        // 서버에서 단축 이동 항목 삭제 (백그라운드에서 비동기 실행)
+        quickNavItemsToDelete.forEach(item => {
+          deleteQuickNavItem(item.id).catch(error => {
+            console.warn('단축 이동 항목 삭제 실패 (UI는 정상 동작):', error);
+          });
+        });
 
         return {
           ...page,

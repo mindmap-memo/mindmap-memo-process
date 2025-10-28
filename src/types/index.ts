@@ -198,6 +198,7 @@ export interface MemoBlock {
   position: { x: number; y: number };
   size?: { width: number; height: number };
   displaySize?: MemoDisplaySize; // 캔버스에서의 표시 크기
+  importance?: ImportanceLevel; // 메모 전체의 중요도
   parentId?: string | null; // 부모 카테고리 ID (종속 관계)
 }
 

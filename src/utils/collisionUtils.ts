@@ -35,6 +35,16 @@ export function resolveUnifiedCollisions(
   movingIds?: string[],
   frameDelta?: { x: number; y: number }
 ): CollisionResult {
+  console.log('[resolveUnifiedCollisions] 호출됨:', {
+    movingId,
+    movingType,
+    maxIterations,
+    movingIds,
+    frameDelta,
+    categoriesCount: page.categories?.length,
+    memosCount: page.memos.length
+  });
+
   let updatedMemos = [...page.memos];
   let updatedCategories = [...(page.categories || [])];
 
@@ -42,11 +52,18 @@ export function resolveUnifiedCollisions(
   const movingMemo = movingType === 'memo' ? updatedMemos.find(m => m.id === movingId) : null;
   const movingCategory = movingType === 'area' ? updatedCategories.find(c => c.id === movingId) : null;
 
+  console.log('[resolveUnifiedCollisions] 이동 중인 객체:', {
+    movingMemo: movingMemo?.id,
+    movingCategory: movingCategory?.id
+  });
+
   if (!movingMemo && !movingCategory) {
+    console.log('[resolveUnifiedCollisions] 이동 중인 객체를 찾을 수 없음 - 종료');
     return { updatedCategories, updatedMemos };
   }
 
   const movingParentId = movingMemo?.parentId ?? movingCategory?.parentId ?? null;
+  console.log('[resolveUnifiedCollisions] movingParentId:', movingParentId);
 
   // 영역의 크기와 offset을 캐시 (드래그 중 크기는 고정, 위치만 업데이트)
   const areaOffsetCache = new Map<string, { width: number; height: number; offsetX: number; offsetY: number }>();
@@ -152,6 +169,14 @@ export function resolveUnifiedCollisions(
 
     // 현재 iteration의 최신 위치로 collidables 다시 계산
     const collidables = getCollidableObjects();
+    console.log(`[resolveUnifiedCollisions] iteration ${iteration}, collidables:`, collidables.length);
+    if (iteration === 0) {
+      console.log('[resolveUnifiedCollisions] collidables 상세:', collidables.map(c => ({
+        id: c.id,
+        type: c.type,
+        bounds: c.bounds
+      })));
+    }
 
     for (const current of collidables) {
       // 이동 중인 객체들은 밀리지 않음 (다중 선택 포함)
@@ -180,6 +205,12 @@ export function resolveUnifiedCollisions(
         const pushDirection = calculatePushDirection(other.bounds, current.bounds, other.id, current.id);
 
         if (pushDirection.x !== 0 || pushDirection.y !== 0) {
+          console.log('[resolveUnifiedCollisions] 충돌 감지!', {
+            iteration,
+            pusher: other.id,
+            pushed: current.id,
+            pushDirection
+          });
           hasCollision = true;
 
           if (otherPriority < highestPusherPriority) {
@@ -275,12 +306,14 @@ export function resolveUnifiedCollisions(
  * @param movingCategoryId - 이동 중인 카테고리 ID (최고 우선순위)
  * @param page - 현재 페이지
  * @param maxIterations - 최대 반복 횟수 (기본 10)
+ * @param frameDelta - 프레임 간 이동 거리 (부드러운 밀어내기용)
  * @returns 충돌 처리 후 업데이트된 카테고리와 메모
  */
 export function resolveAreaCollisions(
   movingCategoryId: string,
   page: Page,
-  maxIterations: number = 10
+  maxIterations: number = 10,
+  frameDelta?: { x: number; y: number }
 ): CollisionResult {
   let updatedCategories = [...(page.categories || [])];
   let updatedMemos = [...page.memos];
@@ -355,8 +388,24 @@ export function resolveAreaCollisions(
 
           // 가장 우선순위가 높은 밀어내는 영역만 적용
           if (otherPriority < highestPusherPriority) {
-            totalPushX = pushDirection.x;
-            totalPushY = pushDirection.y;
+            if (frameDelta) {
+              // 프레임 기반 밀어내기: frameDelta만큼만 밀고 종료 (부드러운 이동)
+              const pushDirX = pushDirection.x !== 0 ? Math.sign(pushDirection.x) : 0;
+              const pushDirY = pushDirection.y !== 0 ? Math.sign(pushDirection.y) : 0;
+
+              // frameDelta의 절대값을 사용하되, 겹친 거리를 초과하지 않도록 제한
+              const frameDeltaX = Math.abs(frameDelta.x);
+              const frameDeltaY = Math.abs(frameDelta.y);
+              const overlapX = Math.abs(pushDirection.x);
+              const overlapY = Math.abs(pushDirection.y);
+
+              totalPushX = pushDirX * Math.min(frameDeltaX, overlapX);
+              totalPushY = pushDirY * Math.min(frameDeltaY, overlapY);
+            } else {
+              // 겹침 기반 밀어내기: 충돌이 완전히 해소될 때까지 (기존 동작)
+              totalPushX = pushDirection.x;
+              totalPushY = pushDirection.y;
+            }
             highestPusherPriority = otherPriority;
 
             // 우선순위 업데이트: 밀린 카테고리는 밀어낸 카테고리보다 1 낮은 우선순위

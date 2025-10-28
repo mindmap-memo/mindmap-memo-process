@@ -117,59 +117,49 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     return result;
   };
   const [content, setContent] = useState(block.content);
+  const [importanceRanges, setImportanceRanges] = useState<ImportanceRange[]>(block.importanceRanges || []);
   const [isFocused, setIsFocused] = useState(false);
   const [showImportanceMenu, setShowImportanceMenu] = useState(false);
   const [importanceMenuPosition, setImportanceMenuPosition] = useState({ x: 0, y: 0 });
   const [selectedRange, setSelectedRange] = useState<{ start: number; end: number } | null>(null);
-  const [, forceUpdate] = useState({});
+  const [, forceUpdate] = React.useReducer(x => x + 1, 0); // useReducer로 변경
+  const [backgroundKey, setBackgroundKey] = useState(0); // 배경 레이어 강제 리렌더링용 key
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // 외부에서 블록 내용이 변경되었을 때 로컬 상태 동기화
+  // 단, 포커스된 상태에서는 외부 변경을 무시 (사용자가 입력 중일 수 있음)
   useEffect(() => {
-    if (block.content !== content) {
-      setContent(block.content);
+    // 포커스된 상태에서는 외부 변경 무시
+    if (isFocused) {
+      return;
     }
-  }, [block.content]);
 
-
-  // 자동 저장 제거 - 블록 단위 히스토리를 위해
-
-  // block 전체 변경 시 강제 리렌더링 (특히 importanceRanges)
-  useEffect(() => {
-    forceUpdate({});
-    // importanceRanges가 있는데 렌더링이 안되는 경우를 위한 추가 체크
-    if (block.importanceRanges && block.importanceRanges.length > 0) {
-      setTimeout(() => {
-        forceUpdate({});
-      }, 50);
+    // content가 변경되지 않았으면 동기화하지 않음
+    if (block.content === content) {
+      return;
     }
-  }, [block]);
 
-  // importanceRanges 전용 감지
+    setContent(block.content);
+  }, [block.content, isFocused]);
+
+  // 외부에서 importanceRanges가 변경되었을 때 로컬 상태 동기화
   useEffect(() => {
-    if (block.importanceRanges && block.importanceRanges.length > 0) {
-      forceUpdate({});
-      setTimeout(() => forceUpdate({}), 10);
+    const isSameContent = JSON.stringify(importanceRanges) === JSON.stringify(block.importanceRanges);
+
+    // 내용이 다를 때만 업데이트
+    if (!isSameContent) {
+      const newRanges = block.importanceRanges ? [...block.importanceRanges] : [];
+      setImportanceRanges(newRanges);
+      setBackgroundKey(prev => prev + 1);
     }
   }, [block.importanceRanges]);
 
-  // 편집모드 진입 시 상태 동기화
+  // 편집모드 진입 시 포커스만 처리 (동기화는 하지 않음)
   useEffect(() => {
     if (isEditing && textareaRef.current) {
-
-      // 텍스트박스 값이 로컬 content와 다르면 동기화
-      if (textareaRef.current.value !== content) {
-        textareaRef.current.value = content;
-      }
-
-      // 로컬 content가 블록 content와 다르면 동기화
-      if (content !== block.content) {
-        setContent(block.content);
-        if (textareaRef.current) {
-          textareaRef.current.value = block.content;
-        }
-      }
+      // 포커스만 주고, 값은 건드리지 않음
+      // 값 동기화는 외부 block.content 변경 시에만 발생
     }
   }, [isEditing]);
 
@@ -200,25 +190,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
 
   // 메뉴가 렌더링된 후 실제 DOM 위치 확인
   useEffect(() => {
-    if (showImportanceMenu && menuRef.current) {
-      const menuRect = menuRef.current.getBoundingClientRect();
-      console.log('=== 실제 렌더링된 메뉴 위치 ===');
-      console.log('설정한 position:', importanceMenuPosition);
-      console.log('실제 DOM 위치:', {
-        top: menuRect.top,
-        left: menuRect.left,
-        bottom: menuRect.bottom,
-        right: menuRect.right,
-        width: menuRect.width,
-        height: menuRect.height
-      });
-      console.log('메뉴 style:', {
-        left: menuRef.current.style.left,
-        top: menuRef.current.style.top,
-        position: menuRef.current.style.position
-      });
-      console.log('================================');
-    }
+    // 로그 제거
   }, [showImportanceMenu, importanceMenuPosition]);
 
   // 텍스트 영역 자동 리사이즈 (항상 적용)
@@ -257,7 +229,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
       const updatedContent = beforeCursor;
       setContent(updatedContent);
       if (onUpdate) {
-        onUpdate({ ...block, content: updatedContent });
+        onUpdate({ ...block, content: updatedContent, importanceRanges });
       }
       
       // 새 텍스트 블록 생성 (커서 이후 내용으로)
@@ -270,7 +242,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     if (e.key === 'Escape') {
       // Escape 키로 편집 종료 시 내용 저장
       if (content !== block.content && onUpdate) {
-        onUpdate({ ...block, content, importanceRanges: block.importanceRanges });
+        onUpdate({ ...block, content, importanceRanges });
       }
       if (onSaveToHistory) {
         onSaveToHistory();
@@ -335,7 +307,13 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
       textarea.style.height = `${textarea.scrollHeight}px`;
     }
 
+    // 로컬 상태 즉시 업데이트
     setContent(newContent);
+
+    // 부모에게도 즉시 알림 (debounce 없이)
+    if (onUpdate) {
+      onUpdate({ ...block, content: newContent, importanceRanges });
+    }
   };
 
   // 붙여넣기 핸들러
@@ -433,11 +411,16 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   };
 
   const handleBlur = () => {
+    // blur 시 현재 textarea의 실제 값을 가져와서 저장
+    const currentValue = textareaRef.current?.value || '';
+
     setIsFocused(false);
 
     // 내용이 변경되었으면 저장
-    if (content !== block.content && onUpdate) {
-      onUpdate({ ...block, content, importanceRanges: block.importanceRanges });
+    if (currentValue !== block.content && onUpdate) {
+      // 로컬 상태도 업데이트
+      setContent(currentValue);
+      onUpdate({ ...block, content: currentValue, importanceRanges });
 
       // 실제로 내용이 변경되었을 때만 히스토리 저장
       if (onSaveToHistory) {
@@ -454,27 +437,19 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
 
   // 텍스트 선택 처리 (드래그 끝난 후)
   const handleTextSelection = (e: React.MouseEvent) => {
-    console.log('=== handleTextSelection 호출됨 ===');
-    console.log('isEditing:', isEditing, 'canEdit:', canEdit);
-
     if (!isEditing || !canEdit) {
-      console.log('편집 모드가 아니거나 편집 불가 -> 종료');
       return;
     }
 
     const textarea = textareaRef.current;
     if (!textarea) {
-      console.log('textarea ref가 없음 -> 종료');
       return;
     }
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
 
-    console.log('텍스트 선택 범위:', { start, end });
-
     if (start !== end && end > start) {
-      console.log('텍스트가 선택됨 -> 메뉴 표시 로직 진행');
       // 텍스트가 선택된 경우
       setSelectedRange({ start, end });
 
@@ -493,57 +468,29 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
       const mouseX = e.clientX;
       const mouseY = e.clientY;
 
-      console.log('=== 중요도 메뉴 위치 계산 ===');
-      console.log('마우스 위치:', { mouseX, mouseY });
-      console.log('textarea 위치:', {
-        top: textareaRect.top,
-        left: textareaRect.left,
-        bottom: textareaRect.bottom,
-        right: textareaRect.right,
-        width: textareaRect.width,
-        height: textareaRect.height
-      });
-      console.log('화면 크기:', { viewportWidth, viewportHeight });
-
       // 기본 위치: 마우스 오른쪽에 바로 붙여서 표시
       let x = mouseX + 10;
       let y = mouseY - 10; // 마우스 위치보다 약간 위에 표시
 
-      console.log('초기 계산 위치:', { x, y });
-
       // 오른쪽 경계 체크 - 화면을 넘어가면 왼쪽에 표시
       if (x + menuWidth > viewportWidth) {
         x = mouseX - menuWidth - 10;
-        console.log('오른쪽 경계 초과 -> 왼쪽으로 이동:', x);
       }
 
       // 왼쪽 경계 체크
       if (x < 10) {
         x = 10;
-        console.log('왼쪽 경계 초과 -> 10px로 보정:', x);
       }
 
       // 아래쪽 경계 체크 - 양옆 체크와 동일한 방식
-      console.log('아래쪽 경계 체크:', { y, menuHeight, viewportHeight, 'y+menuHeight': y + menuHeight });
       if (y + menuHeight > viewportHeight) {
         y = viewportHeight - menuHeight - 10;
-        console.log('아래쪽 경계 초과 -> 위로 이동:', y);
       }
 
       // 위쪽 경계 체크
       if (y < 10) {
         y = 10;
-        console.log('위쪽 경계 초과 -> 10px로 보정:', y);
       }
-
-      console.log('최종 위치:', { x, y });
-      console.log('마우스가 textarea 영역 내에 있는가?',
-        mouseX >= textareaRect.left &&
-        mouseX <= textareaRect.right &&
-        mouseY >= textareaRect.top &&
-        mouseY <= textareaRect.bottom
-      );
-      console.log('=======================');
 
       setImportanceMenuPosition({ x, y });
       setShowImportanceMenu(true);
@@ -558,15 +505,14 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     if (!selectedRange) {
       return;
     }
-    
-    
-    const ranges = block.importanceRanges || [];
+
+    const ranges = importanceRanges || [];
     const newRange: ImportanceRange = {
       start: selectedRange.start,
       end: selectedRange.end,
       level: level
     };
-    
+
     let updatedRanges: ImportanceRange[];
 
     if (level === 'none') {
@@ -632,19 +578,18 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
       // 새 강조 범위 추가
       updatedRanges.push(newRange);
     }
-    
 
-    // 배열을 완전히 새로운 객체로 만들어서 React가 변경을 확실히 감지하도록 함
-    const freshUpdatedRanges = updatedRanges.map(range => ({ ...range }));
+    // 로컬 상태 업데이트
+    setImportanceRanges(updatedRanges);
+    setBackgroundKey(prev => prev + 1);
 
-    const updatedBlock = {
-      ...block,
-      content: content, // 현재 입력 중인 content 상태 사용
-      importanceRanges: freshUpdatedRanges
+    // 블록 업데이트
+    const updatedBlock: TextBlock = {
+      id: block.id,
+      type: 'text',
+      content: content,
+      importanceRanges: updatedRanges
     };
-
-    // 로컬 content 상태만 업데이트 (importanceRanges는 props에 의존)
-    setContent(updatedBlock.content);
 
     if (onUpdate) {
       onUpdate(updatedBlock);
@@ -652,39 +597,17 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
 
     // 중요도 변경 시 히스토리 저장
     if (onSaveToHistory) {
-      setTimeout(() => onSaveToHistory(), 50); // 약간의 지연으로 업데이트 후 저장
+      setTimeout(() => onSaveToHistory(), 50);
     }
 
-    // 상태를 즉시 업데이트하여 리렌더링 강제
+    // 메뉴 닫기 및 포커스 복원
     setShowImportanceMenu(false);
     setSelectedRange(null);
-
-    // 강제로 리렌더링 (다중 호출로 확실히)
-    forceUpdate({});
-
-    // 즉시 DOM을 직접 업데이트하여 배경색 반영
-    setTimeout(() => {
-      forceUpdate({});
-      // DOM 요소를 직접 업데이트
-      if (textareaRef.current && textareaRef.current.parentElement) {
-        const backgroundDiv = textareaRef.current.parentElement.querySelector('div[style*="position: absolute"]');
-        if (backgroundDiv && !backgroundDiv.textContent) {
-          // 배경 div가 존재하지만 내용이 없다면 강제로 다시 렌더링
-          forceUpdate({});
-        }
-      }
-    }, 10);
-
-    setTimeout(() => forceUpdate({}), 50);
-    setTimeout(() => forceUpdate({}), 100);
-    setTimeout(() => forceUpdate({}), 200);
-
-    // 포커스 복원
     setTimeout(() => {
       if (textareaRef.current) {
         textareaRef.current.focus();
       }
-    }, 100);
+    }, 50);
   };
 
   // 필터링이 적용된 편집모드 배경 렌더링
@@ -718,7 +641,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
       parts.push({ text: text.substring(lastIndex) });
     }
 
-    return parts.map((part, index) => {
+    const result = parts.map((part, index) => {
       // 필터링 적용 - 조건에 맞지 않으면 null 반환하여 아예 렌더링하지 않음
       if (part.level) {
         // 중요도가 있는 부분은 필터에 맞는지 확인
@@ -733,6 +656,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
       }
 
       const importanceStyle = part.level ? getImportanceStyle(part.level) : {};
+
       return (
         <span
           key={index}
@@ -752,17 +676,12 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
         </span>
       );
     }).filter(Boolean); // null 값들을 제거
+
+    return result;
   };
 
   // 텍스트에 중요도 스타일 적용
-  const renderStyledText = (text: string, ranges: ImportanceRange[] = block.importanceRanges || []) => {
-
-    // 배열 내용 자세히 확인
-    if (ranges && ranges.length > 0) {
-      ranges.forEach((range, index) => {
-      });
-    }
-
+  const renderStyledText = (text: string, ranges: ImportanceRange[] = importanceRanges || []) => {
     if (!ranges || ranges.length === 0) {
       return text;
     }
@@ -776,43 +695,50 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
       if (lastIndex < range.start) {
         parts.push({ text: text.substring(lastIndex, range.start) });
       }
-      
+
       // 중요도 적용 부분
-      parts.push({ 
-        text: text.substring(range.start, range.end), 
-        level: range.level 
+      parts.push({
+        text: text.substring(range.start, range.end),
+        level: range.level
       });
-      
+
       lastIndex = range.end;
     });
-    
+
     // 마지막 부분 (스타일 없음)
     if (lastIndex < text.length) {
       parts.push({ text: text.substring(lastIndex) });
     }
-    
+
     return parts.map((part, index) => {
-      const importanceStyle = part.level ? getImportanceStyle(part.level) : {};
+      // 중요도가 없는 부분은 렌더링하지 않음 (배경색만 필요)
+      if (!part.level) {
+        return null;
+      }
+
+      const importanceStyle = getImportanceStyle(part.level);
 
       return (
         <span
-          key={index}
-          style={part.level ? {
+          key={`${backgroundKey}-${index}-${part.level}`}
+          style={{
             backgroundColor: importanceStyle.backgroundColor,
             padding: '1px 0px',
             borderRadius: '2px',
             fontWeight: '500',
-            color: 'transparent', // 텍스트는 투명하게
+            color: 'rgba(0,0,0,0)',
             margin: '0',
-            display: 'inline'
-          } : {
-            color: 'rgba(0,0,0,0.05)' // 일반 텍스트도 거의 투명하게
+            display: 'inline',
+            WebkitTextFillColor: 'rgba(0,0,0,0)',
+            textShadow: 'none',
+            userSelect: 'none',
+            fontSize: '0'
           }}
         >
           {part.text}
         </span>
       );
-    });
+    }).filter(Boolean);
   };
 
   if (isEditing) {
@@ -826,32 +752,32 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
           display: 'flex',
           alignItems: 'center'
         }}>
-          {/* 배경에 스타일된 텍스트 표시 - 항상 표시 */}
-          {block.importanceRanges && block.importanceRanges.length > 0 && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '2px',
-                left: '0px',
-                right: '0px',
-                bottom: '0px',
-                fontFamily: 'inherit',
-                fontSize: '14px',
-                lineHeight: '1.4',
-                padding: '0px',
-                pointerEvents: 'none',
-                zIndex: 1,
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                color: 'transparent', // 텍스트는 투명하게, 배경색만 보이게
-                userSelect: 'none' // 선택 불가능하게
-              }}
-            >
-              {(activeImportanceFilters || showGeneralContent !== undefined) ?
-                renderFilteredStyledText(content, block.importanceRanges, activeImportanceFilters, showGeneralContent) :
-                renderStyledText(content, block.importanceRanges)}
-            </div>
-          )}
+          {/* 배경에 스타일된 텍스트 표시 - div는 항상 렌더링, 내용만 조건부 */}
+          <div
+            data-importance-background="true"
+            key={`bg-${block.id}-${backgroundKey}`}
+            style={{
+              position: 'absolute',
+              top: '2px',
+              left: '0px',
+              right: '0px',
+              bottom: '0px',
+              fontFamily: 'inherit',
+              fontSize: '14px',
+              lineHeight: '1.4',
+              padding: '0px',
+              pointerEvents: 'none',
+              zIndex: 1,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              userSelect: 'none' // 선택 불가능하게
+            }}
+          >
+            {/* 로컬 상태의 importanceRanges를 즉시 반영 - 항상 렌더링 */}
+            {(activeImportanceFilters || showGeneralContent !== undefined) ?
+              renderFilteredStyledText(content, importanceRanges, activeImportanceFilters, showGeneralContent) :
+              renderStyledText(content, importanceRanges)}
+          </div>
           <textarea
             ref={textareaRef}
             value={canEdit ? content : getFilteredText()}
@@ -889,21 +815,18 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
               backgroundColor: 'transparent',
               outline: 'none',
               lineHeight: '1.4',
-              transition: 'all 0.15s ease',
               color: 'inherit',
               cursor: !canEdit ? 'not-allowed' : 'text'
             }}
             onMouseEnter={(e) => {
-              // 중요도 스타일이 있는 경우 배경색 변경하지 않음
-              if (!isFocused && (!block.importanceRanges || block.importanceRanges.length === 0)) {
+              // 중요도가 없고 포커스되지 않은 경우에만 배경색 변경
+              if (!isFocused && (!importanceRanges || importanceRanges.length === 0)) {
                 e.currentTarget.style.backgroundColor = '#f8f9fa';
               }
             }}
             onMouseLeave={(e) => {
-              // 중요도 스타일이 있는 경우 배경색 변경하지 않음
-              if (!isFocused && (!block.importanceRanges || block.importanceRanges.length === 0)) {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }
+              // 항상 투명으로 복원 (중요도 배경이 보이도록)
+              e.currentTarget.style.backgroundColor = 'transparent';
             }}
           />
         </div>
@@ -1026,13 +949,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
 
   // 읽기 모드에서만 제대로 된 색상으로 중요도 표시
   const renderStyledTextForReadMode = (text: string, ranges: ImportanceRange[] = block.importanceRanges || []) => {
-
-    // 배열 내용 자세히 확인
-    if (ranges && ranges.length > 0) {
-      ranges.forEach((range, index) => {
-      });
-    }
-
     if (!ranges || ranges.length === 0) {
       return text;
     }
@@ -1105,4 +1021,5 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   );
 };
 
+// React.memo 제거 - 부모에서 블록 배열 전체가 새로 생성되므로 memo 최적화가 오히려 문제를 일으킴
 export default TextBlockComponent;

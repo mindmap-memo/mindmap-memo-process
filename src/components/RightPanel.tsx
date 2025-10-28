@@ -80,6 +80,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const [showImportanceSubmenu, setShowImportanceSubmenu] = React.useState(false);
   const [submenuPosition, setSubmenuPosition] = React.useState<'right' | 'left'>('right');
   const [submenuTopOffset, setSubmenuTopOffset] = React.useState<number>(0);
+  const [, forceUpdate] = React.useReducer(x => x + 1, 0); // RightPanel 강제 리렌더링용
 
   // 메모가 변경될 때마다 연결된 메모를 펼침
   React.useEffect(() => {
@@ -209,35 +210,65 @@ const RightPanel: React.FC<RightPanelProps> = ({
     }
   };
 
-  // 블록 관련 핸들러들
-  const handleBlockUpdate = (updatedBlock: ContentBlock) => {
-    if (selectedMemo) {
-      const updatedBlocks = selectedMemo.blocks?.map(block => {
-        if (block.id === updatedBlock.id) {
-          // TextBlock의 경우 importanceRanges를 확실히 보존
-          if (block.type === 'text' && updatedBlock.type === 'text') {
-            const textBlock = block as TextBlock;
-            const updatedTextBlock = updatedBlock as TextBlock;
+  // selectedMemo를 ref로 저장하여 항상 최신 값 참조
+  const selectedMemoRef = React.useRef(selectedMemo);
+  React.useEffect(() => {
+    selectedMemoRef.current = selectedMemo;
+  }, [selectedMemo]);
 
-            // 업데이트된 블록에 importanceRanges가 있으면 사용, 없으면 원본 보존
-            const finalImportanceRanges = updatedTextBlock.importanceRanges !== undefined
-              ? updatedTextBlock.importanceRanges
-              : (textBlock.importanceRanges || []);
+  // 블록 관련 핸들러들 - ref를 사용하여 항상 최신 selectedMemo 참조
+  const handleBlockUpdate = React.useCallback((updatedBlock: ContentBlock) => {
+    // ref에서 최신 selectedMemo 가져오기
+    const currentMemo = selectedMemoRef.current;
 
-
-            return {
-              ...updatedTextBlock,
-              importanceRanges: finalImportanceRanges
-            };
-          }
-          return updatedBlock;
-        }
-        return block;
-      }) || [];
-      onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
-    } else {
+    if (!currentMemo || !currentMemo.blocks) {
+      return;
     }
-  };
+
+    // 중요: 중요도 업데이트 시에만 디버그 로그 출력
+    const isImportanceUpdate = updatedBlock.type === 'text' && (updatedBlock as any).importanceRanges;
+    if (isImportanceUpdate) {
+      console.log('[RightPanel] handleBlockUpdate - 중요도 업데이트 받음', {
+        blockId: updatedBlock.id,
+        importanceRanges: (updatedBlock as any).importanceRanges,
+        rangesDetail: (updatedBlock as any).importanceRanges?.map((r: any) => ({ start: r.start, end: r.end, level: r.level })),
+        totalBlocks: currentMemo.blocks?.length
+      });
+    }
+
+    const updatedBlocks = currentMemo.blocks.map(block => {
+      if (block.id === updatedBlock.id) {
+        // updatedBlock을 그대로 사용 (TextBlock에서 이미 완전한 데이터를 전달함)
+        if (isImportanceUpdate) {
+          console.log('[RightPanel] 블록 업데이트:', {
+            blockId: block.id,
+            updatedBlock,
+            updatedImportanceRanges: (updatedBlock as any).importanceRanges
+          });
+        }
+
+        // updatedBlock을 그대로 반환 (이미 완전한 데이터)
+        return updatedBlock;
+      }
+      // 변경되지 않은 블록은 원본 그대로 반환
+      return block;
+    });
+
+    if (isImportanceUpdate) {
+      console.log('[RightPanel] onMemoUpdate 호출 전', {
+        updatedBlocksLength: updatedBlocks.length,
+        updatedBlock: updatedBlocks.find(b => b.id === updatedBlock.id)
+      });
+    }
+
+    onMemoUpdate(currentMemo.id, { blocks: updatedBlocks });
+
+    if (isImportanceUpdate) {
+      console.log('[RightPanel] onMemoUpdate 호출 완료');
+      // 중요도 업데이트 시 RightPanel 강제 리렌더링
+      forceUpdate();
+    }
+  }, [onMemoUpdate]);
 
   const handleBlockDelete = (blockId: string) => {
     if (selectedMemo && selectedMemo.blocks && selectedMemo.blocks.length > 1) {
@@ -598,7 +629,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
     }
   };
 
-  const handleCreateNewBlock = (afterBlockId: string, content: string) => {
+  const handleCreateNewBlock = React.useCallback((afterBlockId: string, content: string) => {
     if (selectedMemo && selectedMemo.blocks) {
       saveToHistory(); // Enter 키로 새 블록 생성 시 히스토리 저장
       const blockIndex = selectedMemo.blocks.findIndex(block => block.id === afterBlockId);
@@ -620,7 +651,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
         }
       }, 50);
     }
-  };
+  }, [selectedMemo, onMemoUpdate]);
 
   const handleInsertBlockAfter = (afterBlockId: string, newBlock: ContentBlock) => {
     if (selectedMemo && selectedMemo.blocks) {
@@ -833,13 +864,28 @@ const RightPanel: React.FC<RightPanelProps> = ({
         if (previousBlock.type === 'text' && currentBlock.type === 'text') {
           saveToHistory(); // 블록 병합 시 히스토리 저장
           const previousContent = (previousBlock as any).content || '';
+          const previousLength = previousContent.length;
           const mergedContent = previousContent + currentContent;
-          
+
+          // 이전 블록과 현재 블록의 importanceRanges 합치기
+          const previousRanges = (previousBlock as any).importanceRanges || [];
+          const currentRanges = (currentBlock as any).importanceRanges || [];
+
+          // 현재 블록의 importanceRanges를 이전 블록 길이만큼 오프셋 적용
+          const offsetCurrentRanges = currentRanges.map((range: any) => ({
+            ...range,
+            start: range.start + previousLength,
+            end: range.end + previousLength
+          }));
+
+          const mergedRanges = [...previousRanges, ...offsetCurrentRanges];
+
           const updatedBlocks = [...selectedMemo.blocks];
-          // 이전 블록의 내용을 합친 내용으로 업데이트
-          updatedBlocks[blockIndex - 1] = { 
-            ...previousBlock, 
-            content: mergedContent 
+          // 이전 블록의 내용을 합친 내용으로 업데이트 (importanceRanges 포함)
+          updatedBlocks[blockIndex - 1] = {
+            ...previousBlock,
+            content: mergedContent,
+            importanceRanges: mergedRanges
           } as any;
           // 현재 블록 제거
           updatedBlocks.splice(blockIndex, 1);

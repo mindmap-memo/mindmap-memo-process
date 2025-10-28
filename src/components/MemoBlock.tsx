@@ -249,6 +249,10 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   const pendingPosition = React.useRef<{ x: number; y: number } | null>(null);
   const memoRef = React.useRef<HTMLDivElement>(null);
 
+  // 이벤트 핸들러 ref (useEffect 의존성 문제 해결)
+  const handleMouseMoveRef = React.useRef<((e: MouseEvent) => void) | null>(null);
+  const handleMouseUpRef = React.useRef<((e: MouseEvent) => void) | null>(null);
+
   // 크기별 스타일 정의
   const getSizeConfig = (size: MemoDisplaySize) => {
     switch (size) {
@@ -535,7 +539,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
     setIsConnectionDragging(false);
   };
 
-  const handleMouseMove = React.useCallback((e: MouseEvent) => {
+  // handleMouseMove와 handleMouseUp를 useCallback 없이 정의하고 ref에 저장
+  const handleMouseMove = (e: MouseEvent) => {
     // 마우스 다운 후 드래그 임계값 확인
     if (mouseDownPos && !isDragging) {
       const distance = Math.sqrt(
@@ -566,58 +571,26 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
 
       // 루트 메모이고 Shift 드래그가 아닐 때, 영역과 충돌하면 방향별 이동 차단
       if (!memo.parentId && !isShiftPressed && currentPage) {
-        console.log('[BLOCKING] 차단 조건 진입', {
-          memoId: memo.id,
-          parentId: memo.parentId,
-          isShiftPressed,
-          hasCurrentPage: !!currentPage
-        });
-
         const deltaX = newPosition.x - memo.position.x;
         const deltaY = newPosition.y - memo.position.y;
-
-        console.log('[BLOCKING] 이동 방향', {
-          deltaX,
-          deltaY,
-          from: memo.position,
-          to: newPosition
-        });
 
         const categories = currentPage.categories || [];
         const memoWidth = memo.size?.width || 200;
         const memoHeight = memo.size?.height || 95;
 
-        console.log('[BLOCKING] 카테고리 검사 시작', {
-          totalCategories: categories.length,
-          memoSize: { width: memoWidth, height: memoHeight }
-        });
-
-        // 카테고리 parentId 상태 확인 (하나씩 로그)
-        categories.forEach(c => {
-          console.log(`[BLOCKING] 카테고리 ${c.id}: parentId=${c.parentId}, isExpanded=${c.isExpanded}`);
-        });
-
         for (const category of categories) {
           // 루트 레벨 카테고리만 확인 (parentId가 null 또는 undefined)
           if (category.parentId != null) {
-            console.log('[BLOCKING] 카테고리 스킵 (하위 카테고리)', category.id);
             continue;
           }
           if (!category.isExpanded) {
-            console.log('[BLOCKING] 카테고리 스킵 (접힘 상태)', category.id);
             continue;
           }
 
           const categoryArea = calculateCategoryArea(category, currentPage);
           if (!categoryArea) {
-            console.log('[BLOCKING] 카테고리 영역 계산 실패', category.id);
             continue;
           }
-
-          console.log('[BLOCKING] 카테고리 영역 확인', {
-            categoryId: category.id,
-            area: categoryArea
-          });
 
           // 새 위치에서 메모의 경계
           const newMemoBounds = {
@@ -634,11 +607,6 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
             bottom: categoryArea.y + categoryArea.height
           };
 
-          console.log('[BLOCKING] 경계 계산', {
-            memoBounds: newMemoBounds,
-            areaBounds
-          });
-
           // 겹침 계산
           const overlapLeft = Math.max(newMemoBounds.left, areaBounds.left);
           const overlapTop = Math.max(newMemoBounds.top, areaBounds.top);
@@ -646,49 +614,26 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
           const overlapBottom = Math.min(newMemoBounds.bottom, areaBounds.bottom);
 
           const hasOverlap = overlapLeft < overlapRight && overlapTop < overlapBottom;
-          console.log('[BLOCKING] 겹침 검사', {
-            overlapLeft,
-            overlapTop,
-            overlapRight,
-            overlapBottom,
-            hasOverlap
-          });
 
           // 겹침이 발생하면 해당 방향으로 이동 차단
           if (hasOverlap) {
-            console.log('[BLOCKING] ⚠️ 충돌 감지! 이동 차단');
-
             // 어느 방향에서 충돌했는지 판단하고, 해당 방향으로의 이동만 차단 (현재 위치 유지)
             if (deltaX < 0) {
               // 왼쪽으로 이동 중 → x 좌표는 현재 메모 위치 유지
               newPosition.x = memo.position.x;
-              console.log('[BLOCKING] 왼쪽 이동 차단 (현재 위치 유지)');
             } else if (deltaX > 0) {
               // 오른쪽으로 이동 중 → x 좌표는 현재 메모 위치 유지
               newPosition.x = memo.position.x;
-              console.log('[BLOCKING] 오른쪽 이동 차단 (현재 위치 유지)');
             }
 
             if (deltaY < 0) {
               // 위로 이동 중 → y 좌표는 현재 메모 위치 유지
               newPosition.y = memo.position.y;
-              console.log('[BLOCKING] 위쪽 이동 차단 (현재 위치 유지)');
             } else if (deltaY > 0) {
               // 아래로 이동 중 → y 좌표는 현재 메모 위치 유지
               newPosition.y = memo.position.y;
-              console.log('[BLOCKING] 아래쪽 이동 차단 (현재 위치 유지)');
             }
           }
-        }
-      } else {
-        if (memo.parentId) {
-          console.log('[BLOCKING] 차단 조건 불만족: parentId 존재', memo.parentId);
-        }
-        if (isShiftPressed) {
-          console.log('[BLOCKING] 차단 조건 불만족: Shift 키 눌림');
-        }
-        if (!currentPage) {
-          console.log('[BLOCKING] 차단 조건 불만족: currentPage 없음');
         }
       }
 
@@ -701,9 +646,12 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         lastUpdateTime.current = now;
       }
     }
-  }, [isDragging, dragMoved, dragStart, canvasOffset, canvasScale, onPositionChange, memo.id, memo.position, memo.parentId, memo.size, currentPage, isShiftPressed, mouseDownPos, DRAG_THRESHOLD, onDragStart]);
+  };
 
-  const handleMouseUp = React.useCallback((e: MouseEvent) => {
+  // ref에 최신 핸들러 저장
+  handleMouseMoveRef.current = handleMouseMove;
+
+  const handleMouseUp = (e: MouseEvent) => {
     if (isDragging) {
       // 드래그가 끝날 때 최종 위치 업데이트 (대기 중인 위치가 있으면 사용)
       const finalPosition = pendingPosition.current || {
@@ -711,7 +659,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         y: (e.clientY - dragStart.y - canvasOffset.y) / canvasScale
       };
 
-      // Shift 모드가 아닐 때만 최종 위치 업데이트 (Shift 모드는 handleShiftDrop에서 위치 복원)
+      // Shift 모드가 아닐 때만 최종 위치 업데이트 (Shift 모드는 handleShiftDrop에서 처리)
       if (!isShiftPressed) {
         onPositionChange(memo.id, finalPosition);
       }
@@ -731,19 +679,26 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
     setIsDragging(false);
     setMouseDownPos(null);
     onDragEnd?.();
-  }, [isDragging, dragMoved, dragStart, canvasOffset, canvasScale, onDetectCategoryOnDrop, onPositionChange, memo.id, onDragEnd, isShiftPressed]);
+  };
 
+  // ref에 최신 핸들러 저장
+  handleMouseUpRef.current = handleMouseUp;
+
+  // 안정적인 이벤트 핸들러 래퍼 (useEffect 의존성 문제 해결)
   React.useEffect(() => {
     // 마우스 다운 상태이거나 드래그 중일 때 이벤트 리스너 등록
     if (mouseDownPos || isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+      const moveHandler = (e: MouseEvent) => handleMouseMoveRef.current?.(e);
+      const upHandler = (e: MouseEvent) => handleMouseUpRef.current?.(e);
+
+      document.addEventListener('mousemove', moveHandler);
+      document.addEventListener('mouseup', upHandler);
       return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('mousemove', moveHandler);
+        document.removeEventListener('mouseup', upHandler);
       };
     }
-  }, [mouseDownPos, isDragging, handleMouseMove, handleMouseUp]);
+  }, [mouseDownPos, isDragging]); // handleMouseMove, handleMouseUp 의존성 제거
 
   React.useEffect(() => {
     if (memoRef.current && onSizeChange) {
@@ -1205,7 +1160,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
           setShowQuickNavModal(false);
         }}
         onConfirm={handleQuickNavConfirm}
-        initialName={memo.title || ''}
+        initialName={memo.title || '제목 없는 메모'}
       />
     </div>
   );

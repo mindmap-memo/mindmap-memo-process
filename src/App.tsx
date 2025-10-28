@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Analytics } from "@vercel/analytics/react";
+import { useSession, signOut } from 'next-auth/react';
 import { TutorialState } from './types';
 import { useCanvasHistory } from './hooks/useCanvasHistory';
 import { useAppState } from './hooks/useAppState';
@@ -17,7 +17,7 @@ import { useCollisionHandlers } from './hooks/useCollisionHandlers';
 import { useShiftDragHandlers } from './hooks/useShiftDragHandlers';
 import { useCategoryPositionHandlers } from './hooks/useCategoryPositionHandlers';
 import { useGlobalEventHandlers } from './hooks/useGlobalEventHandlers';
-import { useLocalStorage } from './hooks/useLocalStorage';
+import { useAutoSave } from './hooks/useAutoSave';
 import { useTutorialValidation } from './hooks/useTutorialValidation';
 import { useCategoryDrop } from './hooks/useCategoryDrop';
 import { usePositionHandlers } from './hooks/usePositionHandlers';
@@ -33,9 +33,31 @@ import Canvas from './components/Canvas/Canvas';
 import { Tutorial } from './components/Tutorial';
 import { coreTutorialSteps, basicTutorialSteps } from './utils/tutorialSteps';
 import { QuickNavPanel } from './components/QuickNavPanel';
+import { useMigration } from './features/migration/hooks/useMigration';
+import { MigrationPrompt } from './features/migration/components/MigrationPrompt';
 import styles from './scss/App.module.scss';
 
+// 개발 환경에서만 디버깅 도구 로드
+if (process.env.NODE_ENV === 'development') {
+  import('./features/migration/utils/debugUtils');
+}
+
 const App: React.FC = () => {
+  // ===== 세션 정보 =====
+  const { data: session } = useSession();
+
+  // ===== 마이그레이션 관리 =====
+  const migration = useMigration(!!session);
+  const {
+    status: migrationStatus,
+    needsMigration,
+    error: migrationError,
+    result: migrationResult,
+    migrate,
+    skipMigration,
+    deleteLegacyData,
+  } = migration;
+
   // ===== 커스텀 훅으로 상태 관리 =====
   const appState = useAppState();
   const {
@@ -43,6 +65,7 @@ const App: React.FC = () => {
     setPages,
     currentPageId,
     setCurrentPageId,
+    isInitialLoadDone,
     selectedMemoId,
     setSelectedMemoId,
     selectedMemoIds,
@@ -161,7 +184,10 @@ const App: React.FC = () => {
     rightPanelWidth,
     canvasScale,
     setCanvasOffset,
-    saveCanvasState
+    saveCanvasState,
+    isShiftPressed: appState.isShiftPressed,
+    isDraggingMemo: appState.isDraggingMemo,
+    isDraggingCategory: appState.isDraggingCategory
   });
 
 
@@ -214,6 +240,7 @@ const App: React.FC = () => {
     handleNavigateToMemo,
     handleNavigateToCategory,
     addQuickNavItem,
+    updateQuickNavItem,
     deleteQuickNavItem,
     executeQuickNav,
     isQuickNavExists
@@ -237,11 +264,24 @@ const App: React.FC = () => {
 
   // ===== 튜토리얼 상태 =====
   const [tutorialState, setTutorialState] = useState<TutorialState>(() => {
-    const completed = localStorage.getItem('tutorial-completed') === 'true';
+    const completed = typeof window !== 'undefined'
+      ? localStorage.getItem('tutorial-completed') === 'true'
+      : false;
+
+    // 마이그레이션이 필요한 경우(기존 사용자) 튜토리얼 자동으로 완료 처리
+    const hasMigrationData = typeof window !== 'undefined'
+      ? localStorage.getItem('mindmap-memo-pages') !== null
+      : false;
+
+    // 마이그레이션 데이터가 있으면 튜토리얼 완료 플래그 설정
+    if (hasMigrationData && typeof window !== 'undefined') {
+      localStorage.setItem('tutorial-completed', 'true');
+    }
+
     return {
-      isActive: !completed, // 완료되지 않았으면 자동으로 시작
+      isActive: !completed && !hasMigrationData, // 완료되지 않았고 마이그레이션 데이터가 없을 때만 자동 시작
       currentStep: 0,
-      completed: completed,
+      completed: completed || hasMigrationData, // 마이그레이션 데이터가 있으면 완료된 것으로 처리
       currentSubStep: 0
     };
   });
@@ -468,17 +508,8 @@ const App: React.FC = () => {
     setDragHoveredCategoryIds: appState.setDragHoveredCategoryIds
   });
 
-  // ===== LocalStorage 자동 저장 =====
-  useLocalStorage({
-    pages,
-    setPages,
-    currentPageId,
-    setCurrentPageId,
-    leftPanelOpen,
-    rightPanelOpen,
-    leftPanelWidth,
-    rightPanelWidth
-  });
+  // ===== 데이터베이스 자동 저장 =====
+  useAutoSave(pages, currentPageId, isInitialLoadDone);
 
   // ===== 카테고리 드롭 감지 =====
   // shiftDragAreaCache를 Map으로 변환하는 래퍼
@@ -517,7 +548,10 @@ const App: React.FC = () => {
     shiftDragAreaCache,
     previousFramePosition,
     cacheCreationStarted,
-    clearCategoryCache
+    clearCategoryCache,
+    isShiftPressed: appState.isShiftPressed,
+    isDraggingMemo: appState.isDraggingMemo,
+    isDraggingCategory: appState.isDraggingCategory
   });
 
   const {
@@ -697,6 +731,11 @@ const App: React.FC = () => {
     setShowQuickNavPanel
   });
 
+  // 초기 로딩이 완료될 때까지 렌더링하지 않음 (hydration 에러 방지)
+  if (!isInitialLoadDone) {
+    return null;
+  }
+
   return (
     <AppProviders
       appState={appStateContextValue}
@@ -725,6 +764,12 @@ const App: React.FC = () => {
           onNavigateToMemo={handleNavigateToMemo}
           onNavigateToCategory={handleNavigateToCategory}
           onStartTutorial={handleStartTutorialWrapper}
+          userEmail={session?.user?.email || undefined}
+          onLogout={async () => {
+            if (window.confirm('Mindmap-Memo 로그아웃하시겠습니까?')) {
+              await signOut({ callbackUrl: '/login' });
+            }
+          }}
         />
       )}
 
@@ -878,26 +923,6 @@ const App: React.FC = () => {
         {rightPanelOpen ? '▶' : '◀'}
       </button>
 
-      {/* 단축 이동 버튼 */}
-      <button
-        data-tutorial="quick-nav-btn"
-        onClick={() => setShowQuickNavPanel(!showQuickNavPanel)}
-        className={styles['quick-nav-button']}
-        style={{
-          right: rightPanelOpen ? `${rightPanelWidth + 20}px` : '20px'
-        }}
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M8 2L9.5 5.5L13 6L10.5 8.5L11 12L8 10L5 12L5.5 8.5L3 6L6.5 5.5L8 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-        <span>단축 이동</span>
-        {quickNavItems.length > 0 && (
-          <span className={styles['quick-nav-badge']}>
-            {quickNavItems.length}
-          </span>
-        )}
-      </button>
-
       {/* 단축 이동 패널 */}
       <QuickNavPanel
         quickNavItems={quickNavItems}
@@ -908,6 +933,7 @@ const App: React.FC = () => {
         showQuickNavPanel={showQuickNavPanel}
         onTogglePanel={() => setShowQuickNavPanel(!showQuickNavPanel)}
         onExecuteQuickNav={executeQuickNav}
+        onUpdateQuickNavItem={updateQuickNavItem}
         onDeleteQuickNavItem={deleteQuickNavItem}
       />
 
@@ -934,8 +960,8 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* 튜토리얼 오버레이 */}
-      {tutorialState.isActive && (
+      {/* 튜토리얼 오버레이 - 마이그레이션이 필요하지 않을 때만 표시 */}
+      {tutorialState.isActive && !needsMigration && (
         <Tutorial
           steps={currentTutorialSteps}
           currentStep={tutorialState.currentStep}
@@ -948,8 +974,25 @@ const App: React.FC = () => {
           canProceed={tutorialMode === 'core' ? true : canProceedTutorial()}
         />
       )}
+
+      {/* 마이그레이션 프롬프트 */}
+      {needsMigration && session && (
+        <MigrationPrompt
+          status={migrationStatus}
+          error={migrationError}
+          result={migrationResult}
+          onMigrate={migrate}
+          onSkip={skipMigration}
+          onDeleteLegacy={deleteLegacyData}
+          onClose={() => {
+            // 성공 후 확인 버튼 클릭 시 프롬프트 닫기
+            if (migrationStatus === 'success') {
+              skipMigration(); // needsMigration을 false로 설정
+            }
+          }}
+        />
+      )}
       </div>
-      <Analytics />
     </AppProviders>
   );
 };

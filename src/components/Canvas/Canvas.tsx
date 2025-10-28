@@ -739,7 +739,7 @@ const Canvas: React.FC<CanvasProps> = ({
             }
             setShowAreaQuickNavModal(null);
           }}
-          initialName={showAreaQuickNavModal.categoryName}
+          initialName={showAreaQuickNavModal.categoryName || '제목 없는 카테고리'}
         />
       )}
     </div>

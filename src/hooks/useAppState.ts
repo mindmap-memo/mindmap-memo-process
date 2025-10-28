@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Page, QuickNavItem, ImportanceLevel, DataRegistry } from '../types';
-import { STORAGE_KEYS, DEFAULT_PAGES } from '../constants/defaultData';
-import { loadFromStorage } from '../utils/storageUtils';
+import { DEFAULT_PAGES } from '../constants/defaultData';
+import { fetchPages } from '../utils/api';
 
 /**
  * useAppState
@@ -19,8 +19,8 @@ import { loadFromStorage } from '../utils/storageUtils';
  * - Data Registry (테이블 데이터)
  *
  * **초기화:**
- * - localStorage에서 데이터 로드
- * - 기본값 제공
+ * - 데이터베이스에서 데이터 로드
+ * - 실패 시 기본값 제공
  *
  * @returns 앱 상태 및 setter 함수들
  *
@@ -38,13 +38,36 @@ import { loadFromStorage } from '../utils/storageUtils';
  */
 export const useAppState = () => {
   // ===== 페이지 & 데이터 상태 =====
-  const [pages, setPages] = useState<Page[]>(() =>
-    loadFromStorage(STORAGE_KEYS.PAGES, DEFAULT_PAGES)
-  );
+  const [pages, setPages] = useState<Page[]>([]);
+  const [currentPageId, setCurrentPageId] = useState<string>('1');
+  const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
 
-  const [currentPageId, setCurrentPageId] = useState<string>(() =>
-    loadFromStorage(STORAGE_KEYS.CURRENT_PAGE_ID, '1')
-  );
+  // 초기 데이터 로드
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        const loadedPages = await fetchPages();
+        if (loadedPages.length > 0) {
+          setPages(loadedPages);
+          setCurrentPageId(loadedPages[0].id);
+        } else {
+          // 페이지가 없으면 기본 페이지 사용
+          console.log('데이터베이스에 페이지가 없습니다. 기본 페이지를 사용합니다.');
+          setPages(DEFAULT_PAGES);
+          setCurrentPageId('1');
+        }
+      } catch (error) {
+        console.error('데이터베이스 연결 실패. 기본 페이지로 시작합니다:', error);
+        console.log('데이터베이스를 사용하려면 create-tables.sql을 실행하세요.');
+        setPages(DEFAULT_PAGES);
+        setCurrentPageId('1');
+      } finally {
+        setIsInitialLoadDone(true);
+      }
+    };
+
+    loadInitialData();
+  }, []);
 
   // ===== 선택 상태 (메모) =====
   const [selectedMemoId, setSelectedMemoId] = useState<string | null>(null);
@@ -112,6 +135,7 @@ export const useAppState = () => {
     setPages,
     currentPageId,
     setCurrentPageId,
+    isInitialLoadDone,
 
     // 선택 상태 (메모)
     selectedMemoId,

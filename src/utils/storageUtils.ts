@@ -2,6 +2,11 @@ import { STORAGE_KEYS } from '../constants/defaultData';
 
 // localStorage에서 데이터 로드 및 마이그레이션
 export const loadFromStorage = <T,>(key: string, defaultValue: T): T => {
+  // 서버사이드 렌더링에서는 localStorage가 없으므로 기본값 반환
+  if (typeof window === 'undefined') {
+    return defaultValue;
+  }
+
   try {
     const stored = localStorage.getItem(key);
     if (stored) {
@@ -28,6 +33,11 @@ export const loadFromStorage = <T,>(key: string, defaultValue: T): T => {
 
 // localStorage에 데이터 저장
 export const saveToStorage = (key: string, data: any): void => {
+  // 서버사이드 렌더링에서는 localStorage가 없으므로 무시
+  if (typeof window === 'undefined') {
+    return;
+  }
+
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch (error) {

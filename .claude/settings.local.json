@@ -14,7 +14,11 @@
       "Bash(Stop-Process -Name node -Force)",
       "Bash(Stop-Process -Name \"node\" -Force -ErrorAction SilentlyContinue)",
       "Bash(powershell:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(timeout 15 bash:*)",
+      "Bash(npm run dev:*)",
+      "Bash(timeout 10 bash -c 'while ! curl -s http://localhost:3000 > /dev/null 2>&1; do sleep 1; done; echo \"\"Server is up\"\"')",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

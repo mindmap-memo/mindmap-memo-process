@@ -51,10 +51,23 @@ export const useSelectedItems = ({
 
   // ===== 선택된 메모 =====
   const selectedMemo = useMemo(() => {
+    console.log('[useSelectedItems] selectedMemo 재계산');
     if (!currentPage) return undefined;
-    return currentPage.memos.find(memo => memo.id === selectedMemoId) ||
+    const memo = currentPage.memos.find(memo => memo.id === selectedMemoId) ||
            (selectedMemoIds.length === 1 ? currentPage.memos.find(memo => memo.id === selectedMemoIds[0]) : undefined);
-  }, [currentPage, selectedMemoId, selectedMemoIds]);
+
+    if (memo?.blocks) {
+      const textBlocksWithImportance = memo.blocks.filter(b => b.type === 'text' && (b as any).importanceRanges?.length > 0);
+      console.log('[useSelectedItems] selectedMemo 결과:', {
+        memoId: memo.id,
+        totalBlocks: memo.blocks.length,
+        blocksWithImportance: textBlocksWithImportance.length,
+        firstBlockImportance: textBlocksWithImportance[0] ? (textBlocksWithImportance[0] as any).importanceRanges : null
+      });
+    }
+
+    return memo;
+  }, [currentPage?.memos, selectedMemoId, selectedMemoIds]);
 
   const selectedMemos = useMemo(() => {
     if (!currentPage) return [];
