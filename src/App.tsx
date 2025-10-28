@@ -766,7 +766,7 @@ const App: React.FC = () => {
           onStartTutorial={handleStartTutorialWrapper}
           userEmail={session?.user?.email || undefined}
           onLogout={async () => {
-            if (window.confirm('로그아웃하시겠습니까?')) {
+            if (window.confirm('Mindmap-Memo 로그아웃하시겠습니까?')) {
               await signOut({ callbackUrl: '/login' });
             }
           }}
