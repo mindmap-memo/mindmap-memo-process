@@ -42,6 +42,8 @@ interface LeftPanelProps {
   onNavigateToMemo?: (memoId: string, pageId?: string) => void;
   onNavigateToCategory?: (categoryId: string, pageId?: string) => void;
   onStartTutorial?: () => void;
+  userEmail?: string;
+  onLogout?: () => void;
 }
 
 const LeftPanel: React.FC<LeftPanelProps> = ({
@@ -58,7 +60,9 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
   onDeleteCategory,
   onNavigateToMemo,
   onNavigateToCategory,
-  onStartTutorial
+  onStartTutorial,
+  userEmail,
+  onLogout
 }) => {
   const [editingPageId, setEditingPageId] = React.useState<string | null>(null);
   const [editingName, setEditingName] = React.useState<string>('');
@@ -837,6 +841,22 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
       className={styles.leftPanel}
       style={{ width: `${width}px` }}>
       <div className={styles.header}>
+        {/* 사용자 정보 영역 */}
+        {userEmail && (
+          <div className={styles.userInfo}>
+            <span className={styles.userEmail}>{userEmail}</span>
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className={styles.logoutButton}
+                title="로그아웃"
+              >
+                로그아웃
+              </button>
+            )}
+          </div>
+        )}
+
         <div className={styles.headerTop}>
           <h2 className={styles.title}>마인드맵</h2>
           {onStartTutorial && (

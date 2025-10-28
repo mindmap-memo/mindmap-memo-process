@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSession, signOut } from 'next-auth/react';
 import { TutorialState } from './types';
 import { useCanvasHistory } from './hooks/useCanvasHistory';
 import { useAppState } from './hooks/useAppState';
@@ -35,6 +36,9 @@ import { QuickNavPanel } from './components/QuickNavPanel';
 import styles from './scss/App.module.scss';
 
 const App: React.FC = () => {
+  // ===== 세션 정보 =====
+  const { data: session } = useSession();
+
   // ===== 커스텀 훅으로 상태 관리 =====
   const appState = useAppState();
   const {
@@ -730,6 +734,12 @@ const App: React.FC = () => {
           onNavigateToMemo={handleNavigateToMemo}
           onNavigateToCategory={handleNavigateToCategory}
           onStartTutorial={handleStartTutorialWrapper}
+          userEmail={session?.user?.email || undefined}
+          onLogout={async () => {
+            if (window.confirm('로그아웃하시겠습니까?')) {
+              await signOut({ callbackUrl: '/login' });
+            }
+          }}
         />
       )}
 

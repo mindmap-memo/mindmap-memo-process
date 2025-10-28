@@ -19,7 +19,6 @@ export const useAutoSave = (
   const saveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const previousPagesRef = useRef<Page[]>(pages);
   const isInitialLoad = useRef(true);
-  const isDatabaseAvailable = useRef(true); // 데이터베이스 사용 가능 여부
 
   useEffect(() => {
     // 첫 로드 시에는 저장하지 않음
@@ -29,7 +28,7 @@ export const useAutoSave = (
       return;
     }
 
-    if (!enabled || !isDatabaseAvailable.current) return;
+    if (!enabled) return;
 
     // 이전 타이머 취소
     if (saveTimeoutRef.current) {
@@ -44,42 +43,14 @@ export const useAutoSave = (
       for (const page of pages) {
         const prevPage = previousPages.find(p => p.id === page.id);
 
-        if (!prevPage) {
-          // 새 페이지는 이미 API에서 생성됨
-          continue;
-        }
+        if (!prevPage) continue;
 
         // 페이지 이름 변경 감지
         if (prevPage.name !== page.name) {
           try {
             await updatePage(page.id, page.name);
           } catch (error) {
-            console.warn('페이지 저장 실패 (데이터베이스 미사용):', error);
-            isDatabaseAvailable.current = false;
-          }
-        }
-
-        // 삭제된 메모 감지 및 삭제
-        const deletedMemoIds = prevPage.memos
-          .filter(prevMemo => !page.memos.find(m => m.id === prevMemo.id))
-          .map(m => m.id);
-
-        for (const memoId of deletedMemoIds) {
-          try {
-            const { deleteMemo: deleteMemoApi } = await import('../utils/api');
-            await deleteMemoApi(memoId);
-            console.log(`✅ 메모 "${memoId}" 삭제 성공`);
-          } catch (error) {
-            // 404 에러는 이미 삭제된 것이므로 무시
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            if (errorMessage.includes('404') || errorMessage.includes('not found') || errorMessage.includes('Memo not found')) {
-              console.log(`ℹ️ 메모 "${memoId}" 이미 삭제됨 (404)`);
-            } else {
-              console.error(`❌ 메모 "${memoId}" 삭제 실패:`, error);
-              // 데이터베이스 미사용 시 조용히 실패
-              isDatabaseAvailable.current = false;
-              return;
-            }
+            console.error('페이지 저장 실패:', error);
           }
         }
 
@@ -87,15 +58,10 @@ export const useAutoSave = (
         for (const memo of page.memos) {
           const prevMemo = prevPage.memos.find(m => m.id === memo.id);
 
-          if (!prevMemo) {
-            // 새 메모는 이미 API에서 생성됨
-            continue;
-          }
+          if (!prevMemo) continue;
 
-          // 메모 데이터 비교 (간단한 JSON 비교)
-          const memoChanged = JSON.stringify(prevMemo) !== JSON.stringify(memo);
-
-          if (memoChanged) {
+          // 메모 데이터 비교
+          if (JSON.stringify(prevMemo) !== JSON.stringify(memo)) {
             try {
               await updateMemo(memo.id, {
                 title: memo.title,
@@ -109,33 +75,7 @@ export const useAutoSave = (
                 parentId: memo.parentId,
               });
             } catch (error) {
-              // 데이터베이스 미사용 시 조용히 실패
-              isDatabaseAvailable.current = false;
-              return; // 더 이상 저장 시도하지 않음
-            }
-          }
-        }
-
-        // 삭제된 카테고리 감지 및 삭제
-        const deletedCategoryIds = (prevPage.categories || [])
-          .filter(prevCategory => !(page.categories || []).find(c => c.id === prevCategory.id))
-          .map(c => c.id);
-
-        for (const categoryId of deletedCategoryIds) {
-          try {
-            const { deleteCategory: deleteCategoryApi } = await import('../utils/api');
-            await deleteCategoryApi(categoryId);
-            console.log(`✅ 카테고리 "${categoryId}" 삭제 성공`);
-          } catch (error) {
-            // 404 에러는 이미 삭제된 것이므로 무시
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            if (errorMessage.includes('404') || errorMessage.includes('not found') || errorMessage.includes('Category not found')) {
-              console.log(`ℹ️ 카테고리 "${categoryId}" 이미 삭제됨 (404)`);
-            } else {
-              console.error(`❌ 카테고리 "${categoryId}" 삭제 실패:`, error);
-              // 데이터베이스 미사용 시 조용히 실패
-              isDatabaseAvailable.current = false;
-              return;
+              console.error('메모 저장 실패:', error);
             }
           }
         }
@@ -144,15 +84,10 @@ export const useAutoSave = (
         for (const category of page.categories || []) {
           const prevCategory = prevPage.categories?.find(c => c.id === category.id);
 
-          if (!prevCategory) {
-            // 새 카테고리는 이미 API에서 생성됨
-            continue;
-          }
+          if (!prevCategory) continue;
 
           // 카테고리 데이터 비교
-          const categoryChanged = JSON.stringify(prevCategory) !== JSON.stringify(category);
-
-          if (categoryChanged) {
+          if (JSON.stringify(prevCategory) !== JSON.stringify(category)) {
             try {
               await updateCategory(category.id, {
                 title: category.title,
@@ -165,9 +100,7 @@ export const useAutoSave = (
                 isExpanded: category.isExpanded,
               });
             } catch (error) {
-              // 데이터베이스 미사용 시 조용히 실패
-              isDatabaseAvailable.current = false;
-              return; // 더 이상 저장 시도하지 않음
+              console.error('카테고리 저장 실패:', error);
             }
           }
         }
@@ -175,7 +108,7 @@ export const useAutoSave = (
 
       // 현재 상태를 이전 상태로 업데이트
       previousPagesRef.current = pages;
-    }, 100); // 100ms 디바운스 (빠른 응답성)
+    }, 300);
 
     return () => {
       if (saveTimeoutRef.current) {
@@ -184,7 +117,7 @@ export const useAutoSave = (
     };
   }, [pages, enabled]);
 
-  // 컴포넌트 언마운트 시 저장 보장
+  // 컴포넌트 언마운트 시 정리
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) {

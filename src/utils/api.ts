@@ -20,9 +20,9 @@ export async function fetchPages(): Promise<Page[]> {
   });
   const data = await handleResponse<{ pages: Page[] }>(response);
 
-  console.log('[클라이언트] fetchPages 완료, 첫 번째 페이지의 첫 번째 메모 blocks:', JSON.stringify(data.pages[0]?.memos[0]?.blocks, null, 2));
+  console.log('[클라이언트] fetchPages 완료, pages count:', data.pages?.length || 0);
 
-  return data.pages;
+  return data.pages || [];
 }
 
 export async function createPage(id: string, name: string): Promise<Page> {
