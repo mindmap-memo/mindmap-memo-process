@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
+import { requireAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -9,6 +10,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await requireAuth();
     const { id } = await params;
     const body = await request.json();
     const { title } = body;
@@ -24,6 +26,7 @@ export async function PUT(
       UPDATE quick_nav_items
       SET title = ${title}
       WHERE id = ${id}
+        AND user_id = ${user.id}
     `;
 
     return NextResponse.json({ success: true });
@@ -42,11 +45,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await requireAuth();
     const { id } = await params;
 
     await sql`
       DELETE FROM quick_nav_items
       WHERE id = ${id}
+        AND user_id = ${user.id}
     `;
 
     return NextResponse.json({ success: true });

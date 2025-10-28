@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { CategoryBlock, Page, MemoBlock, CanvasActionType } from '../types';
 import { calculateCategoryArea, centerCanvasOnPosition } from '../utils/categoryAreaUtils';
 import { resolveAreaCollisions } from '../utils/collisionUtils';
-import { createCategory as createCategoryApi, deleteQuickNavItem } from '../utils/api';
+import { createCategory as createCategoryApi, deleteCategory as deleteCategoryAPI, deleteQuickNavItem } from '../utils/api';
 import { removeInvalidConnectionsAfterHierarchyChange } from '../utils/categoryHierarchyUtils';
 
 /**
@@ -199,6 +199,11 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
     // 삭제된 카테고리의 제목 가져오기
     const deletedCategory = pages.find(p => p.id === currentPageId)?.categories?.find(c => c.id === categoryId);
     const categoryTitle = deletedCategory?.title || '카테고리';
+
+    // 서버에서 카테고리 삭제
+    deleteCategoryAPI(categoryId).catch(error => {
+      console.error('카테고리 삭제 API 실패:', error);
+    });
 
     setPages(prev => prev.map(page => {
       if (page.id === currentPageId) {

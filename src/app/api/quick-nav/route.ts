@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
+import { requireAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
 // GET /api/quick-nav - Get all quick nav items
 export async function GET() {
   try {
+    const user = await requireAuth();
+
     const items = await sql`
       SELECT
         id, type, target_id, page_id, title, created_at
       FROM quick_nav_items
+      WHERE user_id = ${user.id}
       ORDER BY created_at DESC
     `;
 
@@ -34,6 +38,7 @@ export async function GET() {
 // POST /api/quick-nav - Create new quick nav item
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireAuth();
     const body = await request.json();
     const { type, itemId, pageId, title } = body;
 
@@ -51,6 +56,7 @@ export async function POST(request: NextRequest) {
       WHERE target_id = ${itemId}
         AND type = ${type}
         AND page_id = ${pageId}
+        AND user_id = ${user.id}
     `;
 
     if (existing.length > 0) {
@@ -74,7 +80,7 @@ export async function POST(request: NextRequest) {
         id, user_id, type, target_id, page_id, title
       )
       VALUES (
-        ${quickNavId}, 'default-user', ${type}, ${itemId}, ${pageId}, ${title || ''}
+        ${quickNavId}, ${user.id}, ${type}, ${itemId}, ${pageId}, ${title || ''}
       )
     `;
 
