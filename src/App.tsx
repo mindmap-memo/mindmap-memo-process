@@ -33,11 +33,30 @@ import Canvas from './components/Canvas/Canvas';
 import { Tutorial } from './components/Tutorial';
 import { coreTutorialSteps, basicTutorialSteps } from './utils/tutorialSteps';
 import { QuickNavPanel } from './components/QuickNavPanel';
+import { useMigration } from './features/migration/hooks/useMigration';
+import { MigrationPrompt } from './features/migration/components/MigrationPrompt';
 import styles from './scss/App.module.scss';
+
+// 개발 환경에서만 디버깅 도구 로드
+if (process.env.NODE_ENV === 'development') {
+  import('./features/migration/utils/debugUtils');
+}
 
 const App: React.FC = () => {
   // ===== 세션 정보 =====
   const { data: session } = useSession();
+
+  // ===== 마이그레이션 관리 =====
+  const migration = useMigration(!!session);
+  const {
+    status: migrationStatus,
+    needsMigration,
+    error: migrationError,
+    result: migrationResult,
+    migrate,
+    skipMigration,
+    deleteLegacyData,
+  } = migration;
 
   // ===== 커스텀 훅으로 상태 관리 =====
   const appState = useAppState();
@@ -248,10 +267,21 @@ const App: React.FC = () => {
     const completed = typeof window !== 'undefined'
       ? localStorage.getItem('tutorial-completed') === 'true'
       : false;
+
+    // 마이그레이션이 필요한 경우(기존 사용자) 튜토리얼 자동으로 완료 처리
+    const hasMigrationData = typeof window !== 'undefined'
+      ? localStorage.getItem('mindmap-memo-pages') !== null
+      : false;
+
+    // 마이그레이션 데이터가 있으면 튜토리얼 완료 플래그 설정
+    if (hasMigrationData && typeof window !== 'undefined') {
+      localStorage.setItem('tutorial-completed', 'true');
+    }
+
     return {
-      isActive: !completed, // 완료되지 않았으면 자동으로 시작
+      isActive: !completed && !hasMigrationData, // 완료되지 않았고 마이그레이션 데이터가 없을 때만 자동 시작
       currentStep: 0,
-      completed: completed,
+      completed: completed || hasMigrationData, // 마이그레이션 데이터가 있으면 완료된 것으로 처리
       currentSubStep: 0
     };
   });
@@ -930,8 +960,8 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* 튜토리얼 오버레이 */}
-      {tutorialState.isActive && (
+      {/* 튜토리얼 오버레이 - 마이그레이션이 필요하지 않을 때만 표시 */}
+      {tutorialState.isActive && !needsMigration && (
         <Tutorial
           steps={currentTutorialSteps}
           currentStep={tutorialState.currentStep}
@@ -942,6 +972,24 @@ const App: React.FC = () => {
           onComplete={handleTutorialComplete}
           onSwitchToCore={handleSwitchToBasic}
           canProceed={tutorialMode === 'core' ? true : canProceedTutorial()}
+        />
+      )}
+
+      {/* 마이그레이션 프롬프트 */}
+      {needsMigration && session && (
+        <MigrationPrompt
+          status={migrationStatus}
+          error={migrationError}
+          result={migrationResult}
+          onMigrate={migrate}
+          onSkip={skipMigration}
+          onDeleteLegacy={deleteLegacyData}
+          onClose={() => {
+            // 성공 후 확인 버튼 클릭 시 프롬프트 닫기
+            if (migrationStatus === 'success') {
+              skipMigration(); // needsMigration을 false로 설정
+            }
+          }}
         />
       )}
       </div>

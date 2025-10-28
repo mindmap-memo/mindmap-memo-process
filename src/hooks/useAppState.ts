@@ -45,6 +45,25 @@ export const useAppState = () => {
   // 초기 데이터 로드
   useEffect(() => {
     const loadInitialData = async () => {
+      // 개발 환경에서 localStorage가 비어있으면 자동으로 테스트 데이터 생성
+      if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+        try {
+          const { STORAGE_KEYS } = await import('../constants/defaultData');
+          const { MIGRATION_FLAG_KEY } = await import('../features/migration/utils/migrationUtils');
+          const { createEnhancedTestData } = await import('../features/migration/utils/debugUtils');
+
+          const hasData = localStorage.getItem(STORAGE_KEYS.PAGES);
+          if (!hasData) {
+            console.log('🔧 개발 모드: 테스트 데이터 자동 생성');
+            createEnhancedTestData();
+            // 마이그레이션 플래그 리셋 (프롬프트가 나타나도록)
+            localStorage.removeItem(MIGRATION_FLAG_KEY);
+          }
+        } catch (error) {
+          console.error('테스트 데이터 생성 실패:', error);
+        }
+      }
+
       try {
         const loadedPages = await fetchPages();
         if (loadedPages.length > 0) {
