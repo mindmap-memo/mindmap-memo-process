@@ -18,6 +18,7 @@ import { useUIState } from './hooks/useUIState';
 import PanelHeader from './PanelHeader';
 import MultiSelectView from './MultiSelectView';
 import CategoryEditView from './CategoryEditView';
+import BlockDragPreview from './BlockDragPreview';
 import { getSpacerHeight, isBlockVisible, getTopSelectedBlockPosition, blockTypes, ensureBlocks, isDefaultFilterState } from './utils/blockUtils';
 
 interface RightPanelProps {
@@ -1097,70 +1098,16 @@ const RightPanel: React.FC<RightPanelProps> = ({
           </div>
         )}
 
-        {/* 드래그 프리뷰 */}
-        {isDraggingBlock && draggedBlockId && selectedMemo?.blocks && (
-          <div
-            style={{
-              position: 'fixed',
-              left: `${dragPreviewPosition.x}px`,
-              top: `${dragPreviewPosition.y}px`,
-              pointerEvents: 'none',
-              zIndex: 10001,
-              opacity: 0.8,
-              transform: 'rotate(-2deg)',
-              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.3)',
-              maxWidth: '600px'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
-              {/* 드래그 핸들 */}
-              <div
-                style={{
-                  padding: '4px',
-                  marginTop: '8px',
-                  opacity: 0.5,
-                  flexShrink: 0,
-                  userSelect: 'none',
-                  fontSize: '16px',
-                  lineHeight: 1,
-                  color: '#6b7280'
-                }}
-              >
-                ⋮⋮
-              </div>
-
-              {/* 블록 콘텐츠 복사본 */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <ContentBlockComponent
-                  block={selectedMemo.blocks.find(b => b.id === draggedBlockId)!}
-                  isEditing={false}
-                  isSelected={false}
-                  isDragSelected={false}
-                  isDragHovered={false}
-                  pageId={currentPage?.id}
-                  memoId={selectedMemo?.id}
-                  onUpdate={() => {}}
-                  onDelete={() => {}}
-                  onDuplicate={() => {}}
-                  onMoveUp={() => {}}
-                  onMoveDown={() => {}}
-                  onConvertToBlock={() => {}}
-                  onCreateNewBlock={() => {}}
-                  onInsertBlockAfter={() => {}}
-                  onFocusPrevious={() => {}}
-                  onFocusNext={() => {}}
-                  onBlockClick={() => {}}
-                  onMergeWithPrevious={() => {}}
-                  onBlockSelect={() => {}}
-                  onSaveToHistory={() => {}}
-                  activeImportanceFilters={activeImportanceFilters}
-                  showGeneralContent={showGeneralContent}
-                  onResetFilters={onResetFilters}
-                />
-              </div>
-            </div>
-          </div>
-        )}
+        <BlockDragPreview
+          isDraggingBlock={isDraggingBlock}
+          draggedBlockId={draggedBlockId}
+          selectedMemo={selectedMemo || null}
+          dragPreviewPosition={dragPreviewPosition}
+          currentPage={currentPage}
+          activeImportanceFilters={activeImportanceFilters}
+          showGeneralContent={showGeneralContent}
+          onResetFilters={onResetFilters}
+        />
 
         {/* 빈 공간 우클릭 컨텍스트 메뉴 */}
         {showEmptySpaceMenu && (
