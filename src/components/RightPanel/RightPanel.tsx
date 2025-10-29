@@ -1,5 +1,5 @@
 import React from 'react';
-import { MemoBlock, Page, ContentBlock, ContentBlockType, TextBlock, ImportanceLevel, CategoryBlock } from '../../types';
+import { MemoBlock, Page, ImportanceLevel, CategoryBlock } from '../../types';
 import { IMPORTANCE_LABELS, IMPORTANCE_COLORS } from '../../utils/importanceStyles';
 import Resizer from '../Resizer';
 import ContentBlockComponent from '../ContentBlock';
@@ -11,6 +11,14 @@ import { useDragSelection } from './hooks/useDragSelection';
 import { useContextMenu } from './hooks/useContextMenu';
 import { useBlockDrag } from './hooks/useBlockDrag';
 import { useInputHandlers } from './hooks/useInputHandlers';
+import { useKeyboardEvents } from './hooks/useKeyboardEvents';
+import { useTableCreation } from './hooks/useTableCreation';
+import { useConnectedMemos } from './hooks/useConnectedMemos';
+import { useUIState } from './hooks/useUIState';
+import PanelHeader from './PanelHeader';
+import MultiSelectView from './MultiSelectView';
+import CategoryEditView from './CategoryEditView';
+import { getSpacerHeight, isBlockVisible, getTopSelectedBlockPosition, blockTypes, ensureBlocks, isDefaultFilterState } from './utils/blockUtils';
 
 interface RightPanelProps {
   selectedMemo: MemoBlock | undefined;
@@ -51,15 +59,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
   showGeneralContent = true,
   onResetFilters
 }) => {
-  // 모든 중요도 필터가 활성화되어 있고 일반 내용도 표시하는 기본 상태인지 확인
-  const isDefaultFilterState = () => {
-    const allLevels: ImportanceLevel[] = ['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'];
-
-    return (!activeImportanceFilters ||
-            (activeImportanceFilters.size === allLevels.length &&
-             allLevels.every(level => activeImportanceFilters.has(level)))) &&
-           showGeneralContent !== false;
-  };
   const [selectedBlocks, setSelectedBlocks] = React.useState<string[]>([]);
   const [dragSelectedBlocks, setDragSelectedBlocks] = React.useState<string[]>([]);
   const [dragJustCompleted, setDragJustCompleted] = React.useState(false);
@@ -67,21 +66,34 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const blocksContainerRef = React.useRef<HTMLDivElement>(null);
   const rightPanelRef = React.useRef<HTMLDivElement>(null);
   const importanceButtonRef = React.useRef<HTMLButtonElement>(null);
-  const [showMenu, setShowMenu] = React.useState(false);
-  const [menuPosition, setMenuPosition] = React.useState({ x: 0, y: 0 });
-  const [isGoogleSignedIn, setIsGoogleSignedIn] = React.useState(false);
-  const [showConnectedMemos, setShowConnectedMemos] = React.useState(false);
-  const [isTitleFocused, setIsTitleFocused] = React.useState(false);
-  const [showContextMenu, setShowContextMenu] = React.useState(false);
-  const [showImportanceSubmenu, setShowImportanceSubmenu] = React.useState(false);
-  const [submenuPosition, setSubmenuPosition] = React.useState<'right' | 'left'>('right');
-  const [submenuTopOffset, setSubmenuTopOffset] = React.useState<number>(0);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [, forceUpdate] = React.useReducer(x => x + 1, 0); // RightPanel 강제 리렌더링용
 
-  // 빈 공간 우클릭 컨텍스트 메뉴
-  const [showEmptySpaceMenu, setShowEmptySpaceMenu] = React.useState(false);
-  const [clickedPosition, setClickedPosition] = React.useState<number | null>(null); // 블록 삽입 위치
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  // UI 상태 훅 사용
+  const {
+    showMenu,
+    setShowMenu,
+    menuPosition,
+    setMenuPosition,
+    isGoogleSignedIn,
+    setIsGoogleSignedIn,
+    showConnectedMemos,
+    setShowConnectedMemos,
+    isTitleFocused,
+    setIsTitleFocused,
+    showContextMenu,
+    setShowContextMenu,
+    showImportanceSubmenu,
+    setShowImportanceSubmenu,
+    submenuPosition,
+    setSubmenuPosition,
+    submenuTopOffset,
+    setSubmenuTopOffset,
+    showEmptySpaceMenu,
+    setShowEmptySpaceMenu,
+    clickedPosition,
+    setClickedPosition
+  } = useUIState();
 
   // Undo/Redo 훅 사용
   const { saveToHistory, handleUndo, handleRedo, canUndo, canRedo } = useUndoRedo(selectedMemo, onMemoUpdate);
@@ -196,215 +208,30 @@ const RightPanel: React.FC<RightPanelProps> = ({
     setSelectedBlocks
   });
 
-  // 메모가 변경될 때마다 연결된 메모를 펼침
-  React.useEffect(() => {
-    if (selectedMemo) {
-      setShowConnectedMemos(true);
-    }
-  }, [selectedMemo?.id]);
+  // 키보드 이벤트 훅 사용
+  useKeyboardEvents({
+    selectedBlocks,
+    setSelectedBlocks,
+    setDragSelectedBlocks,
+    selectedMemo: selectedMemo || null,
+    handleBlocksDelete,
+    handleBlocksMove,
+    handleUndo,
+    handleRedo
+  });
 
-  // 공백 크기를 계산하는 함수 (최대 1블록 높이로 제한)
-  const getSpacerHeight = (consecutiveHiddenBlocks: number): string => {
-    if (consecutiveHiddenBlocks <= 1) return '0';
-    return '0.8em'; // 적당한 공백 크기
-  };
+  // 테이블 생성 신호 감지 훅 사용
+  useTableCreation({
+    selectedMemo: selectedMemo || null,
+    onMemoUpdate
+  });
 
-  // 블록이 필터링되어 보이는지 확인하는 함수
-  const isBlockVisible = (block: ContentBlock): boolean => {
-    // 모든 중요도 필터가 활성화되어 있고 일반 내용도 표시하는 기본 상태인지 확인
-    const allLevels: ImportanceLevel[] = ['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'];
-    const isDefaultFilterState = (!activeImportanceFilters ||
-                                 (activeImportanceFilters.size === allLevels.length &&
-                                  allLevels.every(level => activeImportanceFilters.has(level)))) &&
-                                showGeneralContent !== false;
+  // 연결된 메모 자동 펼침 훅 사용
+  useConnectedMemos({
+    selectedMemo: selectedMemo || null,
+    setShowConnectedMemos
+  });
 
-    if (isDefaultFilterState) return true;
-
-    if (block.type === 'text') {
-      const textBlock = block as TextBlock;
-      if (!textBlock.content || textBlock.content.trim() === '') {
-        return showGeneralContent !== false;
-      }
-
-      if (!textBlock.importanceRanges || textBlock.importanceRanges.length === 0) {
-        return showGeneralContent !== false;
-      }
-
-      // 필터에 맞는 중요도 범위가 있는지 확인
-      return textBlock.importanceRanges.some(range =>
-        activeImportanceFilters && activeImportanceFilters.has(range.level)
-      ) || (showGeneralContent !== false && textBlock.importanceRanges.length < textBlock.content.length);
-    }
-
-    // 다른 블록 타입들은 기본적으로 표시
-    return true;
-  };
-
-  // 선택된 블록 중 첫 번째 블록의 위치 계산
-  const getTopSelectedBlockPosition = () => {
-    if (selectedBlocks.length === 0 || !selectedMemo?.blocks) return null;
-    
-    const firstSelectedIndex = selectedMemo.blocks.findIndex(block => 
-      selectedBlocks.includes(block.id)
-    );
-    
-    if (firstSelectedIndex === -1) return null;
-    
-    return firstSelectedIndex;
-  };
-
-  // 전역 테이블 생성 신호 감지
-  React.useEffect(() => {
-    const checkForTableCreation = () => {
-      const signal = (window as any).createTableAfterBlock;
-      if (signal && selectedMemo) {
-        const { afterBlockId, tableBlock } = signal;
-        
-        // 현재 메모에서 해당 블록 찾기
-        const blockIndex = selectedMemo.blocks?.findIndex(block => block.id === afterBlockId);
-        
-        if (blockIndex !== undefined && blockIndex >= 0 && selectedMemo.blocks) {
-          const updatedBlocks = [...selectedMemo.blocks];
-          updatedBlocks.splice(blockIndex + 1, 0, tableBlock);
-          
-          onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
-          
-          // 신호 제거
-          delete (window as any).createTableAfterBlock;
-        }
-      }
-    };
-    
-    const interval = setInterval(checkForTableCreation, 100);
-    return () => clearInterval(interval);
-  }, [selectedMemo, onMemoUpdate]);
-
-  // 기존 키보드 이벤트 리스너 제거 (중복)
-
-  // 빈 공간 우클릭 핸들러 (패널의 빈 영역)
-
-
-
-  // 블록 선택 관련 핸들러들
-
-
-  // 키보드 이벤트 처리 (Delete 키로 블록 삭제)
-  React.useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-
-      // 입력 필드에 포커스가 있을 때 처리
-      const activeElement = document.activeElement;
-      const isInputFocused = activeElement && (
-        activeElement.tagName === 'INPUT' ||
-        activeElement.tagName === 'TEXTAREA' ||
-        (activeElement as HTMLElement).contentEditable === 'true'
-      );
-
-      if (isInputFocused) {
-
-        // Enter 키는 항상 허용 (블록 생성을 위해)
-        if (event.key === 'Enter') {
-          return;
-        }
-
-        // Undo/Redo는 입력 필드에서도 허용 (z 또는 Z)
-        if ((event.key === 'z' || event.key === 'Z') && (event.ctrlKey || event.metaKey)) {
-          // Undo/Redo 로직으로 넘어감
-        }
-        // 선택된 블록이 있고 Delete/Backspace를 눌렀을 때만 예외 처리
-        else if ((event.key === 'Delete' || event.key === 'Backspace') && selectedBlocks.length > 0) {
-          // 텍스트가 선택되어 있거나 커서가 중간에 있으면 일반 편집 동작
-          const textarea = activeElement as HTMLTextAreaElement;
-
-          if (textarea.selectionStart !== textarea.selectionEnd ||
-              (textarea.selectionStart > 0 && textarea.selectionStart < textarea.value.length)) {
-            return;
-          }
-
-          // 빈 입력 필드이거나 커서가 맨 앞/뒤에 있으면 블록 삭제 허용
-        } else {
-          return;
-        }
-      }
-
-      if (event.key === 'Delete' || event.key === 'Backspace') {
-        if (selectedBlocks.length > 0) {
-          event.preventDefault();
-          handleBlocksDelete();
-        } else {
-        }
-      } else if (event.key === 'Escape') {
-        if (selectedBlocks.length > 0) {
-          setSelectedBlocks([]);
-          setDragSelectedBlocks([]);
-        }
-      } else if (event.key === 'ArrowUp' && (event.ctrlKey || event.metaKey)) {
-        if (selectedBlocks.length > 0) {
-          event.preventDefault();
-          handleBlocksMove('up');
-        }
-      } else if (event.key === 'ArrowDown' && (event.ctrlKey || event.metaKey)) {
-        if (selectedBlocks.length > 0) {
-          event.preventDefault();
-          handleBlocksMove('down');
-        }
-      } else if ((event.key === 'z' || event.key === 'Z') && (event.ctrlKey || event.metaKey)) {
-        // RightPanel이 포커스되어 있을 때만 블록 Undo/Redo 처리
-        // 그렇지 않으면 Canvas의 Undo/Redo가 작동하도록 통과
-        const target = event.target as HTMLElement;
-        const isInRightPanel = target.closest('[data-right-panel="true"]');
-
-        if (isInRightPanel) {
-          console.log('RightPanel: Handling Ctrl+Z in RightPanel');
-          if (event.shiftKey) {
-            // Ctrl+Shift+Z: Redo
-            event.preventDefault();
-            handleRedo();
-          } else {
-            // Ctrl+Z: Undo
-            event.preventDefault();
-            handleUndo();
-          }
-        } else {
-          console.log('RightPanel: Not in RightPanel, letting Ctrl+Z pass through');
-          // RightPanel 밖에서 발생한 이벤트는 통과
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [selectedBlocks, selectedMemo, onMemoUpdate, handleUndo, handleRedo]);
-
-
-  // 기존 메모에 blocks가 없으면 초기화
-  const ensureBlocks = (memo: MemoBlock): MemoBlock => {
-    if (!memo.blocks || memo.blocks.length === 0) {
-      return {
-        ...memo,
-        blocks: memo.content ? 
-          [{ id: memo.id + '_text', type: 'text', content: memo.content }] :
-          [{ id: memo.id + '_text', type: 'text', content: '' }]
-      };
-    }
-    return memo;
-  };
-
-
-
-  const blockTypes = [
-    { type: 'text' as ContentBlockType, label: '텍스트', icon: '📝' },
-    { type: 'callout' as ContentBlockType, label: '콜아웃', icon: '💡' },
-    { type: 'checklist' as ContentBlockType, label: '체크리스트', icon: '✓' },
-    { type: 'quote' as ContentBlockType, label: '인용구', icon: '💬' },
-    { type: 'code' as ContentBlockType, label: '코드', icon: '💻' },
-    { type: 'image' as ContentBlockType, label: '이미지', icon: '🖼️' },
-    { type: 'file' as ContentBlockType, label: '파일', icon: '📎' },
-    { type: 'bookmark' as ContentBlockType, label: '북마크', icon: '🔖' },
-    { type: 'table' as ContentBlockType, label: '테이블', icon: '📊' }
-  ];
 
   return (
     <div
@@ -433,84 +260,14 @@ const RightPanel: React.FC<RightPanelProps> = ({
           onResize={onResize}
         />
       )}
-      
-      <div style={{
-        padding: '16px',
-        borderBottom: '1px solid #e1e5e9',
-        backgroundColor: 'white',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <h2 style={{
-            margin: '0',
-            fontSize: '16px',
-            fontWeight: '600',
-            color: '#1f2937'
-          }}>
-            메모 편집
-          </h2>
 
-          {/* 필터링 해제 버튼 - 기본 상태가 아닐 때만 표시 */}
-          {!isDefaultFilterState() && (
-            <button
-              onClick={() => onResetFilters && onResetFilters()}
-              style={{
-                fontSize: '12px',
-                padding: '4px 8px',
-                backgroundColor: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                transition: 'background-color 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#2563eb';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#3b82f6';
-              }}
-            >
-              📝 필터링 해제 후 편집
-            </button>
-          )}
-        </div>
-
-        {onToggleFullscreen && (
-          <button
-            onClick={onToggleFullscreen}
-            style={{
-              padding: '8px',
-              border: '1px solid #e1e5e9',
-              borderRadius: '6px',
-              backgroundColor: 'white',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '16px',
-              color: '#6b7280',
-              transition: 'all 0.2s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f3f4f6';
-              e.currentTarget.style.color = '#374151';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'white';
-              e.currentTarget.style.color = '#6b7280';
-            }}
-            title={isFullscreen ? "전체화면 종료" : "전체화면"}
-          >
-{isFullscreen ? '◧' : '⛶'}
-          </button>
-        )}
-      </div>
+      <PanelHeader
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={onToggleFullscreen}
+        activeImportanceFilters={activeImportanceFilters}
+        showGeneralContent={showGeneralContent}
+        onResetFilters={onResetFilters}
+      />
 
       <div
         ref={rightPanelRef}
@@ -520,403 +277,20 @@ const RightPanel: React.FC<RightPanelProps> = ({
         onContextMenu={handleEmptySpaceContextMenu}
       >
         {(selectedMemos.length > 1 || selectedCategories.length > 1 || (selectedMemos.length > 0 && selectedCategories.length > 0)) ? (
-          // 멀티 선택 모드
-          <div>
-            <h3 style={{
-              marginBottom: '16px',
-              fontSize: '18px',
-              fontWeight: '600',
-              color: '#1f2937'
-            }}>
-              선택된 아이템 (메모 {selectedMemos.length}개, 카테고리 {selectedCategories.length}개)
-            </h3>
-
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px',
-              maxHeight: '400px',
-              overflowY: 'auto'
-            }}>
-              {/* 선택된 카테고리들 */}
-              {selectedCategories.map(category => (
-                <div
-                  key={category.id}
-                  onClick={() => onCategorySelect(category.id)}
-                  style={{
-                    padding: '12px',
-                    backgroundColor: '#fff3e0',
-                    border: '1px solid #ffb74d',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#ffe0b2';
-                    e.currentTarget.style.borderColor = '#ff9800';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#fff3e0';
-                    e.currentTarget.style.borderColor = '#ffb74d';
-                  }}
-                >
-                  <div style={{
-                    fontWeight: '600',
-                    fontSize: '14px',
-                    color: '#1f2937',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
-                    {category.title}
-                  </div>
-                  <div style={{
-                    fontSize: '12px',
-                    color: '#6b7280',
-                    marginTop: '4px'
-                  }}>
-                    하위 아이템: {category.children.length}개
-                  </div>
-                </div>
-              ))}
-
-              {/* 선택된 메모들 */}
-              {selectedMemos.map(memo => (
-                <div
-                  key={memo.id}
-                  onClick={() => onFocusMemo(memo.id)}
-                  style={{
-                    padding: '12px 16px',
-                    backgroundColor: 'white',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <div style={{ fontWeight: '600', marginBottom: '4px' }}>
-                    {memo.title}
-                  </div>
-                  <div style={{ 
-                    fontSize: '12px', 
-                    color: '#6b7280',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden'
-                  }}>
-                    {memo.content || '내용 없음'}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <MultiSelectView
+            selectedMemos={selectedMemos}
+            selectedCategories={selectedCategories}
+            onCategorySelect={onCategorySelect}
+            onFocusMemo={onFocusMemo}
+          />
         ) : selectedCategory ? (
-          // 단일 카테고리 편집 모드
-          <div>
-            <div style={{ marginBottom: '16px', paddingLeft: '20px' }}>
-              <input
-                type="text"
-                value={selectedCategory.title}
-                onChange={(e) => onCategoryUpdate({ ...selectedCategory, title: e.target.value })}
-                placeholder="카테고리 제목을 입력하세요..."
-                style={{
-                  width: '100%',
-                  padding: '2px 0',
-                  border: 'none',
-                  borderBottom: '2px solid transparent',
-                  borderRadius: '0',
-                  fontSize: '24px',
-                  fontWeight: '700',
-                  backgroundColor: 'transparent',
-                  outline: 'none',
-                  color: '#ff9800',
-                  transition: 'border-bottom-color 0.2s ease'
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderBottomColor = '#ff9800';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderBottomColor = 'transparent';
-                }}
-              />
-            </div>
-
-            {/* 태그 관리 */}
-            <div style={{ marginBottom: '16px', paddingLeft: '20px' }}>
-              {selectedCategory.tags.length > 0 && (
-                <div style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '6px',
-                  marginBottom: '8px'
-                }}>
-                  {selectedCategory.tags.map((tag, index) => (
-                    <span
-                      key={index}
-                      style={{
-                        backgroundColor: '#e5e7eb',
-                        color: '#374151',
-                        padding: '4px 8px',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      {tag}
-                      <button
-                        onClick={() => {
-                          const newTags = selectedCategory.tags.filter((_, i) => i !== index);
-                          onCategoryUpdate({ ...selectedCategory, tags: newTags });
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#6b7280',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          padding: '0'
-                        }}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <input
-                type="text"
-                placeholder="태그를 입력하세요 (Enter로 추가)"
-                style={{
-                  width: '100%',
-                  padding: '2px 0',
-                  border: 'none',
-                  borderBottom: '1px solid #e5e7eb',
-                  borderRadius: '0',
-                  fontSize: '14px',
-                  backgroundColor: 'transparent',
-                  outline: 'none',
-                  color: '#6b7280',
-                  transition: 'border-bottom-color 0.2s ease'
-                }}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                    const newTag = e.currentTarget.value.trim();
-                    if (!selectedCategory.tags.includes(newTag)) {
-                      onCategoryUpdate({
-                        ...selectedCategory,
-                        tags: [...selectedCategory.tags, newTag]
-                      });
-                    }
-                    e.currentTarget.value = '';
-                  }
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderBottomColor = '#3b82f6';
-                  e.target.style.color = '#1f2937';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderBottomColor = '#e5e7eb';
-                  e.target.style.color = '#6b7280';
-                }}
-              />
-            </div>
-
-            {/* 연결된 아이템들 */}
-            <div style={{ marginBottom: '16px' }}>
-              <h4 style={{
-                fontSize: '16px',
-                fontWeight: '600',
-                color: '#1f2937',
-                marginBottom: '12px',
-                paddingLeft: '20px'
-              }}>
-                연결된 카테고리
-              </h4>
-
-              <div style={{ paddingLeft: '20px' }}>
-                {selectedCategory.connections && selectedCategory.connections.length > 0 ? (
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px'
-                  }}>
-                    {selectedCategory.connections.map(connectionId => {
-                      const connectedMemo = currentPage?.memos.find(m => m.id === connectionId);
-                      const connectedCategory = currentPage?.categories?.find(c => c.id === connectionId);
-                      const connectedItem = connectedMemo || connectedCategory;
-
-                      if (!connectedItem) return null;
-
-                      return (
-                        <div
-                          key={connectionId}
-                          onClick={() => {
-                            if (connectedMemo) {
-                              onFocusMemo(connectionId);
-                            } else if (connectedCategory) {
-                              onCategorySelect(connectionId);
-                            }
-                          }}
-                          style={{
-                            padding: '8px 12px',
-                            backgroundColor: connectedMemo ? '#f0f9ff' : '#fff3e0',
-                            border: `1px solid ${connectedMemo ? '#bae6fd' : '#ffcc02'}`,
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            transition: 'all 0.2s ease'
-                          }}
-                        >
-                          <div style={{ fontWeight: '500' }}>
-                            {connectedMemo ? '📝 ' : ''}{connectedItem.title}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div style={{
-                    padding: '16px',
-                    textAlign: 'center',
-                    color: '#6b7280',
-                    fontSize: '14px',
-                    border: '1px dashed #d1d5db',
-                    borderRadius: '6px'
-                  }}>
-                    연결된 아이템이 없습니다
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* 하위 카테고리 */}
-            <div style={{ marginBottom: '16px' }}>
-              <h4 style={{
-                fontSize: '16px',
-                fontWeight: '600',
-                color: '#1f2937',
-                marginBottom: '12px',
-                paddingLeft: '20px'
-              }}>
-                하위 카테고리
-              </h4>
-
-              <div style={{ paddingLeft: '20px' }}>
-                {(() => {
-                  const childCategories = selectedCategory.children
-                    ?.map(childId => currentPage?.categories?.find(c => c.id === childId))
-                    .filter(Boolean) as CategoryBlock[] | undefined;
-
-                  return childCategories && childCategories.length > 0 ? (
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px'
-                    }}>
-                      {childCategories.map(childCategory => (
-                        <div
-                          key={childCategory.id}
-                          onClick={() => onCategorySelect(childCategory.id)}
-                          style={{
-                            padding: '8px 12px',
-                            backgroundColor: '#fff3e0',
-                            border: '1px solid #ffcc02',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            transition: 'all 0.2s ease'
-                          }}
-                        >
-                          <div style={{ fontWeight: '500' }}>
-                            📁 {childCategory.title}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{
-                      padding: '16px',
-                      textAlign: 'center',
-                      color: '#6b7280',
-                      fontSize: '14px',
-                      border: '1px dashed #d1d5db',
-                      borderRadius: '6px'
-                    }}>
-                      하위 카테고리가 없습니다
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-
-            {/* 하위 메모 */}
-            <div style={{ marginBottom: '16px' }}>
-              <h4 style={{
-                fontSize: '16px',
-                fontWeight: '600',
-                color: '#1f2937',
-                marginBottom: '12px',
-                paddingLeft: '20px'
-              }}>
-                하위 메모
-              </h4>
-
-              <div style={{ paddingLeft: '20px' }}>
-                {(() => {
-                  const childMemos = selectedCategory.children
-                    ?.map(childId => {
-                      const memo = currentPage?.memos.find(m => m.id === childId);
-                      return memo;
-                    })
-                    .filter(Boolean) as MemoBlock[] | undefined;
-
-                  return childMemos && childMemos.length > 0 ? (
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px'
-                    }}>
-                      {childMemos.map(childMemo => (
-                        <div
-                          key={childMemo.id}
-                          onClick={() => onFocusMemo(childMemo.id)}
-                          style={{
-                            padding: '8px 12px',
-                            backgroundColor: '#f0f9ff',
-                            border: '1px solid #bae6fd',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            transition: 'all 0.2s ease'
-                          }}
-                        >
-                          <div style={{ fontWeight: '500' }}>
-                            📝 {childMemo.title}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{
-                      padding: '16px',
-                      textAlign: 'center',
-                      color: '#6b7280',
-                      fontSize: '14px',
-                      border: '1px dashed #d1d5db',
-                      borderRadius: '6px'
-                    }}>
-                      하위 메모가 없습니다
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-          </div>
+          <CategoryEditView
+            selectedCategory={selectedCategory}
+            currentPage={currentPage}
+            onCategoryUpdate={onCategoryUpdate}
+            onCategorySelect={onCategorySelect}
+            onFocusMemo={onFocusMemo}
+          />
         ) : selectedMemo ? (
           // 단일 메모 편집 모드
           <div>
@@ -1565,22 +939,17 @@ const RightPanel: React.FC<RightPanelProps> = ({
                 const renderedElements: React.ReactElement[] = [];
                 let consecutiveHiddenBlocks = 0;
 
-                // 모든 중요도 필터가 활성화되어 있고 일반 내용도 표시하는 기본 상태인지 확인
-                const allLevels: ImportanceLevel[] = ['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'];
-                const isDefaultFilterState = (!activeImportanceFilters ||
-                                             (activeImportanceFilters.size === allLevels.length &&
-                                              allLevels.every(level => activeImportanceFilters.has(level)))) &&
-                                            showGeneralContent !== false;
+                const defaultFilterState = isDefaultFilterState(activeImportanceFilters, showGeneralContent);
 
                 blocks.forEach((block, index) => {
                   const isSelected = selectedBlocks.includes(block.id);
-                  const topSelectedIndex = getTopSelectedBlockPosition();
+                  const topSelectedIndex = getTopSelectedBlockPosition(selectedBlocks, selectedMemo);
                   const isFirstSelected = topSelectedIndex === index;
-                  const blockVisible = isBlockVisible(block);
+                  const blockVisible = isBlockVisible(block, activeImportanceFilters, showGeneralContent);
 
                   if (blockVisible) {
                     // 공백 처리: 숨겨진 블록이 2개 이상 연속으로 있었고, 기본 상태가 아닐 때
-                    if (!isDefaultFilterState && consecutiveHiddenBlocks >= 2) {
+                    if (!defaultFilterState && consecutiveHiddenBlocks >= 2) {
                       // 마지막 블록인지 확인 (뒤에 보이는 블록이 있는지 체크)
                       const hasVisibleBlocksAfter = blocks.slice(index + 1).some(laterBlock => isBlockVisible(laterBlock));
 
@@ -1693,7 +1062,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     consecutiveHiddenBlocks = 0; // 리셋
                   } else {
                     // 블록이 숨겨짐
-                    if (!isDefaultFilterState) {
+                    if (!defaultFilterState) {
                       consecutiveHiddenBlocks++;
                     }
                   }
