@@ -1,9 +1,16 @@
 import React from 'react';
-import { MemoBlock, Page, ContentBlock, ContentBlockType, TextBlock, ImportanceLevel, CategoryBlock } from '../types';
-import { IMPORTANCE_LABELS, IMPORTANCE_COLORS } from '../utils/importanceStyles';
-import Resizer from './Resizer';
-import ContentBlockComponent from './ContentBlock';
-import GoogleAuth from './GoogleAuth';
+import { MemoBlock, Page, ContentBlock, ContentBlockType, TextBlock, ImportanceLevel, CategoryBlock } from '../../types';
+import { IMPORTANCE_LABELS, IMPORTANCE_COLORS } from '../../utils/importanceStyles';
+import Resizer from '../Resizer';
+import ContentBlockComponent from '../ContentBlock';
+import GoogleAuth from '../GoogleAuth';
+import { useUndoRedo } from './hooks/useUndoRedo';
+import { useBlockHandlers } from './hooks/useBlockHandlers';
+import { useFileHandlers } from './hooks/useFileHandlers';
+import { useDragSelection } from './hooks/useDragSelection';
+import { useContextMenu } from './hooks/useContextMenu';
+import { useBlockDrag } from './hooks/useBlockDrag';
+import { useInputHandlers } from './hooks/useInputHandlers';
 
 interface RightPanelProps {
   selectedMemo: MemoBlock | undefined;
@@ -53,20 +60,10 @@ const RightPanel: React.FC<RightPanelProps> = ({
              allLevels.every(level => activeImportanceFilters.has(level)))) &&
            showGeneralContent !== false;
   };
-  const [tagInput, setTagInput] = React.useState('');
   const [selectedBlocks, setSelectedBlocks] = React.useState<string[]>([]);
-  const [dragSelectedBlocks, setDragSelectedBlocks] = React.useState<string[]>([]); // 드래그로 선택된 블록들
-  const [isDragSelecting, setIsDragSelecting] = React.useState(false);
-  const [dragJustCompleted, setDragJustCompleted] = React.useState(false); // 드래그 완료 직후 상태
-  const [dragStart, setDragStart] = React.useState({ x: 0, y: 0 });
-  const [dragEnd, setDragEnd] = React.useState({ x: 0, y: 0 });
-  const [dragHoveredBlocks, setDragHoveredBlocks] = React.useState<string[]>([]);
-  const [isDragMoved, setIsDragMoved] = React.useState(false); // 실제 드래그 움직임 감지
+  const [dragSelectedBlocks, setDragSelectedBlocks] = React.useState<string[]>([]);
+  const [dragJustCompleted, setDragJustCompleted] = React.useState(false);
 
-  // Undo/Redo 히스토리 관리
-  const [undoHistory, setUndoHistory] = React.useState<any[]>([]);
-  const [redoHistory, setRedoHistory] = React.useState<any[]>([]);
-  const [isUndoRedoAction, setIsUndoRedoAction] = React.useState(false); // Undo/Redo 중인지 확인
   const blocksContainerRef = React.useRef<HTMLDivElement>(null);
   const rightPanelRef = React.useRef<HTMLDivElement>(null);
   const importanceButtonRef = React.useRef<HTMLButtonElement>(null);
@@ -76,11 +73,128 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const [showConnectedMemos, setShowConnectedMemos] = React.useState(false);
   const [isTitleFocused, setIsTitleFocused] = React.useState(false);
   const [showContextMenu, setShowContextMenu] = React.useState(false);
-  const [contextMenuPosition, setContextMenuPosition] = React.useState({ x: 0, y: 0 });
   const [showImportanceSubmenu, setShowImportanceSubmenu] = React.useState(false);
   const [submenuPosition, setSubmenuPosition] = React.useState<'right' | 'left'>('right');
   const [submenuTopOffset, setSubmenuTopOffset] = React.useState<number>(0);
   const [, forceUpdate] = React.useReducer(x => x + 1, 0); // RightPanel 강제 리렌더링용
+
+  // 빈 공간 우클릭 컨텍스트 메뉴
+  const [showEmptySpaceMenu, setShowEmptySpaceMenu] = React.useState(false);
+  const [clickedPosition, setClickedPosition] = React.useState<number | null>(null); // 블록 삽입 위치
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Undo/Redo 훅 사용
+  const { saveToHistory, handleUndo, handleRedo, canUndo, canRedo } = useUndoRedo(selectedMemo, onMemoUpdate);
+
+  // 블록 핸들러 훅 사용
+  const {
+    createNewBlock,
+    handleBlockUpdate,
+    handleBlockDelete,
+    handleBlockDuplicate,
+    handleBlockMove,
+    handleConvertBlock,
+    handleCreateNewBlock,
+    handleInsertBlockAfter,
+    handleMergeWithPrevious,
+    handleFocusPrevious,
+    handleFocusNext
+  } = useBlockHandlers(selectedMemo, onMemoUpdate, saveToHistory, forceUpdate);
+
+  // 파일 핸들러 훅 사용
+  const {
+    handleFileAttach,
+    handleFileSelect,
+    handleAddTextBlock,
+    handleFileDrop,
+    handleDragOver
+  } = useFileHandlers({
+    selectedMemo: selectedMemo || null,
+    clickedPosition,
+    onMemoUpdate,
+    saveToHistory,
+    setShowEmptySpaceMenu,
+    fileInputRef
+  });
+
+  // 드래그 선택 훅 사용
+  const {
+    isDragSelecting,
+    isDragMoved,
+    dragStart,
+    dragEnd,
+    dragHoveredBlocks,
+    handleBlockClick,
+    handleMouseDown,
+    handleMemoAreaClick
+  } = useDragSelection({
+    selectedMemo: selectedMemo || null,
+    selectedBlocks,
+    setSelectedBlocks,
+    dragSelectedBlocks,
+    setDragSelectedBlocks,
+    dragJustCompleted,
+    setDragJustCompleted,
+    blocksContainerRef,
+    rightPanelRef
+  });
+
+  // 컨텍스트 메뉴 훅 사용
+  const {
+    contextMenuPosition,
+    emptySpaceMenuPosition,
+    handleEmptySpaceContextMenu,
+    handleBlockContextMenu,
+    handleDeleteSelectedBlocks,
+    handleApplyImportance,
+    handleBlocksMove,
+    handleBlocksDelete,
+    addNewBlock
+  } = useContextMenu({
+    selectedMemo: selectedMemo || null,
+    selectedBlocks,
+    setSelectedBlocks,
+    dragSelectedBlocks,
+    setDragSelectedBlocks,
+    showContextMenu,
+    setShowContextMenu,
+    showEmptySpaceMenu,
+    setShowEmptySpaceMenu,
+    setClickedPosition,
+    onMemoUpdate,
+    createNewBlock,
+    saveToHistory
+  });
+
+  // 블록 드래그 훅 사용
+  const {
+    isDraggingBlock,
+    draggedBlockId,
+    dropTargetIndex,
+    dragStartY,
+    currentDragY,
+    dragPreviewPosition,
+    handleBlockDragStart
+  } = useBlockDrag({
+    selectedMemo: selectedMemo || null,
+    onMemoUpdate,
+    blocksContainerRef
+  });
+
+  // 입력 핸들러 훅 사용
+  const {
+    tagInput,
+    setTagInput,
+    handleTitleChange,
+    handleTagInputChange,
+    handleTagInputKeyPress,
+    removeTag,
+    handleBlockSelect
+  } = useInputHandlers({
+    selectedMemo: selectedMemo || null,
+    onMemoUpdate,
+    setSelectedBlocks
+  });
 
   // 메모가 변경될 때마다 연결된 메모를 펼침
   React.useEffect(() => {
@@ -88,21 +202,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
       setShowConnectedMemos(true);
     }
   }, [selectedMemo?.id]);
-
-  // 블록 드래그 앤 드롭 상태
-  const [isDraggingBlock, setIsDraggingBlock] = React.useState(false);
-  const [draggedBlockId, setDraggedBlockId] = React.useState<string | null>(null);
-  const [dropTargetIndex, setDropTargetIndex] = React.useState<number | null>(null);
-  const [dragStartY, setDragStartY] = React.useState(0);
-  const [currentDragY, setCurrentDragY] = React.useState(0);
-  const [dragOffset, setDragOffset] = React.useState({ x: 0, y: 0 }); // 드래그 시작 시 마우스와 블록의 상대 위치
-  const [dragPreviewPosition, setDragPreviewPosition] = React.useState({ x: 0, y: 0 }); // 드래그 프리뷰 절대 위치
-
-  // 빈 공간 우클릭 컨텍스트 메뉴
-  const [showEmptySpaceMenu, setShowEmptySpaceMenu] = React.useState(false);
-  const [emptySpaceMenuPosition, setEmptySpaceMenuPosition] = React.useState({ x: 0, y: 0 });
-  const [clickedPosition, setClickedPosition] = React.useState<number | null>(null); // 블록 삽입 위치
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // 공백 크기를 계산하는 함수 (최대 1블록 높이로 제한)
   const getSpacerHeight = (consecutiveHiddenBlocks: number): string => {
@@ -182,1012 +281,12 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
   // 기존 키보드 이벤트 리스너 제거 (중복)
 
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (selectedMemo) {
-      onMemoUpdate(selectedMemo.id, { title: e.target.value });
-    }
-  };
-
-  const handleTagInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTagInput(e.target.value);
-  };
-
-  const handleTagInputKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && tagInput.trim() && selectedMemo) {
-      const newTag = tagInput.trim();
-      if (!selectedMemo.tags.includes(newTag)) {
-        onMemoUpdate(selectedMemo.id, { tags: [...selectedMemo.tags, newTag] });
-      }
-      setTagInput('');
-    }
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    if (selectedMemo) {
-      onMemoUpdate(selectedMemo.id, { 
-        tags: selectedMemo.tags.filter(tag => tag !== tagToRemove) 
-      });
-    }
-  };
-
-  // selectedMemo를 ref로 저장하여 항상 최신 값 참조
-  const selectedMemoRef = React.useRef(selectedMemo);
-  React.useEffect(() => {
-    selectedMemoRef.current = selectedMemo;
-  }, [selectedMemo]);
-
-  // 블록 관련 핸들러들 - ref를 사용하여 항상 최신 selectedMemo 참조
-  const handleBlockUpdate = React.useCallback((updatedBlock: ContentBlock) => {
-    // ref에서 최신 selectedMemo 가져오기
-    const currentMemo = selectedMemoRef.current;
-
-    if (!currentMemo || !currentMemo.blocks) {
-      return;
-    }
-
-    // 중요: 중요도 업데이트 시에만 디버그 로그 출력
-    const isImportanceUpdate = updatedBlock.type === 'text' && (updatedBlock as any).importanceRanges;
-    if (isImportanceUpdate) {
-      console.log('[RightPanel] handleBlockUpdate - 중요도 업데이트 받음', {
-        blockId: updatedBlock.id,
-        importanceRanges: (updatedBlock as any).importanceRanges,
-        rangesDetail: (updatedBlock as any).importanceRanges?.map((r: any) => ({ start: r.start, end: r.end, level: r.level })),
-        totalBlocks: currentMemo.blocks?.length
-      });
-    }
-
-    const updatedBlocks = currentMemo.blocks.map(block => {
-      if (block.id === updatedBlock.id) {
-        // updatedBlock을 그대로 사용 (TextBlock에서 이미 완전한 데이터를 전달함)
-        if (isImportanceUpdate) {
-          console.log('[RightPanel] 블록 업데이트:', {
-            blockId: block.id,
-            updatedBlock,
-            updatedImportanceRanges: (updatedBlock as any).importanceRanges
-          });
-        }
-
-        // updatedBlock을 그대로 반환 (이미 완전한 데이터)
-        return updatedBlock;
-      }
-      // 변경되지 않은 블록은 원본 그대로 반환
-      return block;
-    });
-
-    if (isImportanceUpdate) {
-      console.log('[RightPanel] onMemoUpdate 호출 전', {
-        updatedBlocksLength: updatedBlocks.length,
-        updatedBlock: updatedBlocks.find(b => b.id === updatedBlock.id)
-      });
-    }
-
-    onMemoUpdate(currentMemo.id, { blocks: updatedBlocks });
-
-    if (isImportanceUpdate) {
-      console.log('[RightPanel] onMemoUpdate 호출 완료');
-      // 중요도 업데이트 시 RightPanel 강제 리렌더링
-      forceUpdate();
-    }
-  }, [onMemoUpdate]);
-
-  const handleBlockDelete = (blockId: string) => {
-    if (selectedMemo && selectedMemo.blocks && selectedMemo.blocks.length > 1) {
-      saveToHistory(); // 삭제 전 히스토리 저장
-      const updatedBlocks = selectedMemo.blocks.filter(block => block.id !== blockId);
-      onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
-    }
-  };
-
-  const handleBlockDuplicate = (blockId: string) => {
-    if (selectedMemo && selectedMemo.blocks) {
-      saveToHistory(); // 복제 전 히스토리 저장
-      const blockIndex = selectedMemo.blocks.findIndex(block => block.id === blockId);
-      if (blockIndex !== -1) {
-        const originalBlock = selectedMemo.blocks[blockIndex];
-        // 새로운 ID로 블록 복제
-        const duplicatedBlock: ContentBlock = {
-          ...originalBlock,
-          id: Date.now().toString()
-        };
-        
-        const updatedBlocks = [...selectedMemo.blocks];
-        updatedBlocks.splice(blockIndex + 1, 0, duplicatedBlock);
-        onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
-      }
-    }
-  };
-
-  const handleBlockSelect = (blockId: string) => {
-    // 드래그 핸들 버튼 클릭 시 해당 블록만 선택
-    setSelectedBlocks([blockId]);
-  };
-
-  const handleBlockMove = (blockId: string, direction: 'up' | 'down') => {
-    if (selectedMemo && selectedMemo.blocks) {
-      const blocks = [...selectedMemo.blocks];
-      const index = blocks.findIndex(block => block.id === blockId);
-
-      if (direction === 'up' && index > 0) {
-        [blocks[index], blocks[index - 1]] = [blocks[index - 1], blocks[index]];
-      } else if (direction === 'down' && index < blocks.length - 1) {
-        [blocks[index], blocks[index + 1]] = [blocks[index + 1], blocks[index]];
-      }
-
-      onMemoUpdate(selectedMemo.id, { blocks });
-    }
-  };
-
-  // 블록 드래그 시작
-  const handleBlockDragStart = (e: React.MouseEvent, blockId: string) => {
-    // 텍스트 선택 중이거나 입력 중일 때는 드래그 금지
-    const target = e.target as HTMLElement;
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-      return;
-    }
-
-    e.preventDefault();
-
-    // 드래그하는 블록 요소 찾기
-    const blockElement = target.closest('[data-block-id]') as HTMLElement;
-    if (!blockElement) return;
-
-    const rect = blockElement.getBoundingClientRect();
-    const offsetX = e.clientX - rect.left;
-    const offsetY = e.clientY - rect.top;
-
-    setIsDraggingBlock(true);
-    setDraggedBlockId(blockId);
-    setDragStartY(e.clientY);
-    setCurrentDragY(e.clientY);
-    setDragOffset({ x: offsetX, y: offsetY });
-    setDragPreviewPosition({ x: e.clientX - offsetX, y: e.clientY - offsetY });
-  };
-
-  // 블록 드래그 중
-  const handleBlockDragMove = React.useCallback((e: MouseEvent) => {
-    if (!isDraggingBlock || !draggedBlockId || !selectedMemo?.blocks) return;
-
-    setCurrentDragY(e.clientY);
-
-    // 드래그 프리뷰 위치 업데이트
-    const previewX = e.clientX - dragOffset.x;
-    const previewY = e.clientY - dragOffset.y;
-    setDragPreviewPosition({ x: previewX, y: previewY });
-
-    // 드롭 타겟 인덱스 계산 - 마우스 커서와 가장 가까운 경계
-    const container = blocksContainerRef.current;
-    if (!container) return;
-
-    const blockElements = Array.from(container.querySelectorAll('[data-block-id]'));
-    const draggedIndex = selectedMemo.blocks.findIndex(b => b.id === draggedBlockId);
-
-    // 마우스 커서 Y 좌표
-    const mouseY = e.clientY;
-
-    // 모든 블록 경계 위치 수집 (위쪽과 아래쪽)
-    const boundaries: { index: number; y: number }[] = [];
-
-    blockElements.forEach((element, i) => {
-      const rect = element.getBoundingClientRect();
-      // 블록 위쪽 경계
-      boundaries.push({ index: i, y: rect.top });
-      // 블록 아래쪽 경계 (다음 삽입 위치)
-      boundaries.push({ index: i + 1, y: rect.bottom });
-    });
-
-    // 마우스 커서에서 가장 가까운 경계 찾기
-    let targetIndex = 0;
-    let minDistance = Infinity;
-
-    boundaries.forEach(boundary => {
-      const distance = Math.abs(mouseY - boundary.y);
-      if (distance < minDistance) {
-        minDistance = distance;
-        targetIndex = boundary.index;
-      }
-    });
-
-    // 자기 자신의 원래 위치로 돌아가는 경우만 null로 설정 (이동 없음을 의미)
-    if (targetIndex === draggedIndex || targetIndex === draggedIndex + 1) {
-      setDropTargetIndex(null);
-    } else {
-      setDropTargetIndex(targetIndex);
-    }
-  }, [isDraggingBlock, draggedBlockId, selectedMemo?.blocks, dragOffset]);
-
-  // 블록 드래그 종료
-  const handleBlockDragEnd = React.useCallback(() => {
-    if (!isDraggingBlock || !draggedBlockId || !selectedMemo?.blocks || dropTargetIndex === null) {
-      setIsDraggingBlock(false);
-      setDraggedBlockId(null);
-      setDropTargetIndex(null);
-      return;
-    }
-
-    const blocks = [...selectedMemo.blocks];
-    const draggedIndex = blocks.findIndex(b => b.id === draggedBlockId);
-    const draggedBlock = blocks[draggedIndex];
-
-    // 블록 제거
-    blocks.splice(draggedIndex, 1);
-
-    // 새 위치에 삽입 (드래그한 블록이 제거되었으므로 인덱스 조정)
-    let insertIndex = dropTargetIndex;
-    if (dropTargetIndex > draggedIndex) {
-      insertIndex = dropTargetIndex - 1;
-    }
-
-    blocks.splice(insertIndex, 0, draggedBlock);
-
-    onMemoUpdate(selectedMemo.id, { blocks });
-
-    // 상태 초기화
-    setIsDraggingBlock(false);
-    setDraggedBlockId(null);
-    setDropTargetIndex(null);
-  }, [isDraggingBlock, draggedBlockId, selectedMemo, dropTargetIndex, onMemoUpdate]);
-
-  // 드래그 이벤트 리스너 등록
-  React.useEffect(() => {
-    if (isDraggingBlock) {
-      window.addEventListener('mousemove', handleBlockDragMove);
-      window.addEventListener('mouseup', handleBlockDragEnd);
-
-      return () => {
-        window.removeEventListener('mousemove', handleBlockDragMove);
-        window.removeEventListener('mouseup', handleBlockDragEnd);
-      };
-    }
-  }, [isDraggingBlock, handleBlockDragMove, handleBlockDragEnd]);
-
   // 빈 공간 우클릭 핸들러 (패널의 빈 영역)
-  const handleEmptySpaceContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
 
-    // 이벤트 정보 저장 (React 합성 이벤트는 비동기에서 사용 불가)
-    const clientX = e.clientX;
-    const clientY = e.clientY;
-    const target = e.target as HTMLElement;
 
-    // 컨텍스트 메뉴가 이미 열려있으면 먼저 닫기
-    if (showContextMenu || showEmptySpaceMenu) {
-      setShowContextMenu(false);
-      setShowEmptySpaceMenu(false);
-      // 잠시 대기 후 새로운 메뉴 판정
-      setTimeout(() => {
-        handleEmptySpaceContextMenuInternal(clientX, clientY, target);
-      }, 10);
-      return;
-    }
-
-    handleEmptySpaceContextMenuInternal(clientX, clientY, target);
-  };
-
-  const handleEmptySpaceContextMenuInternal = (clientX: number, clientY: number, targetElement: HTMLElement) => {
-    // 컨텍스트 메뉴 자체를 클릭한 경우 무시
-    if (targetElement.closest('[data-context-menu]')) {
-      return;
-    }
-
-    // 블록 위에서 클릭한 경우
-    if (targetElement.closest('[data-block-id]')) {
-      return;
-    }
-
-    // 블록 컨테이너 내부에서 클릭한 경우 (블록이 아닌 경우에도)
-    if (targetElement.closest('.blocks-container')) {
-      return;
-    }
-
-    // 태그나 다른 입력 요소 위에서 클릭한 경우
-    if (targetElement.tagName === 'INPUT' || targetElement.tagName === 'TEXTAREA' || targetElement.tagName === 'BUTTON') {
-      return;
-    }
-
-    // 패널의 빈 공간이 아닌 경우
-    if (!targetElement.closest('.right-panel-content')) {
-      return;
-    }
-
-    // 맨 끝에 블록 추가
-    const insertPosition = selectedMemo?.blocks?.length || 0;
-    setClickedPosition(insertPosition);
-
-    setEmptySpaceMenuPosition({ x: clientX, y: clientY });
-    setShowEmptySpaceMenu(true);
-  };
-
-  // 파일 첨부 핸들러
-  const handleFileAttach = () => {
-    setShowEmptySpaceMenu(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
-
-  // 파일 선택 핸들러
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !selectedMemo || clickedPosition === null) return;
-
-    // 파일을 Data URL로 변환
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const fileUrl = event.target?.result as string;
-      const newBlock: ContentBlock = {
-        id: Date.now().toString(),
-        type: 'file',
-        url: fileUrl,
-        name: file.name
-      };
-
-      const blocks = [...(selectedMemo.blocks || [])];
-      blocks.splice(clickedPosition, 0, newBlock);
-      onMemoUpdate(selectedMemo.id, { blocks });
-    };
-    reader.readAsDataURL(file);
-
-    // input 초기화
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  // 입력창 추가 핸들러
-  const handleAddTextBlock = () => {
-    setShowEmptySpaceMenu(false);
-
-    if (!selectedMemo || clickedPosition === null) return;
-
-    const newBlock: ContentBlock = {
-      id: Date.now().toString(),
-      type: 'text',
-      content: ''
-    };
-
-    const blocks = [...(selectedMemo.blocks || [])];
-    blocks.splice(clickedPosition, 0, newBlock);
-    onMemoUpdate(selectedMemo.id, { blocks });
-  };
-
-  // 빈 공간 메뉴 닫기
-  React.useEffect(() => {
-    const handleClickOutside = () => {
-      if (showEmptySpaceMenu) {
-        setShowEmptySpaceMenu(false);
-      }
-    };
-
-    if (showEmptySpaceMenu) {
-      window.addEventListener('click', handleClickOutside);
-      return () => window.removeEventListener('click', handleClickOutside);
-    }
-  }, [showEmptySpaceMenu]);
-
-  const addNewBlock = (type: ContentBlockType) => {
-    if (selectedMemo) {
-      const newBlock: ContentBlock = createNewBlock(type);
-      const updatedBlocks = [...(selectedMemo.blocks || []), newBlock];
-      onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
-    }
-  };
-
-  const createNewBlock = (type: ContentBlockType): ContentBlock => {
-    const baseId = Date.now().toString();
-    
-    switch (type) {
-      case 'text':
-        return { id: baseId, type, content: '' };
-      case 'callout':
-        return { id: baseId, type, content: '', emoji: '💡', color: 'blue' };
-      case 'checklist':
-        return { id: baseId, type, items: [] };
-      case 'image':
-        return { id: baseId, type, url: '' };
-      case 'file':
-        return { id: baseId, type, url: '', name: '' };
-      case 'bookmark':
-        return { id: baseId, type, url: '' };
-      case 'quote':
-        return { id: baseId, type, content: '' };
-      case 'code':
-        return { id: baseId, type, content: '', language: 'javascript' };
-      case 'table':
-        return { 
-          id: baseId, 
-          type, 
-          headers: ['컬럼 1', '컬럼 2'], 
-          rows: [['', ''], ['', '']] 
-        };
-      case 'sheets':
-        return {
-          id: baseId,
-          type,
-          url: '',
-          width: 800,
-          height: 400,
-          zoom: 100
-        };
-      default:
-        return { id: baseId, type: 'text', content: '' } as any;
-    }
-  };
-
-  const handleConvertBlock = (blockId: string, newBlockType: ContentBlockType) => {
-    if (selectedMemo && selectedMemo.blocks) {
-      const blockIndex = selectedMemo.blocks.findIndex(block => block.id === blockId);
-      if (blockIndex === -1) return;
-
-      const newBlock = createNewBlock(newBlockType);
-      const updatedBlocks = [...selectedMemo.blocks];
-      
-      // 현재 블록 다음에 새 블록 타입 추가
-      updatedBlocks.splice(blockIndex + 1, 0, newBlock);
-      
-      onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
-    }
-  };
-
-  const handleCreateNewBlock = React.useCallback((afterBlockId: string, content: string) => {
-    if (selectedMemo && selectedMemo.blocks) {
-      saveToHistory(); // Enter 키로 새 블록 생성 시 히스토리 저장
-      const blockIndex = selectedMemo.blocks.findIndex(block => block.id === afterBlockId);
-      if (blockIndex === -1) return;
-
-      const newBlock = createNewBlock('text') as any;
-      newBlock.content = content;
-
-      const updatedBlocks = [...selectedMemo.blocks];
-      updatedBlocks.splice(blockIndex + 1, 0, newBlock);
-
-      onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
-
-      // 새 블록으로 포커스 이동 (약간의 지연 후)
-      setTimeout(() => {
-        const newTextarea = document.querySelector(`textarea[data-block-id="${newBlock.id}"]`) as HTMLTextAreaElement;
-        if (newTextarea) {
-          newTextarea.focus();
-        }
-      }, 50);
-    }
-  }, [selectedMemo, onMemoUpdate]);
-
-  const handleInsertBlockAfter = (afterBlockId: string, newBlock: ContentBlock) => {
-    if (selectedMemo && selectedMemo.blocks) {
-      saveToHistory();
-      const blockIndex = selectedMemo.blocks.findIndex(block => block.id === afterBlockId);
-      if (blockIndex === -1) return;
-
-      const updatedBlocks = [...selectedMemo.blocks];
-      updatedBlocks.splice(blockIndex + 1, 0, newBlock);
-
-      onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
-    }
-  };
-
-  // 드래그 앤 드롭으로 파일 추가
-  const handleFileDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (!selectedMemo) return;
-
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length === 0) return;
-
-    saveToHistory();
-
-    const newBlocks: ContentBlock[] = [];
-
-    for (const file of files) {
-      const reader = new FileReader();
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        reader.onload = (event) => resolve(event.target?.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
-      let newBlock: ContentBlock;
-
-      if (file.type.startsWith('image/')) {
-        // 이미지 파일
-        newBlock = {
-          id: Date.now().toString() + '_' + Math.random(),
-          type: 'image',
-          url: dataUrl,
-          caption: file.name
-        };
-      } else {
-        // 일반 파일
-        newBlock = {
-          id: Date.now().toString() + '_' + Math.random(),
-          type: 'file',
-          url: dataUrl,
-          name: file.name,
-          size: file.size
-        };
-      }
-
-      newBlocks.push(newBlock);
-    }
-
-    const updatedBlocks = [...(selectedMemo.blocks || []), ...newBlocks];
-    onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  // 우클릭 컨텍스트 메뉴
-  const handleBlockContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    // 이벤트 정보 저장 (React 합성 이벤트는 비동기에서 사용 불가)
-    const clientX = e.clientX;
-    const clientY = e.clientY;
-    const target = e.target as HTMLElement;
-
-    // 컨텍스트 메뉴가 이미 열려있으면 먼저 닫기
-    if (showContextMenu || showEmptySpaceMenu) {
-      setShowContextMenu(false);
-      setShowEmptySpaceMenu(false);
-      // 잠시 대기 후 새로운 메뉴 판정 (메뉴 DOM이 제거될 시간을 줌)
-      setTimeout(() => {
-        handleBlockContextMenuInternal(clientX, clientY, target);
-      }, 10);
-      return;
-    }
-
-    handleBlockContextMenuInternal(clientX, clientY, target);
-  };
-
-  const handleBlockContextMenuInternal = (clientX: number, clientY: number, targetElement: HTMLElement) => {
-    // 컨텍스트 메뉴 자체를 클릭한 경우 무시
-    if (targetElement.closest('[data-context-menu]')) {
-      return;
-    }
-
-    const blockElement = targetElement.closest('[data-block-id]') as HTMLElement;
-
-    let blocksToUse = selectedBlocks.length > 0 ? selectedBlocks : dragSelectedBlocks;
-
-    // 우클릭한 위치에 블록이 있고, 그 블록이 선택되지 않은 경우 해당 블록을 선택
-    if (blockElement) {
-      const clickedBlockId = blockElement.getAttribute('data-block-id');
-      if (clickedBlockId && !blocksToUse.includes(clickedBlockId)) {
-        blocksToUse = [clickedBlockId];
-        setSelectedBlocks([clickedBlockId]);
-        setDragSelectedBlocks([]);
-      }
-    }
-
-    if (blocksToUse.length === 0) return;
-
-    // 메뉴 크기 추정 (실제 렌더링 전 대략적인 크기)
-    const menuWidth = 150;
-    const menuHeight = 120; // 기본 메뉴 높이
-    const submenuWidth = 140;
-    const submenuHeight = 260; // 중요도 서브메뉴 높이 (7개 항목)
-
-    // 화면 크기
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    // 초기 위치
-    let x = clientX;
-    let y = clientY;
-
-    // 오른쪽 경계 체크
-    if (x + menuWidth > viewportWidth) {
-      x = viewportWidth - menuWidth - 10; // 10px 여유 공간
-    }
-
-    // 왼쪽 경계 체크
-    if (x < 10) {
-      x = 10;
-    }
-
-    // 아래쪽 경계 체크 (서브메뉴를 고려하여 더 큰 높이 체크)
-    if (y + Math.max(menuHeight, submenuHeight) > viewportHeight) {
-      y = viewportHeight - Math.max(menuHeight, submenuHeight) - 10;
-    }
-
-    // 위쪽 경계 체크
-    if (y < 10) {
-      y = 10;
-    }
-
-    setContextMenuPosition({ x, y });
-    setShowContextMenu(true);
-  };
-
-  // 선택된 블록 삭제
-  const handleDeleteSelectedBlocks = () => {
-    handleBlocksDelete();
-    setShowContextMenu(false);
-  };
-
-  // 선택된 블록에 중요도 적용
-  const handleApplyImportance = (level: ImportanceLevel) => {
-    if (!selectedMemo) return;
-
-    saveToHistory();
-    const blocksToUpdate = selectedBlocks.length > 0 ? selectedBlocks : dragSelectedBlocks;
-    const updatedBlocks = selectedMemo.blocks?.map(block => {
-      if (blocksToUpdate.includes(block.id)) {
-        // 텍스트 블록인 경우 전체 텍스트에 중요도 범위 적용
-        if (block.type === 'text') {
-          const textBlock = block as TextBlock;
-          const content = textBlock.content || '';
-
-          if (content.length === 0) {
-            // 빈 텍스트면 그냥 반환
-            return block;
-          }
-
-          if (level === 'none') {
-            // 강조 해제: importanceRanges 제거
-            return { ...textBlock, importanceRanges: [] } as ContentBlock;
-          } else {
-            // 전체 텍스트에 중요도 적용
-            return {
-              ...textBlock,
-              importanceRanges: [{ start: 0, end: content.length, level }]
-            } as ContentBlock;
-          }
-        } else {
-          // 다른 블록 타입(이미지, 파일 등)은 기존 방식대로 블록 자체에 중요도 적용
-          return { ...block, importance: level } as ContentBlock;
-        }
-      }
-      return block;
-    }) || [];
-
-    onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
-    setShowContextMenu(false);
-    setShowImportanceSubmenu(false);
-  };
-
-  const handleMergeWithPrevious = (blockId: string, currentContent: string) => {
-    if (selectedMemo && selectedMemo.blocks) {
-      const blockIndex = selectedMemo.blocks.findIndex(block => block.id === blockId);
-
-      if (blockIndex > 0) {
-        const currentBlock = selectedMemo.blocks[blockIndex];
-        const previousBlock = selectedMemo.blocks[blockIndex - 1];
-
-        // 이전 블록이 텍스트 블록인 경우에만 합치기
-        if (previousBlock.type === 'text' && currentBlock.type === 'text') {
-          saveToHistory(); // 블록 병합 시 히스토리 저장
-          const previousContent = (previousBlock as any).content || '';
-          const previousLength = previousContent.length;
-          const mergedContent = previousContent + currentContent;
-
-          // 이전 블록과 현재 블록의 importanceRanges 합치기
-          const previousRanges = (previousBlock as any).importanceRanges || [];
-          const currentRanges = (currentBlock as any).importanceRanges || [];
-
-          // 현재 블록의 importanceRanges를 이전 블록 길이만큼 오프셋 적용
-          const offsetCurrentRanges = currentRanges.map((range: any) => ({
-            ...range,
-            start: range.start + previousLength,
-            end: range.end + previousLength
-          }));
-
-          const mergedRanges = [...previousRanges, ...offsetCurrentRanges];
-
-          const updatedBlocks = [...selectedMemo.blocks];
-          // 이전 블록의 내용을 합친 내용으로 업데이트 (importanceRanges 포함)
-          updatedBlocks[blockIndex - 1] = {
-            ...previousBlock,
-            content: mergedContent,
-            importanceRanges: mergedRanges
-          } as any;
-          // 현재 블록 제거
-          updatedBlocks.splice(blockIndex, 1);
-          
-          // 상태 업데이트를 즉시 실행
-          onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
-          
-          // 포커스 이동을 더 긴 지연시간으로 설정
-          setTimeout(() => {
-            const previousTextarea = document.querySelector(`textarea[data-block-id="${previousBlock.id}"]`) as HTMLTextAreaElement;
-            if (previousTextarea) {
-              previousTextarea.focus();
-              // 커서를 원래 이전 블록 내용의 끝으로 이동
-              const cursorPosition = previousContent.length;
-              previousTextarea.setSelectionRange(cursorPosition, cursorPosition);
-              // 강제로 값을 다시 설정하여 확실하게 업데이트
-              previousTextarea.value = mergedContent;
-              previousTextarea.setSelectionRange(cursorPosition, cursorPosition);
-            }
-          }, 100);
-        }
-      }
-    }
-  };
-
-  const handleFocusPrevious = (blockId: string) => {
-    if (selectedMemo && selectedMemo.blocks) {
-      const blockIndex = selectedMemo.blocks.findIndex(block => block.id === blockId);
-      if (blockIndex > 0) {
-        // Focus the previous block - this would need to be implemented with refs
-        // For now, we'll just handle the deletion part
-      }
-    }
-  };
-
-  const handleFocusNext = (blockId: string) => {
-    if (selectedMemo && selectedMemo.blocks) {
-      const blockIndex = selectedMemo.blocks.findIndex(block => block.id === blockId);
-      if (blockIndex < selectedMemo.blocks.length - 1) {
-        // Focus the next block - this would need to be implemented with refs
-        // For now, we'll just handle basic navigation
-      }
-    }
-  };
 
   // 블록 선택 관련 핸들러들
-  const handleBlockClick = (blockId: string, event: React.MouseEvent) => {
-    // 드래그가 아닌 클릭으로 선택하는 경우 dragSelectedBlocks 초기화
-    setDragSelectedBlocks([]);
-    
-    if (event.shiftKey || event.ctrlKey || event.metaKey) {
-      // Shift/Ctrl/Cmd + 클릭: 다중 선택
-      setSelectedBlocks(prev => 
-        prev.includes(blockId) 
-          ? prev.filter(id => id !== blockId)
-          : [...prev, blockId]
-      );
-    } else {
-      // 일반 클릭: 단일 선택
-      setSelectedBlocks([blockId]);
-    }
-  };
 
-  // 드래그 선택 핸들러들
-  const handleMouseDown = (event: React.MouseEvent) => {
-    // 버튼이나 인터랙티브 요소가 아닌 곳에서 드래그 시작
-    const target = event.target as HTMLElement;
-    const isInteractiveElement = target.tagName === 'BUTTON' ||
-                                target.tagName === 'INPUT' ||
-                                target.tagName === 'TEXTAREA' ||
-                                target.closest('button') !== null ||
-                                target.closest('textarea') !== null; // textarea 내부 요소도 제외
-
-    // 오른쪽 패널 전체에서 드래그 허용 (블록 편집 모드일 때만)
-    const isInRightPanel = rightPanelRef.current?.contains(target) ||
-                           blocksContainerRef.current?.contains(target);
-    const isNotInBlockContent = !target.closest('[data-block-id]') ||
-                               target.style.cursor === 'crosshair' ||
-                               target.classList.contains('drag-zone');
-
-    // Ctrl 키를 누르고 있으면 블록 내부에서도 드래그 선택 허용
-    const allowBlockSelection = event.ctrlKey || event.metaKey;
-
-    if (!isInteractiveElement && isInRightPanel && (isNotInBlockContent || allowBlockSelection) &&
-        selectedMemo && !event.shiftKey) {
-      event.preventDefault();
-
-      // 블록 컨테이너가 있으면 그것 기준으로, 없으면 오른쪽 패널 기준으로 좌표 계산
-      const container = blocksContainerRef.current || rightPanelRef.current;
-      if (container) {
-        const containerRect = container.getBoundingClientRect();
-        const startPos = {
-          x: event.clientX - containerRect.left,
-          y: event.clientY - containerRect.top
-        };
-
-        setIsDragSelecting(true);
-        setIsDragMoved(false); // 드래그 움직임 초기화
-        setDragStart(startPos);
-        setDragEnd(startPos);
-        setDragHoveredBlocks([]);
-        // 드래그 시작할 때 기존 선택 해제하지 않음 - 드래그 완료 후 새 선택으로 덮어씀
-      }
-    }
-  };
-
-  const handleMouseMove = React.useCallback((event: MouseEvent) => {
-    if (isDragSelecting) {
-      // 블록 컨테이너가 있으면 그것 기준으로, 없으면 오른쪽 패널 기준으로 좌표 계산
-      const container = blocksContainerRef.current || rightPanelRef.current;
-      if (container) {
-        const containerRect = container.getBoundingClientRect();
-        const currentPos = {
-          x: event.clientX - containerRect.left,
-          y: event.clientY - containerRect.top
-        };
-        
-        // 드래그 임계값 확인 (5픽셀 이상 움직여야 드래그로 인식)
-        const dragDistance = Math.sqrt(
-          Math.pow(currentPos.x - dragStart.x, 2) + 
-          Math.pow(currentPos.y - dragStart.y, 2)
-        );
-        
-        if (dragDistance > 5) {
-          setIsDragMoved(true);
-        }
-        
-        setDragEnd(currentPos);
-        
-        // 선택 영역 계산
-        const selectionRect = {
-          left: Math.min(dragStart.x, currentPos.x),
-          top: Math.min(dragStart.y, currentPos.y),
-          right: Math.max(dragStart.x, currentPos.x),
-          bottom: Math.max(dragStart.y, currentPos.y)
-        };
-        
-        // 드래그 영역에 있는 블록들 실시간으로 하이라이트 (블록 컨테이너에서만)
-        if (selectedMemo?.blocks && blocksContainerRef.current) {
-          const blocksContainer = blocksContainerRef.current;
-          const blockElements = blocksContainer.querySelectorAll('[data-block-id]');
-          const blocksContainerRect = blocksContainer.getBoundingClientRect();
-          const hoveredIds: string[] = [];
-          const seenIds = new Set<string>();
-          
-          blockElements.forEach(element => {
-            const blockRect = element.getBoundingClientRect();
-            // 선택 영역은 드래그 컨테이너 기준이고, 블록 위치는 블록 컨테이너 기준
-            const relativeBlockRect = {
-              left: blockRect.left - blocksContainerRect.left,
-              top: blockRect.top - blocksContainerRect.top,
-              right: blockRect.right - blocksContainerRect.left,
-              bottom: blockRect.bottom - blocksContainerRect.top
-            };
-            
-            // 드래그 영역이 다른 컨테이너에서 시작된 경우 좌표 변환
-            const dragOffsetX = containerRect.left - blocksContainerRect.left;
-            const dragOffsetY = containerRect.top - blocksContainerRect.top;
-            const adjustedSelectionRect = {
-              left: selectionRect.left + dragOffsetX,
-              top: selectionRect.top + dragOffsetY,
-              right: selectionRect.right + dragOffsetX,
-              bottom: selectionRect.bottom + dragOffsetY
-            };
-            
-            // 블록이 선택 영역과 겹치는지 확인 (좌표 변환된 선택 영역 사용)
-            if (relativeBlockRect.right >= adjustedSelectionRect.left &&
-                relativeBlockRect.left <= adjustedSelectionRect.right &&
-                relativeBlockRect.bottom >= adjustedSelectionRect.top &&
-                relativeBlockRect.top <= adjustedSelectionRect.bottom) {
-              const blockId = element.getAttribute('data-block-id');
-              if (blockId && !seenIds.has(blockId)) {
-                seenIds.add(blockId);
-                hoveredIds.push(blockId);
-              }
-            }
-          });
-          
-          setDragHoveredBlocks(hoveredIds);
-        }
-      }
-    }
-  }, [isDragSelecting, dragStart, selectedMemo?.blocks]);
-
-  const handleMouseUp = React.useCallback(() => {
-    if (isDragSelecting) {
-
-      if (isDragMoved) {
-        // 실제 드래그가 일어난 경우에만 선택 적용
-        const selectedIds = [...dragHoveredBlocks]; // 복사본 생성
-        setSelectedBlocks(selectedIds);
-        setDragSelectedBlocks(selectedIds); // 드래그로 선택된 블록들 저장
-
-        // 드래그 완료 직후 플래그 설정
-        setDragJustCompleted(true);
-        setTimeout(() => {
-          setDragJustCompleted(false);
-        }, 200); // 200ms 후 해제
-      } else {
-      }
-
-      // 드래그 상태 초기화는 선택 설정 후에
-      setIsDragSelecting(false);
-      setIsDragMoved(false);
-      setDragHoveredBlocks([]);
-    }
-  }, [isDragSelecting, isDragMoved, dragHoveredBlocks]);
-
-  // 마우스 이벤트 리스너 등록
-  React.useEffect(() => {
-    if (isDragSelecting) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [isDragSelecting, handleMouseMove, handleMouseUp]);
-
-  // selectedBlocks 변경 감지
-  React.useEffect(() => {
-  }, [selectedBlocks]);
-
-  // 히스토리에 현재 상태 저장 (즉시 실행)
-  const saveToHistory = React.useCallback(() => {
-    if (!selectedMemo || isUndoRedoAction) {
-      return;
-    }
-
-    const currentState = {
-      blocks: selectedMemo.blocks ? JSON.parse(JSON.stringify(selectedMemo.blocks)) : [],
-      timestamp: Date.now()
-    };
-
-
-    // 마지막 상태와 동일하면 저장하지 않음
-    setUndoHistory(prev => {
-      const lastState = prev[prev.length - 1];
-      if (lastState && JSON.stringify(lastState.blocks) === JSON.stringify(currentState.blocks)) {
-        return prev;
-      }
-
-      const newHistory = [...prev, currentState];
-      // 히스토리 크기 제한 (최대 50개)
-      return newHistory.length > 50 ? newHistory.slice(-50) : newHistory;
-    });
-
-    // 새로운 액션이 발생하면 redo 히스토리 클리어
-    setRedoHistory([]);
-  }, [selectedMemo, isUndoRedoAction]);
-
-  // 자동 히스토리 저장 제거 - 명시적인 액션에만 저장하도록 변경
-
-  // Undo 기능
-  const handleUndo = React.useCallback(() => {
-    if (undoHistory.length === 0 || !selectedMemo) return;
-
-
-    setIsUndoRedoAction(true);
-
-    // 현재 상태를 redo 히스토리에 저장
-    const currentState = {
-      blocks: selectedMemo.blocks ? JSON.parse(JSON.stringify(selectedMemo.blocks)) : [],
-      timestamp: Date.now()
-    };
-    setRedoHistory(prev => [...prev, currentState]);
-
-    // undo 히스토리에서 이전 상태 복원
-    const previousState = undoHistory[undoHistory.length - 1];
-    setUndoHistory(prev => prev.slice(0, -1));
-
-    onMemoUpdate(selectedMemo.id, { blocks: previousState.blocks });
-
-    setTimeout(() => {
-      setIsUndoRedoAction(false);
-    }, 100);
-  }, [undoHistory, selectedMemo, onMemoUpdate]);
-
-  // Redo 기능
-  const handleRedo = React.useCallback(() => {
-    if (redoHistory.length === 0 || !selectedMemo) return;
-
-    setIsUndoRedoAction(true);
-
-    // 현재 상태를 undo 히스토리에 저장
-    const currentState = {
-      blocks: selectedMemo.blocks ? JSON.parse(JSON.stringify(selectedMemo.blocks)) : [],
-      timestamp: Date.now()
-    };
-    setUndoHistory(prev => [...prev, currentState]);
-
-    // redo 히스토리에서 다음 상태 복원
-    const nextState = redoHistory[redoHistory.length - 1];
-    setRedoHistory(prev => prev.slice(0, -1));
-
-    onMemoUpdate(selectedMemo.id, { blocks: nextState.blocks });
-
-    setTimeout(() => {
-      setIsUndoRedoAction(false);
-    }, 100);
-  }, [redoHistory, selectedMemo, onMemoUpdate]);
 
   // 키보드 이벤트 처리 (Delete 키로 블록 삭제)
   React.useEffect(() => {
@@ -1279,51 +378,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
     };
   }, [selectedBlocks, selectedMemo, onMemoUpdate, handleUndo, handleRedo]);
 
-  const handleBlocksDelete = () => {
-
-    if (selectedMemo && selectedBlocks.length > 0) {
-      // 삭제 전에 현재 상태를 히스토리에 저장
-      saveToHistory();
-      const updatedBlocks = selectedMemo.blocks?.filter(block =>
-        !selectedBlocks.includes(block.id)
-      ) || [];
-
-
-      // 최소 하나의 블록은 유지
-      if (updatedBlocks.length === 0) {
-        const newBlock = createNewBlock('text');
-        updatedBlocks.push(newBlock);
-      }
-
-      onMemoUpdate(selectedMemo.id, { blocks: updatedBlocks });
-      setSelectedBlocks([]);
-    } else {
-    }
-  };
-
-  const handleBlocksMove = (direction: 'up' | 'down') => {
-    if (selectedMemo && selectedBlocks.length > 0) {
-      const blocks = [...(selectedMemo.blocks || [])];
-      const selectedIndices = selectedBlocks
-        .map(id => blocks.findIndex(b => b.id === id))
-        .filter(index => index !== -1)
-        .sort((a, b) => a - b);
-
-      if (direction === 'up' && selectedIndices[0] > 0) {
-        // 위로 이동
-        selectedIndices.reverse().forEach(index => {
-          [blocks[index], blocks[index - 1]] = [blocks[index - 1], blocks[index]];
-        });
-      } else if (direction === 'down' && selectedIndices[selectedIndices.length - 1] < blocks.length - 1) {
-        // 아래로 이동
-        selectedIndices.forEach(index => {
-          [blocks[index], blocks[index + 1]] = [blocks[index + 1], blocks[index]];
-        });
-      }
-
-      onMemoUpdate(selectedMemo.id, { blocks });
-    }
-  };
 
   // 기존 메모에 blocks가 없으면 초기화
   const ensureBlocks = (memo: MemoBlock): MemoBlock => {
@@ -1338,101 +392,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
     return memo;
   };
 
-  // 스마트 클릭 핸들러: 빈 공간 클릭 시 가장 가까운 블록에 포커스하거나 선택 해제
-  const handleMemoAreaClick = (event: React.MouseEvent) => {
-    const target = event.target as HTMLElement;
-
-    // 버튼이나 중요한 인터랙티브 요소만 제외
-    const isButton = target.tagName === 'BUTTON' || target.closest('button') !== null;
-    const isImportanceMenu = target.closest('[data-importance-menu]') !== null;
-
-    // 텍스트 입력 중인 textarea나 input은 제외 (클릭된 것이 textarea 또는 input인 경우만)
-    const isClickedTextarea = target.tagName === 'TEXTAREA';
-    const isClickedInput = target.tagName === 'INPUT';
-
-
-    // 드래그 완료 직후에는 클릭 이벤트 무시
-    if (dragJustCompleted) {
-      return;
-    }
-
-    if (!isButton && !isImportanceMenu && !isClickedInput && selectedMemo?.blocks) {
-      // 선택된 블록 위를 클릭한 경우인지 확인
-      const clickedBlockElement = target.closest('[data-block-id]');
-      const clickedBlockId = clickedBlockElement?.getAttribute('data-block-id');
-
-      if (selectedBlocks.length > 0) {
-        // 선택된 블록 중 하나를 클릭한 경우 - 선택 유지
-        if (clickedBlockId && selectedBlocks.includes(clickedBlockId)) {
-          return;
-        }
-
-        // 다른 블록을 클릭하거나 빈 공간을 클릭한 경우 - 선택 해제
-        setSelectedBlocks([]);
-        setDragSelectedBlocks([]);
-
-        // 다른 블록을 클릭한 경우에는 해당 블록 선택하지 않고 여기서 종료
-        if (clickedBlockId) {
-          return;
-        }
-      }
-      
-      // 클릭 위치에서 가장 가까운 블록 찾기 (거리 제한 없음)
-      const clickY = event.clientY;
-      const clickX = event.clientX;
-      const container = blocksContainerRef.current;
-      
-      if (container) {
-        const blockElements = container.querySelectorAll('[data-block-id]');
-        
-        if (blockElements.length === 0) {
-          return;
-        }
-        
-        type ClosestBlockType = { element: HTMLElement; distance: number; blockId: string };
-        let closestBlock: ClosestBlockType | null = null;
-        
-        blockElements.forEach(element => {
-          const rect = element.getBoundingClientRect();
-          
-          // 블록의 중심점과 클릭 위치의 거리 계산 (유클리드 거리)
-          const blockCenterX = rect.left + rect.width / 2;
-          const blockCenterY = rect.top + rect.height / 2;
-          const distance = Math.sqrt(
-            Math.pow(clickX - blockCenterX, 2) + 
-            Math.pow(clickY - blockCenterY, 2)
-          );
-          
-          if (!closestBlock || distance < closestBlock.distance) {
-            const blockId = element.getAttribute('data-block-id');
-            if (blockId) {
-              const newClosestBlock: ClosestBlockType = { 
-                element: element as HTMLElement, 
-                distance, 
-                blockId 
-              };
-              closestBlock = newClosestBlock;
-            }
-          }
-        });
-        
-        // 가장 가까운 블록의 텍스트 영역에 포커스 (거리에 관계없이)
-        if (closestBlock) {
-          const blockElement = (closestBlock as ClosestBlockType).element;
-          const textarea = blockElement.querySelector('textarea') as HTMLTextAreaElement;
-          if (textarea) {
-            // 블록 선택 방지 - 단일 포커스만
-            setTimeout(() => {
-              textarea.focus();
-              // 커서를 텍스트 끝으로 이동
-              const length = textarea.value.length;
-              textarea.setSelectionRange(length, length);
-            }, 50);
-          }
-        }
-      }
-    }
-  };
 
 
   const blockTypes = [

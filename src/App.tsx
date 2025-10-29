@@ -28,7 +28,7 @@ import { useContextValues } from './hooks/useContextValues';
 import { CategoryArea } from './utils/categoryAreaUtils';
 import { AppProviders } from './contexts';
 import LeftPanel from './components/LeftPanel';
-import RightPanel from './components/RightPanel';
+import RightPanel from './components/RightPanel/RightPanel';
 import Canvas from './components/Canvas/Canvas';
 import { Tutorial } from './components/Tutorial';
 import { coreTutorialSteps, basicTutorialSteps } from './utils/tutorialSteps';
