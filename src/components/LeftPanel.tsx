@@ -878,7 +878,16 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
               type="text"
               placeholder="메모 검색..."
               value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
+              onChange={(e) => {
+                e.stopPropagation();
+                handleSearch(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                // 백스페이스, 삭제 키 등의 이벤트 전파 방지
+                if (e.key === 'Backspace' || e.key === 'Delete') {
+                  e.stopPropagation();
+                }
+              }}
               className={styles.searchInput}
               onFocus={() => {
                 setIsSearchFocused(true);
