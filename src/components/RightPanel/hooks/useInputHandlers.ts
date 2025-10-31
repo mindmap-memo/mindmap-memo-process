@@ -35,8 +35,18 @@ export const useInputHandlers = ({
   const [tagInput, setTagInput] = React.useState('');
 
   const handleTitleChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (selectedMemo) {
+    if (!selectedMemo) {
+      console.error('[useInputHandlers] handleTitleChange: selectedMemo is null or undefined');
+      return;
+    }
+    if (!onMemoUpdate) {
+      console.error('[useInputHandlers] handleTitleChange: onMemoUpdate is null or undefined');
+      return;
+    }
+    try {
       onMemoUpdate(selectedMemo.id, { title: e.target.value });
+    } catch (error) {
+      console.error('[useInputHandlers] handleTitleChange error:', error);
     }
   }, [selectedMemo, onMemoUpdate]);
 

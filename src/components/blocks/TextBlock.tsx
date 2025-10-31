@@ -76,6 +76,8 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   const [backgroundKey, setBackgroundKey] = useState(0); // 배경 레이어 강제 리렌더링용 key
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const readModeRef = useRef<HTMLDivElement>(null); // 읽기 모드용 ref
+  const backgroundLayerRef = useRef<HTMLDivElement>(null); // 배경 레이어용 ref
 
   // 모든 중요도 필터가 활성화되어 있고 일반 내용도 표시하는 기본 상태인지 확인 - useMemo로 최적화
   const canEdit = React.useMemo(() => {
@@ -197,6 +199,26 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
       textarea.style.height = `${textarea.scrollHeight}px`;
     }
   }, [content]);
+
+  // 읽기 모드 DOM 검사 (디버깅용)
+  useEffect(() => {
+    if (readModeRef.current) {
+      const allSpans = readModeRef.current.querySelectorAll('span');
+      console.log('[TextBlock 읽기 모드] DOM 검사:', {
+        blockId: block.id,
+        totalSpans: allSpans.length,
+        spans: Array.from(allSpans).map((span, idx) => ({
+          index: idx,
+          text: span.textContent?.substring(0, 20),
+          visibility: window.getComputedStyle(span).visibility,
+          display: window.getComputedStyle(span).display,
+          backgroundColor: window.getComputedStyle(span).backgroundColor,
+          color: window.getComputedStyle(span).color,
+          isHidden: window.getComputedStyle(span).visibility === 'hidden' || window.getComputedStyle(span).display === 'none'
+        }))
+      });
+    }
+  }, [block.content, block.importanceRanges]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Enter로 새 텍스트 블록 생성 (Shift+Enter는 줄바꿈)
@@ -757,9 +779,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     });
   };
 
-  // Hook은 조건문 밖에서 선언
-  const backgroundLayerRef = React.useRef<HTMLDivElement>(null);
-
   // 배경 레이어 렌더링 최적화 - useMemo로 캐싱
   const backgroundLayer = React.useMemo(() => {
     if (!importanceRanges || importanceRanges.length === 0) {
@@ -1022,28 +1041,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
       </span>
     ));
   };
-
-  // 읽기 모드
-  const readModeRef = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    if (readModeRef.current) {
-      const allSpans = readModeRef.current.querySelectorAll('span');
-      console.log('[TextBlock 읽기 모드] DOM 검사:', {
-        blockId: block.id,
-        totalSpans: allSpans.length,
-        spans: Array.from(allSpans).map((span, idx) => ({
-          index: idx,
-          text: span.textContent?.substring(0, 20),
-          visibility: window.getComputedStyle(span).visibility,
-          display: window.getComputedStyle(span).display,
-          backgroundColor: window.getComputedStyle(span).backgroundColor,
-          color: window.getComputedStyle(span).color,
-          isHidden: window.getComputedStyle(span).visibility === 'hidden' || window.getComputedStyle(span).display === 'none'
-        }))
-      });
-    }
-  }, [block.content, block.importanceRanges]);
 
   return (
     <div
