@@ -15,7 +15,7 @@ import { CategoryBlock, Page } from '../../../types';
 export interface CreateCategoryAreaDragHandlerParams {
   category: CategoryBlock;
   isConnecting: boolean;
-  isShiftPressed: boolean;
+  isShiftPressed?: boolean;
   canvasScale: number;
   canvasOffset?: { x: number; y: number };
   currentPage?: Page;
@@ -81,7 +81,7 @@ export const createCategoryAreaDragHandler = (params: CreateCategoryAreaDragHand
       let startY = e.clientY;
       const originalCategoryPosition = { x: category.position.x, y: category.position.y };
       let hasMoved = false;
-      let isShiftMode = isShiftPressed;
+      let isShiftMode = isShiftPressed || false;
 
       // 초기 Shift 상태에 따라 캐시 설정
       if (isShiftMode) {
