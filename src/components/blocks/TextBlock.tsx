@@ -613,8 +613,8 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   // 필터링이 적용된 편집모드 배경 렌더링
   const renderFilteredStyledText = (text: string, importanceRanges?: ImportanceRange[], activeFilters?: Set<ImportanceLevel>, showGeneral?: boolean) => {
     if (!importanceRanges || importanceRanges.length === 0) {
-      // 하이라이팅이 없는 일반 텍스트는 일반 텍스트 필터에 따라 표시/숨김
-      return showGeneral === false ? '' : text;
+      // 배경 레이어에서는 중요도가 없으면 아무것도 렌더링하지 않음
+      return null;
     }
 
     const ranges = [...importanceRanges].sort((a, b) => a.start - b.start);
@@ -642,40 +642,60 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     }
 
     const result = parts.map((part, index) => {
-      // 필터링 적용 - 조건에 맞지 않으면 null 반환하여 아예 렌더링하지 않음
-      if (part.level) {
-        // 중요도가 있는 부분은 필터에 맞는지 확인
-        if (activeFilters && !activeFilters.has(part.level)) {
-          return null; // 필터링된 부분은 렌더링하지 않음
-        }
-      } else {
-        // 일반 텍스트 부분은 showGeneral에 따라 결정
-        if (showGeneral === false) {
-          return null; // 일반 텍스트 숨김
-        }
-      }
-
       const importanceStyle = part.level ? getImportanceStyle(part.level) : {};
 
+      // 중요도가 있는 경우
+      if (part.level) {
+        // 필터링 확인
+        if (activeFilters && !activeFilters.has(part.level)) {
+          // 필터링된 부분도 투명하게 렌더링하여 위치 유지
+          return (
+            <span
+              key={index}
+              style={{
+                color: 'transparent',
+                userSelect: 'none',
+                pointerEvents: 'none'
+              }}
+            >
+              {part.text}
+            </span>
+          );
+        }
+
+        // 중요도 있는 부분 렌더링
+        return (
+          <span
+            key={index}
+            style={{
+              backgroundColor: importanceStyle.backgroundColor,
+              padding: '1px 0px',
+              borderRadius: '2px',
+              fontWeight: '500',
+              color: 'transparent',
+              margin: '0',
+              display: 'inline'
+            }}
+          >
+            {part.text}
+          </span>
+        );
+      }
+
+      // 일반 텍스트도 투명하게 렌더링하여 위치 유지
       return (
         <span
           key={index}
-          style={part.level ? {
-            backgroundColor: importanceStyle.backgroundColor,
-            padding: '1px 0px',
-            borderRadius: '2px',
-            fontWeight: '500',
-            color: 'transparent', // 텍스트는 투명하게
-            margin: '0',
-            display: 'inline'
-          } : {
-            color: 'rgba(0,0,0,0.05)' // 일반 텍스트도 거의 투명하게
+          style={{
+            color: 'transparent',
+            userSelect: 'none',
+            pointerEvents: 'none'
           }}
         >
           {part.text}
         </span>
       );
-    }).filter(Boolean); // null 값들을 제거
+    });
 
     return result;
   };
@@ -683,7 +703,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   // 텍스트에 중요도 스타일 적용
   const renderStyledText = (text: string, ranges: ImportanceRange[] = importanceRanges || []) => {
     if (!ranges || ranges.length === 0) {
-      return text;
+      return null; // 중요도가 없으면 배경 레이어에 아무것도 렌더링하지 않음
     }
 
     const sortedRanges = [...ranges].sort((a, b) => a.start - b.start);
@@ -711,35 +731,50 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     }
 
     return parts.map((part, index) => {
-      // 중요도가 없는 부분은 렌더링하지 않음 (배경색만 필요)
-      if (!part.level) {
-        return null;
+      // 중요도가 있는 경우
+      if (part.level) {
+        const importanceStyle = getImportanceStyle(part.level);
+
+        return (
+          <span
+            key={`${backgroundKey}-${index}-${part.level}`}
+            style={{
+              backgroundColor: importanceStyle.backgroundColor,
+              padding: '1px 0px',
+              borderRadius: '2px',
+              fontWeight: '500',
+              color: 'transparent',
+              margin: '0',
+              display: 'inline',
+              WebkitTextFillColor: 'transparent',
+              textShadow: 'none',
+              userSelect: 'none',
+              pointerEvents: 'none'
+            }}
+          >
+            {part.text}
+          </span>
+        );
       }
 
-      const importanceStyle = getImportanceStyle(part.level);
-
+      // 일반 텍스트도 투명하게 렌더링하여 위치 유지
       return (
         <span
-          key={`${backgroundKey}-${index}-${part.level}`}
+          key={`${backgroundKey}-${index}-empty`}
           style={{
-            backgroundColor: importanceStyle.backgroundColor,
-            padding: '1px 0px',
-            borderRadius: '2px',
-            fontWeight: '500',
-            color: 'rgba(0,0,0,0)',
-            margin: '0',
-            display: 'inline',
-            WebkitTextFillColor: 'rgba(0,0,0,0)',
-            textShadow: 'none',
+            color: 'transparent',
             userSelect: 'none',
-            fontSize: '0'
+            pointerEvents: 'none'
           }}
         >
           {part.text}
         </span>
       );
-    }).filter(Boolean);
+    });
   };
+
+  // Hook은 조건문 밖에서 선언
+  const backgroundLayerRef = React.useRef<HTMLDivElement>(null);
 
   if (isEditing) {
     // 편집 모드
@@ -754,6 +789,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
         }}>
           {/* 배경에 스타일된 텍스트 표시 - div는 항상 렌더링, 내용만 조건부 */}
           <div
+            ref={backgroundLayerRef}
             data-importance-background="true"
             key={`bg-${block.id}-${backgroundKey}`}
             style={{
@@ -994,8 +1030,30 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   };
 
   // 읽기 모드
+  const readModeRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (readModeRef.current) {
+      const allSpans = readModeRef.current.querySelectorAll('span');
+      console.log('[TextBlock 읽기 모드] DOM 검사:', {
+        blockId: block.id,
+        totalSpans: allSpans.length,
+        spans: Array.from(allSpans).map((span, idx) => ({
+          index: idx,
+          text: span.textContent?.substring(0, 20),
+          visibility: window.getComputedStyle(span).visibility,
+          display: window.getComputedStyle(span).display,
+          backgroundColor: window.getComputedStyle(span).backgroundColor,
+          color: window.getComputedStyle(span).color,
+          isHidden: window.getComputedStyle(span).visibility === 'hidden' || window.getComputedStyle(span).display === 'none'
+        }))
+      });
+    }
+  }, [block.content, block.importanceRanges]);
+
   return (
     <div
+      ref={readModeRef}
       onClick={handleClick}
       style={{
         display: 'flex',

@@ -60,14 +60,6 @@ export const useBlockHandlers = (
       return;
     }
 
-    const isImportanceUpdate = updatedBlock.type === 'text' && (updatedBlock as any).importanceRanges;
-    if (isImportanceUpdate) {
-      console.log('[RightPanel] handleBlockUpdate - 중요도 업데이트 받음', {
-        blockId: updatedBlock.id,
-        importanceRanges: (updatedBlock as any).importanceRanges
-      });
-    }
-
     const updatedBlocks = currentMemo.blocks.map(block => {
       if (block.id === updatedBlock.id) {
         return updatedBlock;
@@ -76,10 +68,6 @@ export const useBlockHandlers = (
     });
 
     onMemoUpdate(currentMemo.id, { blocks: updatedBlocks });
-
-    if (isImportanceUpdate) {
-      forceUpdate();
-    }
   }, [onMemoUpdate, forceUpdate]);
 
   // 블록 삭제

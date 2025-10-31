@@ -224,16 +224,6 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
               if (memo.id === memoId) {
                 const updatedMemo = { ...memo, ...updates };
 
-                if (isBlockUpdate && updates.blocks) {
-                  console.log('[updateMemo] blocks 업데이트:', {
-                    memoId,
-                    oldBlocks: memo.blocks,
-                    newBlocks: updates.blocks,
-                    sameArray: memo.blocks === updates.blocks,
-                    firstBlockSame: memo.blocks?.[0] === updates.blocks?.[0]
-                  });
-                }
-
                 return updatedMemo;
               }
               return memo;
