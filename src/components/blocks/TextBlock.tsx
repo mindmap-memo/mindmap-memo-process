@@ -799,7 +799,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
             onMouseUp={(e) => handleTextSelection(e)}
             data-block-id={block.id}
             disabled={!canEdit}
-            placeholder={content === '' && isFocused ? "텍스트를 입력하세요" : ''}
+            placeholder={content === '' ? "텍스트를 입력하거나 파일을 드래그해 추가하세요" : ''}
             style={{
               position: 'relative',
               zIndex: 2,

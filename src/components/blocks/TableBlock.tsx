@@ -5,6 +5,10 @@ import { globalDataRegistry } from '../../utils/dataRegistry';
 import { getImportanceStyle } from '../../utils/importanceStyles';
 import CellEditor from '../table/CellEditor';
 import ColumnTypeSelector from '../table/ColumnTypeSelector';
+import { useCellSelection } from './TableBlock/hooks/useCellSelection';
+import { useColumnResize } from './TableBlock/hooks/useColumnResize';
+import { useRowSelection } from './TableBlock/hooks/useRowSelection';
+import { initializeColumnsFromBlock, initializeCells } from './TableBlock/utils/tableInitializers';
 
 interface TableBlockProps {
   block: TableBlock;
@@ -35,22 +39,16 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
   const [showColumnTypeSelector, setShowColumnTypeSelector] = useState(false);
   const [typeSelectorPosition, setTypeSelectorPosition] = useState<{x: number, y: number}>({x: 0, y: 0});
   const [editingColumnIndex, setEditingColumnIndex] = useState<number | null>(null);
-  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
-  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
-  const [lastSelectedCell, setLastSelectedCell] = useState<{row: number, col: number} | null>(null);
-  const [hoveredRow, setHoveredRow] = useState<number | null>(null);
-  const [showRowContextMenu, setShowRowContextMenu] = useState(false);
-  const [rowContextMenuPosition, setRowContextMenuPosition] = useState<{x: number, y: number}>({x: 0, y: 0});
-  const [columnWidths, setColumnWidths] = useState<number[]>([]);
-  const [isResizing, setIsResizing] = useState(false);
-  const [resizingColumn, setResizingColumn] = useState<number | null>(null);
-  const [resizeStartX, setResizeStartX] = useState(0);
-  const [resizeStartWidth, setResizeStartWidth] = useState(0);
-  const [isDragSelecting, setIsDragSelecting] = useState(false);
-  const [dragStartCell, setDragStartCell] = useState<{row: number, col: number} | null>(null);
-  const [dragEndCell, setDragEndCell] = useState<{row: number, col: number} | null>(null);
   const tableRef = useRef<HTMLTableElement>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  // 커스텀 훅 사용
+  const cellSelection = useCellSelection();
+  const rowSelection = useRowSelection();
+  const columnResize = useColumnResize({
+    initialWidths: block.columns?.length ? new Array(block.columns.length).fill(150) : [],
+    columnCount: columns.length
+  });
 
   const formulaEngine = useMemo(() =>
     new FormulaEngine(globalDataRegistry.getRegistry()),
@@ -63,141 +61,26 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
   // 전역 마우스 이벤트 처리 (드래그 선택 완료)
   useEffect(() => {
     const handleGlobalMouseUp = () => {
-      if (isDragSelecting) {
-        setIsDragSelecting(false);
-        setDragStartCell(null);
-        setDragEndCell(null);
+      if (cellSelection.isDragSelecting) {
+        cellSelection.finishDragSelection();
       }
     };
 
-    if (isDragSelecting) {
+    if (cellSelection.isDragSelecting) {
       document.addEventListener('mouseup', handleGlobalMouseUp);
       return () => {
         document.removeEventListener('mouseup', handleGlobalMouseUp);
       };
     }
-  }, [isDragSelecting]);
-
-  // Initialize columns from block data
-  const initializeColumnsFromBlock = useCallback((tableBlock: TableBlock): TableColumn[] => {
-    const { headers, columns: existingColumns } = tableBlock;
-    
-    
-    if (existingColumns && existingColumns.length > 0) {
-      // Google Sheets에서 온 columns 데이터를 TableColumn 형태로 변환
-      return existingColumns.map((col, index) => ({
-        id: col.id || `col-${index}`,
-        name: col.name || (col as any).title || headers[index] || `컬럼 ${index + 1}`,
-        type: col.type || 'text' as CellType,
-        options: col.options
-      }));
-    }
-    
-    // Create default columns from headers (all text type)
-    const defaultColumns = headers.map((header, index) => ({
-      id: `col-${index}`,
-      name: header,
-      type: 'text' as CellType
-    }));
-    
-    return defaultColumns;
-  }, []);
-
-  // Helper functions for cell selection
-  const getCellKey = (row: number, col: number) => `${row}-${col}`;
-  
-  const isCellSelected = (row: number, col: number) => {
-    return selectedCells.has(getCellKey(row, col));
-  };
-
-  // Calculate cells in drag selection range
-  const getCellsInRange = (startRow: number, startCol: number, endRow: number, endCol: number): Set<string> => {
-    const cells = new Set<string>();
-    const minRow = Math.min(startRow, endRow);
-    const maxRow = Math.max(startRow, endRow);
-    const minCol = Math.min(startCol, endCol);
-    const maxCol = Math.max(startCol, endCol);
-    
-    for (let row = minRow; row <= maxRow; row++) {
-      for (let col = minCol; col <= maxCol; col++) {
-        cells.add(getCellKey(row, col));
-      }
-    }
-    
-    return cells;
-  };
-
-  // Check if cell is in current drag selection
-  const isCellInDragRange = (row: number, col: number) => {
-    if (!isDragSelecting || !dragStartCell || !dragEndCell) return false;
-    
-    const minRow = Math.min(dragStartCell.row, dragEndCell.row);
-    const maxRow = Math.max(dragStartCell.row, dragEndCell.row);
-    const minCol = Math.min(dragStartCell.col, dragEndCell.col);
-    const maxCol = Math.max(dragStartCell.col, dragEndCell.col);
-    
-    return row >= minRow && row <= maxRow && col >= minCol && col <= maxCol;
-  };
-
-  // Initialize cells from block data
-  function initializeCells(tableBlock: TableBlock): TableCell[][] {
-    const { headers, rows, cells: existingCells, columns: blockColumns } = tableBlock;
-    
-    if (existingCells && existingCells.length > 0) {
-      return existingCells;
-    }
-    
-    const cols = blockColumns || initializeColumnsFromBlock(tableBlock);
-    
-    // Convert legacy string-based rows to cell objects with column types
-    // Add safety check to ensure rows is an array and each row is also an array
-    if (!Array.isArray(rows)) {
-      console.warn('TableBlock - rows is not an array:', rows);
-      return [];
-    }
-    
-    return rows
-      .filter(row => Array.isArray(row)) // Filter out non-array elements
-      .map(row => 
-        row.map((cellValue, colIndex) => {
-          const column = cols[colIndex];
-          const cellType = column?.type || 'text';
-          
-          let processedValue: any = cellValue;
-          
-          // Convert value based on column type
-          switch (cellType) {
-            case 'number':
-              processedValue = parseFloat(cellValue) || 0;
-              break;
-            case 'checkbox':
-              processedValue = cellValue === 'true' || cellValue === '1';
-              break;
-            case 'date':
-              processedValue = cellValue || new Date().toISOString().split('T')[0];
-              break;
-            default:
-              processedValue = cellValue;
-          }
-          
-          return {
-            value: processedValue,
-            type: cellType,
-            isKey: false,
-            options: column?.options,
-            format: column?.format
-          };
-        })
-      );
-  }
+  }, [cellSelection.isDragSelecting, cellSelection.finishDragSelection]);
 
   // Initialize columns and cells from block data
   useEffect(() => {
     const initializedColumns = initializeColumnsFromBlock(block);
-    const initializedCells = initializeCells(block);
+    const initializedCells = initializeCells(block, initializedColumns);
     setColumns(initializedColumns);
     setCells(initializedCells);
-  }, [initializeColumnsFromBlock]);
+  }, [block]);
 
   // Handle clicks outside table to finish editing
   useEffect(() => {
@@ -261,62 +144,6 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
     }
   }, [block, onUpdate]);
 
-  // 컬럼 너비 초기화
-  useEffect(() => {
-    if (headers.length > 0 && columnWidths.length === 0) {
-      setColumnWidths(new Array(headers.length).fill(150)); // 기본 150px
-    }
-  }, [headers.length, columnWidths.length]);
-
-  // 리사이즈 중
-  const handleResizeMove = useRef<((e: MouseEvent) => void) | null>(null);
-  const handleResizeEnd = useRef<(() => void) | null>(null);
-
-  // 리사이즈 시작
-  const handleResizeStart = (e: React.MouseEvent, columnIndex: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    
-    const startX = e.clientX;
-    const startWidth = columnWidths[columnIndex] || 150;
-    
-    setIsResizing(true);
-    setResizingColumn(columnIndex);
-    
-    handleResizeMove.current = (e: MouseEvent) => {
-      const deltaX = e.clientX - startX;
-      const newWidth = Math.max(20, startWidth + deltaX); // 최소 20px
-      
-      setColumnWidths(prevWidths => {
-        const newColumnWidths = [...prevWidths];
-        newColumnWidths[columnIndex] = newWidth;
-        return newColumnWidths;
-      });
-    };
-    
-    handleResizeEnd.current = () => {
-      document.removeEventListener('mousemove', handleResizeMove.current!);
-      document.removeEventListener('mouseup', handleResizeEnd.current!);
-      setIsResizing(false);
-      setResizingColumn(null);
-    };
-    
-    document.addEventListener('mousemove', handleResizeMove.current);
-    document.addEventListener('mouseup', handleResizeEnd.current);
-  };
-
-  // 컴포넌트 언마운트 시 이벤트 리스너 정리
-  useEffect(() => {
-    return () => {
-      if (handleResizeMove.current) {
-        document.removeEventListener('mousemove', handleResizeMove.current);
-      }
-      if (handleResizeEnd.current) {
-        document.removeEventListener('mouseup', handleResizeEnd.current);
-      }
-    };
-  }, []);
 
   const handleUpdateHeader = (index: number, value: string) => {
     const newHeaders = [...headers];
@@ -406,7 +233,7 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
   };
 
   const handleHeaderClick = (event: React.MouseEvent, columnIndex: number) => {
-    if (isResizing) return; // 리사이즈 중일 때는 헤더 클릭 무시
+    if (columnResize.isResizing) return; // 리사이즈 중일 때는 헤더 클릭 무시
     
     event.preventDefault();
     event.stopPropagation();
@@ -499,7 +326,7 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
       setColumns(newColumns);
       setRows(newRows);
       setCells(newCells);
-      setColumnWidths([...columnWidths, 150]); // 새 컬럼 기본 너비 150px
+      columnResize.setColumnWidths([...columnResize.columnWidths, 150]); // 새 컬럼 기본 너비 150px
       updateBlock(newHeaders, newRows, newCells, newColumns);
     } else {
       // 기존 컬럼 타입 변경
@@ -595,75 +422,51 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
     setEditingColumnIndex(null);
   };
 
-  const handleRowSelect = (rowIndex: number, checked: boolean) => {
-    const newSelectedRows = new Set(selectedRows);
-    if (checked) {
-      newSelectedRows.add(rowIndex);
-    } else {
-      newSelectedRows.delete(rowIndex);
-    }
-    setSelectedRows(newSelectedRows);
-  };
-
-  const handleRowContextMenu = (e: React.MouseEvent, rowIndex: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (!selectedRows.has(rowIndex)) {
-      setSelectedRows(new Set([rowIndex]));
-    }
-    
-    setRowContextMenuPosition({
-      x: e.clientX,
-      y: e.clientY
-    });
-    setShowRowContextMenu(true);
-  };
 
   const handleCopySelectedRows = () => {
-    const sortedRows = Array.from(selectedRows).sort((a, b) => a - b);
+    const sortedRows = Array.from(rowSelection.selectedRows).sort((a, b) => a - b);
     const rowsToCopy = sortedRows.map(rowIndex => ({
       row: [...rows[rowIndex]],
       cell: [...cells[rowIndex]]
     }));
-    
+
     let newRows = [...rows];
     let newCells = [...cells];
-    
+
     // Insert copied rows after the last selected row
     const insertIndex = Math.max(...sortedRows) + 1;
-    
+
     rowsToCopy.forEach((rowData, index) => {
       newRows.splice(insertIndex + index, 0, rowData.row);
       newCells.splice(insertIndex + index, 0, rowData.cell);
     });
-    
+
     setRows(newRows);
     setCells(newCells);
-    setSelectedRows(new Set());
-    setShowRowContextMenu(false);
+    rowSelection.clearRowSelection();
+    rowSelection.setShowRowContextMenu(false);
     updateBlock(headers, newRows, newCells, columns);
   };
 
   const handleDeleteSelectedRows = () => {
-    const sortedRows = Array.from(selectedRows).sort((a, b) => b - a);
-    
+    const sortedRows = Array.from(rowSelection.selectedRows).sort((a, b) => b - a);
+
     if (rows.length - sortedRows.length < 1) {
       return; // 최소 1개 행은 유지
     }
-    
+
     let newRows = [...rows];
     let newCells = [...cells];
-    
+
     sortedRows.forEach(rowIndex => {
       newRows = newRows.filter((_, index) => index !== rowIndex);
       newCells = newCells.filter((_, index) => index !== rowIndex);
     });
-    
+
     setRows(newRows);
     setCells(newCells);
-    setSelectedRows(new Set());
-    setShowRowContextMenu(false);
+    rowSelection.clearRowSelection();
+    rowSelection.setShowRowContextMenu(false);
     updateBlock(headers, newRows, newCells, columns);
   };
 
@@ -714,13 +517,13 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
     const newColumns = columns.filter((_, i) => i !== index);
     const newRows = rows.map(row => row.filter((_, i) => i !== index));
     const newCells = cells.map(row => row.filter((_, i) => i !== index));
-    const newColumnWidths = columnWidths.filter((_, i) => i !== index);
+    const newColumnWidths = columnResize.columnWidths.filter((_, i) => i !== index);
 
     setHeaders(newHeaders);
     setColumns(newColumns);
     setRows(newRows);
     setCells(newCells);
-    setColumnWidths(newColumnWidths);
+    columnResize.setColumnWidths(newColumnWidths);
     updateBlock(newHeaders, newRows, newCells, newColumns);
   };
 
@@ -737,17 +540,16 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
 
   const startEditingCell = (rowIndex: number, cellIndex: number) => {
     // 편집 시작 시 선택 상태 해제
-    setSelectedCells(new Set());
-    setLastSelectedCell(null);
+    cellSelection.clearSelection();
     setEditingCell({ row: rowIndex, col: cellIndex });
   };
 
   const finishEditingCell = () => {
     if (editingCell) {
       // 편집이 끝난 셀을 선택 상태로 만들기
-      const cellKey = getCellKey(editingCell.row, editingCell.col);
-      setSelectedCells(new Set([cellKey]));
-      setLastSelectedCell(editingCell);
+      const cellKey = cellSelection.getCellKey(editingCell.row, editingCell.col);
+      cellSelection.selectCells(new Set([cellKey]));
+      cellSelection.setLastSelectedCell(editingCell);
     }
     setEditingCell(null);
   };
@@ -845,8 +647,8 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
                 textAlign: 'left',
                 fontWeight: '600',
                 position: 'relative',
-                width: `${columnWidths[index] || 150}px`,
-                maxWidth: `${columnWidths[index] || 150}px`,
+                width: `${columnResize.columnWidths[index] || 150}px`,
+                maxWidth: `${columnResize.columnWidths[index] || 150}px`,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap'
@@ -926,8 +728,7 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
                 {/* 리사이즈 핸들 */}
                 {index < headers.length - 1 && ( // 마지막 컬럼은 리사이즈 핸들 없음
                   <div
-                    onMouseDown={(e) => {
-                    }}
+                    onMouseDown={(e) => columnResize.handleResizeStart(e, index)}
                     style={{
                       position: 'absolute',
                       top: '0',
@@ -937,14 +738,14 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
                       cursor: 'col-resize',
                       backgroundColor: 'transparent',
                       zIndex: 1000,
-                      borderRight: isResizing && resizingColumn === index ? '2px solid #007acc' : 'none'
+                      borderRight: columnResize.isResizing && columnResize.resizingColumn === index ? '2px solid #007acc' : 'none'
                     }}
                     onMouseEnter={(e) => {
                       (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(0, 122, 204, 0.1)';
                       (e.currentTarget as HTMLElement).style.borderRight = '2px solid #007acc';
                     }}
                     onMouseLeave={(e) => {
-                      if (!isResizing) {
+                      if (!columnResize.isResizing) {
                         (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
                         (e.currentTarget as HTMLElement).style.borderRight = 'none';
                       }
@@ -983,22 +784,22 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
       </thead>
         <tbody>
           {cells.filter(row => Array.isArray(row)).map((row, rowIndex) => (
-            <tr 
+            <tr
               key={rowIndex}
-              onContextMenu={(e) => handleRowContextMenu(e, rowIndex)}
+              onContextMenu={(e) => rowSelection.handleRowContextMenu(e, rowIndex)}
             >
               {row.map((cell, cellIndex) => (
                 <td key={cellIndex} style={{
                   border: (editingCell?.row === rowIndex && editingCell?.col === cellIndex) ? '1px solid #e0e0e0' :
-                          isCellSelected(rowIndex, cellIndex) ? '2px solid #007acc' : '1px solid #e0e0e0',
+                          cellSelection.isCellSelected(rowIndex, cellIndex) ? '2px solid #007acc' : '1px solid #e0e0e0',
                   padding: '4px',
                   position: 'relative',
                   backgroundColor: (editingCell?.row === rowIndex && editingCell?.col === cellIndex) ? 'white' :
-                                   isCellInDragRange(rowIndex, cellIndex) ? '#c7e6ff' :
-                                   isCellSelected(rowIndex, cellIndex) ? '#e7f3ff' : 
-                                   selectedRows.has(rowIndex) ? '#f0f8ff' : 'transparent',
-                  width: `${columnWidths[cellIndex] || 150}px`,
-                  maxWidth: `${columnWidths[cellIndex] || 150}px`,
+                                   cellSelection.isCellInDragRange(rowIndex, cellIndex) ? '#c7e6ff' :
+                                   cellSelection.isCellSelected(rowIndex, cellIndex) ? '#e7f3ff' :
+                                   rowSelection.selectedRows.has(rowIndex) ? '#f0f8ff' : 'transparent',
+                  width: `${columnResize.columnWidths[cellIndex] || 150}px`,
+                  maxWidth: `${columnResize.columnWidths[cellIndex] || 150}px`,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap'
@@ -1006,76 +807,72 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
                 onMouseDown={(e) => {
                   e.stopPropagation();
                   // 드래그 선택 시작
-                  setIsDragSelecting(true);
-                  setDragStartCell({row: rowIndex, col: cellIndex});
-                  setDragEndCell({row: rowIndex, col: cellIndex});
-                  
+                  cellSelection.startDragSelection(rowIndex, cellIndex);
+
                   if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
                     // 일반 클릭: 기존 선택 초기화
-                    setSelectedCells(new Set([getCellKey(rowIndex, cellIndex)]));
-                    setLastSelectedCell({row: rowIndex, col: cellIndex});
+                    cellSelection.selectCells(new Set([cellSelection.getCellKey(rowIndex, cellIndex)]));
+                    cellSelection.setLastSelectedCell({row: rowIndex, col: cellIndex});
                   }
                 }}
                 onMouseEnter={(e) => {
-                  if (isDragSelecting && dragStartCell) {
-                    setDragEndCell({row: rowIndex, col: cellIndex});
+                  if (cellSelection.isDragSelecting) {
+                    cellSelection.updateDragSelection(rowIndex, cellIndex);
                   }
                 }}
                 onMouseUp={(e) => {
-                  if (isDragSelecting && dragStartCell && dragEndCell) {
+                  if (cellSelection.isDragSelecting && cellSelection.dragStartCell && cellSelection.dragEndCell) {
                     e.stopPropagation();
                     // 드래그 선택 완료
-                    const selection = getCellsInRange(
-                      dragStartCell.row, 
-                      dragStartCell.col, 
-                      dragEndCell.row, 
-                      dragEndCell.col
+                    const selection = cellSelection.getCellsInRange(
+                      cellSelection.dragStartCell.row,
+                      cellSelection.dragStartCell.col,
+                      cellSelection.dragEndCell.row,
+                      cellSelection.dragEndCell.col
                     );
-                    
+
                     if (e.ctrlKey || e.metaKey) {
                       // Ctrl/Cmd 드래그: 기존 선택에 추가
-                      const newSelection = new Set([...Array.from(selectedCells), ...Array.from(selection)]);
-                      setSelectedCells(newSelection);
+                      const newSelection = new Set([...Array.from(cellSelection.selectedCells), ...Array.from(selection)]);
+                      cellSelection.selectCells(newSelection);
                     } else {
                       // 일반 드래그: 새로운 선택
-                      setSelectedCells(selection);
+                      cellSelection.selectCells(selection);
                     }
-                    
-                    setLastSelectedCell(dragEndCell);
-                    setIsDragSelecting(false);
-                    setDragStartCell(null);
-                    setDragEndCell(null);
+
+                    cellSelection.setLastSelectedCell(cellSelection.dragEndCell);
+                    cellSelection.finishDragSelection();
                   }
                 }}
                 onClick={(e) => {
-                  if (!isDragSelecting) {
+                  if (!cellSelection.isDragSelecting) {
                     e.stopPropagation();
                     // 셀 클릭 시 해당 셀을 선택 상태로 설정 (드래그가 아닌 경우에만)
                     if (e.ctrlKey || e.metaKey) {
                       // Ctrl/Cmd 클릭: 다중 선택
-                      const cellKey = getCellKey(rowIndex, cellIndex);
-                      const newSelection = new Set(selectedCells);
+                      const cellKey = cellSelection.getCellKey(rowIndex, cellIndex);
+                      const newSelection = new Set(cellSelection.selectedCells);
                       if (newSelection.has(cellKey)) {
                         newSelection.delete(cellKey);
                       } else {
                         newSelection.add(cellKey);
                       }
-                      setSelectedCells(newSelection);
-                      setLastSelectedCell({row: rowIndex, col: cellIndex});
-                    } else if (e.shiftKey && lastSelectedCell) {
+                      cellSelection.selectCells(newSelection);
+                      cellSelection.setLastSelectedCell({row: rowIndex, col: cellIndex});
+                    } else if (e.shiftKey && cellSelection.lastSelectedCell) {
                       // Shift 클릭: 범위 선택
-                      const startRow = Math.min(lastSelectedCell.row, rowIndex);
-                      const endRow = Math.max(lastSelectedCell.row, rowIndex);
-                      const startCol = Math.min(lastSelectedCell.col, cellIndex);
-                      const endCol = Math.max(lastSelectedCell.col, cellIndex);
-                      
+                      const startRow = Math.min(cellSelection.lastSelectedCell.row, rowIndex);
+                      const endRow = Math.max(cellSelection.lastSelectedCell.row, rowIndex);
+                      const startCol = Math.min(cellSelection.lastSelectedCell.col, cellIndex);
+                      const endCol = Math.max(cellSelection.lastSelectedCell.col, cellIndex);
+
                       const newSelection = new Set<string>();
                       for (let r = startRow; r <= endRow; r++) {
                         for (let c = startCol; c <= endCol; c++) {
-                          newSelection.add(getCellKey(r, c));
+                          newSelection.add(cellSelection.getCellKey(r, c));
                         }
                       }
-                      setSelectedCells(newSelection);
+                      cellSelection.selectCells(newSelection);
                     }
                   }
                 }}>
@@ -1113,9 +910,9 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
             {/* Row checkboxes */}
             {cells.filter(row => Array.isArray(row)).map((_, rowIndex) => {
               const rowHeight = tableRef.current?.querySelector(`tbody tr:nth-child(${rowIndex + 1})`)?.getBoundingClientRect().height || 35;
-              const isRowSelected = selectedRows.has(rowIndex);
-              const shouldShowCheckbox = hoveredRow === rowIndex || isRowSelected;
-              
+              const isRowSelected = rowSelection.selectedRows.has(rowIndex);
+              const shouldShowCheckbox = rowSelection.hoveredRow === rowIndex || isRowSelected;
+
               return (
                 <div
                   key={rowIndex}
@@ -1128,17 +925,17 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
                     cursor: 'pointer'
                   }}
                   onMouseEnter={() => {
-                    setHoveredRow(rowIndex);
+                    rowSelection.setHoveredRow(rowIndex);
                   }}
                   onMouseLeave={() => {
-                    setHoveredRow(null);
+                    rowSelection.setHoveredRow(null);
                   }}
                 >
                   {shouldShowCheckbox && (
                     <input
                       type="checkbox"
                       checked={isRowSelected}
-                      onChange={(e) => handleRowSelect(rowIndex, e.target.checked)}
+                      onChange={(e) => rowSelection.handleRowSelect(rowIndex, e.target.checked)}
                       style={{
                         cursor: 'pointer'
                       }}
@@ -1204,7 +1001,7 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
       )}
 
       {/* Row Context Menu */}
-      {showRowContextMenu && (
+      {rowSelection.showRowContextMenu && (
         <>
           <div
             style={{
@@ -1215,13 +1012,13 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
               bottom: 0,
               zIndex: 999
             }}
-            onClick={() => setShowRowContextMenu(false)}
+            onClick={() => rowSelection.closeContextMenu()}
           />
           <div
             style={{
               position: 'fixed',
-              top: rowContextMenuPosition.y,
-              left: rowContextMenuPosition.x,
+              top: rowSelection.rowContextMenuPosition.y,
+              left: rowSelection.rowContextMenuPosition.x,
               backgroundColor: 'white',
               border: '1px solid #e1e5e9',
               borderRadius: '8px',

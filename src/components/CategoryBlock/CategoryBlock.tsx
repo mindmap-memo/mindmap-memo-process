@@ -1,15 +1,23 @@
-import React, { useState } from 'react';
-import { CategoryBlock } from '../types';
-import ContextMenu from './ContextMenu';
-import QuickNavModal from './QuickNavModal';
+import React from 'react';
+import { CategoryBlock } from '../../types';
+import ContextMenu from '../ContextMenu';
+import QuickNavModal from '../QuickNavModal';
+import { useCategoryBlockState } from './hooks/useCategoryBlockState';
+import { useCategoryTitleHandlers } from './hooks/useCategoryTitleHandlers';
+import { useCategoryDragHandlers } from './hooks/useCategoryDragHandlers';
+import { useCategoryConnectionHandlers } from './hooks/useCategoryConnectionHandlers';
+import { useCategoryContextMenu } from './hooks/useCategoryContextMenu';
+import { useCategoryDropHandlers } from './hooks/useCategoryDropHandlers';
+import { useCategoryResizeObserver } from './hooks/useCategoryResizeObserver';
+import { useCategoryDragEffects } from './hooks/useCategoryDragEffects';
 
 interface CategoryBlockProps {
   category: CategoryBlock;
-  children?: React.ReactNode; // 하위 블록들이 렌더링된 컴포넌트들
-  hasChildren?: boolean; // 실제 하위 아이템 존재 여부
+  children?: React.ReactNode;
+  hasChildren?: boolean;
   isDragging?: boolean;
   isSelected?: boolean;
-  isMemoBeingDragged?: boolean; // 메모가 드래그 중인지 여부
+  isMemoBeingDragged?: boolean;
   isConnecting?: boolean;
   isDisconnectMode?: boolean;
   connectingFromId?: string | null;
@@ -32,9 +40,9 @@ interface CategoryBlockProps {
   canvasOffset?: { x: number; y: number };
   onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
   isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
-  isDragTarget?: boolean; // 드래그 타겟인지 여부
-  isCategoryBeingDragged?: boolean; // 카테고리가 드래그 중인지 여부
-  isShiftPressed?: boolean; // Shift 키가 눌려있는지 여부
+  isDragTarget?: boolean;
+  isCategoryBeingDragged?: boolean;
+  isShiftPressed?: boolean;
 }
 
 const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
@@ -70,69 +78,127 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   isCategoryBeingDragged = false,
   isShiftPressed = false
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editTitle, setEditTitle] = useState(category.title);
-  const [isHovered, setIsHovered] = useState(false);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-  const [showQuickNavModal, setShowQuickNavModal] = useState(false);
+  // 상태 관리
+  const {
+    isEditing,
+    setIsEditing,
+    editTitle,
+    setEditTitle,
+    isHovered,
+    setIsHovered,
+    isDragOver,
+    setIsDragOver,
+    contextMenu,
+    setContextMenu,
+    showQuickNavModal,
+    setShowQuickNavModal,
+    isDraggingPosition,
+    setIsDraggingPosition,
+    isConnectionDragging,
+    setIsConnectionDragging,
+    dragStart,
+    setDragStart,
+    mouseDownPos,
+    setMouseDownPos,
+    dragMoved,
+    setDragMoved,
+    lastUpdateTime,
+    pendingPosition,
+    isDraggingRef,
+    titleRef,
+    categoryRef
+  } = useCategoryBlockState(category);
 
-  // MemoBlock과 동일한 드래그 시스템 사용
-  const [isDraggingPosition, setIsDraggingPosition] = useState(false);
-  const [isConnectionDragging, setIsConnectionDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [mouseDownPos, setMouseDownPos] = useState<{ x: number; y: number } | null>(null);
-  const [dragMoved, setDragMoved] = useState(false);
+  // 제목 편집 핸들러
+  const { handleTitleClick, handleTitleSave, handleTitleKeyDown } = useCategoryTitleHandlers({
+    category,
+    isEditing,
+    editTitle,
+    setIsEditing,
+    setEditTitle,
+    titleRef,
+    onUpdate
+  });
 
-  // 드래그 임계값 (픽셀 단위)
-  const DRAG_THRESHOLD = 5;
+  // 드래그 핸들러
+  const { handleMouseDown, handleMouseMove, handleMouseUp, handleClick } = useCategoryDragHandlers({
+    category,
+    isEditing,
+    isConnecting,
+    mouseDownPos,
+    isDraggingRef,
+    dragStart,
+    dragMoved,
+    canvasScale,
+    canvasOffset,
+    pendingPosition,
+    lastUpdateTime,
+    setMouseDownPos,
+    setDragMoved,
+    setDragStart,
+    setIsDraggingPosition,
+    onClick,
+    onDragStart,
+    onDragEnd,
+    onPositionChange,
+    onPositionDragEnd
+  });
 
-  // 빠른 드래그 최적화를 위한 상태
-  const lastUpdateTime = React.useRef<number>(0);
-  const pendingPosition = React.useRef<{ x: number; y: number } | null>(null);
-  const isDraggingRef = React.useRef<boolean>(false);
+  // 연결 핸들러
+  const { handleConnectionPointMouseDown, handleConnectionPointMouseUp } = useCategoryConnectionHandlers({
+    categoryId: category.id,
+    isConnecting,
+    connectingFromId,
+    setIsConnectionDragging,
+    onStartConnection,
+    onConnectItems
+  });
 
-  const titleRef = React.useRef<HTMLInputElement>(null);
-  const categoryRef = React.useRef<HTMLDivElement>(null);
+  // 컨텍스트 메뉴 핸들러
+  const { handleContextMenu, handleAddQuickNav, handleQuickNavConfirm } = useCategoryContextMenu({
+    categoryId: category.id,
+    contextMenu,
+    setContextMenu,
+    setShowQuickNavModal,
+    onDelete,
+    onAddQuickNav,
+    isQuickNavExists
+  });
 
-  const handleTitleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsEditing(true);
-    setEditTitle(category.title);
-    setTimeout(() => titleRef.current?.focus(), 0);
-  };
+  // 드롭 핸들러
+  const { handleDragOver, handleDragLeave, handleDrop } = useCategoryDropHandlers({
+    categoryId: category.id,
+    setIsDragOver,
+    onDragOver,
+    onDrop,
+    onMoveToCategory
+  });
 
-  const handleTitleSave = () => {
-    setIsEditing(false);
-    if (editTitle.trim() !== category.title) {
-      onUpdate({
-        ...category,
-        title: editTitle.trim() || 'Untitled Category'
-      });
-    }
-  };
+  // ResizeObserver 효과
+  useCategoryResizeObserver({
+    category,
+    categoryRef,
+    isDraggingPosition,
+    isCategoryBeingDragged,
+    isMemoBeingDragged,
+    isHovered,
+    isDragOver,
+    canvasScale,
+    onSizeChange
+  });
 
-  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleTitleSave();
-    } else if (e.key === 'Escape') {
-      setIsEditing(false);
-      setEditTitle(category.title);
-    }
-  };
+  // 드래그 이벤트 효과
+  useCategoryDragEffects({
+    mouseDownPos,
+    isDraggingPosition,
+    handleMouseMove,
+    handleMouseUp
+  });
 
   const handleExpandToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
     onToggleExpanded(category.id);
   };
-
-  const handleClick = (e: React.MouseEvent) => {
-    // MemoBlock과 동일하게 dragMoved만 체크 (isConnectionDragging 제거)
-    if (!dragMoved && !isEditing) {
-      onClick?.(category.id, e.shiftKey);
-    }
-  };
-
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -142,274 +208,21 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     }
   };
 
-  // 단축 이동 추가 핸들러
-  const handleAddQuickNav = () => {
-    // 중복 체크
-    if (isQuickNavExists && isQuickNavExists(category.id, 'category')) {
-      alert('이미 단축 이동이 설정되어 있습니다.');
-      setContextMenu(null);
-      return;
-    }
-    setContextMenu(null);
-    setShowQuickNavModal(true);
-  };
-
-  // 단축 이동 추가 확인
-  const handleQuickNavConfirm = (name: string) => {
-    if (name.trim() && onAddQuickNav) {
-      onAddQuickNav(name.trim(), category.id, 'category');
-      setShowQuickNavModal(false);
-    }
-  };
-
-  // 우클릭 컨텍스트 메뉴
-  const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setContextMenu({ x: e.clientX, y: e.clientY });
-  };
-
-  // 컨텍스트 메뉴 외부 클릭 시 닫기
-  React.useEffect(() => {
-    if (contextMenu) {
-      const handleClickOutside = () => setContextMenu(null);
-      document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
-    }
-  }, [contextMenu]);
-
-  // MemoBlock과 동일한 드래그 핸들러들
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button === 0 && !isConnecting && !isEditing) {
-      // Shift 클릭 시 다중 선택
-      if (e.shiftKey) {
-        onClick?.(category.id, true);
-        e.preventDefault();
-        return;
-      }
-
-      // 마우스 다운 위치 저장 (임계값 판단용)
-      setMouseDownPos({ x: e.clientX, y: e.clientY });
-      setDragMoved(false);
-      setDragStart({
-        x: e.clientX - (category.position.x * (canvasScale || 1) + (canvasOffset?.x || 0)),
-        y: e.clientY - (category.position.y * (canvasScale || 1) + (canvasOffset?.y || 0))
-      });
-      e.preventDefault(); // 기본 드래그 동작 방지
-    }
-  };
-
-  const handleConnectionPointMouseDown = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-
-    if (!isConnecting) {
-      setIsConnectionDragging(true);
-      onStartConnection?.(category.id);
-    }
-  };
-
-  const handleConnectionPointMouseUp = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-
-    if (isConnecting && connectingFromId && connectingFromId !== category.id) {
-      onConnectItems?.(connectingFromId, category.id);
-    }
-    setIsConnectionDragging(false);
-  };
-
-  const handleMouseMove = React.useCallback((e: MouseEvent) => {
-    // 마우스 다운 후 드래그 임계값 확인
-    if (mouseDownPos && !isDraggingRef.current) {
-      const distance = Math.sqrt(
-        Math.pow(e.clientX - mouseDownPos.x, 2) +
-        Math.pow(e.clientY - mouseDownPos.y, 2)
-      );
-
-      // 임계값을 넘으면 드래그 시작
-      if (distance >= DRAG_THRESHOLD) {
-        isDraggingRef.current = true;
-        setIsDraggingPosition(true);
-        onClick?.(category.id, false); // 드래그 시작 시 선택
-        onDragStart?.(e as any); // App.tsx에 드래그 시작 알림
-      }
-    }
-
-    // ref를 사용한 즉시 체크로 드래그 종료 후 이벤트 무시
-    if (!isDraggingRef.current) {
-      return;
-    }
-
-    if (onPositionChange) {
-      if (!dragMoved) {
-        setDragMoved(true);
-      }
-
-      // MemoBlock과 동일한 방식으로 canvasScale과 canvasOffset 고려
-      const newPosition = {
-        x: (e.clientX - dragStart.x - (canvasOffset?.x || 0)) / (canvasScale || 1),
-        y: (e.clientY - dragStart.y - (canvasOffset?.y || 0)) / (canvasScale || 1)
-      };
-
-      // 빠른 드래그 시 업데이트 빈도 조절 (50ms마다만 업데이트)
-      const now = Date.now();
-      pendingPosition.current = newPosition;
-
-      if (now - lastUpdateTime.current >= 50) {
-        onPositionChange(category.id, newPosition);
-        lastUpdateTime.current = now;
-      }
-    }
-  }, [onPositionChange, dragMoved, dragStart, canvasOffset, canvasScale, category.id, mouseDownPos, DRAG_THRESHOLD, onClick, onDragStart]);
-
-  const handleMouseUp = React.useCallback((e: MouseEvent) => {
-    if (isDraggingRef.current) {
-      // ref를 즉시 false로 설정하여 추가 mousemove 이벤트 무시
-      isDraggingRef.current = false;
-
-      // 최종 위치 계산
-      const finalPosition = pendingPosition.current || {
-        x: (e.clientX - dragStart.x - (canvasOffset?.x || 0)) / (canvasScale || 1),
-        y: (e.clientY - dragStart.y - (canvasOffset?.y || 0)) / (canvasScale || 1)
-      };
-
-      // 드래그 종료 콜백 호출 (최종 위치 전달)
-      onPositionDragEnd?.(category.id, finalPosition);
-
-      // 상태 초기화
-      pendingPosition.current = null;
-      lastUpdateTime.current = 0;
-    }
-
-    // 모든 경우에 상태 초기화 (드래그 임계값 미달로 드래그가 시작되지 않은 경우 포함)
-    setIsDraggingPosition(false);
-    setMouseDownPos(null);
-    onDragEnd?.(e as any); // App.tsx에 드래그 종료 알림
-  }, [onPositionDragEnd, category.id, onDragEnd, dragStart, canvasOffset, canvasScale]);
-
-  React.useEffect(() => {
-    // 마우스 다운 상태이거나 드래그 중일 때 이벤트 리스너 등록
-    if (mouseDownPos || isDraggingPosition) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [mouseDownPos, isDraggingPosition, handleMouseMove, handleMouseUp]);
-
-  // ResizeObserver로 실제 크기 측정 (드래그 중에는 비활성화)
-  React.useEffect(() => {
-    if (!categoryRef.current || !onSizeChange) return;
-
-    let timeoutId: NodeJS.Timeout;
-
-    const updateSize = () => {
-      // 드래그 중이거나 호버/하이라이트 중일 때는 크기 업데이트 방지
-      const isCurrentlyHighlighted = isDragOver || (isMemoBeingDragged && isHovered);
-      // CategoryBlock 드래그 또는 Canvas 라벨 드래그 중일 때 크기 업데이트 방지
-      if (isDraggingPosition || isCategoryBeingDragged || isCurrentlyHighlighted) {
-        return;
-      }
-
-      if (categoryRef.current) {
-        const rect = categoryRef.current.getBoundingClientRect();
-        // 0이거나 매우 작은 크기는 무시 (컴포넌트가 사라지는 중일 수 있음)
-        if (rect.width < 10 || rect.height < 10) {
-          return;
-        }
-
-        // scale을 나누어서 실제 논리적 크기 계산
-        const newSize = {
-          width: Math.round(rect.width / canvasScale),
-          height: Math.round(rect.height / canvasScale)
-        };
-
-        // 크기 변화가 충분히 클 때만 업데이트 (5px 이상 차이)
-        if (!category.size ||
-            Math.abs(category.size.width - newSize.width) > 5 ||
-            Math.abs(category.size.height - newSize.height) > 5) {
-          // 디바운싱: 100ms 후에 업데이트
-          clearTimeout(timeoutId);
-          timeoutId = setTimeout(() => {
-            onSizeChange(category.id, newSize);
-          }, 100);
-        }
-      }
-    };
-
-    // 초기 크기 설정을 위한 지연 실행
-    timeoutId = setTimeout(updateSize, 50);
-
-    const resizeObserver = new ResizeObserver(() => {
-      // ResizeObserver 콜백도 디바운싱
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(updateSize, 100);
-    });
-
-    if (categoryRef.current) {
-      resizeObserver.observe(categoryRef.current);
-    }
-
-    return () => {
-      clearTimeout(timeoutId);
-      resizeObserver.disconnect();
-    };
-  }, [category.id, category.title, category.tags, category.children, onSizeChange, canvasScale, isDraggingPosition, isMemoBeingDragged, isHovered, isDragOver]);
-
-  // 드래그 앤 드롭 핸들러 (하위 아이템을 받기 위한 용도만)
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-    onDragOver?.(e);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    // 드래그가 자식 요소로 이동한 경우가 아닐 때만 상태 변경
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setIsDragOver(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-
-    // 드래그된 아이템의 ID 가져오기
-    try {
-      const dragDataStr = e.dataTransfer.getData('text/plain');
-
-      const dragData = JSON.parse(dragDataStr);
-
-      if (dragData.id && onMoveToCategory) {
-        onMoveToCategory(dragData.id, category.id);
-      } else {
-      }
-    } catch (error) {
-      console.error('❌ Error parsing drag data:', error);
-    }
-
-    onDrop?.(e);
-  };
-
   // 카테고리 블록 스타일 - 하위 아이템이 있으면 태그 스타일로 표시
   const isHighlighted = isDragOver || (isMemoBeingDragged && isHovered) || (isCategoryBeingDragged && isHovered);
-  const isTagMode = hasChildren && !isHighlighted; // 하위 아이템이 있으면 태그로 표시 (하이라이트 시 제외)
+  const isTagMode = hasChildren && !isHighlighted;
 
   // Shift+드래그 스타일 적용
   const isShiftDragging = isDraggingPosition && isShiftPressed;
 
   const categoryStyle: React.CSSProperties = {
-    width: isTagMode ? 'auto' : '100%', // 태그 모드면 auto, 아니면 전체 너비
-    minWidth: isTagMode ? '80px' : '200px', // 태그 모드면 작게
-    minHeight: isTagMode ? '32px' : '80px', // 태그 모드면 작게
+    width: isTagMode ? 'auto' : '100%',
+    minWidth: isTagMode ? '80px' : '200px',
+    minHeight: isTagMode ? '32px' : '80px',
     backgroundColor: isShiftDragging ? '#10b981' : (isHighlighted ? '#581c87' : (isSelected ? '#7c3aed' : '#8b5cf6')),
     border: isShiftDragging ? '2px solid #059669' : (isHighlighted ? '3px solid #4c1d95' : (isSelected ? '2px solid #6d28d9' : '1px solid #7c3aed')),
-    borderRadius: isTagMode ? '16px' : '8px', // 태그 모드면 더 둥글게
-    padding: isTagMode ? '6px 12px' : '16px', // 태그 모드면 작게
+    borderRadius: isTagMode ? '16px' : '8px',
+    padding: isTagMode ? '6px 12px' : '16px',
     boxShadow: isDragging ? '0 8px 16px rgba(0,0,0,0.3)' : (isHighlighted ? '0 6px 20px rgba(139, 92, 246, 0.6)' : '0 2px 8px rgba(0,0,0,0.1)'),
     cursor: isDraggingPosition ? 'grabbing' : 'grab',
     opacity: isDragging ? 0.7 : (isHighlighted ? 0.8 : 1),
@@ -426,8 +239,8 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     alignItems: 'center',
     marginBottom: category.isExpanded && children && !isTagMode ? '12px' : '0',
     minHeight: isTagMode ? '20px' : '24px',
-    width: '100%', // 전체 너비 사용
-    overflow: 'hidden' // 내용이 넘치면 숨김
+    width: '100%',
+    overflow: 'hidden'
   };
 
   const expandButtonStyle: React.CSSProperties = {
@@ -443,7 +256,6 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     justifyContent: 'center'
   };
 
-
   const titleStyle: React.CSSProperties = {
     flex: 1,
     fontSize: isTagMode ? '13px' : '16px',
@@ -454,10 +266,10 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     borderRadius: '4px',
     padding: isTagMode ? '2px 4px' : '4px 8px',
     outline: 'none',
-    minWidth: 0, // flex 아이템이 축소될 수 있도록
-    maxWidth: '100%', // 부모 컨테이너를 넘지 않도록
-    boxSizing: 'border-box', // 패딩 포함한 전체 크기 계산
-    whiteSpace: isTagMode ? 'nowrap' : 'normal', // 태그 모드에서는 한 줄로
+    minWidth: 0,
+    maxWidth: '100%',
+    boxSizing: 'border-box',
+    whiteSpace: isTagMode ? 'nowrap' : 'normal',
     overflow: isTagMode ? 'hidden' : 'visible',
     textOverflow: isTagMode ? 'ellipsis' : 'clip'
   };
@@ -509,7 +321,6 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
       width: category.size?.width ? `${category.size.width}px` : 'auto',
       height: 'auto'
     }}>
-      {/* 카테고리 블록 콘텐츠 */}
       <div
         ref={categoryRef}
         data-category-block="true"
@@ -523,14 +334,12 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         onMouseDown={handleMouseDown}
         onContextMenu={handleContextMenu}
         onMouseUp={(e) => {
-          // 연결 모드일 때 카테고리 블록 전체에서 연결 처리
           if (isConnecting && connectingFromId && connectingFromId !== category.id) {
             e.stopPropagation();
             onConnectItems?.(connectingFromId, category.id);
           }
         }}
         onMouseEnter={() => {
-          // 메모나 카테고리가 드래그 중일 때만 hover 상태 설정
           if (isMemoBeingDragged || isCategoryBeingDragged) {
             setIsHovered(true);
           }
@@ -548,7 +357,6 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
           {category.isExpanded ? '▼' : '▶'}
         </button>
 
-
         {isEditing ? (
           <input
             ref={titleRef}
@@ -565,7 +373,6 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
             onClick={handleTitleClick}
             title="클릭하여 편집"
           >
-            {/* Shift+드래그 시 + 아이콘 표시 */}
             {isShiftDragging && (
               <span style={{ color: 'white', fontSize: '18px', fontWeight: 'bold', marginRight: '4px' }}>+</span>
             )}
@@ -584,7 +391,6 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         </div>
       </div>
 
-      {/* 태그 표시 - 태그 모드에서는 숨김 */}
       {!isTagMode && category.tags.length > 0 && (
         <div style={tagsStyle}>
           {category.tags.map((tag, index) => (
@@ -595,14 +401,12 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         </div>
       )}
 
-      {/* 하위 블록들 - 태그 모드에서는 숨김 */}
       {!isTagMode && category.isExpanded && children && (
         <div style={childrenContainerStyle}>
           {children}
         </div>
       )}
 
-      {/* MemoBlock과 동일한 4면 연결점들 - 태그 모드에서는 숨김 */}
       {!isTagMode && (<>
       <div
         onMouseDown={handleConnectionPointMouseDown}
@@ -726,7 +530,6 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
       </div>
       </>)}
 
-      {/* 드롭 존 표시 - 태그 모드에서는 숨김 */}
       {!isTagMode && category.isExpanded && (
         <div
           style={{
@@ -745,7 +548,6 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
       )}
       </div>
 
-      {/* 드래그 중 힌트 UI - 카테고리 오른쪽에 고정 */}
       {isDraggingPosition && !isShiftPressed && (
         <div
           style={{
@@ -767,7 +569,6 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         </div>
       )}
 
-      {/* 컨텍스트 메뉴 */}
       {contextMenu && (
         <ContextMenu
           position={contextMenu}
@@ -782,7 +583,6 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         />
       )}
 
-      {/* 단축 이동 추가 모달 */}
       <QuickNavModal
         isOpen={showQuickNavModal}
         onClose={() => {

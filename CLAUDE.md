@@ -299,6 +299,37 @@ The application implements Shift+drag functionality for adding/removing memos an
      - 로직과 UI가 분리되어 테스트 및 유지보수 용이
      - 관련 파일들이 한 폴더에 모여 있어 찾기 쉬움
 
+9. **컴포넌트 리팩토링 프로세스 (CRITICAL)**
+   - **목적**: 비대한 컴포넌트를 체계적으로 커스텀 훅으로 분리
+   - **리팩토링 단계**:
+     1. 각 컴포넌트 안에 있는 각 로직을 커스텀 훅으로 분리한다
+     2. 특정 컴포넌트에 해당하는 커스텀 훅은 컴포넌트 메인 tsx 파일과 함께 같은 폴더에 위치시킨다
+        - 예: RightPanel의 로직을 커스텀 훅으로 나눴다면:
+          ```
+          src/components/RightPanel/
+          ├── RightPanel.tsx              # 컴포넌트 본체
+          └── hooks/                      # 컴포넌트 전용 훅 폴더
+              ├── useRightPanelState.ts   # 상태 관리
+              ├── useRightPanelHandlers.ts # 이벤트 핸들러
+              └── useRightPanelEffects.ts  # useEffect 로직
+          ```
+     3. 코드가 너무 길어 전체적인 파악이 힘든 경우, **로직의 의미 단위로 분리**한다 (300줄은 관리하기 적절한 파일 크기 기준이며, 무작정 300줄씩 자르는 것이 아님)
+     4. 훅으로 분리를 마친 로직은 **즉시 기존 파일에서 코드를 삭제**하고, 훅을 import 한다
+        - ⚠️ **중요**: 훅 파일을 만들자마자 바로 기존 코드를 삭제해야 함 (나중에 하면 안 됨)
+        - 삭제 후 즉시 import 문 추가
+        - 중복 코드가 절대 남아있으면 안 됨
+     5. 모든 로직이 훅으로 분리될 때까지 이 작업을 반복한다
+   - **분리 원칙**:
+     - 상태 관리 로직 → `useComponentNameState.ts`
+     - 이벤트 핸들러 → `useComponentNameHandlers.ts`
+     - 부수 효과(useEffect) → `useComponentNameEffects.ts`
+     - 렌더링 로직 → `useComponentNameRendering.tsx`
+   - **주의사항**:
+     - 분리 후 반드시 기존 코드 삭제
+     - import 경로 확인
+     - 타입 정의도 함께 이동
+     - 의존성 배열 확인
+
 ### Specific Implementation Guidelines
 
 - **File Management**: Always prefer editing existing files to creating new ones; never create files unless absolutely necessary

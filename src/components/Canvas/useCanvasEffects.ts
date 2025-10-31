@@ -1,6 +1,9 @@
 import { useEffect } from 'react';
 import { Page, CategoryBlock, ImportanceLevel } from '../../types';
 import { calculateCategoryArea } from '../../utils/categoryAreaUtils';
+import { useCacheManagement } from './hooks/useCacheManagement';
+import { useContextMenuEffect } from './hooks/useContextMenuEffect';
+import { useCanvasKeyboard } from './hooks/useCanvasKeyboard';
 
 interface UseCanvasEffectsProps {
   // Context menu
@@ -159,75 +162,25 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
     setDragTargetCategoryId
   } = props;
 
-  // 1. 드래그가 완전히 끝나면 캐시 클리어
-  // 중요: Shift를 떼는 것과 드래그가 끝나는 것은 별개
-  // Shift를 떼도 드래그가 진행 중이면 캐시 유지 (기존 부모 영역 고정)
-  useEffect(() => {
-    if (!isDraggingMemo && !isDraggingCategory) {
-      shiftDragAreaCache.current = {};
-    }
-  }, [isDraggingMemo, isDraggingCategory, shiftDragAreaCache]);
-
-  // 2. 컨텍스트 메뉴 외부 클릭 시 닫기
-  useEffect(() => {
-    if (areaContextMenu) {
-      const handleClickOutside = () => setAreaContextMenu(null);
-      document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
-    }
-  }, [areaContextMenu, setAreaContextMenu]);
-
-  // 3. 메모 위치 변경 시 영역 업데이트 (카테고리 위치는 제외)
-  useEffect(() => {
-    if (currentPage) {
-      // 메모가 속한 카테고리의 캐시 제거 (영역 크기 재계산)
-      // 단, 드래그 중인 카테고리는 제외 (크기 고정 유지)
-      const affectedCategoryIds = new Set<string>();
-      currentPage.memos.forEach(memo => {
-        if (memo.parentId && memo.parentId !== isDraggingCategoryArea) {
-          affectedCategoryIds.add(memo.parentId);
-        }
-      });
-
-      if (affectedCategoryIds.size > 0) {
-        setDraggedCategoryAreas(prev => {
-          const newAreas = { ...prev };
-          affectedCategoryIds.forEach(catId => {
-            // 드래그 중인 카테고리의 캐시는 제거하지 않음
-            if (catId !== isDraggingCategoryArea) {
-              delete newAreas[catId];
-            }
-          });
-          return newAreas;
-        });
-
-        // App.tsx의 메모 위치 캐시도 동기화하여 제거 (별도 effect로 분리)
-        affectedCategoryIds.forEach(catId => {
-          if (catId !== isDraggingCategoryArea) {
-            onClearCategoryCache?.(catId);
-          }
-        });
-      }
-    }
-  }, [
-    // 메모 위치만 감지 (카테고리 위치는 제외)
-    currentPage?.memos?.map(m => `${m.id}:${m.position.x}:${m.position.y}:${m.size?.width}:${m.size?.height}:${m.parentId}`).join('|'),
+  // 캐시 관리 (Shift 드래그, 메모/카테고리 변경 감지)
+  useCacheManagement({
+    isDraggingMemo,
+    isDraggingCategory,
     isDraggingCategoryArea,
+    shiftDragAreaCache,
+    currentPage,
+    setDraggedCategoryAreas,
     onClearCategoryCache,
-    setDraggedCategoryAreas
-  ]);
-
-  // 4. 카테고리 상태 변경 시 영역 업데이트 트리거만 실행 (캐시 제거 안 함)
-  useEffect(() => {
-    if (currentPage) {
-      setAreaUpdateTrigger(prev => prev + 1);
-    }
-  }, [
-    currentPage?.categories?.map(c => `${c.id}:${c.size?.width}:${c.size?.height}:${c.isExpanded}`).join('|'),
     setAreaUpdateTrigger
-  ]);
+  });
 
-  // 5. 캔버스 휠 이벤트 (줌)
+  // 컨텍스트 메뉴 외부 클릭 감지
+  useContextMenuEffect({
+    areaContextMenu,
+    setAreaContextMenu
+  });
+
+  // 캔버스 휠 이벤트 (줌)
   useEffect(() => {
     const canvasElement = document.getElementById('main-canvas');
     if (!canvasElement) return;
@@ -392,102 +345,14 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
     setJustFinishedDragSelection
   ]);
 
-  // 8. 키보드 이벤트 처리
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+Z (Undo) / Ctrl+Shift+Z (Redo)
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
-        e.preventDefault();
-
-        if (e.shiftKey) {
-          // Ctrl+Shift+Z: Redo
-          if (canRedo) {
-            onRedo();
-          }
-        } else {
-          // Ctrl+Z: Undo
-          if (canUndo) {
-            onUndo();
-          }
-        }
-        return;
-      }
-
-      if (e.code === 'Space' && !e.repeat && !isSpacePressed) {
-        setIsSpacePressed(true);
-        setCurrentTool('pan');
-        e.preventDefault();
-      }
-      if ((e.code === 'AltLeft' || e.code === 'AltRight') && !isAltPressed) {
-        setIsAltPressed(true);
-        setCurrentTool('zoom');
-      }
-      if (e.code === 'Escape') {
-        // 모든 선택 해제
-        onMemoSelect('', false); // 빈 문자열로 호출해서 선택 해제
-        // 모든 드래그 상태 리셋
-        setIsPanning(false);
-        if (isConnecting) {
-          onCancelConnection();
-        }
-        e.preventDefault();
-      }
-
-      // Delete 키: 선택된 메모/카테고리 삭제
-      if (e.code === 'Delete') {
-        // RightPanel의 입력 필드에 포커스가 있는 경우 무시
-        const activeElement = document.activeElement;
-        const isInputFocused = activeElement && (
-          activeElement.tagName === 'INPUT' ||
-          activeElement.tagName === 'TEXTAREA' ||
-          activeElement.getAttribute('contenteditable') === 'true'
-        );
-
-        if (!isInputFocused) {
-          // 선택된 메모나 카테고리가 있으면 삭제
-          if (selectedMemoId || selectedCategoryId || selectedMemoIds.length > 0 || selectedCategoryIds.length > 0) {
-            onDeleteSelected();
-            e.preventDefault();
-          }
-        }
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && isSpacePressed) {
-        setIsSpacePressed(false);
-        // Alt가 눌려있으면 zoom, 아니면 baseTool로
-        if (isAltPressed) {
-          setCurrentTool('zoom');
-        } else {
-          setCurrentTool(baseTool);
-        }
-        e.preventDefault();
-      }
-      if ((e.code === 'AltLeft' || e.code === 'AltRight') && isAltPressed) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        setIsAltPressed(false);
-        // Space가 눌려있으면 pan, 아니면 baseTool로
-        if (isSpacePressed) {
-          setCurrentTool('pan');
-        } else {
-          setCurrentTool(baseTool);
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown, { capture: true });
-    document.addEventListener('keyup', handleKeyUp, { capture: true });
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown, { capture: true } as any);
-      document.removeEventListener('keyup', handleKeyUp, { capture: true } as any);
-    };
-  }, [
-    baseTool,
+  // 키보드 이벤트 처리
+  useCanvasKeyboard({
     isSpacePressed,
+    setIsSpacePressed,
     isAltPressed,
+    setIsAltPressed,
+    baseTool,
+    setCurrentTool,
     isMouseOverCanvas,
     isConnecting,
     onCancelConnection,
@@ -501,13 +366,10 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
     selectedMemoIds,
     selectedCategoryIds,
     onDeleteSelected,
-    setIsSpacePressed,
-    setIsAltPressed,
-    setCurrentTool,
     setIsPanning
-  ]);
+  });
 
-  // 9. Shift 드래그 중 마우스 위치로 영역 충돌 감지
+  // Shift 드래그 중 마우스 위치로 영역 충돌 감지
   useEffect(() => {
     if (isShiftPressed && (isDraggingMemo || isDraggingCategory || isDraggingCategoryArea) && currentPage) {
       // 드래그 시작 시의 부모 ID를 고정 (드래그 중 변경되지 않도록)
