@@ -233,7 +233,7 @@ const TableBlockComponent: React.FC<TableBlockProps> = ({
   };
 
   const handleHeaderClick = (event: React.MouseEvent, columnIndex: number) => {
-    if (isResizing) return; // 리사이즈 중일 때는 헤더 클릭 무시
+    if (columnResize.isResizing) return; // 리사이즈 중일 때는 헤더 클릭 무시
     
     event.preventDefault();
     event.stopPropagation();
