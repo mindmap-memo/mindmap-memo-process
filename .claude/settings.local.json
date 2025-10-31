@@ -18,7 +18,22 @@
       "Bash(timeout 15 bash:*)",
       "Bash(npm run dev:*)",
       "Bash(timeout 10 bash -c 'while ! curl -s http://localhost:3000 > /dev/null 2>&1; do sleep 1; done; echo \"\"Server is up\"\"')",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git checkout:*)",
+      "Bash(git stash:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(timeout 5 bash:*)",
+      "Bash(curl:*)",
+      "Bash(find:*)",
+      "Bash(for file in \"c:\\Users\\ghpjj\\OneDrive\\Desktop\\project\\mindmap-memo-next\\src\\components\\RightPanel\\hooks\"/*.{ts,tsx})",
+      "Bash(do:*)",
+      "Bash(wc:*)",
+      "Bash(done)",
+      "Bash(awk:*)",
+      "Bash(Remove-Item -Recurse -Force .next 2)",
+      "Bash($null)",
+      "Bash(nul)"
     ],
     "deny": [],
     "ask": []

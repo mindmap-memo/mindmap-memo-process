@@ -1,168 +1,16 @@
 import React, { useState } from 'react';
 import { MemoBlock as MemoBlockType, MemoDisplaySize, ImportanceLevel, ImportanceRange, Page } from '../types';
-import { calculateCategoryArea } from '../utils/categoryAreaUtils';
 import ContextMenu from './ContextMenu';
 import QuickNavModal from './QuickNavModal';
 import styles from '../scss/components/MemoBlock.module.scss';
-
-// 중요도 레벨별 형광펜 스타일 정의 (TextBlock과 동일)
-const getImportanceStyle = (level: ImportanceLevel) => {
-  switch (level) {
-    case 'critical':
-      return { backgroundColor: '#ffcdd2', color: '#000' }; // 빨간 형광펜 - 매우중요
-    case 'important':
-      return { backgroundColor: '#ffcc80', color: '#000' }; // 주황 형광펜 - 중요
-    case 'opinion':
-      return { backgroundColor: '#e1bee7', color: '#000' }; // 보라 형광펜 - 의견
-    case 'reference':
-      return { backgroundColor: '#81d4fa', color: '#000' }; // 파란 형광펜 - 참고
-    case 'question':
-      return { backgroundColor: '#fff59d', color: '#000' }; // 노란 형광펜 - 질문
-    case 'idea':
-      return { backgroundColor: '#c8e6c9', color: '#000' }; // 초록 형광펜 - 아이디어
-    case 'data':
-      return { backgroundColor: '#bdbdbd', color: '#000' }; // 진한 회색 형광펜 - 데이터
-    default:
-      return {};
-  }
-};
-
-// 읽기 모드에서 하이라이팅된 텍스트 렌더링 (필터링 적용)
-const renderHighlightedText = (text: string, importanceRanges?: ImportanceRange[], activeFilters?: Set<ImportanceLevel>, showGeneral?: boolean) => {
-  if (!importanceRanges || importanceRanges.length === 0) {
-    // 하이라이팅이 없는 일반 텍스트는 일반 텍스트 필터에 따라 표시/숨김
-    return showGeneral === false ? '' : text;
-  }
-
-  const ranges = [...importanceRanges].sort((a, b) => a.start - b.start);
-  const parts: Array<{ text: string; level?: ImportanceLevel }> = [];
-  let lastIndex = 0;
-
-  ranges.forEach(range => {
-    // 이전 부분 (스타일 없음)
-    if (range.start > lastIndex) {
-      parts.push({ text: text.substring(lastIndex, range.start) });
-    }
-
-    // 현재 범위 (스타일 적용)
-    parts.push({
-      text: text.substring(range.start, range.end),
-      level: range.level
-    });
-
-    lastIndex = range.end;
-  });
-
-  // 마지막 부분 (스타일 없음)
-  if (lastIndex < text.length) {
-    parts.push({ text: text.substring(lastIndex) });
-  }
-
-  return parts.map((part, index) => {
-    // 필터링 적용: 중요도가 있는 부분은 필터에 따라 표시/숨김
-    if (part.level && activeFilters && !activeFilters.has(part.level)) {
-      return null; // 필터에 포함되지 않은 중요도는 숨김
-    }
-
-    // 일반 텍스트 필터링 적용
-    if (!part.level && showGeneral === false) {
-      return null; // 일반 텍스트가 비활성화되면 숨김
-    }
-
-    return (
-      <span
-        key={index}
-        style={part.level ? {
-          backgroundColor: getImportanceStyle(part.level).backgroundColor,
-          padding: '1px 0px',
-          borderRadius: '2px',
-          fontWeight: '500',
-          margin: '0'
-        } : {}}
-      >
-        {part.text}
-      </span>
-    );
-  });
-};
-
-// 공백 크기를 계산하는 함수 (최대 1블록 높이로 제한)
-const getSpacerHeight = (consecutiveHiddenBlocks: number): string => {
-  if (consecutiveHiddenBlocks <= 1) return '0';
-  return '0.8em'; // 적당한 공백 크기
-};
-
-// 블록이 필터링되어 보이는지 확인하는 함수
-const isBlockVisible = (block: any, activeImportanceFilters?: Set<ImportanceLevel>, showGeneralContent?: boolean): boolean => {
-  // 모든 중요도 필터가 활성화되어 있고 일반 내용도 표시하는 기본 상태인지 확인
-  const allLevels: ImportanceLevel[] = ['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'];
-  const isDefaultFilterState = (!activeImportanceFilters ||
-                               (activeImportanceFilters.size === allLevels.length &&
-                                allLevels.every(level => activeImportanceFilters.has(level)))) &&
-                              showGeneralContent !== false;
-
-  if (isDefaultFilterState) return true;
-
-  if (block.type === 'text') {
-    const textBlock = block;
-    if (!textBlock.content || textBlock.content.trim() === '') {
-      return showGeneralContent !== false;
-    }
-
-    if (!textBlock.importanceRanges || textBlock.importanceRanges.length === 0) {
-      return showGeneralContent !== false;
-    }
-
-    // 필터에 맞는 중요도 범위가 있는지 확인
-    return textBlock.importanceRanges.some((range: ImportanceRange) =>
-      activeImportanceFilters && activeImportanceFilters.has(range.level)
-    ) || (showGeneralContent !== false && textBlock.importanceRanges.length < textBlock.content.length);
-  }
-
-  // 비텍스트 블록(image, file, bookmark, callout, quote, code, table, checklist 등)의 중요도 필터링
-  const blockWithImportance = block as any;
-
-  // 중요도가 있는 경우
-  if (blockWithImportance.importance) {
-    return activeImportanceFilters ? activeImportanceFilters.has(blockWithImportance.importance) : true;
-  }
-
-  // 중요도가 없는 경우 (일반 내용)
-  return showGeneralContent !== false;
-};
-
-// 메모 블록의 가장 높은 중요도를 찾는 함수
-const getHighestImportanceLevel = (memo: MemoBlockType): ImportanceLevel | null => {
-  if (!memo.blocks || memo.blocks.length === 0) return null;
-
-  // 중요도 우선순위 정의 (높은 순서부터)
-  const importancePriority: ImportanceLevel[] = ['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'];
-
-  let highestLevel: ImportanceLevel | null = null;
-
-  memo.blocks.forEach(block => {
-    if (block.type === 'text') {
-      const textBlock = block as any; // TextBlock으로 캐스팅
-      if (textBlock.importanceRanges && textBlock.importanceRanges.length > 0) {
-        textBlock.importanceRanges.forEach((range: ImportanceRange) => {
-          if (!highestLevel || importancePriority.indexOf(range.level) < importancePriority.indexOf(highestLevel)) {
-            highestLevel = range.level;
-          }
-        });
-      }
-    } else {
-      // 비텍스트 블록의 중요도 확인 (image, file, callout, bookmark, quote, code, table, sheets 등)
-      const blockWithImportance = block as any;
-      if (blockWithImportance.importance) {
-        if (!highestLevel || importancePriority.indexOf(blockWithImportance.importance) < importancePriority.indexOf(highestLevel)) {
-          highestLevel = blockWithImportance.importance;
-        }
-      }
-    }
-  });
-
-  return highestLevel;
-};
+import {
+  getImportanceStyle,
+  renderHighlightedText,
+  getSpacerHeight,
+  isBlockVisible,
+  getHighestImportanceLevel
+} from './MemoBlock/utils/renderingUtils';
+import { useMemoBlockDrag } from './MemoBlock/hooks/useMemoBlockDrag';
 
 interface MemoBlockProps {
   memo: MemoBlockType;
@@ -223,13 +71,34 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   onTitleUpdate,
   onBlockUpdate
 }) => {
-  const [isDragging, setIsDragging] = useState(false);
+  // 드래그 관련 상태 및 핸들러 (커스텀 훅)
+  const {
+    isDragging,
+    isConnectionDragging,
+    dragMoved,
+    cursorPosition,
+    handleMouseDown,
+    handleConnectionPointMouseDown,
+    handleConnectionPointMouseUp
+  } = useMemoBlockDrag({
+    memo,
+    isConnecting,
+    isDraggingAnyMemo,
+    isShiftPressed,
+    canvasScale,
+    canvasOffset,
+    currentPage,
+    onPositionChange,
+    onDetectCategoryOnDrop,
+    onStartConnection,
+    onConnectMemos,
+    onDragStart,
+    onDragEnd,
+    connectingFromId
+  });
+
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [showQuickNavModal, setShowQuickNavModal] = useState(false);
-  const [isConnectionDragging, setIsConnectionDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [mouseDownPos, setMouseDownPos] = useState<{ x: number; y: number } | null>(null);
-  const [dragMoved, setDragMoved] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(memo.title);
   const titleInputRef = React.useRef<HTMLInputElement>(null);
@@ -237,21 +106,10 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   const [editedAllContent, setEditedAllContent] = useState('');
   const allBlocksInputRef = React.useRef<HTMLTextAreaElement>(null);
 
-  // 드래그 임계값 (픽셀 단위)
-  const DRAG_THRESHOLD = 5;
   const [isScrolling, setIsScrolling] = useState(false);
   const [scrollTimeout, setScrollTimeout] = useState<NodeJS.Timeout | null>(null);
   const [isHovering, setIsHovering] = useState(false);
-  const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
-
-  // 빠른 드래그 최적화를 위한 상태
-  const lastUpdateTime = React.useRef<number>(0);
-  const pendingPosition = React.useRef<{ x: number; y: number } | null>(null);
   const memoRef = React.useRef<HTMLDivElement>(null);
-
-  // 이벤트 핸들러 ref (useEffect 의존성 문제 해결)
-  const handleMouseMoveRef = React.useRef<((e: MouseEvent) => void) | null>(null);
-  const handleMouseUpRef = React.useRef<((e: MouseEvent) => void) | null>(null);
 
   // 크기별 스타일 정의
   const getSizeConfig = (size: MemoDisplaySize) => {
@@ -495,210 +353,6 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       }
     };
   }, []); // 의존성 배열을 빈 배열로 변경
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    // 우클릭은 컨텍스트 메뉴용으로 무시
-    if (e.button === 2) {
-      return;
-    }
-
-    // 다른 메모가 이미 드래그 중이면 무시 (단, 현재 메모가 드래그 중이면 허용)
-    if (isDraggingAnyMemo && !isDragging) {
-      e.stopPropagation();
-      return;
-    }
-
-    // 연결 모드가 아닐 때만 드래그 준비 (왼쪽 클릭만)
-    if (e.button === 0 && !isConnecting) {
-      // 마우스 다운 위치 저장 (임계값 판단용)
-      setMouseDownPos({ x: e.clientX, y: e.clientY });
-      setDragMoved(false);
-      setDragStart({
-        x: e.clientX - (memo.position.x * canvasScale + canvasOffset.x),
-        y: e.clientY - (memo.position.y * canvasScale + canvasOffset.y)
-      });
-      e.preventDefault(); // HTML5 드래그 방지, 마우스 드래그 우선
-    }
-  };
-
-  const handleConnectionPointMouseDown = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    
-    if (!isConnecting) {
-      setIsConnectionDragging(true);
-      onStartConnection?.(memo.id);
-    }
-  };
-
-  const handleConnectionPointMouseUp = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    
-    if (isConnecting && connectingFromId && connectingFromId !== memo.id) {
-      onConnectMemos?.(connectingFromId, memo.id);
-    }
-    setIsConnectionDragging(false);
-  };
-
-  // handleMouseMove와 handleMouseUp를 useCallback 없이 정의하고 ref에 저장
-  const handleMouseMove = (e: MouseEvent) => {
-    // 마우스 다운 후 드래그 임계값 확인
-    if (mouseDownPos && !isDragging) {
-      const distance = Math.sqrt(
-        Math.pow(e.clientX - mouseDownPos.x, 2) +
-        Math.pow(e.clientY - mouseDownPos.y, 2)
-      );
-
-      // 임계값을 넘으면 드래그 시작
-      if (distance >= DRAG_THRESHOLD) {
-        setIsDragging(true);
-        onDragStart?.(memo.id);
-      }
-    }
-
-    if (isDragging) {
-      // 커서 위치 저장 (힌트 UI용)
-      setCursorPosition({ x: e.clientX, y: e.clientY });
-
-      if (!dragMoved) {
-        setDragMoved(true);
-      }
-
-      // 마우스 현재 위치에서 드래그 시작 오프셋을 빼고 캔버스 좌표계로 변환
-      let newPosition = {
-        x: (e.clientX - dragStart.x - canvasOffset.x) / canvasScale,
-        y: (e.clientY - dragStart.y - canvasOffset.y) / canvasScale
-      };
-
-      // 루트 메모이고 Shift 드래그가 아닐 때, 영역과 충돌하면 방향별 이동 차단
-      if (!memo.parentId && !isShiftPressed && currentPage) {
-        const deltaX = newPosition.x - memo.position.x;
-        const deltaY = newPosition.y - memo.position.y;
-
-        const categories = currentPage.categories || [];
-        const memoWidth = memo.size?.width || 200;
-        const memoHeight = memo.size?.height || 95;
-
-        for (const category of categories) {
-          // 루트 레벨 카테고리만 확인 (parentId가 null 또는 undefined)
-          if (category.parentId != null) {
-            continue;
-          }
-          if (!category.isExpanded) {
-            continue;
-          }
-
-          const categoryArea = calculateCategoryArea(category, currentPage);
-          if (!categoryArea) {
-            continue;
-          }
-
-          // 새 위치에서 메모의 경계
-          const newMemoBounds = {
-            left: newPosition.x,
-            top: newPosition.y,
-            right: newPosition.x + memoWidth,
-            bottom: newPosition.y + memoHeight
-          };
-
-          const areaBounds = {
-            left: categoryArea.x,
-            top: categoryArea.y,
-            right: categoryArea.x + categoryArea.width,
-            bottom: categoryArea.y + categoryArea.height
-          };
-
-          // 겹침 계산
-          const overlapLeft = Math.max(newMemoBounds.left, areaBounds.left);
-          const overlapTop = Math.max(newMemoBounds.top, areaBounds.top);
-          const overlapRight = Math.min(newMemoBounds.right, areaBounds.right);
-          const overlapBottom = Math.min(newMemoBounds.bottom, areaBounds.bottom);
-
-          const hasOverlap = overlapLeft < overlapRight && overlapTop < overlapBottom;
-
-          // 겹침이 발생하면 해당 방향으로 이동 차단
-          if (hasOverlap) {
-            // 어느 방향에서 충돌했는지 판단하고, 해당 방향으로의 이동만 차단 (현재 위치 유지)
-            if (deltaX < 0) {
-              // 왼쪽으로 이동 중 → x 좌표는 현재 메모 위치 유지
-              newPosition.x = memo.position.x;
-            } else if (deltaX > 0) {
-              // 오른쪽으로 이동 중 → x 좌표는 현재 메모 위치 유지
-              newPosition.x = memo.position.x;
-            }
-
-            if (deltaY < 0) {
-              // 위로 이동 중 → y 좌표는 현재 메모 위치 유지
-              newPosition.y = memo.position.y;
-            } else if (deltaY > 0) {
-              // 아래로 이동 중 → y 좌표는 현재 메모 위치 유지
-              newPosition.y = memo.position.y;
-            }
-          }
-        }
-      }
-
-      // 빠른 드래그 시 업데이트 빈도 조절 (50ms마다만 업데이트)
-      const now = Date.now();
-      pendingPosition.current = newPosition;
-
-      if (now - lastUpdateTime.current >= 50) {
-        onPositionChange(memo.id, newPosition);
-        lastUpdateTime.current = now;
-      }
-    }
-  };
-
-  // ref에 최신 핸들러 저장
-  handleMouseMoveRef.current = handleMouseMove;
-
-  const handleMouseUp = (e: MouseEvent) => {
-    if (isDragging) {
-      // 드래그가 끝날 때 최종 위치 업데이트 (대기 중인 위치가 있으면 사용)
-      const finalPosition = pendingPosition.current || {
-        x: (e.clientX - dragStart.x - canvasOffset.x) / canvasScale,
-        y: (e.clientY - dragStart.y - canvasOffset.y) / canvasScale
-      };
-
-      // Shift 모드가 아닐 때만 최종 위치 업데이트 (Shift 모드는 handleShiftDrop에서 처리)
-      if (!isShiftPressed) {
-        onPositionChange(memo.id, finalPosition);
-      }
-
-      // 카테고리 감지
-      if (dragMoved && onDetectCategoryOnDrop) {
-        onDetectCategoryOnDrop(memo.id, finalPosition);
-      }
-
-      // 상태 초기화
-      pendingPosition.current = null;
-      lastUpdateTime.current = 0;
-      setCursorPosition(null); // 커서 위치 리셋
-    }
-
-    // 모든 경우에 상태 초기화 (드래그 임계값 미달로 드래그가 시작되지 않은 경우 포함)
-    setIsDragging(false);
-    setMouseDownPos(null);
-    onDragEnd?.();
-  };
-
-  // ref에 최신 핸들러 저장
-  handleMouseUpRef.current = handleMouseUp;
-
-  // 안정적인 이벤트 핸들러 래퍼 (useEffect 의존성 문제 해결)
-  React.useEffect(() => {
-    // 마우스 다운 상태이거나 드래그 중일 때 이벤트 리스너 등록
-    if (mouseDownPos || isDragging) {
-      const moveHandler = (e: MouseEvent) => handleMouseMoveRef.current?.(e);
-      const upHandler = (e: MouseEvent) => handleMouseUpRef.current?.(e);
-
-      document.addEventListener('mousemove', moveHandler);
-      document.addEventListener('mouseup', upHandler);
-      return () => {
-        document.removeEventListener('mousemove', moveHandler);
-        document.removeEventListener('mouseup', upHandler);
-      };
-    }
-  }, [mouseDownPos, isDragging]); // handleMouseMove, handleMouseUp 의존성 제거
 
   React.useEffect(() => {
     if (memoRef.current && onSizeChange) {
