@@ -66,56 +66,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   showGeneralContent,
   onResetFilters
 }) => {
-  // 모든 중요도 필터가 활성화되어 있고 일반 내용도 표시하는 기본 상태인지 확인
-  const isDefaultFilterState = () => {
-    const allLevels: ImportanceLevel[] = ['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'];
-
-    // activeImportanceFilters가 없거나 모든 레벨을 포함하고 있고, showGeneralContent가 true인 경우
-    return (!activeImportanceFilters ||
-            (activeImportanceFilters.size === allLevels.length &&
-             allLevels.every(level => activeImportanceFilters.has(level)))) &&
-           showGeneralContent !== false;
-  };
-
-  const canEdit = isDefaultFilterState();
-
-  // 필터링된 텍스트 생성 함수
-  const getFilteredText = () => {
-    if (!block.content) return '';
-    if (canEdit || (!activeImportanceFilters && showGeneralContent !== false)) {
-      return content; // 필터링 없음
-    }
-
-    if (!block.importanceRanges || block.importanceRanges.length === 0) {
-      return showGeneralContent === false ? '' : content;
-    }
-
-    // 간단한 필터링 적용
-    const ranges = [...block.importanceRanges].sort((a, b) => a.start - b.start);
-    let result = '';
-    let lastIndex = 0;
-
-    ranges.forEach(range => {
-      // 이전 부분 (일반 텍스트)
-      if (range.start > lastIndex && showGeneralContent !== false) {
-        result += block.content.substring(lastIndex, range.start);
-      }
-
-      // 현재 범위 (중요도 텍스트)
-      if (!activeImportanceFilters || activeImportanceFilters.has(range.level)) {
-        result += block.content.substring(range.start, range.end);
-      }
-
-      lastIndex = range.end;
-    });
-
-    // 마지막 부분 (일반 텍스트)
-    if (lastIndex < block.content.length && showGeneralContent !== false) {
-      result += block.content.substring(lastIndex);
-    }
-
-    return result;
-  };
   const [content, setContent] = useState(block.content);
   const [importanceRanges, setImportanceRanges] = useState<ImportanceRange[]>(block.importanceRanges || []);
   const [isFocused, setIsFocused] = useState(false);
@@ -126,6 +76,50 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   const [backgroundKey, setBackgroundKey] = useState(0); // 배경 레이어 강제 리렌더링용 key
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // 모든 중요도 필터가 활성화되어 있고 일반 내용도 표시하는 기본 상태인지 확인 - useMemo로 최적화
+  const canEdit = React.useMemo(() => {
+    const allLevels: ImportanceLevel[] = ['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'];
+
+    return (!activeImportanceFilters ||
+            (activeImportanceFilters.size === allLevels.length &&
+             allLevels.every(level => activeImportanceFilters.has(level)))) &&
+           showGeneralContent !== false;
+  }, [activeImportanceFilters, showGeneralContent]);
+
+  // 필터링된 텍스트 생성 함수 - useCallback으로 최적화
+  const getFilteredText = React.useCallback(() => {
+    if (!block.content) return '';
+    if (canEdit || (!activeImportanceFilters && showGeneralContent !== false)) {
+      return content;
+    }
+
+    if (!block.importanceRanges || block.importanceRanges.length === 0) {
+      return showGeneralContent === false ? '' : content;
+    }
+
+    const ranges = [...block.importanceRanges].sort((a, b) => a.start - b.start);
+    let result = '';
+    let lastIndex = 0;
+
+    ranges.forEach(range => {
+      if (range.start > lastIndex && showGeneralContent !== false) {
+        result += block.content.substring(lastIndex, range.start);
+      }
+
+      if (!activeImportanceFilters || activeImportanceFilters.has(range.level)) {
+        result += block.content.substring(range.start, range.end);
+      }
+
+      lastIndex = range.end;
+    });
+
+    if (lastIndex < block.content.length && showGeneralContent !== false) {
+      result += block.content.substring(lastIndex);
+    }
+
+    return result;
+  }, [block.content, block.importanceRanges, canEdit, content, activeImportanceFilters, showGeneralContent]);
 
   // 외부에서 블록 내용이 변경되었을 때 로컬 상태 동기화
   // 단, 포커스된 상태에서는 외부 변경을 무시 (사용자가 입력 중일 수 있음)
@@ -193,24 +187,14 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     // 로그 제거
   }, [showImportanceMenu, importanceMenuPosition]);
 
-  // 텍스트 영역 자동 리사이즈 (항상 적용)
+  // 텍스트 영역 자동 리사이즈 - 최적화
   useEffect(() => {
     const textarea = textareaRef.current;
-    if (textarea) {
-      const adjustHeight = () => {
-        textarea.style.height = '24px'; // 먼저 기본 높이로 설정
+    if (!textarea) return;
 
-        // 빈 내용이면 24px로 유지
-        if (content.trim() === '') {
-          return;
-        }
-
-        // 내용이 있으면 scrollHeight 사용하되, 한 줄일 때는 24px 유지
-        if (content.includes('\n') || textarea.scrollHeight > 24) {
-          textarea.style.height = `${textarea.scrollHeight}px`;
-        }
-      };
-      adjustHeight();
+    textarea.style.height = '24px';
+    if (content.trim() !== '' && (content.includes('\n') || textarea.scrollHeight > 24)) {
+      textarea.style.height = `${textarea.scrollHeight}px`;
     }
   }, [content]);
 
@@ -776,6 +760,17 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   // Hook은 조건문 밖에서 선언
   const backgroundLayerRef = React.useRef<HTMLDivElement>(null);
 
+  // 배경 레이어 렌더링 최적화 - useMemo로 캐싱
+  const backgroundLayer = React.useMemo(() => {
+    if (!importanceRanges || importanceRanges.length === 0) {
+      return null;
+    }
+
+    return (activeImportanceFilters || showGeneralContent !== undefined) ?
+      renderFilteredStyledText(content, importanceRanges, activeImportanceFilters, showGeneralContent) :
+      renderStyledText(content, importanceRanges);
+  }, [content, importanceRanges, activeImportanceFilters, showGeneralContent, backgroundKey]);
+
   if (isEditing) {
     // 편집 모드
     return (
@@ -787,33 +782,32 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
           display: 'flex',
           alignItems: 'center'
         }}>
-          {/* 배경에 스타일된 텍스트 표시 - div는 항상 렌더링, 내용만 조건부 */}
-          <div
-            ref={backgroundLayerRef}
-            data-importance-background="true"
-            key={`bg-${block.id}-${backgroundKey}`}
-            style={{
-              position: 'absolute',
-              top: '2px',
-              left: '0px',
-              right: '0px',
-              bottom: '0px',
-              fontFamily: 'inherit',
-              fontSize: '14px',
-              lineHeight: '1.4',
-              padding: '0px',
-              pointerEvents: 'none',
-              zIndex: 1,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              userSelect: 'none' // 선택 불가능하게
-            }}
-          >
-            {/* 로컬 상태의 importanceRanges를 즉시 반영 - 항상 렌더링 */}
-            {(activeImportanceFilters || showGeneralContent !== undefined) ?
-              renderFilteredStyledText(content, importanceRanges, activeImportanceFilters, showGeneralContent) :
-              renderStyledText(content, importanceRanges)}
-          </div>
+          {/* 배경에 스타일된 텍스트 표시 - 중요도가 있을 때만 렌더링 */}
+          {backgroundLayer && (
+            <div
+              ref={backgroundLayerRef}
+              data-importance-background="true"
+              key={`bg-${block.id}-${backgroundKey}`}
+              style={{
+                position: 'absolute',
+                top: '2px',
+                left: '0px',
+                right: '0px',
+                bottom: '0px',
+                fontFamily: 'inherit',
+                fontSize: '14px',
+                lineHeight: '1.4',
+                padding: '0px',
+                pointerEvents: 'none',
+                zIndex: 1,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                userSelect: 'none'
+              }}
+            >
+              {backgroundLayer}
+            </div>
+          )}
           <textarea
             ref={textareaRef}
             value={canEdit ? content : getFilteredText()}
