@@ -138,6 +138,16 @@ export const useRightPanelMemoView = ({
             e.target.style.color = '#6b7280';
           }}
         />
+
+        {/* 중요도 부여 안내 문구 */}
+        <div style={{
+          marginTop: '12px',
+          fontSize: '13px',
+          color: '#8b5cf6',
+          fontWeight: '500'
+        }}>
+          💡 tip! 텍스트를 드래그하거나 우클릭해 중요도를 부여해보세요
+        </div>
       </div>
     );
   };
