@@ -411,6 +411,23 @@ const RightPanel: React.FC<RightPanelProps> = ({
               {/* 드래그 선택 박스 오버레이 */}
               {renderDragSelectionOverlay()}
 
+              {/* 빈 상태 안내 문구 */}
+              {selectedMemo && selectedMemo.blocks.length === 0 && (
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  color: '#9ca3af',
+                  fontSize: '14px',
+                  textAlign: 'center',
+                  pointerEvents: 'none',
+                  userSelect: 'none'
+                }}>
+                  텍스트를 입력하거나 파일을 드래그해 추가하세요
+                </div>
+              )}
+
               {/* 블록들 */}
               {renderBlocks()}
             </div>

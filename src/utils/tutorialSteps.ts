@@ -57,14 +57,14 @@ export const coreTutorialSteps: TutorialStep[] = [
     action: 'none'
   },
 
-  // === 기본 기능 안내 ===
+  // === 완료 ===
   {
-    id: 'basic-features-intro',
-    title: '✅ 핵심 기능 완료!',
-    description: '핵심 기능을 모두 배우셨습니다!\n\n이제 메모를 작성하는 기본 기능들을 배워보시겠어요?\n\n기본 기능 포함:\n• 캔버스 조작 (이동, 확대/축소)\n• 메모/카테고리 생성 및 관리\n• 메모 편집 및 연결',
+    id: 'complete',
+    title: '튜토리얼 완료! 🎉',
+    description: '핵심 기능을 모두 배우셨습니다!\n\n이제 자유롭게 마인드맵 메모 앱을 사용해보세요.\n\n✅ 단축 이동: 자주 사용하는 메모를 즐겨찾기\n✅ 중요도 부여: 텍스트에 색상으로 분류\n✅ 중요도 필터: 원하는 내용만 선택적으로 보기\n✅ 통합 검색: 모든 페이지 빠르게 검색\n\n언제든지 좌측 상단의 "?" 버튼으로 튜토리얼을 다시 볼 수 있습니다.',
     position: 'center',
     action: 'none',
-    nextButtonText: '기본 기능 배우기'
+    nextButtonText: '시작하기'
   }
 ];
 
@@ -244,8 +244,5 @@ export const basicTutorialSteps: TutorialStep[] = [
   }
 ];
 
-// 전체 튜토리얼 (핵심 기능 먼저, 기본 기능 나중에)
-export const tutorialSteps: TutorialStep[] = [
-  ...coreTutorialSteps,
-  ...basicTutorialSteps.slice(1) // 기본 기능 인트로 제외하고 추가
-];
+// 전체 튜토리얼 (핵심 기능만 표시)
+export const tutorialSteps: TutorialStep[] = coreTutorialSteps;

@@ -207,6 +207,23 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
         onKeyPress={handleKeyPress}
       />
 
+      {/* 단축키 설명 */}
+      <div style={{
+        padding: '12px 16px',
+        borderTop: '1px solid #e5e7eb',
+        backgroundColor: '#f9fafb',
+        fontSize: '12px',
+        color: '#6b7280',
+        lineHeight: '1.6'
+      }}>
+        <div style={{ marginBottom: '4px' }}>
+          <span style={{ fontWeight: '600' }}>Space + 드래그</span> = 화면이동
+        </div>
+        <div>
+          <span style={{ fontWeight: '600' }}>Alt + 스크롤</span> = 확대/축소
+        </div>
+      </div>
+
       <Resizer direction="left" onResize={onResize} />
     </div>
   );
