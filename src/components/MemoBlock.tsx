@@ -776,14 +776,9 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} />
       </div>
 
-      {/* 드래그 중 힌트 UI - 메모 오른쪽에 고정 */}
+      {/* 드래그 중 힌트 UI - 메모 상단에 표시 */}
       {isDragging && !isShiftPressed && (
-        <div
-          className={styles.dragHint}
-          style={{
-            left: sizeConfig.width + 10
-          }}
-        >
+        <div className={styles.dragHint}>
           SHIFT + 드래그로 메모나 카테고리를 다른 카테고리 영역에 종속, 제거하세요
         </div>
       )}
