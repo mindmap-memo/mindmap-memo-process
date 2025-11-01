@@ -33,6 +33,7 @@ export const useMultiBlockImportance = ({
   }>>([]);
 
   const menuRef = React.useRef<HTMLDivElement>(null);
+  const savedSelectionRef = React.useRef<Range | null>(null);
 
   // 전역 텍스트 선택 감지
   const handleGlobalTextSelection = React.useCallback(() => {
@@ -134,6 +135,13 @@ export const useMultiBlockImportance = ({
 
     // 선택 범위 저장
     setSelectedBlocks(blocksInSelection);
+
+    // 현재 선택 영역을 저장 (메뉴가 열릴 때 선택이 풀리지 않도록)
+    try {
+      savedSelectionRef.current = range.cloneRange();
+    } catch (e) {
+      // 실패하면 무시
+    }
 
     // 메뉴 위치 계산
     const rect = range.getBoundingClientRect();
@@ -252,13 +260,30 @@ export const useMultiBlockImportance = ({
     // 히스토리 저장
     setTimeout(() => saveToHistory(), 50);
 
-    // 메뉴 닫기
+    // 메뉴 닫기 (선택은 유지)
     setShowImportanceMenu(false);
     setSelectedBlocks([]);
 
-    // 선택 해제
-    window.getSelection()?.removeAllRanges();
+    // 선택 해제는 약간 지연 (사용자가 결과를 볼 수 있도록)
+    setTimeout(() => {
+      window.getSelection()?.removeAllRanges();
+    }, 300);
   }, [selectedMemo, selectedBlocks, onMemoUpdate, saveToHistory]);
+
+  // 메뉴가 열릴 때 선택 영역 복원
+  React.useEffect(() => {
+    if (showImportanceMenu && savedSelectionRef.current) {
+      const selection = window.getSelection();
+      if (selection) {
+        try {
+          selection.removeAllRanges();
+          selection.addRange(savedSelectionRef.current);
+        } catch (e) {
+          // 실패하면 무시
+        }
+      }
+    }
+  }, [showImportanceMenu]);
 
   // 메뉴 외부 클릭 감지
   React.useEffect(() => {
@@ -266,6 +291,7 @@ export const useMultiBlockImportance = ({
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setShowImportanceMenu(false);
         setSelectedBlocks([]);
+        savedSelectionRef.current = null;
       }
     };
 
@@ -280,15 +306,29 @@ export const useMultiBlockImportance = ({
   // mouseup 이벤트로 텍스트 선택 감지
   React.useEffect(() => {
     const handleMouseUp = () => {
-      // 약간의 지연을 두고 선택 상태 확인 (브라우저가 선택을 완료할 시간을 줌)
+      // 브라우저가 선택을 완료할 시간을 충분히 줌
       setTimeout(() => {
         handleGlobalTextSelection();
-      }, 10);
+      }, 100);
     };
 
     document.addEventListener('mouseup', handleMouseUp);
+
+    // selectionchange 이벤트도 추가로 감지 (더 안정적)
+    const handleSelectionChange = () => {
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed) {
+        setTimeout(() => {
+          handleGlobalTextSelection();
+        }, 50);
+      }
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+
     return () => {
       document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('selectionchange', handleSelectionChange);
     };
   }, [handleGlobalTextSelection]);
 
