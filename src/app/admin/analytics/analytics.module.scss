@@ -52,8 +52,10 @@
 
 .container {
   min-height: 100vh;
+  height: auto;
   background-color: #f3f4f6;
   padding: 24px;
+  overflow-y: auto;
 }
 
 .header {
