@@ -65,6 +65,7 @@ const App: React.FC = () => {
     currentPageId,
     setCurrentPageId,
     isInitialLoadDone,
+    loadingProgress,
     selectedMemoId,
     setSelectedMemoId,
     selectedMemoIds,
@@ -721,9 +722,22 @@ const App: React.FC = () => {
     setShowQuickNavPanel
   });
 
-  // 초기 로딩이 완료될 때까지 렌더링하지 않음 (hydration 에러 방지)
+  // 초기 로딩이 완료될 때까지 로딩 인디케이터 표시
   if (!isInitialLoadDone) {
-    return null;
+    return (
+      <div className={styles['loading-container']}>
+        <div className={styles['loading-spinner']}></div>
+        <div className={styles['loading-text']}>Mindmap Memo 로딩 중...</div>
+        <div className={styles['loading-subtext']}>데이터를 불러오고 있습니다</div>
+        <div className={styles['loading-bar-container']}>
+          <div
+            className={styles['loading-bar']}
+            style={{ width: `${loadingProgress}%` }}
+          />
+        </div>
+        <div className={styles['loading-percentage']}>{loadingProgress}%</div>
+      </div>
+    );
   }
 
   return (
