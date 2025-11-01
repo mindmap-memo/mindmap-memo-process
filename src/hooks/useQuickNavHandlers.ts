@@ -85,7 +85,12 @@ export const useQuickNavHandlers = ({
 
       const memo = targetPage.memos.find((m) => m.id === memoId);
       if (!memo) {
-        console.error('[handleNavigateToMemo] Memo not found in target page!');
+        console.error('[handleNavigateToMemo] Memo not found in target page! Removing from quick nav.');
+        // 메모가 삭제되었으면 단축 이동 목록에서도 제거
+        const itemToDelete = quickNavItems.find(item => item.targetType === 'memo' && item.targetId === memoId);
+        if (itemToDelete) {
+          deleteQuickNavItem(itemToDelete.id);
+        }
         return;
       }
       console.log('[handleNavigateToMemo] Found memo:', memo.title, 'at position:', memo.position);
@@ -145,7 +150,12 @@ export const useQuickNavHandlers = ({
 
       const category = targetPage.categories?.find((c) => c.id === categoryId);
       if (!category) {
-        console.error('[handleNavigateToCategory] Category not found in target page!');
+        console.error('[handleNavigateToCategory] Category not found in target page! Removing from quick nav.');
+        // 카테고리가 삭제되었으면 단축 이동 목록에서도 제거
+        const itemToDelete = quickNavItems.find(item => item.targetType === 'category' && item.targetId === categoryId);
+        if (itemToDelete) {
+          deleteQuickNavItem(itemToDelete.id);
+        }
         return;
       }
       console.log('[handleNavigateToCategory] Found category:', category.title, 'at position:', category.position);

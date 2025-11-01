@@ -44,6 +44,7 @@ export const useBlockHandlers = (
     });
 
     onMemoUpdate(currentMemo.id, { blocks: updatedBlocks });
+    forceUpdate();
   }, [onMemoUpdate, forceUpdate]);
 
   // 블록 삭제
