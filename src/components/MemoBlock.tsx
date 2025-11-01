@@ -11,6 +11,8 @@ import {
   getHighestImportanceLevel
 } from './MemoBlock/utils/renderingUtils';
 import { useMemoBlockDrag } from './MemoBlock/hooks/useMemoBlockDrag';
+import { useMemoBlockState } from './MemoBlock/hooks/useMemoBlockState';
+import { useMemoBlockHandlers } from './MemoBlock/hooks/useMemoBlockHandlers';
 
 interface MemoBlockProps {
   memo: MemoBlockType;
@@ -97,19 +99,67 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
     connectingFromId
   });
 
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-  const [showQuickNavModal, setShowQuickNavModal] = useState(false);
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [editedTitle, setEditedTitle] = useState(memo.title);
-  const titleInputRef = React.useRef<HTMLInputElement>(null);
-  const [isEditingAllBlocks, setIsEditingAllBlocks] = useState(false);
-  const [editedAllContent, setEditedAllContent] = useState('');
-  const allBlocksInputRef = React.useRef<HTMLTextAreaElement>(null);
+  // 상태 관리 훅 사용
+  const state = useMemoBlockState(memo);
+  const {
+    contextMenu,
+    setContextMenu,
+    showQuickNavModal,
+    setShowQuickNavModal,
+    isEditingTitle,
+    setIsEditingTitle,
+    editedTitle,
+    setEditedTitle,
+    titleInputRef,
+    isEditingAllBlocks,
+    setIsEditingAllBlocks,
+    editedAllContent,
+    setEditedAllContent,
+    allContentTextareaRef: allBlocksInputRef,
+    isScrolling,
+    setIsScrolling,
+    scrollTimeout,
+    setScrollTimeout,
+    isHovering,
+    setIsHovering,
+    memoRef
+  } = state;
 
-  const [isScrolling, setIsScrolling] = useState(false);
-  const [scrollTimeout, setScrollTimeout] = useState<NodeJS.Timeout | null>(null);
-  const [isHovering, setIsHovering] = useState(false);
-  const memoRef = React.useRef<HTMLDivElement>(null);
+  // 핸들러 훅 사용
+  const handlers = useMemoBlockHandlers({
+    memo,
+    isSelected,
+    isEditingTitle,
+    setIsEditingTitle,
+    editedTitle,
+    setEditedTitle,
+    titleInputRef,
+    isEditingAllBlocks,
+    setIsEditingAllBlocks,
+    editedAllContent,
+    setEditedAllContent,
+    allBlocksInputRef,
+    setContextMenu,
+    setShowQuickNavModal,
+    setIsScrolling,
+    scrollTimeout,
+    setScrollTimeout,
+    onTitleUpdate,
+    onBlockUpdate,
+    onAddQuickNav
+  });
+
+  const {
+    handleContextMenu,
+    handleQuickNavConfirm,
+    handleTitleDoubleClick,
+    handleTitleBlur,
+    handleTitleKeyDown,
+    handleAllBlocksDoubleClick,
+    handleAllBlocksBlur,
+    handleAllBlocksKeyDown,
+    handleScroll
+  } = handlers;
 
   // 크기별 스타일 정의
   const getSizeConfig = (size: MemoDisplaySize) => {
@@ -151,23 +201,6 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
 
   const sizeConfig = getSizeConfig(memo.displaySize || 'small');
 
-  // 우클릭 메뉴 핸들러
-  const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault(); // 크롬 기본 우클릭 메뉴 막기
-    e.stopPropagation(); // 이벤트 전파 중단
-
-    // 컨텍스트 메뉴 표시
-    setContextMenu({ x: e.clientX, y: e.clientY });
-
-    // 추가 보험: 네이티브 이벤트에도 preventDefault 적용
-    if (e.nativeEvent) {
-      e.nativeEvent.preventDefault();
-      e.nativeEvent.stopImmediatePropagation();
-    }
-
-    return false; // 추가 보험
-  };
-
   // 컨텍스트 메뉴 닫기
   React.useEffect(() => {
     const handleClick = () => setContextMenu(null);
@@ -175,136 +208,12 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       document.addEventListener('click', handleClick);
       return () => document.removeEventListener('click', handleClick);
     }
-  }, [contextMenu]);
-
-  // 단축 이동 추가 확인
-  const handleQuickNavConfirm = (name: string) => {
-    if (name.trim() && onAddQuickNav) {
-      onAddQuickNav(name.trim(), memo.id, 'memo');
-      setShowQuickNavModal(false);
-    }
-  };
-
-  // 제목 더블클릭 핸들러
-  const handleTitleDoubleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isSelected && !isEditingTitle) {
-      setIsEditingTitle(true);
-      setEditedTitle(memo.title);
-      // 약간 지연 후 포커스 (렌더링 완료 후)
-      setTimeout(() => {
-        titleInputRef.current?.focus();
-        titleInputRef.current?.select();
-      }, 10);
-    }
-  };
-
-  // 제목 편집 완료
-  const handleTitleBlur = () => {
-    if (isEditingTitle) {
-      setIsEditingTitle(false);
-      if (editedTitle !== memo.title && onTitleUpdate) {
-        onTitleUpdate(memo.id, editedTitle);
-      }
-    }
-  };
-
-  // 제목 편집 중 엔터/ESC 처리
-  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleTitleBlur();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      setEditedTitle(memo.title);
-      setIsEditingTitle(false);
-    }
-  };
-
-  // 통합 편집 핸들러 - 모든 텍스트 블록을 하나로 합쳐서 편집
-  const handleAllBlocksDoubleClick = () => {
-    if (isSelected && !isEditingAllBlocks) {
-      // 모든 텍스트 블록의 내용을 \n\n으로 구분해서 합치기
-      const textBlocks = (memo.blocks || []).filter(b => b.type === 'text');
-      const combined = textBlocks.map(b => (b as any).content || '').join('\n\n');
-
-      setIsEditingAllBlocks(true);
-      setEditedAllContent(combined);
-      setTimeout(() => {
-        if (allBlocksInputRef.current) {
-          allBlocksInputRef.current.focus();
-          // 초기 높이 설정
-          allBlocksInputRef.current.style.height = 'auto';
-          allBlocksInputRef.current.style.height = allBlocksInputRef.current.scrollHeight + 'px';
-        }
-      }, 10);
-    }
-  };
-
-  // 통합 편집 완료 - \n\n 기준으로 블록 분리
-  const handleAllBlocksBlur = () => {
-    if (isEditingAllBlocks && onBlockUpdate) {
-      // \n\n 기준으로 블록 분리
-      const newContents = editedAllContent.split('\n\n').filter(c => c.trim() !== '');
-      const textBlocks = (memo.blocks || []).filter(b => b.type === 'text') as any[];
-
-      // 각 블록에 새 내용 업데이트
-      newContents.forEach((content, index) => {
-        if (textBlocks[index]) {
-          onBlockUpdate(memo.id, textBlocks[index].id, content);
-        }
-      });
-
-      setIsEditingAllBlocks(false);
-      setEditedAllContent('');
-    }
-  };
-
-  // 통합 편집 중 키 처리
-  const handleAllBlocksKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      // Enter = 블록 구분자 삽입 (\n\n)
-      e.preventDefault();
-      const cursorPos = e.currentTarget.selectionStart;
-      const before = editedAllContent.substring(0, cursorPos);
-      const after = editedAllContent.substring(cursorPos);
-      setEditedAllContent(before + '\n\n' + after);
-      // 커서 위치 조정
-      setTimeout(() => {
-        if (allBlocksInputRef.current) {
-          allBlocksInputRef.current.selectionStart = cursorPos + 2;
-          allBlocksInputRef.current.selectionEnd = cursorPos + 2;
-        }
-      }, 0);
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      setIsEditingAllBlocks(false);
-      setEditedAllContent('');
-    }
-    // Shift+Enter는 일반 \n으로 자동 처리됨
-  };
+  }, [contextMenu, setContextMenu]);
 
   // 배경색은 항상 흰색 또는 선택 시 회색 (#f3f4f6)
   const backgroundColor = React.useMemo(() => {
     return isSelected ? '#f3f4f6' : 'white';
   }, [isSelected]);
-
-  // 스크롤 이벤트 핸들러
-  const handleScroll = () => {
-    setIsScrolling(true);
-    
-    // 기존 타이머가 있다면 클리어
-    if (scrollTimeout) {
-      clearTimeout(scrollTimeout);
-    }
-    
-    // 1초 후 스크롤 상태를 false로 변경
-    const newTimeout = setTimeout(() => {
-      setIsScrolling(false);
-    }, 1000);
-    
-    setScrollTimeout(newTimeout);
-  };
 
   // 커스텀 스크롤바 스타일 추가
   React.useEffect(() => {
