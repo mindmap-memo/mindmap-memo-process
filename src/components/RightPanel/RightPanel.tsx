@@ -18,6 +18,7 @@ import { useRightPanelRendering } from './hooks/useRightPanelRendering';
 import { useRightPanelMenus } from './hooks/useRightPanelMenus';
 import { useRightPanelMemoView } from './hooks/useRightPanelMemoView';
 import { useEmptySpaceMenu } from './hooks/useEmptySpaceMenu';
+import { useMultiBlockImportance } from './hooks/useMultiBlockImportance';
 import PanelHeader from './PanelHeader';
 import MultiSelectView from './MultiSelectView';
 import CategoryEditView from './CategoryEditView';
@@ -309,6 +310,13 @@ const RightPanel: React.FC<RightPanelProps> = ({
     handleAddTextBlock
   });
 
+  // 멀티 블록 중요도 훅 사용
+  const { renderImportanceMenu } = useMultiBlockImportance({
+    selectedMemo: selectedMemo || null,
+    onMemoUpdate,
+    saveToHistory
+  });
+
   return (
     <div
       ref={rightPanelRef}
@@ -396,7 +404,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
               style={{
                 marginBottom: '16px',
                 position: 'relative',
-                userSelect: 'none',
                 minHeight: '200px',
                 padding: '20px'
               }}
@@ -450,6 +457,9 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
         {/* 빈 공간 우클릭 컨텍스트 메뉴 */}
         {renderEmptySpaceMenu()}
+
+        {/* 멀티 블록 중요도 메뉴 */}
+        {renderImportanceMenu()}
 
         {/* 숨겨진 파일 input */}
         <input
