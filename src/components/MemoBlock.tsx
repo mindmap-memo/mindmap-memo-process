@@ -648,21 +648,6 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
                       );
                       totalContentLength += 50; // 이미지는 대략 50글자로 계산
                     }
-                  } else if (block.type === 'callout') {
-                    const calloutBlock = block as any;
-                    renderedBlocks.push(
-                      <div key={block.id} style={{
-                        backgroundColor: '#f3f4f6',
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        margin: '2px 0',
-                        fontSize: '12px'
-                      }}>
-                        {calloutBlock.emoji && <span>{calloutBlock.emoji} </span>}
-                        {calloutBlock.content}
-                      </div>
-                    );
-                    totalContentLength += calloutBlock.content?.length || 0;
                   } else if (block.type === 'file') {
                     const fileBlock = block as any;
                     const fileImportanceStyle = fileBlock.importance ? getImportanceStyle(fileBlock.importance) : {};

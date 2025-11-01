@@ -1,14 +1,9 @@
 // Content Block Types
 export type ContentBlockType =
   | 'text'
-  | 'callout'
-  | 'checklist'
   | 'image'
   | 'file'
-  | 'bookmark'
-  | 'quote'
-  | 'code'
-  | 'sheets';
+  | 'bookmark';
 
 // Importance System
 export type ImportanceLevel = 'critical' | 'important' | 'opinion' | 'reference' | 'question' | 'idea' | 'data' | 'none';
@@ -29,24 +24,6 @@ export interface TextBlock extends BaseContentBlock {
   type: 'text';
   content: string;
   importanceRanges?: ImportanceRange[]; // 텍스트 내 중요도 범위들
-}
-
-export interface CalloutBlock extends BaseContentBlock {
-  type: 'callout';
-  content: string;
-  emoji?: string;
-  color?: string;
-  importance?: ImportanceLevel;
-}
-
-export interface ChecklistBlock extends BaseContentBlock {
-  type: 'checklist';
-  items: Array<{
-    id: string;
-    text: string;
-    checked: boolean;
-  }>;
-  importance?: ImportanceLevel;
 }
 
 export interface ImageBlock extends BaseContentBlock {
@@ -77,40 +54,11 @@ export interface BookmarkBlock extends BaseContentBlock {
   importance?: ImportanceLevel;
 }
 
-export interface QuoteBlock extends BaseContentBlock {
-  type: 'quote';
-  content: string;
-  author?: string;
-  importance?: ImportanceLevel;
-}
-
-export interface CodeBlock extends BaseContentBlock {
-  type: 'code';
-  content: string;
-  language?: string;
-  importance?: ImportanceLevel;
-}
-
-export interface SheetsBlock extends BaseContentBlock {
-  type: 'sheets';
-  url: string;
-  width?: number;
-  height?: number;
-  title?: string;
-  zoom?: number; // 확대/축소 비율 (%)
-  importance?: ImportanceLevel;
-}
-
 export type ContentBlock =
   | TextBlock
-  | CalloutBlock
-  | ChecklistBlock
   | ImageBlock
   | FileBlock
-  | BookmarkBlock
-  | QuoteBlock
-  | CodeBlock
-  | SheetsBlock;
+  | BookmarkBlock;
 
 export type MemoDisplaySize = 'small' | 'medium' | 'large';
 

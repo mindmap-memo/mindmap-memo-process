@@ -2,14 +2,9 @@ import React, { useState, useRef } from 'react';
 import { ContentBlock, ContentBlockType, ImportanceLevel } from '../types';
 import { shouldShowBlock } from '../utils/importanceStyles';
 import TextBlockComponent from './blocks/TextBlock/TextBlock';
-import CalloutBlockComponent from './blocks/CalloutBlock';
-import ChecklistBlockComponent from './blocks/ChecklistBlock';
 import ImageBlockComponent from './blocks/ImageBlock';
 import FileBlockComponent from './blocks/FileBlock';
 import BookmarkBlockComponent from './blocks/BookmarkBlock';
-import QuoteBlockComponent from './blocks/QuoteBlock';
-import CodeBlockComponent from './blocks/CodeBlock';
-import SheetsBlockComponent from './blocks/SheetsBlock';
 
 interface ContentBlockProps {
   block: ContentBlock;
@@ -104,20 +99,6 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
           showGeneralContent={showGeneralContent}
           onResetFilters={onResetFilters}
         />;
-      case 'callout':
-        return <CalloutBlockComponent
-          {...commonProps}
-          block={block as any}
-          activeImportanceFilters={activeImportanceFilters}
-          showGeneralContent={showGeneralContent}
-        />;
-      case 'checklist':
-        return <ChecklistBlockComponent
-          {...commonProps}
-          block={block as any}
-          activeImportanceFilters={activeImportanceFilters}
-          showGeneralContent={showGeneralContent}
-        />;
       case 'image':
         return <ImageBlockComponent
           {...commonProps}
@@ -138,29 +119,6 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
           block={block as any}
           activeImportanceFilters={activeImportanceFilters}
           showGeneralContent={showGeneralContent}
-        />;
-      case 'quote':
-        return <QuoteBlockComponent
-          {...commonProps}
-          block={block as any}
-          activeImportanceFilters={activeImportanceFilters}
-          showGeneralContent={showGeneralContent}
-        />;
-      case 'code':
-        return <CodeBlockComponent
-          {...commonProps}
-          block={block as any}
-          activeImportanceFilters={activeImportanceFilters}
-          showGeneralContent={showGeneralContent}
-        />;
-      case 'sheets':
-        return <SheetsBlockComponent
-          block={block as any}
-          onUpdate={onUpdate}
-          onDelete={() => onDelete?.(block.id)}
-          isSelected={isSelected}
-          onSelect={() => onBlockSelect?.(block.id)}
-          onCreateNewBlock={onCreateNewBlock}
         />;
       default:
         return null;
