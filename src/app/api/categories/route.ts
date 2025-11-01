@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
+import { requireAuth } from '../../../lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
 // POST /api/categories - Create new category
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication
+    const user = await requireAuth();
+
     const body = await request.json();
     const {
       id,
@@ -30,13 +34,14 @@ export async function POST(request: NextRequest) {
 
     await sql`
       INSERT INTO categories (
-        id, page_id, title, tags, connections,
+        id, page_id, user_id, title, tags, connections,
         position_x, position_y, original_position_x, original_position_y,
         width, height, is_expanded, children, parent_id
       )
       VALUES (
         ${id},
         ${pageId},
+        ${user.id},
         ${title},
         ${JSON.stringify(tags)},
         ${JSON.stringify(connections)},

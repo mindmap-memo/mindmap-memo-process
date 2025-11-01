@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
+import { requireAuth } from '../../../../lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -9,11 +10,14 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Require authentication
+    const user = await requireAuth();
+
     const { id } = await params;
     const body = await request.json();
 
-    // Update category in database
-    await sql`
+    // Update category in database (only if owned by user)
+    const result = await sql`
       UPDATE categories
       SET
         title = ${body.title || ''},
@@ -29,8 +33,16 @@ export async function PUT(
         children = ${JSON.stringify(body.children || [])},
         parent_id = ${body.parentId || null},
         updated_at = NOW()
-      WHERE id = ${id}
+      WHERE id = ${id} AND user_id = ${user.id}
+      RETURNING id
     `;
+
+    if (result.length === 0) {
+      return NextResponse.json(
+        { error: 'Category not found or unauthorized' },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -48,12 +60,23 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Require authentication
+    const user = await requireAuth();
+
     const { id } = await params;
 
-    await sql`
+    const result = await sql`
       DELETE FROM categories
-      WHERE id = ${id}
+      WHERE id = ${id} AND user_id = ${user.id}
+      RETURNING id
     `;
+
+    if (result.length === 0) {
+      return NextResponse.json(
+        { error: 'Category not found or unauthorized' },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
