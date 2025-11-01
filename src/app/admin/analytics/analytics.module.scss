@@ -51,11 +51,15 @@
 }
 
 .container {
-  min-height: 100vh;
-  height: auto;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
   background-color: #f3f4f6;
   padding: 24px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .header {
