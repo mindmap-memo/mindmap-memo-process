@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { ContentBlock, ContentBlockType, ImportanceLevel } from '../types';
 import { shouldShowBlock } from '../utils/importanceStyles';
-import TextBlockComponent from './blocks/TextBlock';
+import TextBlockComponent from './blocks/TextBlock/TextBlock';
 import CalloutBlockComponent from './blocks/CalloutBlock';
 import ChecklistBlockComponent from './blocks/ChecklistBlock';
 import ImageBlockComponent from './blocks/ImageBlock';

@@ -31,13 +31,6 @@ export const useBlockHandlers = (
         return { id: baseId, type, content: '' };
       case 'code':
         return { id: baseId, type, content: '', language: 'javascript' };
-      case 'table':
-        return {
-          id: baseId,
-          type,
-          headers: ['컬럼 1', '컬럼 2'],
-          rows: [['', ''], ['', '']]
-        };
       case 'sheets':
         return {
           id: baseId,

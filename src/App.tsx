@@ -23,7 +23,6 @@ import { useCategoryDrop } from './hooks/useCategoryDrop';
 import { usePositionHandlers } from './hooks/usePositionHandlers';
 import { useDeleteHandlers } from './hooks/useDeleteHandlers';
 import { useSelectedItems } from './hooks/useSelectedItems';
-import { useDataRegistry } from './hooks/useDataRegistry';
 import { useContextValues } from './hooks/useContextValues';
 import { CategoryArea } from './utils/categoryAreaUtils';
 import { AppProviders } from './contexts';
@@ -611,13 +610,6 @@ const App: React.FC = () => {
     deleteSelectedItem
   } = deleteHandlers;
 
-  // ===== Data Registry 초기화 (useDataRegistry 훅 사용) =====
-  useDataRegistry({
-    dataRegistry: appState.dataRegistry,
-    setDataRegistry: appState.setDataRegistry
-  });
-
-
   // ===== 현재 페이지 ID가 유효한지 확인하고 수정 =====
   useEffect(() => {
     if (pages.length > 0 && !pages.find(page => page.id === currentPageId)) {
@@ -660,8 +652,6 @@ const App: React.FC = () => {
     setCanvasOffset,
     canvasScale,
     setCanvasScale,
-    dataRegistry: appState.dataRegistry,
-    setDataRegistry: appState.setDataRegistry,
     isShiftPressed,
     setIsShiftPressed,
 

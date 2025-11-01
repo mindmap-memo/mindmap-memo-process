@@ -36,7 +36,10 @@
       "Bash(nul)",
       "Bash(git commit -m \"$(cat <<''EOF''\nrefactor: Canvas와 MemoBlock 컴포넌트 대규모 리팩토링\n\n- MemoBlock.tsx: 1168줄 → 822줄 (346줄, 30% 감소)\n  - useMemoBlockDrag 훅으로 드래그 로직 분리\n  - renderingUtils로 렌더링 유틸리티 함수 분리\n\n- useCanvasRendering.tsx: 1496줄 → 1270줄 (226줄, 15% 감소)\n  - useCategoryAreaCalculation 훅으로 영역 계산 로직 분리\n  - categoryAreaDragHandlers 유틸로 드래그 핸들러 분리\n\n- 새로운 Canvas 훅들 추가:\n  - useCacheManagement: 캐시 관리\n  - useCanvasKeyboard: 키보드 이벤트 처리\n  - useCategoryAreaColors: 카테고리 영역 색상 관리\n  - useCategoryHandlers: 카테고리 핸들러\n  - useConnectionPoints: 연결점 계산\n  - useContextMenuEffect: 컨텍스트 메뉴 효과\n\n- 코드 품질 개선:\n  - 중복 코드 제거\n  - 함수 단일 책임 원칙 준수\n  - 재사용성 및 테스트 용이성 향상\n  - CLAUDE.md 리팩토링 가이드라인 준수\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
       "Bash(git merge:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(timeout 10 bash:*)",
+      "Bash(git log:*)",
+      "Bash(if exist .next rmdir /s /q .next)"
     ],
     "deny": [],
     "ask": []

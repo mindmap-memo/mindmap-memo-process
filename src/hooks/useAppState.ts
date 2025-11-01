@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Page, QuickNavItem, ImportanceLevel, DataRegistry } from '../types';
+import { Page, QuickNavItem, ImportanceLevel } from '../types';
 import { DEFAULT_PAGES } from '../constants/defaultData';
 import { fetchPages } from '../utils/api';
 
@@ -120,9 +120,6 @@ export const useAppState = () => {
     isShiftPressedRef.current = isShiftPressed;
   }, [isShiftPressed]);
 
-  // ===== Data Registry =====
-  const [dataRegistry, setDataRegistry] = useState<DataRegistry>({});
-
   // ===== 드래그 상태 =====
   const [isDraggingMemo, setIsDraggingMemo] = useState<boolean>(false);
   const [draggingMemoId, setDraggingMemoId] = useState<string | null>(null);
@@ -196,10 +193,6 @@ export const useAppState = () => {
     isShiftPressed,
     setIsShiftPressed,
     isShiftPressedRef,
-
-    // Data Registry
-    dataRegistry,
-    setDataRegistry,
 
     // 드래그 상태
     isDraggingMemo,

@@ -27,8 +27,6 @@ interface UseContextValuesProps {
   setCanvasOffset: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
   canvasScale: number;
   setCanvasScale: React.Dispatch<React.SetStateAction<number>>;
-  dataRegistry: Record<string, any>;
-  setDataRegistry: React.Dispatch<React.SetStateAction<Record<string, any>>>;
   isShiftPressed: boolean;
   setIsShiftPressed: React.Dispatch<React.SetStateAction<boolean>>;
 
@@ -110,14 +108,12 @@ export const useContextValues = (props: UseContextValuesProps) => {
     setCanvasOffset: props.setCanvasOffset,
     canvasScale: props.canvasScale,
     setCanvasScale: props.setCanvasScale,
-    dataRegistry: props.dataRegistry,
-    setDataRegistry: props.setDataRegistry,
     isShiftPressed: props.isShiftPressed,
     setIsShiftPressed: props.setIsShiftPressed
   }), [
     props.pages, props.setPages, props.currentPageId, props.setCurrentPageId,
     props.currentPage, props.canvasOffset, props.setCanvasOffset,
-    props.canvasScale, props.setCanvasScale, props.dataRegistry, props.setDataRegistry,
+    props.canvasScale, props.setCanvasScale,
     props.isShiftPressed, props.setIsShiftPressed
   ]);
 
