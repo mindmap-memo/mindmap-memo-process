@@ -207,8 +207,6 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
                 setShowImportanceMenu(false);
                 setSelectedRange(null);
               }
-              // 텍스트 선택을 위해 이벤트 전파 막기
-              e.stopPropagation();
             }}
             onMouseUp={(e) => handleTextSelection(e)}
             data-block-id={block.id}

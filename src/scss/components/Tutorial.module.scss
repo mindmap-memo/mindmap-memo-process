@@ -252,6 +252,25 @@
   color: #666;
   white-space: pre-line;
 
+  // 순서 번호 강조 애니메이션 (1. 2. 3. 형식)
+  :global(.step-number) {
+    display: inline-block;
+    font-weight: 600;
+    color: #4A90E2;
+    animation: step-highlight 3s ease-in-out infinite;
+  }
+
+  :global(.step-number-1) {
+    animation-delay: 0s;
+  }
+
+  :global(.step-number-2) {
+    animation-delay: 1s;
+  }
+
+  :global(.step-number-3) {
+    animation-delay: 2s;
+  }
 }
 
 @keyframes step-highlight {
