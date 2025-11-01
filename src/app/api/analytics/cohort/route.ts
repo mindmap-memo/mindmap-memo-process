@@ -53,33 +53,17 @@ export async function GET(request: NextRequest) {
         const periodEnd = new Date(periodStart);
         periodEnd.setDate(periodEnd.getDate() + periodDays);
 
-        // 기기 필터 적용 - 동적 쿼리 생성
-        let query = `
+        // 기기 필터 적용 - 조건부 WHERE 절
+        const activeUsers = await sql`
           SELECT COUNT(DISTINCT user_email) as count
           FROM analytics_sessions
-          WHERE user_email = ANY($1)
-            AND session_start >= $2
-            AND session_start < $3
+          WHERE user_email = ANY(${userEmails})
+            AND session_start >= ${periodStart.toISOString()}
+            AND session_start < ${periodEnd.toISOString()}
+            AND (${deviceType}::text IS NULL OR device_type = ${deviceType})
+            AND (${browser}::text IS NULL OR browser = ${browser})
+            AND (${os}::text IS NULL OR os = ${os})
         `;
-        const params: any[] = [userEmails, periodStart.toISOString(), periodEnd.toISOString()];
-        let paramIndex = 4;
-
-        if (deviceType) {
-          query += ` AND device_type = $${paramIndex}`;
-          params.push(deviceType);
-          paramIndex++;
-        }
-        if (browser) {
-          query += ` AND browser = $${paramIndex}`;
-          params.push(browser);
-          paramIndex++;
-        }
-        if (os) {
-          query += ` AND os = $${paramIndex}`;
-          params.push(os);
-        }
-
-        const activeUsers = await sql(query, params);
 
         const activeCount = Number(activeUsers[0]?.count || 0);
         const retentionRate = cohort.total_users > 0
