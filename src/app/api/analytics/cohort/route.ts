@@ -11,6 +11,9 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'week'; // 'week' or 'month'
+    const deviceType = searchParams.get('deviceType'); // 'desktop', 'mobile', 'tablet', or null for all
+    const browser = searchParams.get('browser'); // browser filter or null for all
+    const os = searchParams.get('os'); // os filter or null for all
 
     // 코호트별 사용자 수 및 리텐션 계산
     const cohortField = type === 'week' ? 'cohort_week' : 'cohort_month';
@@ -50,13 +53,33 @@ export async function GET(request: NextRequest) {
         const periodEnd = new Date(periodStart);
         periodEnd.setDate(periodEnd.getDate() + periodDays);
 
-        const activeUsers = await sql`
+        // 기기 필터 적용 - 동적 쿼리 생성
+        let query = `
           SELECT COUNT(DISTINCT user_email) as count
           FROM analytics_sessions
-          WHERE user_email = ANY(${userEmails})
-            AND session_start >= ${periodStart.toISOString()}
-            AND session_start < ${periodEnd.toISOString()}
+          WHERE user_email = ANY($1)
+            AND session_start >= $2
+            AND session_start < $3
         `;
+        const params: any[] = [userEmails, periodStart.toISOString(), periodEnd.toISOString()];
+        let paramIndex = 4;
+
+        if (deviceType) {
+          query += ` AND device_type = $${paramIndex}`;
+          params.push(deviceType);
+          paramIndex++;
+        }
+        if (browser) {
+          query += ` AND browser = $${paramIndex}`;
+          params.push(browser);
+          paramIndex++;
+        }
+        if (os) {
+          query += ` AND os = $${paramIndex}`;
+          params.push(os);
+        }
+
+        const activeUsers = await sql(query, params);
 
         const activeCount = Number(activeUsers[0]?.count || 0);
         const retentionRate = cohort.total_users > 0

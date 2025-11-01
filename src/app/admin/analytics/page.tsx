@@ -77,6 +77,9 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(false);
   const [days, setDays] = useState(30);
   const [cohortType, setCohortType] = useState<'week' | 'day'>('week');
+  const [cohortDeviceFilter, setCohortDeviceFilter] = useState<string>('');
+  const [cohortBrowserFilter, setCohortBrowserFilter] = useState<string>('');
+  const [cohortOSFilter, setCohortOSFilter] = useState<string>('');
 
   const handleLogin = () => {
     if (password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD || password === 'admin123') {
@@ -95,9 +98,15 @@ export default function AnalyticsPage() {
       const endDate = new Date().toISOString();
       const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
+      // 코호트 필터 쿼리 파라미터 구성
+      const cohortParams = new URLSearchParams({ type: cohortType });
+      if (cohortDeviceFilter) cohortParams.append('deviceType', cohortDeviceFilter);
+      if (cohortBrowserFilter) cohortParams.append('browser', cohortBrowserFilter);
+      if (cohortOSFilter) cohortParams.append('os', cohortOSFilter);
+
       const [statsRes, cohortRes, deviceRes] = await Promise.all([
         fetch(`/api/analytics/stats?days=${days}`),
-        fetch(`/api/analytics/cohort?type=${cohortType}`),
+        fetch(`/api/analytics/cohort?${cohortParams.toString()}`),
         fetch(`/api/analytics/device-stats?startDate=${startDate}&endDate=${endDate}`),
       ]);
 
@@ -131,7 +140,7 @@ export default function AnalyticsPage() {
     if (isAuthorized) {
       fetchData();
     }
-  }, [days, cohortType]);
+  }, [days, cohortType, cohortDeviceFilter, cohortBrowserFilter, cohortOSFilter]);
 
   if (!isAuthorized) {
     return (
@@ -373,14 +382,65 @@ export default function AnalyticsPage() {
           <section className={styles.section}>
             <div className={styles.cohortHeader}>
               <h2>코호트 리텐션 분석</h2>
-              <select
-                value={cohortType}
-                onChange={(e) => setCohortType(e.target.value as 'week' | 'day')}
-                className={styles.cohortTypeSelector}
-              >
-                <option value="week">주간 분석</option>
-                <option value="day">일간 분석</option>
-              </select>
+              <div className={styles.cohortFilters}>
+                <select
+                  value={cohortType}
+                  onChange={(e) => setCohortType(e.target.value as 'week' | 'day')}
+                  className={styles.cohortTypeSelector}
+                >
+                  <option value="week">주간 분석</option>
+                  <option value="day">일간 분석</option>
+                </select>
+
+                <select
+                  value={cohortDeviceFilter}
+                  onChange={(e) => setCohortDeviceFilter(e.target.value)}
+                  className={styles.cohortFilterSelector}
+                >
+                  <option value="">전체 기기</option>
+                  <option value="desktop">Desktop</option>
+                  <option value="mobile">Mobile</option>
+                  <option value="tablet">Tablet</option>
+                </select>
+
+                <select
+                  value={cohortBrowserFilter}
+                  onChange={(e) => setCohortBrowserFilter(e.target.value)}
+                  className={styles.cohortFilterSelector}
+                >
+                  <option value="">전체 브라우저</option>
+                  <option value="Chrome">Chrome</option>
+                  <option value="Safari">Safari</option>
+                  <option value="Firefox">Firefox</option>
+                  <option value="Edge">Edge</option>
+                </select>
+
+                <select
+                  value={cohortOSFilter}
+                  onChange={(e) => setCohortOSFilter(e.target.value)}
+                  className={styles.cohortFilterSelector}
+                >
+                  <option value="">전체 OS</option>
+                  <option value="Windows">Windows</option>
+                  <option value="macOS">macOS</option>
+                  <option value="iOS">iOS</option>
+                  <option value="Android">Android</option>
+                  <option value="Linux">Linux</option>
+                </select>
+
+                {(cohortDeviceFilter || cohortBrowserFilter || cohortOSFilter) && (
+                  <button
+                    onClick={() => {
+                      setCohortDeviceFilter('');
+                      setCohortBrowserFilter('');
+                      setCohortOSFilter('');
+                    }}
+                    className={styles.clearFilterButton}
+                  >
+                    필터 초기화
+                  </button>
+                )}
+              </div>
             </div>
             {cohortData.length === 0 ? (
               <p className={styles.noData}>데이터가 없습니다. 사용자가 앱을 사용하면 데이터가 수집됩니다.</p>
