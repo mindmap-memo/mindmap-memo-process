@@ -14,6 +14,28 @@ interface CohortData {
   type: 'week' | 'day';
 }
 
+interface DeviceStats {
+  deviceType: string;
+  sessions: number;
+  uniqueUsers: number;
+  avgSessionDuration: number;
+  percentage: number;
+}
+
+interface BrowserStats {
+  browser: string;
+  sessions: number;
+  uniqueUsers: number;
+  percentage: number;
+}
+
+interface OSStats {
+  os: string;
+  sessions: number;
+  uniqueUsers: number;
+  percentage: number;
+}
+
 interface StatsData {
   overview: {
     totalUsers: number;
@@ -24,6 +46,9 @@ interface StatsData {
   eventCounts: { eventType: string; count: number; uniqueUsers: number }[];
   dailyEvents: { date: string; count: number }[];
   newUsers: { date: string; count: number }[];
+  deviceStats?: DeviceStats[];
+  browserStats?: BrowserStats[];
+  osStats?: OSStats[];
 }
 
 const EVENT_NAMES: Record<string, string> = {
@@ -66,15 +91,26 @@ export default function AnalyticsPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [statsRes, cohortRes] = await Promise.all([
+      // 날짜 범위 계산
+      const endDate = new Date().toISOString();
+      const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+      const [statsRes, cohortRes, deviceRes] = await Promise.all([
         fetch(`/api/analytics/stats?days=${days}`),
         fetch(`/api/analytics/cohort?type=${cohortType}`),
+        fetch(`/api/analytics/device-stats?startDate=${startDate}&endDate=${endDate}`),
       ]);
 
       const stats = await statsRes.json();
       const cohort = await cohortRes.json();
+      const device = await deviceRes.json();
 
-      setStatsData(stats);
+      setStatsData({
+        ...stats,
+        deviceStats: device.deviceStats,
+        browserStats: device.browserStats,
+        osStats: device.osStats
+      });
       setCohortData(cohort.cohorts || []);
     } catch (error) {
       console.error('Failed to fetch analytics data:', error);
@@ -182,6 +218,97 @@ export default function AnalyticsPage() {
                 </div>
               </div>
             </div>
+
+            {/* 기기별 통계 */}
+            <section className={styles.section}>
+              <h2>기기별 통계</h2>
+              <div className={styles.deviceStatsGrid}>
+                {/* 기기 타입 */}
+                <div className={styles.deviceCard}>
+                  <h3>기기 타입</h3>
+                  {statsData?.deviceStats && statsData.deviceStats.length > 0 ? (
+                    <div className={styles.deviceList}>
+                      {statsData.deviceStats.map((device) => (
+                        <div key={device.deviceType} className={styles.deviceItem}>
+                          <div className={styles.deviceInfo}>
+                            <span className={styles.deviceType}>{device.deviceType}</span>
+                            <span className={styles.devicePercentage}>{device.percentage}%</span>
+                          </div>
+                          <div className={styles.deviceBar}>
+                            <div
+                              className={styles.deviceBarFill}
+                              style={{ width: `${device.percentage}%` }}
+                            />
+                          </div>
+                          <div className={styles.deviceDetails}>
+                            세션: {device.sessions} | 사용자: {device.uniqueUsers} | 평균 시간:{' '}
+                            {Math.floor(device.avgSessionDuration / 60)}분
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className={styles.noData}>데이터 없음</p>
+                  )}
+                </div>
+
+                {/* 브라우저 */}
+                <div className={styles.deviceCard}>
+                  <h3>브라우저</h3>
+                  {statsData?.browserStats && statsData.browserStats.length > 0 ? (
+                    <div className={styles.deviceList}>
+                      {statsData.browserStats.map((browser) => (
+                        <div key={browser.browser} className={styles.deviceItem}>
+                          <div className={styles.deviceInfo}>
+                            <span className={styles.deviceType}>{browser.browser}</span>
+                            <span className={styles.devicePercentage}>{browser.percentage}%</span>
+                          </div>
+                          <div className={styles.deviceBar}>
+                            <div
+                              className={styles.deviceBarFill}
+                              style={{ width: `${browser.percentage}%`, backgroundColor: '#10b981' }}
+                            />
+                          </div>
+                          <div className={styles.deviceDetails}>
+                            세션: {browser.sessions} | 사용자: {browser.uniqueUsers}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className={styles.noData}>데이터 없음</p>
+                  )}
+                </div>
+
+                {/* 운영체제 */}
+                <div className={styles.deviceCard}>
+                  <h3>운영체제</h3>
+                  {statsData?.osStats && statsData.osStats.length > 0 ? (
+                    <div className={styles.deviceList}>
+                      {statsData.osStats.map((os) => (
+                        <div key={os.os} className={styles.deviceItem}>
+                          <div className={styles.deviceInfo}>
+                            <span className={styles.deviceType}>{os.os}</span>
+                            <span className={styles.devicePercentage}>{os.percentage}%</span>
+                          </div>
+                          <div className={styles.deviceBar}>
+                            <div
+                              className={styles.deviceBarFill}
+                              style={{ width: `${os.percentage}%`, backgroundColor: '#f59e0b' }}
+                            />
+                          </div>
+                          <div className={styles.deviceDetails}>
+                            세션: {os.sessions} | 사용자: {os.uniqueUsers}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className={styles.noData}>데이터 없음</p>
+                  )}
+                </div>
+              </div>
+            </section>
 
             {/* 이벤트 통계 */}
             <section className={styles.section}>

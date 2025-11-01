@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { AnalyticsEventType } from '../types';
+import { getDeviceInfo } from '../utils/deviceDetection';
 
 /**
  * useAnalytics
@@ -22,6 +23,9 @@ export const useAnalytics = () => {
     sessionIdRef.current = sessionId;
     sessionStartTimeRef.current = Date.now();
 
+    // 기기 정보 수집
+    const deviceInfo = getDeviceInfo();
+
     try {
       await fetch('/api/analytics/session', {
         method: 'POST',
@@ -29,7 +33,11 @@ export const useAnalytics = () => {
         body: JSON.stringify({
           sessionId,
           userEmail: session.user.email,
-          action: 'start'
+          action: 'start',
+          deviceType: deviceInfo.deviceType,
+          browser: deviceInfo.browser,
+          os: deviceInfo.os,
+          screenResolution: deviceInfo.screenResolution
         })
       });
     } catch (error) {

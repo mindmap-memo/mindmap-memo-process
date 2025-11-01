@@ -41,6 +41,10 @@ export interface AnalyticsSession {
   sessionStart: string;
   sessionEnd?: string;
   durationSeconds?: number;
+  deviceType?: string;
+  browser?: string;
+  os?: string;
+  screenResolution?: string;
   createdAt: string;
 }
 
@@ -75,4 +79,26 @@ export interface DailyStats {
   uniqueUsers: number;
   avgSessionDuration: number;
   events: Record<AnalyticsEventType, number>;
+}
+
+export interface DeviceStats {
+  deviceType: string;
+  sessions: number;
+  uniqueUsers: number;
+  avgSessionDuration: number;
+  percentage: number;
+}
+
+export interface BrowserStats {
+  browser: string;
+  sessions: number;
+  uniqueUsers: number;
+  percentage: number;
+}
+
+export interface OSStats {
+  os: string;
+  sessions: number;
+  uniqueUsers: number;
+  percentage: number;
 }

@@ -9,13 +9,13 @@ const sql = neon(process.env.DATABASE_URL!);
  */
 export async function POST(request: NextRequest) {
   try {
-    const { sessionId, userEmail, action, durationSeconds } = await request.json();
+    const { sessionId, userEmail, action, durationSeconds, deviceType, browser, os, screenResolution } = await request.json();
 
     if (action === 'start') {
       // 세션 시작
       await sql`
-        INSERT INTO analytics_sessions (id, user_email, session_start)
-        VALUES (${sessionId}, ${userEmail}, NOW())
+        INSERT INTO analytics_sessions (id, user_email, session_start, device_type, browser, os, screen_resolution)
+        VALUES (${sessionId}, ${userEmail}, NOW(), ${deviceType}, ${browser}, ${os}, ${screenResolution})
       `;
 
       // 사용자 코호트 정보 업데이트 (첫 로그인 시)
