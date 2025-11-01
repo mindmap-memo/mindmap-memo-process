@@ -1,5 +1,6 @@
 import React from 'react';
 import { CategoryBlock, MemoBlock, Page } from '../../types';
+import { useAnalyticsTrackers } from '../../features/analytics/hooks/useAnalyticsTrackers';
 
 interface CategoryEditViewProps {
   selectedCategory: CategoryBlock;
@@ -21,13 +22,21 @@ const CategoryEditView: React.FC<CategoryEditViewProps> = ({
   onCategorySelect,
   onFocusMemo
 }) => {
+  const analytics = useAnalyticsTrackers();
+
   return (
     <div>
       <div style={{ marginBottom: '16px', paddingLeft: '20px' }}>
         <input
           type="text"
           value={selectedCategory.title}
-          onChange={(e) => onCategoryUpdate({ ...selectedCategory, title: e.target.value })}
+          onChange={(e) => {
+            onCategoryUpdate({ ...selectedCategory, title: e.target.value });
+            // Track analytics (only if title is not empty)
+            if (e.target.value.trim()) {
+              analytics.trackCategoryTitleEdited();
+            }
+          }}
           placeholder="카테고리 제목을 입력하세요..."
           style={{
             width: '100%',

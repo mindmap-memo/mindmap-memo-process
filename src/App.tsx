@@ -34,6 +34,8 @@ import { coreTutorialSteps, basicTutorialSteps } from './utils/tutorialSteps';
 import { QuickNavPanel } from './components/QuickNavPanel';
 import { useMigration } from './features/migration/hooks/useMigration';
 import { MigrationPrompt } from './features/migration/components/MigrationPrompt';
+import { useAnalytics } from './features/analytics/hooks/useAnalytics';
+import { useAnalyticsTrackers } from './features/analytics/hooks/useAnalyticsTrackers';
 import styles from './scss/App.module.scss';
 
 // 개발 환경에서만 디버깅 도구 로드
@@ -44,6 +46,10 @@ if (process.env.NODE_ENV === 'development') {
 const App: React.FC = () => {
   // ===== 세션 정보 =====
   const { data: session } = useSession();
+
+  // ===== 애널리틱스 =====
+  useAnalytics(); // 세션 자동 추적
+  const analytics = useAnalyticsTrackers();
 
   // ===== 마이그레이션 관리 =====
   const migration = useMigration(!!session);
@@ -456,6 +462,7 @@ const App: React.FC = () => {
   });
 
   const {
+    selectPage,
     addPage,
     updatePageName,
     deletePage
@@ -754,7 +761,7 @@ const App: React.FC = () => {
         <LeftPanel
           pages={pages}
           currentPageId={currentPageId}
-          onPageSelect={setCurrentPageId}
+          onPageSelect={selectPage}
           onAddPage={addPage}
           onPageNameChange={updatePageName}
           onDeletePage={deletePage}
@@ -800,8 +807,12 @@ const App: React.FC = () => {
         onAddMemo={(position) => {
           addMemoBlock(position);
           handleSubStepEvent('memo-created');
+          analytics.trackMemoCreated();
         }}
-        onAddCategory={addCategory}
+        onAddCategory={(position) => {
+          addCategory(position);
+          analytics.trackCategoryCreated();
+        }}
         onDeleteMemo={deleteMemoBlock}
         onDeleteCategory={deleteCategory}
         onDeleteSelected={deleteSelectedItem}
@@ -831,6 +842,7 @@ const App: React.FC = () => {
         onConnectMemos={(fromId, toId) => {
           connectMemos(fromId, toId);
           handleSubStepEvent('connection-completed');
+          analytics.trackConnectionCreated();
         }}
         onCancelConnection={cancelConnection}
         onRemoveConnection={removeConnection}

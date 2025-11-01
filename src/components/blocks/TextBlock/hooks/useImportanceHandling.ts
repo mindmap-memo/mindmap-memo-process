@@ -1,5 +1,6 @@
 import React from 'react';
 import { ImportanceLevel, ImportanceRange, TextBlock } from '../../../../types';
+import { useAnalyticsTrackers } from '../../../../features/analytics/hooks/useAnalyticsTrackers';
 
 interface UseImportanceHandlingParams {
   block: TextBlock;
@@ -35,6 +36,7 @@ export const useImportanceHandling = (params: UseImportanceHandlingParams) => {
     onUpdate,
     onSaveToHistory
   } = params;
+  const analytics = useAnalyticsTrackers();
 
   // 텍스트 선택 처리 (드래그 끝난 후)
   const handleTextSelection = (e: React.MouseEvent) => {
@@ -199,6 +201,11 @@ export const useImportanceHandling = (params: UseImportanceHandlingParams) => {
     // 중요도 변경 시 히스토리 저장
     if (onSaveToHistory) {
       setTimeout(() => onSaveToHistory(), 50);
+    }
+
+    // Track analytics (only if not removing importance)
+    if (level !== 'none') {
+      analytics.trackImportanceAssigned(level);
     }
 
     // 메뉴 닫기 및 포커스 복원

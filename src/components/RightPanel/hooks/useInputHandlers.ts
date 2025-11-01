@@ -1,5 +1,6 @@
 import React from 'react';
 import { MemoBlock } from '../../../types';
+import { useAnalyticsTrackers } from '../../../features/analytics/hooks/useAnalyticsTrackers';
 
 export interface UseInputHandlersProps {
   selectedMemo: MemoBlock | null;
@@ -33,6 +34,7 @@ export const useInputHandlers = ({
   setSelectedBlocks
 }: UseInputHandlersProps): UseInputHandlersReturn => {
   const [tagInput, setTagInput] = React.useState('');
+  const analytics = useAnalyticsTrackers();
 
   const handleTitleChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (!selectedMemo) {
@@ -45,10 +47,15 @@ export const useInputHandlers = ({
     }
     try {
       onMemoUpdate(selectedMemo.id, { title: e.target.value });
+
+      // Track analytics (only if title is not empty)
+      if (e.target.value.trim()) {
+        analytics.trackMemoTitleEdited();
+      }
     } catch (error) {
       console.error('[useInputHandlers] handleTitleChange error:', error);
     }
-  }, [selectedMemo, onMemoUpdate]);
+  }, [selectedMemo, onMemoUpdate, analytics]);
 
   const handleTagInputChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setTagInput(e.target.value);
@@ -59,10 +66,12 @@ export const useInputHandlers = ({
       const newTag = tagInput.trim();
       if (!selectedMemo.tags.includes(newTag)) {
         onMemoUpdate(selectedMemo.id, { tags: [...selectedMemo.tags, newTag] });
+        // Track analytics
+        analytics.trackTagCreated(newTag);
       }
       setTagInput('');
     }
-  }, [tagInput, selectedMemo, onMemoUpdate]);
+  }, [tagInput, selectedMemo, onMemoUpdate, analytics]);
 
   const removeTag = React.useCallback((tagToRemove: string) => {
     if (selectedMemo) {

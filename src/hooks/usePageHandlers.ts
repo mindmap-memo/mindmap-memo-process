@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { Page } from '../types';
 import { createPage, deletePage as deletePageApi } from '../utils/api';
+import { useAnalyticsTrackers } from '../features/analytics/hooks/useAnalyticsTrackers';
 
 /**
  * usePageHandlers
@@ -28,6 +29,21 @@ export const usePageHandlers = ({
   currentPageId,
   setCurrentPageId
 }: UsePageHandlersProps) => {
+  const analytics = useAnalyticsTrackers();
+
+  /**
+   * 페이지 선택 (analytics 추적 포함)
+   */
+  const selectPage = useCallback(
+    (pageId: string) => {
+      if (pageId !== currentPageId) {
+        analytics.trackPageSwitched(currentPageId, pageId);
+        setCurrentPageId(pageId);
+      }
+    },
+    [currentPageId, setCurrentPageId, analytics]
+  );
+
   /**
    * 새 페이지 추가 (DB에 저장)
    */
@@ -49,11 +65,14 @@ export const usePageHandlers = ({
       };
       setPages((prev) => [...prev, newPage]);
       setCurrentPageId(newPage.id);
+
+      // Track analytics
+      analytics.trackPageCreated();
     } catch (error) {
       console.error('페이지 생성 실패:', error);
       alert('페이지 생성에 실패했습니다.');
     }
-  }, [pages.length, setPages, setCurrentPageId]);
+  }, [pages.length, setPages, setCurrentPageId, analytics]);
 
   /**
    * 페이지 삭제 (DB에서 삭제)
@@ -96,6 +115,7 @@ export const usePageHandlers = ({
   );
 
   return {
+    selectPage,
     addPage,
     deletePage,
     updatePageName
