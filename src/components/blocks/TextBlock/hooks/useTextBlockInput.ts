@@ -1,5 +1,6 @@
 import React from 'react';
 import { TextBlock, ImportanceRange, ContentBlock } from '../../../../types';
+import { useAnalyticsTrackers } from '../../../../features/analytics/hooks/useAnalyticsTrackers';
 
 interface UseTextBlockInputParams {
   block: TextBlock;
@@ -35,6 +36,7 @@ export const useTextBlockInput = (params: UseTextBlockInputParams) => {
     onMergeWithPrevious,
     onSaveToHistory
   } = params;
+  const analytics = useAnalyticsTrackers();
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Enter로 새 텍스트 블록 생성 (Shift+Enter는 줄바꿈)
@@ -136,6 +138,11 @@ export const useTextBlockInput = (params: UseTextBlockInputParams) => {
     if (onUpdate) {
       onUpdate({ ...block, content: newContent, importanceRanges });
     }
+
+    // Track analytics (only if content is not empty)
+    if (newContent.trim()) {
+      analytics.trackMemoContentEdited();
+    }
   };
 
   // 붙여넣기 핸들러
@@ -166,6 +173,8 @@ export const useTextBlockInput = (params: UseTextBlockInputParams) => {
             if (onSaveToHistory) {
               setTimeout(() => onSaveToHistory(), 100);
             }
+            // Track analytics
+            analytics.trackFileAttached('image');
           };
           reader.readAsDataURL(file);
         }
@@ -192,6 +201,8 @@ export const useTextBlockInput = (params: UseTextBlockInputParams) => {
             if (onSaveToHistory) {
               setTimeout(() => onSaveToHistory(), 100);
             }
+            // Track analytics
+            analytics.trackFileAttached('file');
           };
           reader.readAsDataURL(file);
         }

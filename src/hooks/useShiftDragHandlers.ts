@@ -2,6 +2,7 @@ import { useCallback, MutableRefObject } from 'react';
 import { Page, MemoBlock, CategoryBlock, CanvasActionType } from '../types';
 import { calculateCategoryArea } from '../utils/categoryAreaUtils';
 import { removeInvalidConnectionsAfterHierarchyChange } from '../utils/categoryHierarchyUtils';
+import { useAnalyticsTrackers } from '../features/analytics/hooks/useAnalyticsTrackers';
 
 interface UseShiftDragHandlersProps {
   pages: Page[];
@@ -28,6 +29,7 @@ export const useShiftDragHandlers = ({
   saveCanvasState,
   clearCategoryCache
 }: UseShiftDragHandlersProps) => {
+  const analytics = useAnalyticsTrackers();
 
   // 겹침 체크 헬퍼 함수
   const isOverlapping = useCallback((bounds1: any, bounds2: any, margin = 50) => {
@@ -294,6 +296,13 @@ export const useShiftDragHandlers = ({
             if (category.id === newParentId) {
               const currentChildren = category.children || [];
               const newChildren = [...currentChildren, ...categoriesToMove.filter(id => !currentChildren.includes(id))];
+
+              // Track analytics (only when actually adding new children)
+              const addedCount = newChildren.length - currentChildren.length;
+              if (addedCount > 0) {
+                analytics.trackCategoryChildAdded('category');
+              }
+
               return {
                 ...category,
                 children: newChildren,
@@ -553,6 +562,9 @@ export const useShiftDragHandlers = ({
             if (category.id === newParentId) {
               const currentChildren = category.children || [];
               if (!currentChildren.includes(draggedMemo.id)) {
+                // Track analytics
+                analytics.trackCategoryChildAdded('memo');
+
                 return {
                   ...category,
                   children: [...currentChildren, draggedMemo.id],
