@@ -62,49 +62,67 @@ export const useMultiBlockImportance = ({
       end: number;
     }> = [];
 
+    // 선택된 텍스트를 블록별로 분해
+    const selectedTextLines = selectedText.split('\n');
+    let currentLineIndex = 0;
+
     // 모든 TextBlock 요소 순회
     selectedMemo.blocks.forEach(block => {
       if (block.type !== 'text') return;
 
-      const blockElement = document.querySelector(`[data-block-id="${block.id}"]`);
-      if (!blockElement) return;
-
-      const textarea = blockElement.querySelector('textarea');
+      const textarea = document.querySelector(`textarea[data-block-id="${block.id}"]`) as HTMLTextAreaElement;
       if (!textarea) return;
 
-      // 이 블록이 선택 범위에 포함되는지 확인
-      if (selection.containsNode(blockElement, true)) {
-        // 블록 전체 텍스트
-        const blockText = (block as TextBlock).content;
+      const blockText = (block as TextBlock).content;
 
-        // 선택된 텍스트에서 이 블록의 텍스트가 어디에 있는지 찾기
-        let start = 0;
-        let end = blockText.length;
+      // 이 textarea가 선택 범위와 교차하는지 확인
+      try {
+        if (!range.intersectsNode(textarea)) {
+          return;
+        }
+      } catch (e) {
+        return;
+      }
 
-        // 시작점과 끝점 계산
-        if (range.startContainer.parentElement?.closest('[data-block-id]') === blockElement) {
-          // 선택 시작이 이 블록 안에 있음
-          const startOffset = getTextOffsetInTextarea(textarea, range.startContainer, range.startOffset);
-          if (startOffset !== -1) {
-            start = startOffset;
+      // 선택 시작과 끝 오프셋 계산
+      let start = 0;
+      let end = blockText.length;
+
+      // 포커스된 textarea인 경우 selectionStart/End 사용
+      if (document.activeElement === textarea) {
+        start = textarea.selectionStart;
+        end = textarea.selectionEnd;
+      } else {
+        // 포커스되지 않은 경우, 텍스트 비교로 범위 추정
+        // 선택된 텍스트에 이 블록의 텍스트가 포함되어 있는지 확인
+        const blockLines = blockText.split('\n');
+
+        // 블록 전체가 선택된 경우
+        if (selectedText.includes(blockText)) {
+          start = 0;
+          end = blockText.length;
+        } else {
+          // 부분 선택: 첫 줄과 마지막 줄 찾기
+          const firstLine = blockLines[0];
+          const lastLine = blockLines[blockLines.length - 1];
+
+          if (selectedText.includes(firstLine) || selectedText.includes(lastLine)) {
+            // 이 블록의 일부가 선택됨
+            start = 0;
+            end = blockText.length;
+          } else {
+            // 선택 범위 밖
+            return;
           }
         }
+      }
 
-        if (range.endContainer.parentElement?.closest('[data-block-id]') === blockElement) {
-          // 선택 끝이 이 블록 안에 있음
-          const endOffset = getTextOffsetInTextarea(textarea, range.endContainer, range.endOffset);
-          if (endOffset !== -1) {
-            end = endOffset;
-          }
-        }
-
-        if (start < end) {
-          blocksInSelection.push({
-            blockId: block.id,
-            start,
-            end
-          });
-        }
+      if (start < end) {
+        blocksInSelection.push({
+          blockId: block.id,
+          start,
+          end
+        });
       }
     });
 
@@ -150,25 +168,6 @@ export const useMultiBlockImportance = ({
     setMenuPosition({ x, y });
     setShowImportanceMenu(true);
   }, [selectedMemo]);
-
-  // textarea 내에서 텍스트 오프셋 계산
-  const getTextOffsetInTextarea = (
-    textarea: HTMLTextAreaElement,
-    container: Node,
-    offset: number
-  ): number => {
-    // textarea인 경우 직접 selectionStart 사용
-    if (container === textarea) {
-      return textarea.selectionStart;
-    }
-
-    // textarea의 텍스트 노드인 경우
-    if (container.nodeType === Node.TEXT_NODE && container.parentElement === textarea) {
-      return offset;
-    }
-
-    return -1;
-  };
 
   // 중요도 적용
   const applyImportance = React.useCallback((level: ImportanceLevel) => {
