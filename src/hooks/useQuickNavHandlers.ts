@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { QuickNavItem, Page } from '../types';
 import { calculateCategoryArea } from '../utils/categoryAreaUtils';
 import { createQuickNavItem, updateQuickNavItem as updateQuickNavItemApi, deleteQuickNavItem as deleteQuickNavItemApi } from '../utils/api';
+import { useAnalyticsTrackers } from '../features/analytics/hooks/useAnalyticsTrackers';
 
 /**
  * useQuickNavHandlers
@@ -67,6 +68,7 @@ export const useQuickNavHandlers = ({
   setCanvasOffset,
   setCanvasScale
 }: UseQuickNavHandlersProps) => {
+  const analytics = useAnalyticsTrackers();
   /**
    * 메모로 네비게이션
    * 캔버스 뷰를 메모 중심으로 이동하고 초기 줌 레벨로 설정
@@ -272,6 +274,9 @@ export const useQuickNavHandlers = ({
             return page;
           })
         );
+
+        // Track analytics
+        analytics.trackQuickNavCreated(targetType);
       } catch (error) {
         console.error('단축 이동 추가 실패:', error);
         // 실패 시 롤백
@@ -387,6 +392,9 @@ export const useQuickNavHandlers = ({
    */
   const executeQuickNav = useCallback(
     (item: QuickNavItem) => {
+      // Track analytics
+      analytics.trackQuickNavUsed(item.targetType);
+
       // 페이지가 다르면 페이지 전환
       if (item.pageId !== currentPageId) {
         setCurrentPageId(item.pageId);
@@ -407,7 +415,7 @@ export const useQuickNavHandlers = ({
         }
       }
     },
-    [currentPageId, setCurrentPageId, handleNavigateToMemo, handleNavigateToCategory]
+    [currentPageId, setCurrentPageId, handleNavigateToMemo, handleNavigateToCategory, analytics]
   );
 
   return {

@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { Page, CategoryBlock, ImportanceLevel } from '../types';
 import { calculateCategoryArea } from '../utils/categoryAreaUtils';
+import { useAnalyticsTrackers } from '../features/analytics/hooks/useAnalyticsTrackers';
 
 /**
  * useSelectionHandlers
@@ -38,6 +39,7 @@ interface UseSelectionHandlersProps {
 }
 
 export const useSelectionHandlers = (props: UseSelectionHandlersProps) => {
+  const analytics = useAnalyticsTrackers();
   const {
     pages,
     currentPageId,
@@ -280,14 +282,21 @@ export const useSelectionHandlers = (props: UseSelectionHandlersProps) => {
   const toggleImportanceFilter = useCallback((level: ImportanceLevel) => {
     setActiveImportanceFilters(prev => {
       const newSet = new Set(prev);
+      const isAdding = !newSet.has(level);
       if (newSet.has(level)) {
         newSet.delete(level);
       } else {
         newSet.add(level);
       }
+
+      // Track analytics (only when adding filter)
+      if (isAdding) {
+        analytics.trackImportanceFilterUsed(Array.from(newSet));
+      }
+
       return newSet;
     });
-  }, [setActiveImportanceFilters]);
+  }, [setActiveImportanceFilters, analytics]);
 
   // 필터 초기화
   const resetFiltersToDefault = useCallback(() => {
