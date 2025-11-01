@@ -9,7 +9,6 @@ import FileBlockComponent from './blocks/FileBlock';
 import BookmarkBlockComponent from './blocks/BookmarkBlock';
 import QuoteBlockComponent from './blocks/QuoteBlock';
 import CodeBlockComponent from './blocks/CodeBlock';
-import TableBlockComponent from './blocks/TableBlock';
 import SheetsBlockComponent from './blocks/SheetsBlock';
 
 interface ContentBlockProps {
@@ -154,45 +153,14 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
           activeImportanceFilters={activeImportanceFilters}
           showGeneralContent={showGeneralContent}
         />;
-      case 'table':
-        return <TableBlockComponent
-          {...commonProps}
-          block={block as any}
-          pageId={pageId}
-          memoId={memoId}
-          activeImportanceFilters={activeImportanceFilters}
-          showGeneralContent={showGeneralContent}
-        />;
       case 'sheets':
-        return <SheetsBlockComponent 
-          block={block as any} 
+        return <SheetsBlockComponent
+          block={block as any}
           onUpdate={onUpdate}
           onDelete={() => onDelete?.(block.id)}
-          isSelected={isSelected} 
+          isSelected={isSelected}
           onSelect={() => onBlockSelect?.(block.id)}
           onCreateNewBlock={onCreateNewBlock}
-          onCreateTableBlock={(tableData) => {
-            // 구글 시트 데이터로 새 테이블 블록 생성
-            if (onUpdate) {
-              // 현재 블록 위치를 찾고 바로 뒤에 새 테이블 블록 추가
-              const tableBlock = {
-                id: `table-${Date.now()}`,
-                type: 'table' as const,
-                headers: tableData.headers,
-                rows: tableData.rows,
-                columns: tableData.columns || [], // 감지된 컬럼 정보
-                cells: tableData.cells || []      // 생성된 셀 데이터
-              };
-              
-              // 부모 컴포넌트에 새 블록을 추가하라고 신호를 보냄
-              (window as any).createTableAfterBlock = {
-                afterBlockId: block.id,
-                tableBlock: tableBlock
-              };
-              
-              alert('시트 데이터가 테이블 블록으로 생성되었습니다!');
-            }
-          }}
         />;
       default:
         return null;

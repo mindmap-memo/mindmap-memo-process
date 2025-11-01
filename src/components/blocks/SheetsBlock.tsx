@@ -16,12 +16,6 @@ interface SheetsBlockProps {
   onDelete?: () => void;
   isSelected?: boolean;
   onSelect?: () => void;
-  onCreateTableBlock?: (tableData: { 
-    headers: string[], 
-    rows: string[][], 
-    columns?: any[], 
-    cells?: any[] 
-  }) => void;
   onCreateNewBlock?: (afterBlockId: string, content: string) => void;
 }
 
@@ -31,7 +25,6 @@ const SheetsBlock: React.FC<SheetsBlockProps> = ({
   onDelete,
   isSelected,
   onSelect,
-  onCreateTableBlock,
   onCreateNewBlock
 }) => {
   const [isEditing, setIsEditing] = useState(!block.url);
@@ -189,51 +182,9 @@ const SheetsBlock: React.FC<SheetsBlockProps> = ({
   };
 
   const handleExtractData = async () => {
-    if (!isUserSignedIn()) {
-      alert('구글 계정에 로그인이 필요합니다.');
-      return;
-    }
-
-    if (!block.url) {
-      alert('먼저 구글 시트 URL을 입력해주세요.');
-      return;
-    }
-
-    const sheetId = parseSheetUrl(block.url);
-    if (!sheetId) {
-      alert('올바른 구글 시트 URL이 아닙니다.');
-      return;
-    }
-
-    setIsExtracting(true);
-    
-    try {
-      // 시트 접근 권한 확인
-      await checkSheetAccess(sheetId);
-      
-      // 데이터 가져오기 (범위 지정)
-      const sheetData = await getSheetData(sheetId, extractRange);
-      
-      if (!sheetData) {
-        alert('시트 데이터를 가져올 수 없습니다.');
-        return;
-      }
-
-      // 테이블 데이터로 변환
-      const tableData = convertSheetDataToTable(sheetData);
-      
-      // 새 테이블 블록 생성
-      if (onCreateTableBlock) {
-        onCreateTableBlock(tableData);
-        alert('시트 데이터가 테이블 블록으로 생성되었습니다!');
-      }
-      
-    } catch (error: any) {
-      console.error('데이터 추출 실패:', error);
-      alert(error.message || '데이터 추출 중 오류가 발생했습니다.');
-    } finally {
-      setIsExtracting(false);
-    }
+    // 테이블 블록 기능이 제거되어 이 함수는 더 이상 사용되지 않습니다.
+    // 데이터 추출이 필요한 경우 "텍스트로 추출" 버튼을 사용하세요.
+    alert('테이블 블록 기능이 제거되었습니다. "텍스트로 추출" 버튼을 사용하세요.');
   };
 
   const handleExtractAsText = async () => {
