@@ -39,7 +39,11 @@
       "Bash(git push:*)",
       "Bash(timeout 10 bash:*)",
       "Bash(git log:*)",
-      "Bash(if exist .next rmdir /s /q .next)"
+      "Bash(if exist .next rmdir /s /q .next)",
+      "Bash(if exist nul del nul 2)",
+      "Bash(NUL)",
+      "Bash(git rm:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
