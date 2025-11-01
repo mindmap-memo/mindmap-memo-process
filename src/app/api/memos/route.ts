@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
+import { requireAuth } from '../../../lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
 // POST /api/memos - Create new memo
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication
+    const user = await requireAuth();
+
     const body = await request.json();
     const {
       id,
@@ -30,13 +34,14 @@ export async function POST(request: NextRequest) {
 
     await sql`
       INSERT INTO memos (
-        id, page_id, title, blocks, tags, connections,
+        id, page_id, user_id, title, blocks, tags, connections,
         position_x, position_y, width, height,
         display_size, importance, parent_id
       )
       VALUES (
         ${id},
         ${pageId},
+        ${user.id},
         ${title},
         ${JSON.stringify(blocks)},
         ${JSON.stringify(tags)},

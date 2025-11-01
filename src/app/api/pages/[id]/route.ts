@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
+import { requireAuth } from '../../../../lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -9,16 +10,27 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Require authentication
+    const user = await requireAuth();
+
     const { id } = await params;
     const body = await request.json();
 
-    await sql`
+    const result = await sql`
       UPDATE pages
       SET
         name = ${body.name || ''},
         updated_at = NOW()
-      WHERE id = ${id}
+      WHERE id = ${id} AND user_id = ${user.id}
+      RETURNING id
     `;
+
+    if (result.length === 0) {
+      return NextResponse.json(
+        { error: 'Page not found or unauthorized' },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -36,13 +48,24 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Require authentication
+    const user = await requireAuth();
+
     const { id } = await params;
 
     // CASCADE will automatically delete associated memos and categories
-    await sql`
+    const result = await sql`
       DELETE FROM pages
-      WHERE id = ${id}
+      WHERE id = ${id} AND user_id = ${user.id}
+      RETURNING id
     `;
+
+    if (result.length === 0) {
+      return NextResponse.json(
+        { error: 'Page not found or unauthorized' },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

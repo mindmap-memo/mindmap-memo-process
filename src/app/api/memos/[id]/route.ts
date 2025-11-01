@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
+import { requireAuth } from '../../../../lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -9,14 +10,17 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Require authentication
+    const user = await requireAuth();
+
     const { id } = await params;
     const body = await request.json();
 
-    console.log(`[서버] 메모 업데이트, id: ${id}`);
+    console.log(`[서버] 메모 업데이트, id: ${id}, user: ${user.email}`);
     console.log(`[서버] body.blocks:`, JSON.stringify(body.blocks, null, 2));
 
-    // Update memo in database
-    await sql`
+    // Update memo in database (only if owned by user)
+    const result = await sql`
       UPDATE memos
       SET
         title = ${body.title || ''},
@@ -31,8 +35,17 @@ export async function PUT(
         importance = ${body.importance || null},
         parent_id = ${body.parentId || null},
         updated_at = NOW()
-      WHERE id = ${id}
+      WHERE id = ${id} AND user_id = ${user.id}
+      RETURNING id
     `;
+
+    if (result.length === 0) {
+      console.log(`[서버] 메모 업데이트 실패: 권한 없음 또는 존재하지 않음`);
+      return NextResponse.json(
+        { error: 'Memo not found or unauthorized' },
+        { status: 404 }
+      );
+    }
 
     console.log(`[서버] 메모 업데이트 완료`);
 
@@ -52,12 +65,23 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Require authentication
+    const user = await requireAuth();
+
     const { id } = await params;
 
-    await sql`
+    const result = await sql`
       DELETE FROM memos
-      WHERE id = ${id}
+      WHERE id = ${id} AND user_id = ${user.id}
+      RETURNING id
     `;
+
+    if (result.length === 0) {
+      return NextResponse.json(
+        { error: 'Memo not found or unauthorized' },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
