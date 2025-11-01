@@ -17,36 +17,12 @@ export const useBlockHandlers = (
     switch (type) {
       case 'text':
         return { id: baseId, type, content: '' };
-      case 'callout':
-        return { id: baseId, type, content: '', emoji: '💡', color: 'blue' };
-      case 'checklist':
-        return { id: baseId, type, items: [] };
       case 'image':
         return { id: baseId, type, url: '' };
       case 'file':
         return { id: baseId, type, url: '', name: '' };
       case 'bookmark':
         return { id: baseId, type, url: '' };
-      case 'quote':
-        return { id: baseId, type, content: '' };
-      case 'code':
-        return { id: baseId, type, content: '', language: 'javascript' };
-      case 'table':
-        return {
-          id: baseId,
-          type,
-          headers: ['컬럼 1', '컬럼 2'],
-          rows: [['', ''], ['', '']]
-        };
-      case 'sheets':
-        return {
-          id: baseId,
-          type,
-          url: '',
-          width: 800,
-          height: 400,
-          zoom: 100
-        };
       default:
         return { id: baseId, type: 'text', content: '' } as any;
     }
@@ -68,6 +44,7 @@ export const useBlockHandlers = (
     });
 
     onMemoUpdate(currentMemo.id, { blocks: updatedBlocks });
+    forceUpdate();
   }, [onMemoUpdate, forceUpdate]);
 
   // 블록 삭제

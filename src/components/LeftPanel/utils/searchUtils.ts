@@ -84,16 +84,6 @@ export const searchBlockMetadata = (block: ContentBlock, query: string): boolean
       return flexibleMatch(block.title || '', query) ||
              flexibleMatch(block.description || '', query) ||
              flexibleMatch(block.url || '', query);
-    case 'callout':
-      // 콜아웃 내용 검색
-      return flexibleMatch(block.content || '', query);
-    case 'quote':
-      // 인용구 내용과 저자 검색
-      return flexibleMatch(block.content || '', query) ||
-             flexibleMatch(block.author || '', query);
-    case 'code':
-      // 코드 내용 검색
-      return flexibleMatch(block.content || '', query);
     default:
       return false;
   }

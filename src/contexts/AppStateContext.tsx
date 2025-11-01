@@ -1,5 +1,5 @@
 import React, { createContext, useContext, ReactNode } from 'react';
-import { Page, MemoBlock, CategoryBlock, DataRegistry } from '../types';
+import { Page, MemoBlock, CategoryBlock } from '../types';
 
 // AppState Context 타입 정의
 export interface AppStateContextType {
@@ -15,10 +15,6 @@ export interface AppStateContextType {
   setCanvasOffset: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
   canvasScale: number;
   setCanvasScale: React.Dispatch<React.SetStateAction<number>>;
-
-  // Data Registry
-  dataRegistry: DataRegistry;
-  setDataRegistry: React.Dispatch<React.SetStateAction<DataRegistry>>;
 
   // Shift 키 상태
   isShiftPressed: boolean;

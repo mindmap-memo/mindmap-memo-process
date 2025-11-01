@@ -211,6 +211,13 @@ export const useContextMenu = ({
             }]
           };
         }
+        // 이미지, 파일, 북마크 블록인 경우 importance 속성 설정
+        if (block.type === 'image' || block.type === 'file' || block.type === 'bookmark') {
+          return {
+            ...block,
+            importance: level === 'none' ? undefined : level
+          };
+        }
       }
       return block;
     }) || [];

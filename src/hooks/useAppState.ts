@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Page, QuickNavItem, ImportanceLevel, DataRegistry } from '../types';
+import { Page, QuickNavItem, ImportanceLevel } from '../types';
 import { DEFAULT_PAGES } from '../constants/defaultData';
 import { fetchPages } from '../utils/api';
 
@@ -41,12 +41,20 @@ export const useAppState = () => {
   const [pages, setPages] = useState<Page[]>([]);
   const [currentPageId, setCurrentPageId] = useState<string>('1');
   const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
 
   // 초기 데이터 로드
   useEffect(() => {
     const loadInitialData = async () => {
       try {
+        setLoadingProgress(10);
+
+        // 데이터 페칭 시작
+        setLoadingProgress(30);
         const loadedPages = await fetchPages();
+
+        setLoadingProgress(60);
+
         if (loadedPages.length > 0) {
           setPages(loadedPages);
           setCurrentPageId(loadedPages[0].id);
@@ -56,13 +64,24 @@ export const useAppState = () => {
           setPages(DEFAULT_PAGES);
           setCurrentPageId('1');
         }
+
+        setLoadingProgress(90);
+
+        // UI 렌더링을 위한 짧은 대기
+        await new Promise(resolve => setTimeout(resolve, 100));
+
       } catch (error) {
         console.error('데이터베이스 연결 실패. 기본 페이지로 시작합니다:', error);
         console.log('데이터베이스를 사용하려면 create-tables.sql을 실행하세요.');
         setPages(DEFAULT_PAGES);
         setCurrentPageId('1');
+        setLoadingProgress(90);
       } finally {
-        setIsInitialLoadDone(true);
+        setLoadingProgress(100);
+        // 100% 애니메이션을 보여주기 위한 짧은 대기
+        setTimeout(() => {
+          setIsInitialLoadDone(true);
+        }, 200);
       }
     };
 
@@ -120,9 +139,6 @@ export const useAppState = () => {
     isShiftPressedRef.current = isShiftPressed;
   }, [isShiftPressed]);
 
-  // ===== Data Registry =====
-  const [dataRegistry, setDataRegistry] = useState<DataRegistry>({});
-
   // ===== 드래그 상태 =====
   const [isDraggingMemo, setIsDraggingMemo] = useState<boolean>(false);
   const [draggingMemoId, setDraggingMemoId] = useState<string | null>(null);
@@ -136,6 +152,7 @@ export const useAppState = () => {
     currentPageId,
     setCurrentPageId,
     isInitialLoadDone,
+    loadingProgress,
 
     // 선택 상태 (메모)
     selectedMemoId,
@@ -196,10 +213,6 @@ export const useAppState = () => {
     isShiftPressed,
     setIsShiftPressed,
     isShiftPressedRef,
-
-    // Data Registry
-    dataRegistry,
-    setDataRegistry,
 
     // 드래그 상태
     isDraggingMemo,

@@ -12,7 +12,6 @@ import { useContextMenu } from './hooks/useContextMenu';
 import { useBlockDrag } from './hooks/useBlockDrag';
 import { useInputHandlers } from './hooks/useInputHandlers';
 import { useKeyboardEvents } from './hooks/useKeyboardEvents';
-import { useTableCreation } from './hooks/useTableCreation';
 import { useConnectedMemos } from './hooks/useConnectedMemos';
 import { useUIState } from './hooks/useUIState';
 import { useRightPanelRendering } from './hooks/useRightPanelRendering';
@@ -222,12 +221,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
     handleBlocksMove,
     handleUndo,
     handleRedo
-  });
-
-  // 테이블 생성 신호 감지 훅 사용
-  useTableCreation({
-    selectedMemo: selectedMemo || null,
-    onMemoUpdate
   });
 
   // 연결된 메모 자동 펼침 훅 사용

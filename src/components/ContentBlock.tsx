@@ -1,16 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { ContentBlock, ContentBlockType, ImportanceLevel } from '../types';
 import { shouldShowBlock } from '../utils/importanceStyles';
-import TextBlockComponent from './blocks/TextBlock';
-import CalloutBlockComponent from './blocks/CalloutBlock';
-import ChecklistBlockComponent from './blocks/ChecklistBlock';
+import TextBlockComponent from './blocks/TextBlock/TextBlock';
 import ImageBlockComponent from './blocks/ImageBlock';
 import FileBlockComponent from './blocks/FileBlock';
 import BookmarkBlockComponent from './blocks/BookmarkBlock';
-import QuoteBlockComponent from './blocks/QuoteBlock';
-import CodeBlockComponent from './blocks/CodeBlock';
-import TableBlockComponent from './blocks/TableBlock';
-import SheetsBlockComponent from './blocks/SheetsBlock';
 
 interface ContentBlockProps {
   block: ContentBlock;
@@ -105,20 +99,6 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
           showGeneralContent={showGeneralContent}
           onResetFilters={onResetFilters}
         />;
-      case 'callout':
-        return <CalloutBlockComponent
-          {...commonProps}
-          block={block as any}
-          activeImportanceFilters={activeImportanceFilters}
-          showGeneralContent={showGeneralContent}
-        />;
-      case 'checklist':
-        return <ChecklistBlockComponent
-          {...commonProps}
-          block={block as any}
-          activeImportanceFilters={activeImportanceFilters}
-          showGeneralContent={showGeneralContent}
-        />;
       case 'image':
         return <ImageBlockComponent
           {...commonProps}
@@ -139,60 +119,6 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
           block={block as any}
           activeImportanceFilters={activeImportanceFilters}
           showGeneralContent={showGeneralContent}
-        />;
-      case 'quote':
-        return <QuoteBlockComponent
-          {...commonProps}
-          block={block as any}
-          activeImportanceFilters={activeImportanceFilters}
-          showGeneralContent={showGeneralContent}
-        />;
-      case 'code':
-        return <CodeBlockComponent
-          {...commonProps}
-          block={block as any}
-          activeImportanceFilters={activeImportanceFilters}
-          showGeneralContent={showGeneralContent}
-        />;
-      case 'table':
-        return <TableBlockComponent
-          {...commonProps}
-          block={block as any}
-          pageId={pageId}
-          memoId={memoId}
-          activeImportanceFilters={activeImportanceFilters}
-          showGeneralContent={showGeneralContent}
-        />;
-      case 'sheets':
-        return <SheetsBlockComponent 
-          block={block as any} 
-          onUpdate={onUpdate}
-          onDelete={() => onDelete?.(block.id)}
-          isSelected={isSelected} 
-          onSelect={() => onBlockSelect?.(block.id)}
-          onCreateNewBlock={onCreateNewBlock}
-          onCreateTableBlock={(tableData) => {
-            // 구글 시트 데이터로 새 테이블 블록 생성
-            if (onUpdate) {
-              // 현재 블록 위치를 찾고 바로 뒤에 새 테이블 블록 추가
-              const tableBlock = {
-                id: `table-${Date.now()}`,
-                type: 'table' as const,
-                headers: tableData.headers,
-                rows: tableData.rows,
-                columns: tableData.columns || [], // 감지된 컬럼 정보
-                cells: tableData.cells || []      // 생성된 셀 데이터
-              };
-              
-              // 부모 컴포넌트에 새 블록을 추가하라고 신호를 보냄
-              (window as any).createTableAfterBlock = {
-                afterBlockId: block.id,
-                tableBlock: tableBlock
-              };
-              
-              alert('시트 데이터가 테이블 블록으로 생성되었습니다!');
-            }
-          }}
         />;
       default:
         return null;
