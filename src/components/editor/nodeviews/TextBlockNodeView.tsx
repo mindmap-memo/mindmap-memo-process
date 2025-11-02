@@ -33,6 +33,8 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
     // 블록 내의 모든 텍스트에 ImportanceMark 적용
     if (editor && typeof getPos === 'function') {
       const pos = getPos();
+      if (typeof pos !== 'number') return;
+
       const from = pos + 1; // 블록 시작 위치
       const to = pos + node.nodeSize - 1; // 블록 끝 위치
 
@@ -134,9 +136,8 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
           flex: 1,
           minWidth: 0,
           outline: 'none',
-          userDrag: 'none',
           WebkitUserDrag: 'none',
-        }}
+        } as React.CSSProperties}
       />
     </NodeViewWrapper>
   );

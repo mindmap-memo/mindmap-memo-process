@@ -357,7 +357,7 @@ export default function BlockEditor({
     if (JSON.stringify(currentContent) !== JSON.stringify(content)) {
       // requestAnimationFrame을 사용하여 React 렌더링 사이클 이후에 실행
       requestAnimationFrame(() => {
-        editor.commands.setContent(content, false);
+        editor.commands.setContent(content, { emitUpdate: false });
       });
     }
   }, [editor, initialBlocks]); // initialBlocks가 바뀔 때마다 에디터 내용 업데이트
