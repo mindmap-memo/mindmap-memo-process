@@ -9,7 +9,13 @@ const sql = neon(process.env.DATABASE_URL!);
  */
 export async function POST(request: NextRequest) {
   try {
-    const { sessionId, userEmail, action, durationSeconds } = await request.json();
+    // 빈 요청 본문 처리
+    const text = await request.text();
+    if (!text) {
+      return NextResponse.json({ error: 'Empty request body' }, { status: 400 });
+    }
+
+    const { sessionId, userEmail, action, durationSeconds } = JSON.parse(text);
 
     if (action === 'start') {
       // 세션 시작

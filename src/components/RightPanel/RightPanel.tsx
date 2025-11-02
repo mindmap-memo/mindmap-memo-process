@@ -3,6 +3,7 @@ import { MemoBlock, Page, ImportanceLevel, CategoryBlock } from '../../types';
 import { IMPORTANCE_LABELS, IMPORTANCE_COLORS } from '../../utils/importanceStyles';
 import Resizer from '../Resizer';
 import ContentBlockComponent from '../ContentBlock';
+import BlockEditor from '../editor/BlockEditor';
 import GoogleAuth from '../GoogleAuth';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useBlockHandlers } from './hooks/useBlockHandlers';
@@ -428,8 +429,14 @@ const RightPanel: React.FC<RightPanelProps> = ({
                 </div>
               )}
 
-              {/* 블록들 */}
-              {renderBlocks()}
+              {/* 블록 에디터 */}
+              <BlockEditor
+                initialBlocks={selectedMemo.blocks}
+                onChange={(blocks) => {
+                  onMemoUpdate(selectedMemo.id, { blocks });
+                }}
+                placeholder="텍스트를 입력하거나 파일을 드래그해 추가하세요"
+              />
             </div>
 
           </div>

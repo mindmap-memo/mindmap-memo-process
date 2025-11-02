@@ -54,7 +54,8 @@ export const useDragSelection = ({
                                 target.tagName === 'INPUT' ||
                                 target.tagName === 'TEXTAREA' ||
                                 target.closest('button') !== null ||
-                                target.closest('textarea') !== null;
+                                target.closest('textarea') !== null ||
+                                target.closest('.ProseMirror') !== null;
 
     // 오른쪽 패널 전체에서 드래그 허용 (블록 편집 모드일 때만)
     const isInRightPanel = rightPanelRef.current?.contains(target) ||

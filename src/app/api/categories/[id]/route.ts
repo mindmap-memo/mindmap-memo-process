@@ -14,7 +14,11 @@ export async function PUT(
     const user = await requireAuth();
 
     const { id } = await params;
-    const body = await request.json();
+    const text = await request.text();
+    if (!text) {
+      return NextResponse.json({ error: 'Empty request body' }, { status: 400 });
+    }
+    const body = JSON.parse(text);
 
     // Update category in database (only if owned by user)
     const result = await sql`

@@ -10,7 +10,11 @@ export async function POST(request: NextRequest) {
     // Require authentication
     const user = await requireAuth();
 
-    const body = await request.json();
+    const text = await request.text();
+    if (!text) {
+      return NextResponse.json({ error: 'Empty request body' }, { status: 400 });
+    }
+    const body = JSON.parse(text);
     const {
       id,
       pageId,
