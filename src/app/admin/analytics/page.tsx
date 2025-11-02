@@ -24,6 +24,7 @@ interface StatsData {
   eventCounts: { eventType: string; count: number; uniqueUsers: number }[];
   dailyEvents: { date: string; count: number }[];
   newUsers: { date: string; count: number }[];
+  todayActiveUsers: { email: string; lastActive: string }[];
 }
 
 const EVENT_NAMES: Record<string, string> = {
@@ -239,6 +240,25 @@ export default function AnalyticsPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </section>
+
+            {/* 당일 활성 사용자 */}
+            <section className={styles.section}>
+              <h2>당일 활성 사용자 ({statsData?.todayActiveUsers?.length || 0}명)</h2>
+              <div className={styles.userList}>
+                {statsData?.todayActiveUsers && statsData.todayActiveUsers.length > 0 ? (
+                  statsData.todayActiveUsers.map((user) => (
+                    <div key={user.email} className={styles.userItem}>
+                      <div className={styles.userEmail}>{user.email}</div>
+                      <div className={styles.userLastActive}>
+                        {new Date(user.lastActive).toLocaleString('ko-KR')}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className={styles.noData}>당일 활성 사용자가 없습니다.</p>
+                )}
               </div>
             </section>
           </>
