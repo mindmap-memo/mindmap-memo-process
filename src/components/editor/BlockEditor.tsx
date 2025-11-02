@@ -366,7 +366,17 @@ export default function BlockEditor({
     },
     onUpdate: ({ editor }) => {
       if (onChange) {
-        const blocks = editorContentToBlocks(editor.getJSON());
+        let blocks = editorContentToBlocks(editor.getJSON());
+
+        // 모든 블록이 삭제된 경우 빈 textBlock 하나를 유지
+        if (blocks.length === 0) {
+          blocks = [{
+            id: Date.now().toString(),
+            type: 'text',
+            content: '',
+          }];
+        }
+
         isInternalUpdateRef.current = true; // 내부 업데이트 플래그 설정
         onChange(blocks);
       }

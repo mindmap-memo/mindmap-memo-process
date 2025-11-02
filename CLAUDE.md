@@ -36,22 +36,20 @@ This is a React TypeScript mindmap memo application built with Next.js 15 (App R
 Core types in `src/types/index.ts`:
 
 - **MemoBlock**: Individual memo with title, content, tags, connections array, position, and optional size. Contains `blocks` array for rich content
-- **ContentBlock**: Notion-style content blocks with 8 types: text, callout, checklist, image, file, bookmark, quote, code
+- **ContentBlock**: Block-based content with 4 types: text, image, file, link
 - **CategoryBlock**: Hierarchical container for organizing memos and other categories with title, position, size, children array, parentId, and isExpanded state
 - **Page**: Contains arrays of memos and categories with id and name
 - **AppState**: Global application state interface
 
 ### Block-Based Content System
 
-The application implements a Notion-inspired block-based content editor:
+The application implements a TipTap-based block content editor:
 
-- **ContentBlock Types**: 8 distinct block types each with specific properties and rendering logic: text, callout, checklist, image, file, bookmark, quote, code
-- **Block Components**: Individual components in `src/components/blocks/` for each block type
-- **ContentBlockComponent**: Wrapper component that renders appropriate block type and handles common functionality
-- **Block Selection**: Multi-select blocks with drag selection, keyboard shortcuts (Ctrl+A, Delete), and context menu
-- **Block Operations**: Create, delete, move, convert between types, and merge text blocks
-- **Slash Commands**: Type "/" to open BlockSelector for inserting new blocks
-- **Seamless Editing**: Auto-save with 300ms debounce, Enter key splits blocks, backspace merges blocks
+- **ContentBlock Types**: 4 block types each with specific properties: text, image, file, link
+- **Block Editor**: TipTap-based WYSIWYG editor with drag & drop support for files and images
+- **Add Block Button**: Floating + button in bottom right of right panel when memo is selected, provides menu to add text, image, file, or link blocks
+- **Drag & Drop**: Direct file/image drag & drop onto right panel to add new blocks
+- **Seamless Editing**: Auto-save with debouncing, rich text formatting (bold, italic, code, strike)
 
 ### Category System
 
