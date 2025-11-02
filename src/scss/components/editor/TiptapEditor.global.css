@@ -219,34 +219,7 @@ body.dragging-tiptap-block * {
   border-radius: 4px;
 }
 
-/* Text Block - Importance 배경색 */
-.ProseMirror .text-block-wrapper[data-importance="critical"] {
-  background-color: #ffcdd2 !important;
-}
-
-.ProseMirror .text-block-wrapper[data-importance="important"] {
-  background-color: #ffcc80 !important;
-}
-
-.ProseMirror .text-block-wrapper[data-importance="opinion"] {
-  background-color: #e1bee7 !important;
-}
-
-.ProseMirror .text-block-wrapper[data-importance="reference"] {
-  background-color: #81d4fa !important;
-}
-
-.ProseMirror .text-block-wrapper[data-importance="question"] {
-  background-color: #fff59d !important;
-}
-
-.ProseMirror .text-block-wrapper[data-importance="idea"] {
-  background-color: #c8e6c9 !important;
-}
-
-.ProseMirror .text-block-wrapper[data-importance="data"] {
-  background-color: #bdbdbd !important;
-}
+/* Text Block - Importance는 mark로 처리 (블록 전체가 아닌 텍스트에만 적용) */
 
 /* File Node - 드래그 가능한 파일 블록 */
 .ProseMirror .file-node {
