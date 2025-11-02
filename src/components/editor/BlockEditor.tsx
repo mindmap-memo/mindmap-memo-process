@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import Text from '@tiptap/extension-text';
 import Bold from '@tiptap/extension-bold';
@@ -35,6 +35,9 @@ export default function BlockEditor({
   onChange,
   placeholder = '텍스트를 입력하세요...',
 }: BlockEditorProps) {
+  // 내부 업데이트 추적을 위한 ref
+  const isInternalUpdateRef = useRef(false);
+  const prevInitialBlocksRef = useRef(initialBlocks);
 
   // ContentBlocks를 TipTap JSON으로 변환
   const blocksToEditorContent = (blocks: ContentBlock[]) => {
@@ -364,6 +367,7 @@ export default function BlockEditor({
     onUpdate: ({ editor }) => {
       if (onChange) {
         const blocks = editorContentToBlocks(editor.getJSON());
+        isInternalUpdateRef.current = true; // 내부 업데이트 플래그 설정
         onChange(blocks);
       }
     },
@@ -372,6 +376,13 @@ export default function BlockEditor({
   // 초기 블록 로드 (히스토리 초기화 방지)
   useEffect(() => {
     if (!editor) return;
+
+    // 내부 업데이트(onUpdate)로 인한 변경이면 무시
+    if (isInternalUpdateRef.current) {
+      isInternalUpdateRef.current = false;
+      prevInitialBlocksRef.current = initialBlocks;
+      return;
+    }
 
     const content = blocksToEditorContent(initialBlocks);
     const currentContent = editor.getJSON();
@@ -383,6 +394,8 @@ export default function BlockEditor({
         editor.commands.setContent(content, { emitUpdate: false });
       });
     }
+
+    prevInitialBlocksRef.current = initialBlocks;
   }, [editor, initialBlocks]); // initialBlocks가 바뀔 때마다 에디터 내용 업데이트
 
   if (!editor) {

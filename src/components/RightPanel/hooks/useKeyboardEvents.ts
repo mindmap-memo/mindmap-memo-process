@@ -91,26 +91,24 @@ export const useKeyboardEvents = ({
           handleBlocksMove('down');
         }
       } else if ((event.key === 'z' || event.key === 'Z') && (event.ctrlKey || event.metaKey)) {
-        // RightPanel이 포커스되어 있을 때만 블록 Undo/Redo 처리
-        // 그렇지 않으면 Canvas의 Undo/Redo가 작동하도록 통과
+        // TipTap 에디터(ProseMirror) 내에서만 블록 Undo/Redo 처리
         const target = event.target as HTMLElement;
-        const isInRightPanel = target.closest('[data-right-panel="true"]');
+        const isInEditor = target.closest('.ProseMirror');
 
-        if (isInRightPanel) {
-          console.log('RightPanel: Handling Ctrl+Z in RightPanel');
+        if (isInEditor) {
           if (event.shiftKey) {
             // Ctrl+Shift+Z: Redo
             event.preventDefault();
+            event.stopPropagation();
             handleRedo();
           } else {
             // Ctrl+Z: Undo
             event.preventDefault();
+            event.stopPropagation();
             handleUndo();
           }
-        } else {
-          console.log('RightPanel: Not in RightPanel, letting Ctrl+Z pass through');
-          // RightPanel 밖에서 발생한 이벤트는 통과
         }
+        // 에디터 밖에서 발생한 이벤트는 Canvas가 처리하도록 통과
       }
     };
 
