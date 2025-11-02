@@ -154,10 +154,39 @@
   background-color: #dbeafe;
 }
 
+/* Drop cursor - 드래그 중 드롭 위치 표시 */
+.ProseMirror-dropcursor,
+.my-dropcursor {
+  position: absolute !important;
+  display: block !important;
+  height: 2px !important;
+  background-color: #3b82f6 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: none !important;
+  left: 0 !important;
+  right: 0 !important;
+  border: none !important;
+  z-index: 100 !important;
+}
+
+.ProseMirror-dropcursor::before,
+.my-dropcursor::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: -6px;
+  width: 12px;
+  height: 12px;
+  background-color: #3b82f6;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(59, 130, 246, 0.8);
+}
+
 /* Text Block Node - 드래그 가능한 블록 */
 .ProseMirror .text-block-node {
-  margin: 1px 0;
-  padding: 3px 4px 3px 24px;
+  margin: 2px 0;
+  padding: 3px 4px;
   position: relative;
   min-height: 20px;
   transition: background-color 0.1s ease;
@@ -200,32 +229,6 @@
 
 .ProseMirror .text-block-wrapper[data-importance="data"] {
   background-color: #bdbdbd !important;
-}
-
-/* 드래그 핸들 - ::before 사용 */
-.ProseMirror .text-block-node::before {
-  content: '⋮⋮';
-  position: absolute;
-  left: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 14px;
-  color: #9ca3af;
-  cursor: grab;
-  opacity: 0;
-  transition: opacity 0.1s ease;
-  user-select: none;
-  -webkit-user-select: none;
-  padding: 2px 4px;
-  line-height: 1;
-}
-
-.ProseMirror .text-block-node:hover::before {
-  opacity: 1;
-}
-
-.ProseMirror .text-block-node.ProseMirror-selectednode::before {
-  opacity: 1;
 }
 
 /* File Node - 드래그 가능한 파일 블록 */

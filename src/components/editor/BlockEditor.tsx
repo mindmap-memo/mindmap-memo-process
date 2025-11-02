@@ -329,7 +329,8 @@ export default function BlockEditor({
       }),
       Dropcursor.configure({
         color: '#3b82f6',
-        width: 2,
+        width: 3,
+        class: 'my-dropcursor',
       }),
       Gapcursor,
       ImportanceMark,

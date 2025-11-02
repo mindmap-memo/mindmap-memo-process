@@ -14,6 +14,7 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
     x: 0,
     y: 0,
   });
+  const dragHandleRef = useRef<HTMLDivElement>(null);
 
   const { importance } = node.attrs;
 
@@ -21,6 +22,85 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
     e.preventDefault();
     e.stopPropagation();
     setContextMenu({ show: true, x: e.clientX, y: e.clientY });
+  };
+
+  // 수동 드래그 구현
+  const handleDragStart = (e: React.DragEvent) => {
+    if (!editor || typeof getPos !== 'function') return;
+
+    const pos = getPos();
+
+    // 드래그 데이터에 노드 위치와 JSON 저장
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('application/x-tiptap-node-pos', pos.toString());
+    e.dataTransfer.setData('application/x-tiptap-node-type', node.type.name);
+    e.dataTransfer.setData('application/x-tiptap-node-data', JSON.stringify(node.toJSON()));
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!editor || typeof getPos !== 'function') return;
+
+    const draggedPosStr = e.dataTransfer.getData('application/x-tiptap-node-pos');
+    const draggedNodeDataStr = e.dataTransfer.getData('application/x-tiptap-node-data');
+
+    if (!draggedPosStr || !draggedNodeDataStr) return;
+
+    const draggedPos = parseInt(draggedPosStr, 10);
+    const dropPos = getPos();
+
+    if (draggedPos === dropPos) return; // 같은 위치면 무시
+
+    try {
+      const draggedNodeData = JSON.parse(draggedNodeDataStr);
+
+      // TipTap 명령어로 안전하게 이동
+      const { state } = editor;
+      const draggedNode = state.doc.nodeAt(draggedPos);
+
+      if (!draggedNode) return;
+
+      // 드롭 위치 계산
+      let targetPos = dropPos + node.nodeSize;
+
+      // 위에서 아래로 이동하는 경우 위치 조정
+      if (draggedPos < dropPos) {
+        targetPos = dropPos;
+      }
+
+      // TipTap 체인 명령으로 안전하게 이동
+      editor.chain()
+        .focus()
+        .command(({ tr, dispatch }) => {
+          if (!dispatch) return false;
+
+          // 노드 슬라이스 추출
+          const slice = state.doc.slice(draggedPos, draggedPos + draggedNode.nodeSize);
+
+          // 삭제 후 삽입 위치 재계산
+          let insertPos = targetPos;
+          if (draggedPos < targetPos) {
+            insertPos = targetPos - draggedNode.nodeSize;
+          }
+
+          // 1. 원본 노드 삭제
+          tr.delete(draggedPos, draggedPos + draggedNode.nodeSize);
+
+          // 2. 새 위치에 삽입
+          tr.insert(insertPos, slice.content);
+
+          return true;
+        })
+        .run();
+
+    } catch (error) {
+      console.error('Drop error:', error);
+    }
   };
 
   const handleDelete = () => {
@@ -62,16 +142,16 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onContextMenu={handleContextMenu}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '2px',
-        margin: '0',
-        padding: '1px 2px',
-        borderRadius: '2px',
+        display: 'block',
         position: 'relative',
+        margin: '2px 0',
+        padding: '2px',
+        borderRadius: '2px',
         transition: 'background-color 0.1s ease',
-        minHeight: '20px',
+        minHeight: '24px',
         backgroundColor: isHovered ? 'rgba(0, 0, 0, 0.02)' : 'transparent',
       }}
     >
@@ -83,62 +163,40 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
         onClose={() => setContextMenu({ show: false, x: 0, y: 0 })}
         currentImportance={importance as ImportanceLevel}
       />
-      {/* 드래그 핸들 */}
-      <div
-        contentEditable={false}
-        draggable="true"
-        data-drag-handle
-        onMouseDown={(e) => {
-          // 드래그 핸들 클릭 시 텍스트 선택 방지
-          e.stopPropagation();
-        }}
-        onDragStart={(e) => {
-          // 드래그 중임을 표시
-          e.currentTarget.style.cursor = 'grabbing';
-          e.stopPropagation();
-        }}
-        onDragEnd={(e) => {
-          e.currentTarget.style.cursor = 'grab';
-        }}
-        style={{
-          cursor: 'grab',
-          padding: '0 2px',
-          opacity: isHovered ? 1 : 0,
-          transition: 'opacity 0.1s ease',
-          fontSize: '14px',
-          color: '#9ca3af',
-          lineHeight: '1.2',
-          userSelect: 'none',
-          WebkitUserSelect: 'none',
-          position: 'relative',
-          zIndex: 10,
-        }}
-      >
-        ⋮⋮
-      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        {/* 드래그 핸들 */}
+        <div
+          ref={dragHandleRef}
+          contentEditable={false}
+          draggable={true}
+          onDragStart={handleDragStart}
+          style={{
+            cursor: 'grab',
+            padding: '2px 4px',
+            opacity: isHovered ? 1 : 0,
+            transition: 'opacity 0.1s ease',
+            fontSize: '14px',
+            color: '#9ca3af',
+            lineHeight: '1',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            flexShrink: 0,
+          }}
+        >
+          ⋮⋮
+        </div>
 
-      {/* 에디터 콘텐츠 */}
-      <NodeViewContent
-        ref={contentRef}
-        as="div"
-        onDragStart={(e) => {
-          // 텍스트 영역에서 시작된 드래그는 차단
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        }}
-        onDrag={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        }}
-        style={{
-          flex: 1,
-          minWidth: 0,
-          outline: 'none',
-          WebkitUserDrag: 'none',
-        } as React.CSSProperties}
-      />
+        {/* 에디터 콘텐츠 */}
+        <NodeViewContent
+          ref={contentRef}
+          as="div"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            outline: 'none',
+          }}
+        />
+      </div>
     </NodeViewWrapper>
   );
 }

@@ -16,6 +16,8 @@ export const TextBlockNode = Node.create({
 
   draggable: true,
 
+  atom: false,
+
   addAttributes() {
     return {
       id: {
