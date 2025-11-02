@@ -299,7 +299,7 @@ export const useRightPanelMenus = ({
                     alignItems: 'center',
                     gap: '8px'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fef2f2'}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = IMPORTANCE_COLORS.critical}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
                   <span style={{ width: '16px', height: '16px', backgroundColor: IMPORTANCE_COLORS.critical, borderRadius: '3px', display: 'inline-block' }}></span>
@@ -319,7 +319,7 @@ export const useRightPanelMenus = ({
                     alignItems: 'center',
                     gap: '8px'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fff7ed'}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = IMPORTANCE_COLORS.important}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
                   <span style={{ width: '16px', height: '16px', backgroundColor: IMPORTANCE_COLORS.important, borderRadius: '3px', display: 'inline-block' }}></span>
@@ -339,7 +339,7 @@ export const useRightPanelMenus = ({
                     alignItems: 'center',
                     gap: '8px'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fef9c3'}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = IMPORTANCE_COLORS.opinion}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
                   <span style={{ width: '16px', height: '16px', backgroundColor: IMPORTANCE_COLORS.opinion, borderRadius: '3px', display: 'inline-block' }}></span>
@@ -359,7 +359,7 @@ export const useRightPanelMenus = ({
                     alignItems: 'center',
                     gap: '8px'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f0fdf4'}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = IMPORTANCE_COLORS.reference}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
                   <span style={{ width: '16px', height: '16px', backgroundColor: IMPORTANCE_COLORS.reference, borderRadius: '3px', display: 'inline-block' }}></span>
@@ -379,7 +379,7 @@ export const useRightPanelMenus = ({
                     alignItems: 'center',
                     gap: '8px'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#eff6ff'}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = IMPORTANCE_COLORS.question}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
                   <span style={{ width: '16px', height: '16px', backgroundColor: IMPORTANCE_COLORS.question, borderRadius: '3px', display: 'inline-block' }}></span>
@@ -399,7 +399,7 @@ export const useRightPanelMenus = ({
                     alignItems: 'center',
                     gap: '8px'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#faf5ff'}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = IMPORTANCE_COLORS.idea}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
                   <span style={{ width: '16px', height: '16px', backgroundColor: IMPORTANCE_COLORS.idea, borderRadius: '3px', display: 'inline-block' }}></span>
@@ -419,7 +419,7 @@ export const useRightPanelMenus = ({
                     alignItems: 'center',
                     gap: '8px'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = IMPORTANCE_COLORS.data}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
                   <span style={{ width: '16px', height: '16px', backgroundColor: IMPORTANCE_COLORS.data, borderRadius: '3px', display: 'inline-block' }}></span>

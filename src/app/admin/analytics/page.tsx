@@ -19,8 +19,11 @@ interface StatsData {
     totalUsers: number;
     totalSessions: number;
     avgSessionDuration: number;
+    returningUsers: number;
+    newUsers: number;
   };
   dailyActiveUsers: { date: string; users: number }[];
+  dailyUserTypes: { date: string; returningUsers: number; newUsers: number }[];
   eventCounts: { eventType: string; count: number; uniqueUsers: number }[];
   dailyEvents: { date: string; count: number }[];
   newUsers: { date: string; count: number }[];
@@ -53,6 +56,7 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(false);
   const [days, setDays] = useState(30);
   const [cohortType, setCohortType] = useState<'week' | 'day'>('week');
+  const [userFilter, setUserFilter] = useState<'all' | 'returning' | 'new'>('all');
 
   const handleLogin = () => {
     if (password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD || password === 'admin123') {
@@ -165,11 +169,51 @@ export default function AnalyticsPage() {
           <div className={styles.loading}>로딩 중...</div>
         ) : activeTab === 'dashboard' ? (
           <>
+            {/* 사용자 타입 필터 */}
+            <div className={styles.filterContainer}>
+              <button
+                className={`${styles.filterButton} ${userFilter === 'all' ? styles.active : ''}`}
+                onClick={() => setUserFilter('all')}
+              >
+                전체 사용자
+              </button>
+              <button
+                className={`${styles.filterButton} ${userFilter === 'returning' ? styles.active : ''}`}
+                onClick={() => setUserFilter('returning')}
+              >
+                재방문자
+              </button>
+              <button
+                className={`${styles.filterButton} ${userFilter === 'new' ? styles.active : ''}`}
+                onClick={() => setUserFilter('new')}
+              >
+                신규 사용자
+              </button>
+            </div>
+
             {/* 전체 통계 */}
             <div className={styles.statsGrid}>
               <div className={styles.statCard}>
                 <div className={styles.statLabel}>총 사용자</div>
                 <div className={styles.statValue}>{statsData?.overview.totalUsers || 0}</div>
+              </div>
+              <div className={styles.statCard}>
+                <div className={styles.statLabel}>재방문자</div>
+                <div className={styles.statValue}>{statsData?.overview.returningUsers || 0}</div>
+                <div className={styles.statSubtext}>
+                  {statsData?.overview.totalUsers
+                    ? `${((statsData.overview.returningUsers / statsData.overview.totalUsers) * 100).toFixed(1)}%`
+                    : '0%'}
+                </div>
+              </div>
+              <div className={styles.statCard}>
+                <div className={styles.statLabel}>신규 사용자</div>
+                <div className={styles.statValue}>{statsData?.overview.newUsers || 0}</div>
+                <div className={styles.statSubtext}>
+                  {statsData?.overview.totalUsers
+                    ? `${((statsData.overview.newUsers / statsData.overview.totalUsers) * 100).toFixed(1)}%`
+                    : '0%'}
+                </div>
               </div>
               <div className={styles.statCard}>
                 <div className={styles.statLabel}>총 세션</div>
@@ -203,20 +247,96 @@ export default function AnalyticsPage() {
             {/* 일별 활성 사용자 */}
             <section className={styles.section}>
               <h2>일별 활성 사용자 (DAU)</h2>
-              <div className={styles.chartContainer}>
-                {statsData?.dailyActiveUsers.slice(0, 14).reverse().map((day) => (
-                  <div key={day.date} className={styles.barItem}>
-                    <div className={styles.barLabel}>{day.date.slice(5)}</div>
-                    <div className={styles.barContainer}>
-                      <div
-                        className={styles.bar}
-                        style={{ width: `${(day.users / Math.max(...(statsData?.dailyActiveUsers.map(d => d.users) || [1]))) * 100}%` }}
-                      >
-                        {day.users}
+              {userFilter === 'all' ? (
+                <div className={styles.chartContainer}>
+                  {statsData?.dailyUserTypes.slice(0, 14).reverse().map((day) => {
+                    const maxUsers = Math.max(...(statsData?.dailyUserTypes.map(d => d.returningUsers + d.newUsers) || [1]));
+                    const totalUsers = day.returningUsers + day.newUsers;
+                    const returningPercent = totalUsers > 0 ? (day.returningUsers / totalUsers) * 100 : 0;
+                    const newPercent = totalUsers > 0 ? (day.newUsers / totalUsers) * 100 : 0;
+
+                    return (
+                      <div key={day.date} className={styles.barItem}>
+                        <div className={styles.barLabel}>{day.date.slice(5)}</div>
+                        <div className={styles.barContainer}>
+                          <div className={styles.stackedBar} style={{ width: `${(totalUsers / maxUsers) * 100}%` }}>
+                            <div
+                              className={styles.stackedBarSegment}
+                              style={{
+                                width: `${returningPercent}%`,
+                                backgroundColor: '#8b5cf6',
+                              }}
+                              title={`재방문자: ${day.returningUsers}`}
+                            />
+                            <div
+                              className={styles.stackedBarSegment}
+                              style={{
+                                width: `${newPercent}%`,
+                                backgroundColor: '#10b981',
+                              }}
+                              title={`신규: ${day.newUsers}`}
+                            />
+                            <span className={styles.stackedBarLabel}>{totalUsers}</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
+                    );
+                  })}
+                </div>
+              ) : userFilter === 'returning' ? (
+                <div className={styles.chartContainer}>
+                  {statsData?.dailyUserTypes.slice(0, 14).reverse().map((day) => {
+                    const maxUsers = Math.max(...(statsData?.dailyUserTypes.map(d => d.returningUsers) || [1]));
+                    return (
+                      <div key={day.date} className={styles.barItem}>
+                        <div className={styles.barLabel}>{day.date.slice(5)}</div>
+                        <div className={styles.barContainer}>
+                          <div
+                            className={styles.bar}
+                            style={{
+                              width: `${(day.returningUsers / maxUsers) * 100}%`,
+                              backgroundColor: '#8b5cf6'
+                            }}
+                          >
+                            {day.returningUsers}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className={styles.chartContainer}>
+                  {statsData?.dailyUserTypes.slice(0, 14).reverse().map((day) => {
+                    const maxUsers = Math.max(...(statsData?.dailyUserTypes.map(d => d.newUsers) || [1]));
+                    return (
+                      <div key={day.date} className={styles.barItem}>
+                        <div className={styles.barLabel}>{day.date.slice(5)}</div>
+                        <div className={styles.barContainer}>
+                          <div
+                            className={styles.bar}
+                            style={{
+                              width: `${(day.newUsers / maxUsers) * 100}%`,
+                              backgroundColor: '#10b981'
+                            }}
+                          >
+                            {day.newUsers}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div className={styles.legend}>
+                <div className={styles.legendItem}>
+                  <div className={styles.legendColor} style={{ backgroundColor: '#8b5cf6' }} />
+                  <span>재방문자</span>
+                </div>
+                <div className={styles.legendItem}>
+                  <div className={styles.legendColor} style={{ backgroundColor: '#10b981' }} />
+                  <span>신규 사용자</span>
+                </div>
               </div>
             </section>
 

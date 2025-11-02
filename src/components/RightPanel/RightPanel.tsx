@@ -337,6 +337,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
             const newBlock = {
               id: `${Date.now()}${Math.random()}`,
               type: 'image' as const,
+              url: e.target.result as string,
               src: e.target.result as string,
               alt: file.name,
             };
@@ -355,6 +356,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
             const newBlock = {
               id: `${Date.now()}${Math.random()}`,
               type: 'file' as const,
+              url: e.target.result as string,
+              name: file.name,
               fileName: file.name,
               fileSize: file.size,
               fileType: file.type || 'application/octet-stream',
@@ -416,6 +419,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
         const newBlock = {
           id: `${Date.now()}${Math.random()}`,
           type: 'image' as const,
+          url: event.target.result as string,
           src: event.target.result as string,
           alt: file.name,
         };
@@ -426,6 +430,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
         const newBlock = {
           id: `${Date.now()}${Math.random()}`,
           type: 'file' as const,
+          url: event.target.result as string,
+          name: file.name,
           fileName: file.name,
           fileSize: file.size,
           fileType: file.type || 'application/octet-stream',

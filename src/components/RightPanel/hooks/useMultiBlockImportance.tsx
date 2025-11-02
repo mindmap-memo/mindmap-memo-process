@@ -19,6 +19,18 @@ const IMPORTANCE_LABELS = {
   none: '강조 해제'
 };
 
+// 중요도별 hover 색상 (실제 배경색과 동일)
+const IMPORTANCE_HOVER_COLORS: Record<ImportanceLevel, string> = {
+  critical: '#ffcdd2',    // 빨간 형광펜
+  important: '#ffcc80',   // 주황 형광펜
+  opinion: '#e1bee7',     // 보라 형광펜
+  reference: '#81d4fa',   // 파란 형광펜
+  question: '#fff59d',    // 노란 형광펜
+  idea: '#c8e6c9',        // 초록 형광펜
+  data: '#bdbdbd',        // 진한 회색 형광펜
+  none: '#f5f5f5'         // 기본 회색
+};
+
 export const useMultiBlockImportance = ({
   selectedMemo,
   onMemoUpdate,
@@ -374,7 +386,7 @@ export const useMultiBlockImportance = ({
               fontFamily: 'inherit'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f5f5f5';
+              e.currentTarget.style.backgroundColor = IMPORTANCE_HOVER_COLORS[level as ImportanceLevel];
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent';

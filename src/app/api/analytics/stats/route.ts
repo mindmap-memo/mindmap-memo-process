@@ -112,15 +112,58 @@ export async function GET(request: NextRequest) {
       ORDER BY last_active DESC
     `;
 
+    // 9. 재방문자 vs 신규 사용자 통계 (제외된 이메일 제외)
+    // 재방문자: 해당 기간 내에 활동했고, 최초 로그인이 해당 기간 이전인 사용자
+    const returningUsers = await sql`
+      SELECT COUNT(DISTINCT s.user_email) as count
+      FROM analytics_sessions s
+      JOIN user_cohorts c ON s.user_email = c.user_email
+      WHERE s.session_start >= ${startDate.toISOString()}
+        AND c.first_login < ${startDate.toISOString()}
+        AND s.user_email != ${EXCLUDED_EMAILS[0]}
+        AND s.user_email != ${EXCLUDED_EMAILS[1]}
+    `;
+
+    // 신규 사용자: 해당 기간 내에 최초 로그인한 사용자
+    const newUsersCount = await sql`
+      SELECT COUNT(DISTINCT user_email) as count
+      FROM user_cohorts
+      WHERE first_login >= ${startDate.toISOString()}
+        AND user_email != ${EXCLUDED_EMAILS[0]}
+        AND user_email != ${EXCLUDED_EMAILS[1]}
+    `;
+
+    // 10. 일별 재방문자 vs 신규 사용자 수
+    const dailyUserTypes = await sql`
+      SELECT
+        DATE(s.session_start) as date,
+        COUNT(DISTINCT CASE WHEN c.first_login < DATE(s.session_start) THEN s.user_email END) as returning_users,
+        COUNT(DISTINCT CASE WHEN c.first_login >= DATE(s.session_start) AND c.first_login < DATE(s.session_start) + INTERVAL '1 day' THEN s.user_email END) as new_users
+      FROM analytics_sessions s
+      JOIN user_cohorts c ON s.user_email = c.user_email
+      WHERE s.session_start >= ${startDate.toISOString()}
+        AND s.user_email != ${EXCLUDED_EMAILS[0]}
+        AND s.user_email != ${EXCLUDED_EMAILS[1]}
+      GROUP BY DATE(s.session_start)
+      ORDER BY date DESC
+    `;
+
     return NextResponse.json({
       overview: {
         totalUsers: Number(totalUsers[0]?.count || 0),
         totalSessions: Number(totalSessions[0]?.count || 0),
         avgSessionDuration: Math.round(Number(avgSessionDuration[0]?.avg_duration || 0)),
+        returningUsers: Number(returningUsers[0]?.count || 0),
+        newUsers: Number(newUsersCount[0]?.count || 0),
       },
       dailyActiveUsers: dailyActiveUsers.map((d: any) => ({
         date: d.date,
         users: Number(d.users),
+      })),
+      dailyUserTypes: dailyUserTypes.map((d: any) => ({
+        date: d.date,
+        returningUsers: Number(d.returning_users),
+        newUsers: Number(d.new_users),
       })),
       eventCounts: eventCounts.map((e: any) => ({
         eventType: e.event_type,
