@@ -75,17 +75,10 @@ export default function ImageNodeView({ node, deleteNode, updateAttributes }: No
         onClose={() => setContextMenu({ show: false, x: 0, y: 0 })}
         currentImportance={importance as ImportanceLevel}
       />
-      {/* 드래그 핸들 */}
+      {/* 드래그 핸들 - TipTap data-drag-handle 사용 */}
       <div
         contentEditable={false}
-        draggable="true"
         data-drag-handle
-        onDragStart={(e) => {
-          e.currentTarget.style.cursor = 'grabbing';
-        }}
-        onDragEnd={(e) => {
-          e.currentTarget.style.cursor = 'grab';
-        }}
         style={{
           cursor: 'grab',
           padding: '0 4px',
@@ -93,7 +86,7 @@ export default function ImageNodeView({ node, deleteNode, updateAttributes }: No
           transition: 'opacity 0.1s ease',
           fontSize: '14px',
           color: '#9ca3af',
-          lineHeight: '1.2',
+          lineHeight: '1',
           userSelect: 'none',
           display: 'flex',
           alignItems: 'center',

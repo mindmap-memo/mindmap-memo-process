@@ -339,6 +339,28 @@ export default function BlockEditor({
       }),
     ],
     content: blocksToEditorContent(initialBlocks),
+    editorProps: {
+      handleDOMEvents: {
+        dragover: (view, event) => {
+          // 우리 노드를 드래그 중일 때만 처리
+          const hasNodeData = event.dataTransfer?.types.includes('application/x-tiptap-node-pos');
+
+          if (hasNodeData) {
+            // dropEffect 수정
+            event.preventDefault();
+            if (event.dataTransfer) {
+              event.dataTransfer.dropEffect = 'move';
+            }
+
+            // ProseMirror view를 강제로 업데이트하여 dropcursor 계산 트리거
+            requestAnimationFrame(() => {
+              view.updateState(view.state);
+            });
+          }
+          return false; // ProseMirror가 계속 처리하도록 함
+        },
+      },
+    },
     onUpdate: ({ editor }) => {
       if (onChange) {
         const blocks = editorContentToBlocks(editor.getJSON());
@@ -367,8 +389,22 @@ export default function BlockEditor({
     return null;
   }
 
+  // 드래그 중 이벤트 처리 - 드롭 허용
+  const handleDragOver = (e: React.DragEvent) => {
+    // 우리 노드를 드래그 중일 때만 처리
+    const hasNodeData = e.dataTransfer.types.includes('application/x-tiptap-node-pos');
+
+    if (hasNodeData) {
+      e.preventDefault(); // 브라우저 기본 동작 방지 (드롭 허용)
+      e.dataTransfer.dropEffect = 'move'; // 이동 커서 표시
+    }
+  };
+
   return (
-    <div className={styles.container}>
+    <div
+      className={styles.container}
+      onDragOverCapture={handleDragOver}
+    >
       <EditorContent editor={editor} />
       <ImportanceToolbar editor={editor} />
     </div>

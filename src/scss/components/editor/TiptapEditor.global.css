@@ -196,6 +196,23 @@
   background-color: rgba(0, 0, 0, 0.02);
 }
 
+/* 드래그 중 커서 강제 설정 */
+.ProseMirror * {
+  cursor: inherit !important;
+}
+
+.ProseMirror {
+  cursor: default;
+}
+
+/* 드래그 작업 중 move 커서 강제 */
+body.dragging-tiptap-block,
+body.dragging-tiptap-block * {
+  cursor: move !important;
+  cursor: -webkit-grabbing !important;
+  cursor: grabbing !important;
+}
+
 .ProseMirror .text-block-node.ProseMirror-selectednode {
   outline: 2px solid #3b82f6;
   outline-offset: 2px;
