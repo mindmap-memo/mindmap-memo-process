@@ -491,7 +491,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
                     const content = block.content || '';
                     if (content.trim() === '') {
                       // 빈 텍스트 블록은 줄바꿈으로 표시
-                      renderedBlocks.push(<br key={block.id} />);
+                      renderedBlocks.push(<br key={`${block.id}-${index}`} />);
                     } else {
                       const remainingLength = sizeConfig.contentLength - totalContentLength;
                       const displayContent = content.length > remainingLength
@@ -509,7 +509,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
                       // 실제 내용 렌더링
                       renderedBlocks.push(
                         <div
-                          key={block.id}
+                          key={`${block.id}-${index}`}
                           style={{
                             whiteSpace: 'pre-wrap',
                             wordWrap: 'break-word',
@@ -531,7 +531,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
                     if (imageBlock.url) {
                       const imageImportanceStyle = imageBlock.importance ? getImportanceStyle(imageBlock.importance) : {};
                       renderedBlocks.push(
-                        <div key={block.id} style={{
+                        <div key={`${block.id}-${index}`} style={{
                           margin: '4px 0',
                           padding: imageImportanceStyle.backgroundColor ? '8px' : '0',
                           backgroundColor: imageImportanceStyle.backgroundColor,

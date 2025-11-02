@@ -61,8 +61,21 @@ export const useCanvasKeyboard = (params: UseCanvasKeyboardParams) => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // 입력 필드 포커스 확인
+      const activeElement = document.activeElement;
+      const isInputFocused = activeElement && (
+        activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.getAttribute('contenteditable') === 'true'
+      );
+
       // Ctrl+Z (Undo) / Ctrl+Shift+Z (Redo)
       if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+        // 입력 필드에 포커스가 있으면 RightPanel의 Undo/Redo가 처리하도록 통과
+        if (isInputFocused) {
+          return;
+        }
+
         e.preventDefault();
 
         if (e.shiftKey) {

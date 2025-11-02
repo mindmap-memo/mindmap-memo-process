@@ -14,41 +14,20 @@ interface CohortData {
   type: 'week' | 'day';
 }
 
-interface DeviceStats {
-  deviceType: string;
-  sessions: number;
-  uniqueUsers: number;
-  avgSessionDuration: number;
-  percentage: number;
-}
-
-interface BrowserStats {
-  browser: string;
-  sessions: number;
-  uniqueUsers: number;
-  percentage: number;
-}
-
-interface OSStats {
-  os: string;
-  sessions: number;
-  uniqueUsers: number;
-  percentage: number;
-}
-
 interface StatsData {
   overview: {
     totalUsers: number;
     totalSessions: number;
     avgSessionDuration: number;
+    returningUsers: number;
+    newUsers: number;
   };
   dailyActiveUsers: { date: string; users: number }[];
+  dailyUserTypes: { date: string; returningUsers: number; newUsers: number }[];
   eventCounts: { eventType: string; count: number; uniqueUsers: number }[];
   dailyEvents: { date: string; count: number }[];
   newUsers: { date: string; count: number }[];
-  deviceStats?: DeviceStats[];
-  browserStats?: BrowserStats[];
-  osStats?: OSStats[];
+  todayActiveUsers: { email: string; lastActive: string }[];
 }
 
 const EVENT_NAMES: Record<string, string> = {
@@ -77,9 +56,7 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(false);
   const [days, setDays] = useState(30);
   const [cohortType, setCohortType] = useState<'week' | 'day'>('week');
-  const [cohortDeviceFilter, setCohortDeviceFilter] = useState<string>('');
-  const [cohortBrowserFilter, setCohortBrowserFilter] = useState<string>('');
-  const [cohortOSFilter, setCohortOSFilter] = useState<string>('');
+  const [userFilter, setUserFilter] = useState<'all' | 'returning' | 'new'>('all');
 
   const handleLogin = () => {
     if (password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD || password === 'admin123') {
@@ -94,32 +71,15 @@ export default function AnalyticsPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 날짜 범위 계산
-      const endDate = new Date().toISOString();
-      const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-
-      // 코호트 필터 쿼리 파라미터 구성
-      const cohortParams = new URLSearchParams({ type: cohortType });
-      if (cohortDeviceFilter) cohortParams.append('deviceType', cohortDeviceFilter);
-      if (cohortBrowserFilter) cohortParams.append('browser', cohortBrowserFilter);
-      if (cohortOSFilter) cohortParams.append('os', cohortOSFilter);
-
-      const [statsRes, cohortRes, deviceRes] = await Promise.all([
+      const [statsRes, cohortRes] = await Promise.all([
         fetch(`/api/analytics/stats?days=${days}`),
-        fetch(`/api/analytics/cohort?${cohortParams.toString()}`),
-        fetch(`/api/analytics/device-stats?startDate=${startDate}&endDate=${endDate}`),
+        fetch(`/api/analytics/cohort?type=${cohortType}`),
       ]);
 
       const stats = await statsRes.json();
       const cohort = await cohortRes.json();
-      const device = await deviceRes.json();
 
-      setStatsData({
-        ...stats,
-        deviceStats: device.deviceStats,
-        browserStats: device.browserStats,
-        osStats: device.osStats
-      });
+      setStatsData(stats);
       setCohortData(cohort.cohorts || []);
     } catch (error) {
       console.error('Failed to fetch analytics data:', error);
@@ -140,7 +100,7 @@ export default function AnalyticsPage() {
     if (isAuthorized) {
       fetchData();
     }
-  }, [days, cohortType, cohortDeviceFilter, cohortBrowserFilter, cohortOSFilter]);
+  }, [days, cohortType]);
 
   if (!isAuthorized) {
     return (
@@ -209,11 +169,51 @@ export default function AnalyticsPage() {
           <div className={styles.loading}>로딩 중...</div>
         ) : activeTab === 'dashboard' ? (
           <>
+            {/* 사용자 타입 필터 */}
+            <div className={styles.filterContainer}>
+              <button
+                className={`${styles.filterButton} ${userFilter === 'all' ? styles.active : ''}`}
+                onClick={() => setUserFilter('all')}
+              >
+                전체 사용자
+              </button>
+              <button
+                className={`${styles.filterButton} ${userFilter === 'returning' ? styles.active : ''}`}
+                onClick={() => setUserFilter('returning')}
+              >
+                재방문자
+              </button>
+              <button
+                className={`${styles.filterButton} ${userFilter === 'new' ? styles.active : ''}`}
+                onClick={() => setUserFilter('new')}
+              >
+                신규 사용자
+              </button>
+            </div>
+
             {/* 전체 통계 */}
             <div className={styles.statsGrid}>
               <div className={styles.statCard}>
                 <div className={styles.statLabel}>총 사용자</div>
                 <div className={styles.statValue}>{statsData?.overview.totalUsers || 0}</div>
+              </div>
+              <div className={styles.statCard}>
+                <div className={styles.statLabel}>재방문자</div>
+                <div className={styles.statValue}>{statsData?.overview.returningUsers || 0}</div>
+                <div className={styles.statSubtext}>
+                  {statsData?.overview.totalUsers
+                    ? `${((statsData.overview.returningUsers / statsData.overview.totalUsers) * 100).toFixed(1)}%`
+                    : '0%'}
+                </div>
+              </div>
+              <div className={styles.statCard}>
+                <div className={styles.statLabel}>신규 사용자</div>
+                <div className={styles.statValue}>{statsData?.overview.newUsers || 0}</div>
+                <div className={styles.statSubtext}>
+                  {statsData?.overview.totalUsers
+                    ? `${((statsData.overview.newUsers / statsData.overview.totalUsers) * 100).toFixed(1)}%`
+                    : '0%'}
+                </div>
               </div>
               <div className={styles.statCard}>
                 <div className={styles.statLabel}>총 세션</div>
@@ -227,97 +227,6 @@ export default function AnalyticsPage() {
                 </div>
               </div>
             </div>
-
-            {/* 기기별 통계 */}
-            <section className={styles.section}>
-              <h2>기기별 통계</h2>
-              <div className={styles.deviceStatsGrid}>
-                {/* 기기 타입 */}
-                <div className={styles.deviceCard}>
-                  <h3>기기 타입</h3>
-                  {statsData?.deviceStats && statsData.deviceStats.length > 0 ? (
-                    <div className={styles.deviceList}>
-                      {statsData.deviceStats.map((device) => (
-                        <div key={device.deviceType} className={styles.deviceItem}>
-                          <div className={styles.deviceInfo}>
-                            <span className={styles.deviceType}>{device.deviceType}</span>
-                            <span className={styles.devicePercentage}>{device.percentage}%</span>
-                          </div>
-                          <div className={styles.deviceBar}>
-                            <div
-                              className={styles.deviceBarFill}
-                              style={{ width: `${device.percentage}%` }}
-                            />
-                          </div>
-                          <div className={styles.deviceDetails}>
-                            세션: {device.sessions} | 사용자: {device.uniqueUsers} | 평균 시간:{' '}
-                            {Math.floor(device.avgSessionDuration / 60)}분
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className={styles.noData}>데이터 없음</p>
-                  )}
-                </div>
-
-                {/* 브라우저 */}
-                <div className={styles.deviceCard}>
-                  <h3>브라우저</h3>
-                  {statsData?.browserStats && statsData.browserStats.length > 0 ? (
-                    <div className={styles.deviceList}>
-                      {statsData.browserStats.map((browser) => (
-                        <div key={browser.browser} className={styles.deviceItem}>
-                          <div className={styles.deviceInfo}>
-                            <span className={styles.deviceType}>{browser.browser}</span>
-                            <span className={styles.devicePercentage}>{browser.percentage}%</span>
-                          </div>
-                          <div className={styles.deviceBar}>
-                            <div
-                              className={styles.deviceBarFill}
-                              style={{ width: `${browser.percentage}%`, backgroundColor: '#10b981' }}
-                            />
-                          </div>
-                          <div className={styles.deviceDetails}>
-                            세션: {browser.sessions} | 사용자: {browser.uniqueUsers}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className={styles.noData}>데이터 없음</p>
-                  )}
-                </div>
-
-                {/* 운영체제 */}
-                <div className={styles.deviceCard}>
-                  <h3>운영체제</h3>
-                  {statsData?.osStats && statsData.osStats.length > 0 ? (
-                    <div className={styles.deviceList}>
-                      {statsData.osStats.map((os) => (
-                        <div key={os.os} className={styles.deviceItem}>
-                          <div className={styles.deviceInfo}>
-                            <span className={styles.deviceType}>{os.os}</span>
-                            <span className={styles.devicePercentage}>{os.percentage}%</span>
-                          </div>
-                          <div className={styles.deviceBar}>
-                            <div
-                              className={styles.deviceBarFill}
-                              style={{ width: `${os.percentage}%`, backgroundColor: '#f59e0b' }}
-                            />
-                          </div>
-                          <div className={styles.deviceDetails}>
-                            세션: {os.sessions} | 사용자: {os.uniqueUsers}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className={styles.noData}>데이터 없음</p>
-                  )}
-                </div>
-              </div>
-            </section>
 
             {/* 이벤트 통계 */}
             <section className={styles.section}>
@@ -338,20 +247,96 @@ export default function AnalyticsPage() {
             {/* 일별 활성 사용자 */}
             <section className={styles.section}>
               <h2>일별 활성 사용자 (DAU)</h2>
-              <div className={styles.chartContainer}>
-                {statsData?.dailyActiveUsers.slice(0, 14).reverse().map((day) => (
-                  <div key={day.date} className={styles.barItem}>
-                    <div className={styles.barLabel}>{day.date.slice(5)}</div>
-                    <div className={styles.barContainer}>
-                      <div
-                        className={styles.bar}
-                        style={{ width: `${(day.users / Math.max(...(statsData?.dailyActiveUsers.map(d => d.users) || [1]))) * 100}%` }}
-                      >
-                        {day.users}
+              {userFilter === 'all' ? (
+                <div className={styles.chartContainer}>
+                  {statsData?.dailyUserTypes.slice(0, 14).reverse().map((day) => {
+                    const maxUsers = Math.max(...(statsData?.dailyUserTypes.map(d => d.returningUsers + d.newUsers) || [1]));
+                    const totalUsers = day.returningUsers + day.newUsers;
+                    const returningPercent = totalUsers > 0 ? (day.returningUsers / totalUsers) * 100 : 0;
+                    const newPercent = totalUsers > 0 ? (day.newUsers / totalUsers) * 100 : 0;
+
+                    return (
+                      <div key={day.date} className={styles.barItem}>
+                        <div className={styles.barLabel}>{day.date.slice(5)}</div>
+                        <div className={styles.barContainer}>
+                          <div className={styles.stackedBar} style={{ width: `${(totalUsers / maxUsers) * 100}%` }}>
+                            <div
+                              className={styles.stackedBarSegment}
+                              style={{
+                                width: `${returningPercent}%`,
+                                backgroundColor: '#8b5cf6',
+                              }}
+                              title={`재방문자: ${day.returningUsers}`}
+                            />
+                            <div
+                              className={styles.stackedBarSegment}
+                              style={{
+                                width: `${newPercent}%`,
+                                backgroundColor: '#10b981',
+                              }}
+                              title={`신규: ${day.newUsers}`}
+                            />
+                            <span className={styles.stackedBarLabel}>{totalUsers}</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
+                    );
+                  })}
+                </div>
+              ) : userFilter === 'returning' ? (
+                <div className={styles.chartContainer}>
+                  {statsData?.dailyUserTypes.slice(0, 14).reverse().map((day) => {
+                    const maxUsers = Math.max(...(statsData?.dailyUserTypes.map(d => d.returningUsers) || [1]));
+                    return (
+                      <div key={day.date} className={styles.barItem}>
+                        <div className={styles.barLabel}>{day.date.slice(5)}</div>
+                        <div className={styles.barContainer}>
+                          <div
+                            className={styles.bar}
+                            style={{
+                              width: `${(day.returningUsers / maxUsers) * 100}%`,
+                              backgroundColor: '#8b5cf6'
+                            }}
+                          >
+                            {day.returningUsers}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className={styles.chartContainer}>
+                  {statsData?.dailyUserTypes.slice(0, 14).reverse().map((day) => {
+                    const maxUsers = Math.max(...(statsData?.dailyUserTypes.map(d => d.newUsers) || [1]));
+                    return (
+                      <div key={day.date} className={styles.barItem}>
+                        <div className={styles.barLabel}>{day.date.slice(5)}</div>
+                        <div className={styles.barContainer}>
+                          <div
+                            className={styles.bar}
+                            style={{
+                              width: `${(day.newUsers / maxUsers) * 100}%`,
+                              backgroundColor: '#10b981'
+                            }}
+                          >
+                            {day.newUsers}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div className={styles.legend}>
+                <div className={styles.legendItem}>
+                  <div className={styles.legendColor} style={{ backgroundColor: '#8b5cf6' }} />
+                  <span>재방문자</span>
+                </div>
+                <div className={styles.legendItem}>
+                  <div className={styles.legendColor} style={{ backgroundColor: '#10b981' }} />
+                  <span>신규 사용자</span>
+                </div>
               </div>
             </section>
 
@@ -377,70 +362,38 @@ export default function AnalyticsPage() {
                 ))}
               </div>
             </section>
+
+            {/* 당일 활성 사용자 */}
+            <section className={styles.section}>
+              <h2>당일 활성 사용자 ({statsData?.todayActiveUsers?.length || 0}명)</h2>
+              <div className={styles.userList}>
+                {statsData?.todayActiveUsers && statsData.todayActiveUsers.length > 0 ? (
+                  statsData.todayActiveUsers.map((user) => (
+                    <div key={user.email} className={styles.userItem}>
+                      <div className={styles.userEmail}>{user.email}</div>
+                      <div className={styles.userLastActive}>
+                        {new Date(user.lastActive).toLocaleString('ko-KR')}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className={styles.noData}>당일 활성 사용자가 없습니다.</p>
+                )}
+              </div>
+            </section>
           </>
         ) : (
           <section className={styles.section}>
             <div className={styles.cohortHeader}>
               <h2>코호트 리텐션 분석</h2>
-              <div className={styles.cohortFilters}>
-                <select
-                  value={cohortType}
-                  onChange={(e) => setCohortType(e.target.value as 'week' | 'day')}
-                  className={styles.cohortTypeSelector}
-                >
-                  <option value="week">주간 분석</option>
-                  <option value="day">일간 분석</option>
-                </select>
-
-                <select
-                  value={cohortDeviceFilter}
-                  onChange={(e) => setCohortDeviceFilter(e.target.value)}
-                  className={styles.cohortFilterSelector}
-                >
-                  <option value="">전체 기기</option>
-                  <option value="desktop">Desktop</option>
-                  <option value="mobile">Mobile</option>
-                  <option value="tablet">Tablet</option>
-                </select>
-
-                <select
-                  value={cohortBrowserFilter}
-                  onChange={(e) => setCohortBrowserFilter(e.target.value)}
-                  className={styles.cohortFilterSelector}
-                >
-                  <option value="">전체 브라우저</option>
-                  <option value="Chrome">Chrome</option>
-                  <option value="Safari">Safari</option>
-                  <option value="Firefox">Firefox</option>
-                  <option value="Edge">Edge</option>
-                </select>
-
-                <select
-                  value={cohortOSFilter}
-                  onChange={(e) => setCohortOSFilter(e.target.value)}
-                  className={styles.cohortFilterSelector}
-                >
-                  <option value="">전체 OS</option>
-                  <option value="Windows">Windows</option>
-                  <option value="macOS">macOS</option>
-                  <option value="iOS">iOS</option>
-                  <option value="Android">Android</option>
-                  <option value="Linux">Linux</option>
-                </select>
-
-                {(cohortDeviceFilter || cohortBrowserFilter || cohortOSFilter) && (
-                  <button
-                    onClick={() => {
-                      setCohortDeviceFilter('');
-                      setCohortBrowserFilter('');
-                      setCohortOSFilter('');
-                    }}
-                    className={styles.clearFilterButton}
-                  >
-                    필터 초기화
-                  </button>
-                )}
-              </div>
+              <select
+                value={cohortType}
+                onChange={(e) => setCohortType(e.target.value as 'week' | 'day')}
+                className={styles.cohortTypeSelector}
+              >
+                <option value="week">주간 분석</option>
+                <option value="day">일간 분석</option>
+              </select>
             </div>
             {cohortData.length === 0 ? (
               <p className={styles.noData}>데이터가 없습니다. 사용자가 앱을 사용하면 데이터가 수집됩니다.</p>

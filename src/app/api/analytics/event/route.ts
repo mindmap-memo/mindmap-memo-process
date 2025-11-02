@@ -9,7 +9,13 @@ const sql = neon(process.env.DATABASE_URL!);
  */
 export async function POST(request: NextRequest) {
   try {
-    const { sessionId, userEmail, eventType, eventData } = await request.json();
+    // 빈 요청 본문 처리
+    const text = await request.text();
+    if (!text) {
+      return NextResponse.json({ error: 'Empty request body' }, { status: 400 });
+    }
+
+    const { sessionId, userEmail, eventType, eventData } = JSON.parse(text);
 
     const eventId = `evt_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 

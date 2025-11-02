@@ -3,6 +3,7 @@ import { MemoBlock, Page, ImportanceLevel, CategoryBlock } from '../../types';
 import { IMPORTANCE_LABELS, IMPORTANCE_COLORS } from '../../utils/importanceStyles';
 import Resizer from '../Resizer';
 import ContentBlockComponent from '../ContentBlock';
+import BlockEditor from '../editor/BlockEditor';
 import GoogleAuth from '../GoogleAuth';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { useBlockHandlers } from './hooks/useBlockHandlers';
@@ -19,6 +20,8 @@ import { useRightPanelMenus } from './hooks/useRightPanelMenus';
 import { useRightPanelMemoView } from './hooks/useRightPanelMemoView';
 import { useEmptySpaceMenu } from './hooks/useEmptySpaceMenu';
 import { useMultiBlockImportance } from './hooks/useMultiBlockImportance';
+import { useAddBlockButton } from './hooks/useAddBlockButton';
+import { usePanelFileDrop } from './hooks/usePanelFileDrop';
 import PanelHeader from './PanelHeader';
 import MultiSelectView from './MultiSelectView';
 import CategoryEditView from './CategoryEditView';
@@ -66,6 +69,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const [selectedBlocks, setSelectedBlocks] = React.useState<string[]>([]);
   const [dragSelectedBlocks, setDragSelectedBlocks] = React.useState<string[]>([]);
   const [dragJustCompleted, setDragJustCompleted] = React.useState(false);
+  const [pendingFileType, setPendingFileType] = React.useState<'image' | 'file' | null>(null);
 
   const blocksContainerRef = React.useRef<HTMLDivElement>(null);
   const rightPanelRef = React.useRef<HTMLDivElement>(null);
@@ -317,14 +321,151 @@ const RightPanel: React.FC<RightPanelProps> = ({
     saveToHistory
   });
 
+  // 패널 파일 드롭 훅 사용
+  const {
+    isDraggingOver,
+    handleDragOver: handlePanelDragOver,
+    handleDragLeave: handlePanelDragLeave,
+    handleDrop: handlePanelDrop,
+  } = usePanelFileDrop({
+    onFileDrop: (file: File) => {
+      // 파일 타입에 따라 적절한 블록 생성
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (selectedMemo && e.target?.result) {
+            const newBlock = {
+              id: `${Date.now()}${Math.random()}`,
+              type: 'image' as const,
+              url: e.target.result as string,
+              src: e.target.result as string,
+              alt: file.name,
+            };
+            onMemoUpdate(selectedMemo.id, {
+              blocks: [...selectedMemo.blocks, newBlock]
+            });
+            saveToHistory();
+          }
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // 일반 파일
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (selectedMemo && e.target?.result) {
+            const newBlock = {
+              id: `${Date.now()}${Math.random()}`,
+              type: 'file' as const,
+              url: e.target.result as string,
+              name: file.name,
+              fileName: file.name,
+              fileSize: file.size,
+              fileType: file.type || 'application/octet-stream',
+              fileData: e.target.result as string,
+            };
+            onMemoUpdate(selectedMemo.id, {
+              blocks: [...selectedMemo.blocks, newBlock]
+            });
+            saveToHistory();
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    },
+    enabled: !!selectedMemo && !selectedCategory
+  });
+
+  // + 버튼 훅 사용
+  const { renderAddBlockButton } = useAddBlockButton({
+    onAddBlock: (type: string) => {
+      if (!selectedMemo) return;
+
+      if (type === 'text') {
+        const newBlock = {
+          id: `${Date.now()}${Math.random()}`,
+          type: 'text' as const,
+          content: '',
+        };
+        onMemoUpdate(selectedMemo.id, {
+          blocks: [...selectedMemo.blocks, newBlock]
+        });
+      } else if (type === 'image') {
+        setPendingFileType('image');
+        if (fileInputRef.current) {
+          fileInputRef.current.accept = 'image/*';
+          fileInputRef.current.click();
+        }
+      } else if (type === 'file') {
+        setPendingFileType('file');
+        if (fileInputRef.current) {
+          fileInputRef.current.accept = '*';
+          fileInputRef.current.click();
+        }
+      }
+    },
+    show: !!selectedMemo && !selectedCategory
+  });
+
+  // + 버튼에서 파일 선택 핸들러
+  const handleAddBlockFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedMemo) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (!event.target?.result) return;
+
+      if (pendingFileType === 'image') {
+        const newBlock = {
+          id: `${Date.now()}${Math.random()}`,
+          type: 'image' as const,
+          url: event.target.result as string,
+          src: event.target.result as string,
+          alt: file.name,
+        };
+        onMemoUpdate(selectedMemo.id, {
+          blocks: [...selectedMemo.blocks, newBlock]
+        });
+      } else {
+        const newBlock = {
+          id: `${Date.now()}${Math.random()}`,
+          type: 'file' as const,
+          url: event.target.result as string,
+          name: file.name,
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.type || 'application/octet-stream',
+          fileData: event.target.result as string,
+        };
+        onMemoUpdate(selectedMemo.id, {
+          blocks: [...selectedMemo.blocks, newBlock]
+        });
+      }
+
+      saveToHistory();
+      setPendingFileType(null);
+    };
+    reader.readAsDataURL(file);
+
+    // input 초기화
+    e.target.value = '';
+  };
+
   return (
     <div
       ref={rightPanelRef}
       data-right-panel="true"
       data-tutorial="right-panel"
       onClick={handleMemoAreaClick}
-      onDrop={handleFileDrop}
-      onDragOver={handleDragOver}
+      onDrop={(e) => {
+        handleFileDrop(e);
+        handlePanelDrop(e);
+      }}
+      onDragOver={(e) => {
+        handleDragOver(e);
+        handlePanelDragOver(e);
+      }}
+      onDragLeave={handlePanelDragLeave}
       style={{
         display: 'flex',
         height: '100vh',
@@ -428,8 +569,14 @@ const RightPanel: React.FC<RightPanelProps> = ({
                 </div>
               )}
 
-              {/* 블록들 */}
-              {renderBlocks()}
+              {/* 블록 에디터 */}
+              <BlockEditor
+                initialBlocks={selectedMemo.blocks}
+                onChange={(blocks) => {
+                  onMemoUpdate(selectedMemo.id, { blocks });
+                }}
+                placeholder="텍스트를 입력하거나 파일을 드래그해 추가하세요"
+              />
             </div>
 
           </div>
@@ -466,9 +613,39 @@ const RightPanel: React.FC<RightPanelProps> = ({
           ref={fileInputRef}
           type="file"
           style={{ display: 'none' }}
-          onChange={handleFileSelect}
+          onChange={handleAddBlockFileSelect}
         />
       </div>
+
+      {/* 파일 드래그 오버 오버레이 */}
+      {isDraggingOver && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(139, 92, 246, 0.1)',
+          border: '3px dashed #8b5cf6',
+          borderRadius: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'none',
+          zIndex: 1000,
+        }}>
+          <div style={{
+            fontSize: '18px',
+            fontWeight: 600,
+            color: '#8b5cf6',
+          }}>
+            파일을 여기에 드롭하세요
+          </div>
+        </div>
+      )}
+
+      {/* 블록 추가 버튼 */}
+      {renderAddBlockButton()}
     </div>
   );
 };

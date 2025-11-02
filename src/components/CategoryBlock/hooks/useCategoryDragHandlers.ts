@@ -50,6 +50,9 @@ export const useCategoryDragHandlers = ({
 }: UseCategoryDragHandlersProps) => {
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    // 캔버스의 드래그 선택이 시작되지 않도록 이벤트 전파 중단
+    e.stopPropagation();
+
     if (e.button === 0 && !isConnecting && !isEditing) {
       // Shift 클릭 시 다중 선택
       if (e.shiftKey) {
@@ -59,7 +62,7 @@ export const useCategoryDragHandlers = ({
       }
 
       // 마우스 다운 위치 저장 (임계값 판단용)
-      setMouseDownPos({ x: e.clientX, y: e.clientY });
+      setMouseDownPos({ x: e.clientX, y: e.clientX });
       setDragMoved(false);
       setDragStart({
         x: e.clientX - (category.position.x * canvasScale + canvasOffset.x),

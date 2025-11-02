@@ -5,6 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 - `npm run dev` - Start Next.js development server (http://localhost:3000)
+  - **IMPORTANT**: Must run on port 3000 for Google login redirect to work properly
+  - If port 3000 is occupied, kill the process: `npx kill-port 3000`
 - `npm run build` - Create production build in `.next/` directory
 - `npm start` - Start production server (after build)
 - `npm run lint` - Run Next.js linter
@@ -34,22 +36,20 @@ This is a React TypeScript mindmap memo application built with Next.js 15 (App R
 Core types in `src/types/index.ts`:
 
 - **MemoBlock**: Individual memo with title, content, tags, connections array, position, and optional size. Contains `blocks` array for rich content
-- **ContentBlock**: Notion-style content blocks with 8 types: text, callout, checklist, image, file, bookmark, quote, code
+- **ContentBlock**: Block-based content with 4 types: text, image, file, link
 - **CategoryBlock**: Hierarchical container for organizing memos and other categories with title, position, size, children array, parentId, and isExpanded state
 - **Page**: Contains arrays of memos and categories with id and name
 - **AppState**: Global application state interface
 
 ### Block-Based Content System
 
-The application implements a Notion-inspired block-based content editor:
+The application implements a TipTap-based block content editor:
 
-- **ContentBlock Types**: 8 distinct block types each with specific properties and rendering logic: text, callout, checklist, image, file, bookmark, quote, code
-- **Block Components**: Individual components in `src/components/blocks/` for each block type
-- **ContentBlockComponent**: Wrapper component that renders appropriate block type and handles common functionality
-- **Block Selection**: Multi-select blocks with drag selection, keyboard shortcuts (Ctrl+A, Delete), and context menu
-- **Block Operations**: Create, delete, move, convert between types, and merge text blocks
-- **Slash Commands**: Type "/" to open BlockSelector for inserting new blocks
-- **Seamless Editing**: Auto-save with 300ms debounce, Enter key splits blocks, backspace merges blocks
+- **ContentBlock Types**: 4 block types each with specific properties: text, image, file, link
+- **Block Editor**: TipTap-based WYSIWYG editor with drag & drop support for files and images
+- **Add Block Button**: Floating + button in bottom right of right panel when memo is selected, provides menu to add text, image, file, or link blocks
+- **Drag & Drop**: Direct file/image drag & drop onto right panel to add new blocks
+- **Seamless Editing**: Auto-save with debouncing, rich text formatting (bold, italic, code, strike)
 
 ### Category System
 
@@ -228,6 +228,8 @@ The application implements Shift+drag functionality for adding/removing memos an
    - 복잡한 로직은 작은 함수들로 분리
    - 예: 충돌 검사 로직을 `resolveAreaCollisions` 함수로 독립
    - 각 함수는 명확한 input/output을 가져야 함
+   - **파일 크기 제한**: 한 파일의 코드가 500줄을 초과하지 않도록 커스텀 훅으로 로직을 분리
+   - 500줄이 넘어가면 관련 로직을 커스텀 훅으로 추출하여 별도 파일로 분리
 
 3. **함수 호출 정돈화**
    - 불필요한 함수 호출 제거 (성능 및 무한 루프 방지)
@@ -358,6 +360,13 @@ The application implements Shift+drag functionality for adding/removing memos an
     // GOOD - static styles in SCSS
     <div className={styles.container}>
     ```
+- **Icon Usage**: ALWAYS use wireframe/outline SVG icons from `lucide-react` library. NEVER use emoji icons (🔍, 📄, ✏️, 🗑️, etc.) in UI components
+  - **Good**: `<Plus size={16} />`, `<ImageIcon size={16} />`
+  - **Bad**: `+`, `🖼️`, `📎`
+  - Install lucide-react if not present: `npm install lucide-react`
+  - Import icons: `import { Plus, Image as ImageIcon, Link as LinkIcon } from 'lucide-react'`
+  - Standard size for inline icons: 16px
+  - Standard size for larger icons: 20-32px
 - **Error Handling**: Use proper TypeScript error handling with `error instanceof Error ? error.message : 'Unknown error'` pattern
 - **Context Menus**: Position context menus using getBoundingClientRect() and pass position props for proper placement
 - **Category Drag Operations**: Always use absolute positioning (originalPosition + totalDelta) rather than cumulative deltas to prevent position drift

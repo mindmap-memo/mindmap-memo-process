@@ -28,7 +28,8 @@ export interface TextBlock extends BaseContentBlock {
 
 export interface ImageBlock extends BaseContentBlock {
   type: 'image';
-  url: string;
+  url: string; // 기존 호환성
+  src?: string; // TipTap ImageNode용 (url과 동일)
   alt?: string;
   caption?: string;
   width?: number;
@@ -37,10 +38,15 @@ export interface ImageBlock extends BaseContentBlock {
 
 export interface FileBlock extends BaseContentBlock {
   type: 'file';
-  url: string;
-  name: string;
-  size?: number;
-  type_info?: string;
+  url: string; // 기존 호환성
+  name: string; // 기존 호환성
+  size?: number; // 기존 호환성
+  type_info?: string; // 기존 호환성
+  // TipTap FileNode용 필드들
+  fileName?: string; // name과 동일
+  fileSize?: number; // size와 동일
+  fileType?: string; // type_info와 동일
+  fileData?: string; // url과 동일 (base64 data)
   importance?: ImportanceLevel;
 }
 

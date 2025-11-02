@@ -19,6 +19,18 @@ const IMPORTANCE_LABELS = {
   none: '강조 해제'
 };
 
+// 중요도별 hover 색상 (실제 배경색과 동일)
+const IMPORTANCE_HOVER_COLORS: Record<ImportanceLevel, string> = {
+  critical: '#ffcdd2',    // 빨간 형광펜
+  important: '#ffcc80',   // 주황 형광펜
+  opinion: '#e1bee7',     // 보라 형광펜
+  reference: '#81d4fa',   // 파란 형광펜
+  question: '#fff59d',    // 노란 형광펜
+  idea: '#c8e6c9',        // 초록 형광펜
+  data: '#bdbdbd',        // 진한 회색 형광펜
+  none: '#f5f5f5'         // 기본 회색
+};
+
 export const useMultiBlockImportance = ({
   selectedMemo,
   onMemoUpdate,
@@ -33,6 +45,7 @@ export const useMultiBlockImportance = ({
   }>>([]);
 
   const menuRef = React.useRef<HTMLDivElement>(null);
+  const savedSelectionRef = React.useRef<Range | null>(null);
 
   // 전역 텍스트 선택 감지
   const handleGlobalTextSelection = React.useCallback(() => {
@@ -62,49 +75,67 @@ export const useMultiBlockImportance = ({
       end: number;
     }> = [];
 
+    // 선택된 텍스트를 블록별로 분해
+    const selectedTextLines = selectedText.split('\n');
+    let currentLineIndex = 0;
+
     // 모든 TextBlock 요소 순회
     selectedMemo.blocks.forEach(block => {
       if (block.type !== 'text') return;
 
-      const blockElement = document.querySelector(`[data-block-id="${block.id}"]`);
-      if (!blockElement) return;
-
-      const textarea = blockElement.querySelector('textarea');
+      const textarea = document.querySelector(`textarea[data-block-id="${block.id}"]`) as HTMLTextAreaElement;
       if (!textarea) return;
 
-      // 이 블록이 선택 범위에 포함되는지 확인
-      if (selection.containsNode(blockElement, true)) {
-        // 블록 전체 텍스트
-        const blockText = (block as TextBlock).content;
+      const blockText = (block as TextBlock).content;
 
-        // 선택된 텍스트에서 이 블록의 텍스트가 어디에 있는지 찾기
-        let start = 0;
-        let end = blockText.length;
+      // 이 textarea가 선택 범위와 교차하는지 확인
+      try {
+        if (!range.intersectsNode(textarea)) {
+          return;
+        }
+      } catch (e) {
+        return;
+      }
 
-        // 시작점과 끝점 계산
-        if (range.startContainer.parentElement?.closest('[data-block-id]') === blockElement) {
-          // 선택 시작이 이 블록 안에 있음
-          const startOffset = getTextOffsetInTextarea(textarea, range.startContainer, range.startOffset);
-          if (startOffset !== -1) {
-            start = startOffset;
+      // 선택 시작과 끝 오프셋 계산
+      let start = 0;
+      let end = blockText.length;
+
+      // 포커스된 textarea인 경우 selectionStart/End 사용
+      if (document.activeElement === textarea) {
+        start = textarea.selectionStart;
+        end = textarea.selectionEnd;
+      } else {
+        // 포커스되지 않은 경우, 텍스트 비교로 범위 추정
+        // 선택된 텍스트에 이 블록의 텍스트가 포함되어 있는지 확인
+        const blockLines = blockText.split('\n');
+
+        // 블록 전체가 선택된 경우
+        if (selectedText.includes(blockText)) {
+          start = 0;
+          end = blockText.length;
+        } else {
+          // 부분 선택: 첫 줄과 마지막 줄 찾기
+          const firstLine = blockLines[0];
+          const lastLine = blockLines[blockLines.length - 1];
+
+          if (selectedText.includes(firstLine) || selectedText.includes(lastLine)) {
+            // 이 블록의 일부가 선택됨
+            start = 0;
+            end = blockText.length;
+          } else {
+            // 선택 범위 밖
+            return;
           }
         }
+      }
 
-        if (range.endContainer.parentElement?.closest('[data-block-id]') === blockElement) {
-          // 선택 끝이 이 블록 안에 있음
-          const endOffset = getTextOffsetInTextarea(textarea, range.endContainer, range.endOffset);
-          if (endOffset !== -1) {
-            end = endOffset;
-          }
-        }
-
-        if (start < end) {
-          blocksInSelection.push({
-            blockId: block.id,
-            start,
-            end
-          });
-        }
+      if (start < end) {
+        blocksInSelection.push({
+          blockId: block.id,
+          start,
+          end
+        });
       }
     });
 
@@ -116,6 +147,13 @@ export const useMultiBlockImportance = ({
 
     // 선택 범위 저장
     setSelectedBlocks(blocksInSelection);
+
+    // 현재 선택 영역을 저장 (메뉴가 열릴 때 선택이 풀리지 않도록)
+    try {
+      savedSelectionRef.current = range.cloneRange();
+    } catch (e) {
+      // 실패하면 무시
+    }
 
     // 메뉴 위치 계산
     const rect = range.getBoundingClientRect();
@@ -150,25 +188,6 @@ export const useMultiBlockImportance = ({
     setMenuPosition({ x, y });
     setShowImportanceMenu(true);
   }, [selectedMemo]);
-
-  // textarea 내에서 텍스트 오프셋 계산
-  const getTextOffsetInTextarea = (
-    textarea: HTMLTextAreaElement,
-    container: Node,
-    offset: number
-  ): number => {
-    // textarea인 경우 직접 selectionStart 사용
-    if (container === textarea) {
-      return textarea.selectionStart;
-    }
-
-    // textarea의 텍스트 노드인 경우
-    if (container.nodeType === Node.TEXT_NODE && container.parentElement === textarea) {
-      return offset;
-    }
-
-    return -1;
-  };
 
   // 중요도 적용
   const applyImportance = React.useCallback((level: ImportanceLevel) => {
@@ -253,13 +272,30 @@ export const useMultiBlockImportance = ({
     // 히스토리 저장
     setTimeout(() => saveToHistory(), 50);
 
-    // 메뉴 닫기
+    // 메뉴 닫기 (선택은 유지)
     setShowImportanceMenu(false);
     setSelectedBlocks([]);
 
-    // 선택 해제
-    window.getSelection()?.removeAllRanges();
+    // 선택 해제는 약간 지연 (사용자가 결과를 볼 수 있도록)
+    setTimeout(() => {
+      window.getSelection()?.removeAllRanges();
+    }, 300);
   }, [selectedMemo, selectedBlocks, onMemoUpdate, saveToHistory]);
+
+  // 메뉴가 열릴 때 선택 영역 복원
+  React.useEffect(() => {
+    if (showImportanceMenu && savedSelectionRef.current) {
+      const selection = window.getSelection();
+      if (selection) {
+        try {
+          selection.removeAllRanges();
+          selection.addRange(savedSelectionRef.current);
+        } catch (e) {
+          // 실패하면 무시
+        }
+      }
+    }
+  }, [showImportanceMenu]);
 
   // 메뉴 외부 클릭 감지
   React.useEffect(() => {
@@ -267,6 +303,7 @@ export const useMultiBlockImportance = ({
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setShowImportanceMenu(false);
         setSelectedBlocks([]);
+        savedSelectionRef.current = null;
       }
     };
 
@@ -281,15 +318,29 @@ export const useMultiBlockImportance = ({
   // mouseup 이벤트로 텍스트 선택 감지
   React.useEffect(() => {
     const handleMouseUp = () => {
-      // 약간의 지연을 두고 선택 상태 확인 (브라우저가 선택을 완료할 시간을 줌)
+      // 브라우저가 선택을 완료할 시간을 충분히 줌
       setTimeout(() => {
         handleGlobalTextSelection();
-      }, 10);
+      }, 100);
     };
 
     document.addEventListener('mouseup', handleMouseUp);
+
+    // selectionchange 이벤트도 추가로 감지 (더 안정적)
+    const handleSelectionChange = () => {
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed) {
+        setTimeout(() => {
+          handleGlobalTextSelection();
+        }, 50);
+      }
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+
     return () => {
       document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('selectionchange', handleSelectionChange);
     };
   }, [handleGlobalTextSelection]);
 
@@ -335,7 +386,7 @@ export const useMultiBlockImportance = ({
               fontFamily: 'inherit'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f5f5f5';
+              e.currentTarget.style.backgroundColor = IMPORTANCE_HOVER_COLORS[level as ImportanceLevel];
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent';

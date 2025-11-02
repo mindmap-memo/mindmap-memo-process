@@ -77,9 +77,11 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
       return;
     }
 
+    // 캔버스의 드래그 선택이 시작되지 않도록 이벤트 전파 중단
+    e.stopPropagation();
+
     // 다른 메모가 이미 드래그 중이면 무시 (단, 현재 메모가 드래그 중이면 허용)
     if (isDraggingAnyMemo && !isDragging) {
-      e.stopPropagation();
       return;
     }
 

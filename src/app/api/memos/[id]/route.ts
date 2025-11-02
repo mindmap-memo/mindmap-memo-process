@@ -14,7 +14,11 @@ export async function PUT(
     const user = await requireAuth();
 
     const { id } = await params;
-    const body = await request.json();
+    const text = await request.text();
+    if (!text) {
+      return NextResponse.json({ error: 'Empty request body' }, { status: 400 });
+    }
+    const body = JSON.parse(text);
 
     console.log(`[서버] 메모 업데이트, id: ${id}, user: ${user.email}`);
     console.log(`[서버] body.blocks:`, JSON.stringify(body.blocks, null, 2));

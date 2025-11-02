@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { AnalyticsEventType } from '../types';
-import { getDeviceInfo } from '../utils/deviceDetection';
+import { isEmailExcluded } from '../utils/excludedEmails';
 
 /**
  * useAnalytics
@@ -9,6 +9,7 @@ import { getDeviceInfo } from '../utils/deviceDetection';
  * 애널리틱스 이벤트 추적 훅
  * - 세션 시작/종료 자동 추적
  * - 이벤트 기록 함수 제공
+ * - 제외된 이메일 계정은 추적하지 않음
  */
 export const useAnalytics = () => {
   const { data: session } = useSession();
@@ -19,12 +20,12 @@ export const useAnalytics = () => {
   const startSession = useCallback(async () => {
     if (!session?.user?.email) return;
 
+    // 제외된 이메일은 추적하지 않음
+    if (isEmailExcluded(session.user.email)) return;
+
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     sessionIdRef.current = sessionId;
     sessionStartTimeRef.current = Date.now();
-
-    // 기기 정보 수집
-    const deviceInfo = getDeviceInfo();
 
     try {
       await fetch('/api/analytics/session', {
@@ -33,11 +34,7 @@ export const useAnalytics = () => {
         body: JSON.stringify({
           sessionId,
           userEmail: session.user.email,
-          action: 'start',
-          deviceType: deviceInfo.deviceType,
-          browser: deviceInfo.browser,
-          os: deviceInfo.os,
-          screenResolution: deviceInfo.screenResolution
+          action: 'start'
         })
       });
     } catch (error) {
@@ -48,6 +45,9 @@ export const useAnalytics = () => {
   // 세션 종료
   const endSession = useCallback(async () => {
     if (!sessionIdRef.current || !sessionStartTimeRef.current || !session?.user?.email) return;
+
+    // 제외된 이메일은 추적하지 않음
+    if (isEmailExcluded(session.user.email)) return;
 
     const durationSeconds = Math.floor((Date.now() - sessionStartTimeRef.current) / 1000);
 
@@ -73,6 +73,9 @@ export const useAnalytics = () => {
     eventData?: Record<string, any>
   ) => {
     if (!sessionIdRef.current || !session?.user?.email) return;
+
+    // 제외된 이메일은 추적하지 않음
+    if (isEmailExcluded(session.user.email)) return;
 
     try {
       await fetch('/api/analytics/event', {
