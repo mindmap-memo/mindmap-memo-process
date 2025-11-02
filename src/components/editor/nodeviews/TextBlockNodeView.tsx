@@ -53,6 +53,7 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
     if (!editor || typeof getPos !== 'function') return;
 
     const pos = getPos();
+    if (typeof pos !== 'number') return;
 
     // 드래그 데이터에 노드 위치와 JSON 저장
     e.dataTransfer.effectAllowed = 'move';
@@ -125,6 +126,7 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
 
     const draggedPos = parseInt(draggedPosStr, 10);
     const dropPos = getPos();
+    if (typeof dropPos !== 'number') return;
 
     if (draggedPos === dropPos) return;
 
