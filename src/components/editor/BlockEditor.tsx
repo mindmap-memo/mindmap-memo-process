@@ -413,10 +413,29 @@ export default function BlockEditor({
     }
   };
 
+  // 빈 곳 클릭 시 에디터 포커스
+  const handleContainerClick = (e: React.MouseEvent) => {
+    // ProseMirror 에디터나 ImportanceToolbar를 클릭한 경우는 무시
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('.ProseMirror') ||
+      target.closest('.importance-toolbar') ||
+      target.classList.contains('ProseMirror')
+    ) {
+      return;
+    }
+
+    // 컨테이너의 빈 공간을 클릭한 경우 에디터에 포커스
+    if (editor && (target.classList.contains(styles.container) || target === e.currentTarget)) {
+      editor.commands.focus('end');
+    }
+  };
+
   return (
     <div
       className={styles.container}
       onDragOverCapture={handleDragOver}
+      onClick={handleContainerClick}
     >
       <EditorContent editor={editor} />
       <ImportanceToolbar editor={editor} />
