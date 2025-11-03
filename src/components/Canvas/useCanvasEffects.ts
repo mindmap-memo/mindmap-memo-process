@@ -217,9 +217,10 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
     return () => canvasElement.removeEventListener('wheel', wheelHandler);
   }, [currentTool, canvasScale, canvasOffset, setCanvasScale, setCanvasOffset]);
 
-  // 6. 패닝 모드 글로벌 리스너
+  // 6. 패닝 모드 글로벌 리스너 (마우스 + 터치)
   useEffect(() => {
     if (isPanning) {
+      // 마우스 이벤트 핸들러
       const handleGlobalMouseMove = (e: MouseEvent) => {
         const deltaX = e.clientX - panStart.x;
         const deltaY = e.clientY - panStart.y;
@@ -231,6 +232,24 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
       };
 
       const handleGlobalMouseUp = () => {
+        setIsPanning(false);
+      };
+
+      // 터치 이벤트 핸들러
+      const handleGlobalTouchMove = (e: TouchEvent) => {
+        if (e.touches.length === 1) {
+          const touch = e.touches[0];
+          const deltaX = touch.clientX - panStart.x;
+          const deltaY = touch.clientY - panStart.y;
+          const newOffset = {
+            x: panStart.offsetX + deltaX,
+            y: panStart.offsetY + deltaY
+          };
+          setCanvasOffset(newOffset);
+        }
+      };
+
+      const handleGlobalTouchEnd = () => {
         setIsPanning(false);
       };
 
@@ -246,12 +265,18 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
 
       document.addEventListener('mousemove', handleGlobalMouseMove);
       document.addEventListener('mouseup', handleGlobalMouseUp);
+      document.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
+      document.addEventListener('touchend', handleGlobalTouchEnd);
+      document.addEventListener('touchcancel', handleGlobalTouchEnd);
       document.addEventListener('mouseleave', handleMouseLeave);
       window.addEventListener('blur', handleBlur);
 
       return () => {
         document.removeEventListener('mousemove', handleGlobalMouseMove);
         document.removeEventListener('mouseup', handleGlobalMouseUp);
+        document.removeEventListener('touchmove', handleGlobalTouchMove);
+        document.removeEventListener('touchend', handleGlobalTouchEnd);
+        document.removeEventListener('touchcancel', handleGlobalTouchEnd);
         document.removeEventListener('mouseleave', handleMouseLeave);
         window.removeEventListener('blur', handleBlur);
       };

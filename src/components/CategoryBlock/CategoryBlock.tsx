@@ -43,6 +43,7 @@ interface CategoryBlockProps {
   isDragTarget?: boolean;
   isCategoryBeingDragged?: boolean;
   isShiftPressed?: boolean;
+  onOpenEditor?: () => void;
 }
 
 const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
@@ -76,8 +77,12 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   isQuickNavExists,
   isDragTarget = false,
   isCategoryBeingDragged = false,
-  isShiftPressed = false
+  isShiftPressed = false,
+  onOpenEditor
 }) => {
+  // 더블탭 감지를 위한 상태
+  const lastTapTimeRef = React.useRef<number>(0);
+  const DOUBLE_TAP_DELAY = 300; // 300ms 이내 두 번 탭하면 더블탭으로 인식
   // 상태 관리
   const {
     isEditing,
@@ -121,7 +126,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   });
 
   // 드래그 핸들러
-  const { handleMouseDown, handleMouseMove, handleMouseUp, handleClick } = useCategoryDragHandlers({
+  const { handleMouseDown, handleTouchStart, handleMouseMove, handleMouseUp, handleClick } = useCategoryDragHandlers({
     category,
     isEditing,
     isConnecting,
@@ -133,6 +138,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     canvasOffset,
     pendingPosition,
     lastUpdateTime,
+    lastTapTimeRef,
     setMouseDownPos,
     setDragMoved,
     setDragStart,
@@ -141,7 +147,8 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     onDragStart,
     onDragEnd,
     onPositionChange,
-    onPositionDragEnd
+    onPositionDragEnd,
+    onOpenEditor
   });
 
   // 연결 핸들러
@@ -332,6 +339,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         onDrop={handleDrop}
         onClick={handleClick}
         onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
         onContextMenu={handleContextMenu}
         onMouseUp={(e) => {
           if (isConnecting && connectingFromId && connectingFromId !== category.id) {

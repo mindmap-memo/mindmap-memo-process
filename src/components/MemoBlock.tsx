@@ -42,6 +42,7 @@ interface MemoBlockProps {
   isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
   onTitleUpdate?: (id: string, title: string) => void;
   onBlockUpdate?: (memoId: string, blockId: string, content: string) => void;
+  onOpenEditor?: () => void;
 }
 
 const MemoBlock: React.FC<MemoBlockProps> = ({
@@ -71,8 +72,12 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   onAddQuickNav,
   isQuickNavExists,
   onTitleUpdate,
-  onBlockUpdate
+  onBlockUpdate,
+  onOpenEditor
 }) => {
+  // 더블탭 감지를 위한 상태
+  const lastTapTimeRef = React.useRef<number>(0);
+  const DOUBLE_TAP_DELAY = 300; // 300ms 이내 두 번 탭하면 더블탭으로 인식
   // 드래그 관련 상태 및 핸들러 (커스텀 훅)
   const {
     isDragging,
@@ -80,6 +85,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
     dragMoved,
     cursorPosition,
     handleMouseDown,
+    handleTouchStart,
     handleConnectionPointMouseDown,
     handleConnectionPointMouseUp
   } = useMemoBlockDrag({
@@ -340,12 +346,27 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         data-memo-block="true"
         onClick={(e) => {
           // 드래그로 이동했다면 클릭 이벤트를 무시
-          if (!dragMoved) {
+          if (dragMoved) return;
+
+          // 더블탭 감지
+          const currentTime = new Date().getTime();
+          const tapTimeDiff = currentTime - lastTapTimeRef.current;
+
+          if (tapTimeDiff < DOUBLE_TAP_DELAY && tapTimeDiff > 0) {
+            // 더블탭: 에디터 열기
+            if (onOpenEditor) {
+              onOpenEditor();
+            }
+            lastTapTimeRef.current = 0; // 리셋
+          } else {
+            // 싱글탭: 메모 선택만
             onClick(e.shiftKey);
+            lastTapTimeRef.current = currentTime;
           }
         }}
         onContextMenu={handleContextMenu}
         onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
         onMouseUp={(e) => {
           // 연결 모드일 때 메모 블록 전체에서 연결 처리
           if (isConnecting && connectingFromId && connectingFromId !== memo.id) {
