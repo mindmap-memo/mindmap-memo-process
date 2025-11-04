@@ -29,10 +29,11 @@ export async function POST(request: NextRequest) {
       const userAgent = request.headers.get('user-agent') || '';
       const deviceType = detectDeviceType(userAgent);
 
-      // 세션 시작
+      // 세션 시작 (중복 방지)
       await sql`
         INSERT INTO analytics_sessions (id, user_email, session_start, device_type)
         VALUES (${sessionId}, ${userEmail}, NOW(), ${deviceType})
+        ON CONFLICT (id) DO NOTHING
       `;
 
       // 사용자 코호트 정보 업데이트 (첫 로그인 시)
