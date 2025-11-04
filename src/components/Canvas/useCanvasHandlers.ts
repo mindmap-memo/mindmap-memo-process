@@ -302,6 +302,49 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
   }, [isConnecting, isPanning, canvasOffset, canvasScale, panStart, onUpdateDragLine, setCanvasOffset]);
 
   /**
+   * 터치 시작 핸들러 (모바일 패닝)
+   */
+  const handleTouchStart = React.useCallback((e: React.TouchEvent) => {
+    const target = e.target as Element;
+
+    // 메모 블록이나 카테고리 블록을 터치한 경우는 패닝하지 않음
+    const isMemoOrCategory = target.closest('[data-memo-block="true"]') ||
+                             target.closest('[data-category-block="true"]') ||
+                             target.closest('button');
+
+    if (isMemoOrCategory) {
+      return;
+    }
+
+    // 연결 모드가 아닐 때만 패닝 시작
+    if (!isConnecting && e.touches.length === 1) {
+      const touch = e.touches[0];
+      setIsPanning(true);
+      setPanStart({
+        x: touch.clientX,
+        y: touch.clientY,
+        offsetX: canvasOffset.x,
+        offsetY: canvasOffset.y
+      });
+      // preventDefault는 useEffect의 네이티브 리스너에서 처리
+    }
+  }, [isConnecting, canvasOffset, setIsPanning, setPanStart]);
+
+  /**
+   * 터치 이동 핸들러 (모바일 패닝) - 빈 함수 (실제 처리는 useEffect에서)
+   */
+  const handleTouchMove = React.useCallback(() => {
+    // 실제 처리는 useCanvasEffects의 전역 리스너에서 수행
+  }, []);
+
+  /**
+   * 터치 종료 핸들러 (모바일 패닝)
+   */
+  const handleTouchEnd = React.useCallback(() => {
+    setIsPanning(false);
+  }, [setIsPanning]);
+
+  /**
    * 마우스 업 핸들러
    */
   const handleMouseUp = React.useCallback(() => {
@@ -360,6 +403,9 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
     handleWheel,
     handleMouseMove,
     handleMouseUp,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
     handleCanvasDrop,
     handleCanvasDragOver
   };

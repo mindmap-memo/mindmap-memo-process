@@ -1,25 +1,26 @@
 import React from 'react';
 import { ImportanceLevel } from '../types';
+import styles from '../scss/components/ImportanceFilter.module.scss';
 
 // 중요도 레벨별 형광펜 스타일 정의
 const getImportanceStyle = (level: ImportanceLevel) => {
   switch (level) {
     case 'critical':
-      return { backgroundColor: '#ffcdd2', color: '#000' };
+      return '#ffcdd2';
     case 'important':
-      return { backgroundColor: '#ffcc80', color: '#000' };
+      return '#ffcc80';
     case 'opinion':
-      return { backgroundColor: '#e1bee7', color: '#000' };
+      return '#e1bee7';
     case 'reference':
-      return { backgroundColor: '#81d4fa', color: '#000' };
+      return '#81d4fa';
     case 'question':
-      return { backgroundColor: '#fff59d', color: '#000' };
+      return '#fff59d';
     case 'idea':
-      return { backgroundColor: '#c8e6c9', color: '#000' };
+      return '#c8e6c9';
     case 'data':
-      return { backgroundColor: '#bdbdbd', color: '#000' };
+      return '#bdbdbd';
     default:
-      return {};
+      return '#f3f4f6';
   }
 };
 
@@ -39,13 +40,15 @@ interface ImportanceFilterProps {
   onToggleFilter: (level: ImportanceLevel) => void;
   showGeneralContent: boolean;
   onToggleGeneralContent: () => void;
+  isMobile?: boolean;
 }
 
 const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
   activeFilters,
   onToggleFilter,
   showGeneralContent,
-  onToggleGeneralContent
+  onToggleGeneralContent,
+  isMobile = false
 }) => {
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   const [position, setPosition] = React.useState({ x: 20, y: 70 });
@@ -55,6 +58,59 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
   const importanceLevels: Exclude<ImportanceLevel, 'none'>[] = [
     'critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'
   ];
+
+  // 모바일에서는 드래그 기능 비활성화
+  if (isMobile) {
+    return (
+      <div className={styles.mobileFilter}>
+        <div className={styles.mobileHeader}>
+          <span>중요도 필터</span>
+        </div>
+
+        <div className={styles.mobileContent}>
+          {importanceLevels.map(level => {
+            const isActive = activeFilters?.has(level) || false;
+            const bgColor = getImportanceStyle(level);
+            const label = IMPORTANCE_LABELS[level].replace(/^.{2}\s/, ''); // 이모지 제거
+
+            return (
+              <div
+                key={level}
+                className={styles.mobileItem}
+                onClick={() => onToggleFilter(level)}
+                style={{
+                  backgroundColor: isActive ? bgColor : 'transparent',
+                  opacity: isActive ? 0.9 : 1,
+                }}
+              >
+                <span style={{ color: isActive ? '#000' : '#374151' }}>{label}</span>
+                <div
+                  className={styles.mobileColorSwatch}
+                  style={{ backgroundColor: bgColor }}
+                />
+              </div>
+            );
+          })}
+
+          {/* 일반 내용 필터 */}
+          <div
+            className={styles.mobileItem}
+            onClick={onToggleGeneralContent}
+            style={{
+              backgroundColor: showGeneralContent ? '#f3f4f6' : 'transparent',
+              opacity: showGeneralContent ? 0.9 : 1,
+            }}
+          >
+            <span style={{ color: showGeneralContent ? '#000' : '#374151' }}>일반 내용</span>
+            <div
+              className={styles.mobileColorSwatch}
+              style={{ backgroundColor: '#f3f4f6' }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleMouseDown = (e: React.MouseEvent) => {
     // 체크박스나 버튼 클릭 시에는 드래그하지 않음
@@ -100,44 +156,19 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
     <div
       data-tutorial="importance-filter"
       onMouseDown={handleMouseDown}
+      className={`${styles.filter} ${isDragging ? styles.dragging : ''} ${isCollapsed ? styles.collapsed : ''}`}
       style={{
-        position: 'absolute',
         top: `${position.y}px`,
-        left: `${position.x}px`,
-        backgroundColor: 'white',
-        border: '1px solid #e5e7eb',
-        borderRadius: '8px',
-        padding: '12px',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        zIndex: 1000,
-        minWidth: isCollapsed ? 'auto' : '200px',
-        cursor: isDragging ? 'grabbing' : 'grab',
-        userSelect: 'none'
+        left: `${position.x}px`
       }}
     >
-      <div style={{
-        fontSize: '14px',
-        fontWeight: '600',
-        marginBottom: isCollapsed ? '0' : '8px',
-        color: '#374151',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
-      }}>
+      <div className={styles.header}>
         <span>중요도 필터</span>
         <button
+          className={styles.toggleButton}
           onClick={(e) => {
             e.stopPropagation();
             setIsCollapsed(!isCollapsed);
-          }}
-          style={{
-            padding: '2px 6px',
-            fontSize: '12px',
-            backgroundColor: '#f3f4f6',
-            border: '1px solid #d1d5db',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            color: '#374151'
           }}
         >
           {isCollapsed ? '▼' : '▲'}
@@ -146,126 +177,54 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
 
       {!isCollapsed && (
         <>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '4px'
-          }}>
+          <div className={styles.content}>
         {importanceLevels.map(level => {
-          const isActive = activeFilters.has(level);
-          const style = getImportanceStyle(level);
+          const isActive = activeFilters?.has(level) || false;
+          const bgColor = getImportanceStyle(level);
 
           return (
             <label
               key={level}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                padding: '4px 6px',
-                borderRadius: '4px',
-                backgroundColor: isActive ? '#f3f4f6' : 'transparent',
-                transition: 'background-color 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.backgroundColor = '#f9fafb';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }
-              }}
+              className={`${styles.item} ${isActive ? styles.active : ''}`}
             >
               <input
                 type="checkbox"
                 checked={isActive}
                 onChange={() => onToggleFilter(level)}
-                style={{
-                  width: '16px',
-                  height: '16px',
-                  cursor: 'pointer'
-                }}
               />
-              <span style={{
-                fontSize: '13px',
-                color: '#4b5563'
-              }}>
+              <span>
                 {IMPORTANCE_LABELS[level]}
               </span>
-              <div style={{
-                width: '20px',
-                height: '12px',
-                backgroundColor: style.backgroundColor,
-                borderRadius: '2px',
-                border: '1px solid #e5e7eb'
-              }} />
+              <div
+                className={styles.colorSwatch}
+                style={{ backgroundColor: bgColor }}
+              />
             </label>
           );
         })}
 
         {/* 일반 내용 필터 */}
         <label
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            cursor: 'pointer',
-            padding: '4px 6px',
-            borderRadius: '4px',
-            backgroundColor: showGeneralContent ? '#f3f4f6' : 'transparent',
-            transition: 'background-color 0.2s',
-            borderTop: '1px solid #e5e7eb',
-            marginTop: '8px',
-            paddingTop: '8px'
-          }}
-          onMouseEnter={(e) => {
-            if (!showGeneralContent) {
-              e.currentTarget.style.backgroundColor = '#f9fafb';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!showGeneralContent) {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }
-          }}
+          className={`${styles.item} ${styles.generalItem} ${showGeneralContent ? styles.active : ''}`}
         >
           <input
             type="checkbox"
             checked={showGeneralContent}
             onChange={onToggleGeneralContent}
-            style={{
-              width: '16px',
-              height: '16px',
-              cursor: 'pointer'
-            }}
           />
-          <span style={{
-            fontSize: '13px',
-            color: '#4b5563'
-          }}>
+          <span>
             ⚪ 일반 내용
           </span>
-          <div style={{
-            width: '20px',
-            height: '12px',
-            backgroundColor: '#f3f4f6',
-            borderRadius: '2px',
-            border: '1px solid #e5e7eb'
-          }} />
+          <div
+            className={styles.colorSwatch}
+            style={{ backgroundColor: '#f3f4f6' }}
+          />
         </label>
       </div>
 
-      <div style={{
-        marginTop: '8px',
-        paddingTop: '8px',
-        borderTop: '1px solid #e5e7eb',
-        display: 'flex',
-        gap: '4px'
-      }}>
+      <div className={styles.actions}>
         <button
+          className={styles.actionButton}
           onClick={() => {
             importanceLevels.forEach(level => {
               if (!activeFilters.has(level)) {
@@ -273,36 +232,17 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
               }
             });
           }}
-          style={{
-            flex: 1,
-            padding: '4px 8px',
-            fontSize: '12px',
-            backgroundColor: '#f3f4f6',
-            border: '1px solid #d1d5db',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            color: '#374151'
-          }}
         >
           전체 선택
         </button>
         <button
+          className={styles.actionButton}
           onClick={() => {
             importanceLevels.forEach(level => {
               if (activeFilters.has(level)) {
                 onToggleFilter(level);
               }
             });
-          }}
-          style={{
-            flex: 1,
-            padding: '4px 8px',
-            fontSize: '12px',
-            backgroundColor: '#f3f4f6',
-            border: '1px solid #d1d5db',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            color: '#374151'
           }}
         >
           전체 해제

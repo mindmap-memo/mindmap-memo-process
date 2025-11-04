@@ -36,6 +36,8 @@ import { useMigration } from './features/migration/hooks/useMigration';
 import { MigrationPrompt } from './features/migration/components/MigrationPrompt';
 import { useAnalytics } from './features/analytics/hooks/useAnalytics';
 import { useAnalyticsTrackers } from './features/analytics/hooks/useAnalyticsTrackers';
+import { useMediaQuery } from './hooks/useMediaQuery';
+import { MobileLayout } from './components/MobileLayout/MobileLayout';
 import styles from './scss/App.module.scss';
 
 // 개발 환경에서만 디버깅 도구 로드
@@ -688,10 +690,14 @@ const App: React.FC = () => {
     setDragHoveredCategoryIds: appState.setDragHoveredCategoryIds,
     isDragSelectingWithShift: appState.isDragSelectingWithShift,
     setIsDragSelectingWithShift: appState.setIsDragSelectingWithShift,
+    handleMemoSelect,
+    selectCategory,
     activeImportanceFilters: appState.activeImportanceFilters,
     setActiveImportanceFilters: appState.setActiveImportanceFilters,
     showGeneralContent: appState.showGeneralContent,
     setShowGeneralContent: appState.setShowGeneralContent,
+    toggleImportanceFilter,
+    toggleGeneralContent: () => appState.setShowGeneralContent(!appState.showGeneralContent),
     isDraggingMemo: appState.isDraggingMemo,
     setIsDraggingMemo: appState.setIsDraggingMemo,
     draggingMemoId: appState.draggingMemoId,
@@ -729,6 +735,9 @@ const App: React.FC = () => {
     setShowQuickNavPanel
   });
 
+  // ===== 반응형 분기 =====
+  const isMobile = useMediaQuery('(max-width: 768px)');
+
   // 초기 로딩이 완료될 때까지 로딩 인디케이터 표시
   if (!isInitialLoadDone) {
     return (
@@ -747,6 +756,48 @@ const App: React.FC = () => {
     );
   }
 
+  // ===== 모바일 레이아웃 =====
+  if (isMobile) {
+    return (
+      <AppProviders
+        appState={appStateContextValue}
+        selection={selectionContextValue}
+        panel={panelContextValue}
+        connection={connectionContextValue}
+        quickNav={quickNavContextValue}
+      >
+        <MobileLayout
+          tutorialState={tutorialState}
+          tutorialMode={tutorialMode}
+          handleStartTutorialWrapper={handleStartTutorialWrapper}
+          handleCloseTutorial={handleTutorialSkip}
+          handleNextStep={handleTutorialNext}
+          handlePreviousStep={handleTutorialPrev}
+          handleStepClick={(stepIndex) => {
+            setTutorialState({ ...tutorialState, currentStep: stepIndex });
+          }}
+          handleNextSubStep={() => {}}
+          handlePreviousSubStep={() => {}}
+          TutorialComponent={Tutorial}
+          migrationStatus={migrationStatus}
+          needsMigration={needsMigration}
+          migrationError={migrationError}
+          migrationResult={migrationResult}
+          migrate={migrate}
+          skipMigration={skipMigration}
+          deleteLegacyData={deleteLegacyData}
+          MigrationPromptComponent={MigrationPrompt}
+          showQuickNavPanel={showQuickNavPanel}
+          setShowQuickNavPanel={setShowQuickNavPanel}
+          QuickNavPanelComponent={QuickNavPanel}
+          onAddMemo={addMemoBlock}
+          onAddCategory={addCategory}
+        />
+      </AppProviders>
+    );
+  }
+
+  // ===== 데스크톱 레이아웃 =====
   return (
     <AppProviders
       appState={appStateContextValue}

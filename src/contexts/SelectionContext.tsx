@@ -33,11 +33,17 @@ export interface SelectionContextType {
   isDragSelectingWithShift: boolean;
   setIsDragSelectingWithShift: React.Dispatch<React.SetStateAction<boolean>>;
 
+  // 선택 핸들러
+  handleMemoSelect: (memoId: string, isShiftClick?: boolean) => void;
+  selectCategory: (categoryId: string | null, isShiftClick?: boolean) => void;
+
   // 필터
   activeImportanceFilters: Set<ImportanceLevel>;
   setActiveImportanceFilters: React.Dispatch<React.SetStateAction<Set<ImportanceLevel>>>;
   showGeneralContent: boolean;
   setShowGeneralContent: React.Dispatch<React.SetStateAction<boolean>>;
+  toggleImportanceFilter: (level: ImportanceLevel) => void;
+  toggleGeneralContent: () => void;
 
   // 드래그 상태
   isDraggingMemo: boolean;

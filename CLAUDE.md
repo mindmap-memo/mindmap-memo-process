@@ -374,6 +374,234 @@ The application implements Shift+drag functionality for adding/removing memos an
 - **Shift+Drag Operations**: When implementing Shift+drag features, remember to: (1) disable collision detection, (2) freeze area bounds using cache, (3) exclude dragged item from area calculations, (4) use frozen cached bounds for overlap detection
 - **Logging**: NEVER add console.log statements in render functions, useEffect callbacks, or frequently-called functions (e.g., calculateCategoryArea, renderSingleCategoryArea) as they cause infinite log spam and make debugging impossible. Only log in event handlers (onClick, onMouseDown, etc.) or one-time initialization code
 
+## Responsive Design Guidelines (Desktop-Down Approach)
+
+### 1. 기본 원칙: Desktop-Down (점진적 축소)
+
+- **현재 상태**: 데스크톱 버전 웹 애플리케이션이 이미 완성됨
+- **접근 방식**: 'Progressive Degradation' 방식 사용
+- **핵심**: 데스크톱 스타일(기본)을 기준으로, 화면 크기가 작아질 때 스타일을 덮어쓰는(override) 방식으로 수정
+
+### 2. 필수 설정 (Global Setup)
+
+**HTML**: `<head>` 태그에 뷰포트 메타 태그 반드시 포함
+```html
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+```
+
+**CSS (Global)**: 유연한 미디어(이미지, 비디오 등)가 부모 요소를 벗어나지 않도록 설정
+```css
+img, video, iframe {
+  max-width: 100%;
+  height: auto;
+}
+```
+
+### 3. 미디어 쿼리 (Media Query) 전략
+
+- **사용 구문**: `max-width`를 사용하여 화면이 특정 너비 '이하'일 때 스타일 적용
+- **분기점 (Breakpoints)**: 특정 기기가 아닌, 레이아웃이 시각적으로 깨지는 지점을 기준으로 설정 (예: 1024px, 768px, 480px)
+
+**작성 예시**:
+```scss
+/* 1. 기본 스타일 (Desktop) */
+.container {
+  width: 1200px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+/* 2. 태블릿 (1024px 이하) */
+@media (max-width: 1024px) {
+  .container {
+    width: 100%;
+    grid-template-columns: 1fr 1fr; /* 2열 */
+  }
+}
+
+/* 3. 모바일 (768px 이하) */
+@media (max-width: 768px) {
+  .container {
+    grid-template-columns: 1fr; /* 1열 */
+  }
+}
+```
+
+### 4. 핵심 수정 가이드 (Checklist)
+
+#### 4.1. 고정 폭(px) → 유동 폭(%, max-width)
+- **문제**: `width: 1200px;`
+- **수정**: `max-width: 1200px; width: 100%;` (좌우 padding은 별도 지정)
+
+#### 4.2. 내비게이션 (GNB)
+- **데스크톱**: 가로형 메뉴
+- **모바일/태블릿**:
+  - 데스크톱 메뉴는 `display: none;` 처리
+  - '햄버거 버튼(☰)'과 클릭 시 동작하는 메뉴(사이드바, 아코디언 등)를 `display: block;`으로 활성화 (JavaScript 로직 필요)
+
+#### 4.3. 터치 이벤트 (:hover 금지)
+- **문제**: 마우스 hover에 의존하는 모든 기능 (드롭다운, 툴팁 등)
+- **수정**: click (또는 tap) 이벤트로 동작하도록 변경. 모바일에서는 `:hover`가 없음
+
+#### 4.4. 터치 영역 (Touch Target)
+- **문제**: 손가락으로 누르기 힘든 작은 버튼, 링크, 아이콘
+- **수정**: 시각적 크기와 별개로 padding을 추가하여 최소 터치 영역(44px x 44px 이상) 확보
+
+#### 4.5. 단위 (Units)
+- **레이아웃**: 고정 px 대신 flex, grid, % 사용 지향
+- **폰트/여백**: px 대신 rem 단위 우선 고려 (미디어 쿼리 내에서 font-size 재조정)
+
+### 5. 터치 상호작용 (Touch Interaction) 심화 규칙
+
+데스크톱의 '마우스' 환경과 모바일/태블릿의 '터치' 환경은 근본적으로 다름. 다음 규칙을 준수하여 터치 환경의 버그를 방지하고 사용성을 향상.
+
+#### 5.1. '끈적한 호버(Sticky Hover)' 현상 방지
+
+**문제**: 모바일에서 `:hover` 스타일이 적용된 요소를 탭(Tap)하면, 손가락을 뗀 후에도 `:hover` 스타일이 사라지지 않고 남아있는 버그 발생
+
+**규칙**: `:hover` 스타일은 '실제로 호버가 가능한 기기(마우스 사용자 등)'에서만 적용
+
+**해결책**: CSS의 `(hover: hover)` 미디어 쿼리를 사용하여 스타일 분리
+
+```scss
+/* .button:hover 스타일은 기본 CSS에 작성하지 않음
+   대신, 모바일 사용자를 위해 :active (누르는 순간) 피드백을 줌 */
+.button:active {
+  background-color: darkblue; /* 예시: 누르는 순간의 피드백 */
+}
+
+/* @media (hover: hover)
+   마우스 포인터 등 '진짜 호버'가 가능한 기기에서만
+   :hover 스타일이 적용되도록 격리 */
+@media (hover: hover) {
+  .button:hover {
+    background-color: navy; /* 데스크톱 전용 호버 스타일 */
+  }
+}
+```
+
+#### 5.2. 제스처 (Gestures) 충돌 방지 및 접근성
+
+**핀치 줌 (Pinch-to-Zoom)**:
+- **규칙**: 웹 접근성을 위해 사용자의 화면 확대/축소 기능을 절대 막지 않음
+- **금지**: `<meta name="viewport" ... content="user-scalable=no">` 속성 사용 금지 (기본 뷰포트 태그 유지)
+
+**스와이프 (Swipe)**:
+- **주의**: 이미지 캐러셀, 탭 등에 스와이프 기능을 적용할 경우, 브라우저의 기본 '페이지 뒤로 가기 / 앞으로 가기' 스와이프 제스처와 충돌하지 않도록 터치 영역(edge) 신중하게 설정
+
+#### 5.3. 정보 밀도와 간격 (Density & Spacing)
+
+**문제**: 손가락은 마우스보다 뭉툭하고 부정확함
+
+**규칙 1 (간격)**: 터치 영역(44px) 확보뿐만 아니라, 클릭 가능한 요소와 요소 사이의 간격(margin)도 충분히 확보하여 잘못된 터치 방지
+
+**규칙 2 (밀도)**: 데스크톱의 빽빽한 UI(예: 복잡한 데이터 테이블)는 모바일에서 사용 불가능. '카드(Card)형 리스트' 등으로 레이아웃을 단순화하고 정보 밀도를 낮추는 방향으로 리디자인
+
+### 6. 모바일/태블릿 레이아웃 전략 (페이지 분리 방식)
+
+#### 6.1. 레이아웃 구조
+
+**데스크톱 (768px 초과)**:
+- 3패널 레이아웃: Left Panel - Canvas - Right Panel
+- Resizer로 패널 크기 조정 가능
+- 모든 패널이 동시에 표시됨
+
+**모바일/태블릿 (768px 이하)**:
+- **완전 분리된 단일 뷰 시스템**
+- 하단 탭 네비게이션으로 뷰 전환
+- 3개의 독립적인 풀스크린 뷰:
+  1. **Pages 뷰**: 페이지 목록 (LeftPanel fullscreen)
+  2. **Canvas 뷰**: 마인드맵 캔버스 (Canvas fullscreen)
+  3. **Editor 뷰**: 메모 편집 (RightPanel fullscreen)
+
+#### 6.2. 구현 방법
+
+**컴포넌트 구조**:
+```
+src/components/
+  └── MobileLayout/
+      ├── MobileLayout.tsx         # 모바일 레이아웃 컴포넌트
+      ├── BottomTabBar.tsx         # 하단 탭 네비게이션
+      └── hooks/
+          └── useMobileLayout.ts   # 뷰 전환 상태 관리
+```
+
+**App.tsx 분기 로직**:
+```tsx
+const isMobile = useMediaQuery('(max-width: 768px)');
+
+return isMobile ? (
+  <MobileLayout {...props} />
+) : (
+  <DesktopLayout {...props} />  // 기존 3패널 레이아웃
+);
+```
+
+#### 6.3. 상태 관리
+
+- **전역 상태**: Context API로 모든 앱 상태 공유
+- **뷰 전환 시 상태 유지**:
+  - 선택된 메모/카테고리
+  - 스크롤 위치
+  - 편집 중인 콘텐츠
+- **Navigation state**: `activeView` ('pages' | 'canvas' | 'editor')
+
+#### 6.4. 각 패널의 fullscreen prop
+
+모든 패널 컴포넌트에 `fullscreen?: boolean` prop 추가:
+- `true`: 전체 화면 모드, Resizer 숨김, 모바일 최적화 스타일 적용
+- `false` (기본): 데스크톱 모드
+
+**예시**:
+```tsx
+<LeftPanel fullscreen={isMobile} />
+<Canvas fullscreen={isMobile} />
+<RightPanel fullscreen={isMobile} />
+```
+
+#### 6.5. 하단 탭 네비게이션
+
+**디자인**:
+- 고정 하단 바 (position: fixed, bottom: 0)
+- 3개 탭: Pages / Canvas / Editor
+- 아이콘 + 라벨
+- 활성 탭 강조 표시
+- 최소 터치 영역: 44px 높이
+
+**아이콘** (lucide-react):
+- Pages: `<FileText />`
+- Canvas: `<Map />`
+- Editor: `<Edit3 />`
+
+### 7. 반응형 구현 체크리스트
+
+**필수 설정**:
+- [ ] 뷰포트 메타 태그 추가 (`src/app/layout.tsx`)
+- [ ] 전역 미디어 스타일 설정 (`src/app/globals.css`)
+- [ ] 미디어 쿼리 분기점 설정 (768px)
+
+**모바일 레이아웃**:
+- [ ] MobileLayout 컴포넌트 생성
+- [ ] BottomTabBar 컴포넌트 생성
+- [ ] 뷰 전환 상태 관리 훅 생성
+- [ ] App.tsx에 화면 크기 감지 로직 추가
+- [ ] 각 패널에 fullscreen prop 추가
+
+**터치 최적화**:
+- [ ] `:hover` 스타일을 `@media (hover: hover)` 내부로 이동
+- [ ] 모바일용 `:active` 피드백 추가
+- [ ] 터치 영역 44px 이상 확보 (버튼, 링크, 아이콘)
+- [ ] 요소 간 충분한 간격(margin) 확보
+- [ ] 컨텍스트 메뉴를 롱프레스/버튼으로 변경
+- [ ] 드래그 앤 드롭을 터치 드래그로 변환
+
+**스타일 조정**:
+- [ ] 고정 폭을 유동 폭으로 변경 (모든 컴포넌트 SCSS)
+- [ ] 폰트 크기를 rem 단위로 변경
+- [ ] 레이아웃을 flex/grid로 변경
+- [ ] 모바일에서 정보 밀도 낮추기
+- [ ] 핀치 줌 기능 유지 (`user-scalable=no` 금지)
+
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
 NEVER create files unless they're absolutely necessary for achieving your goal.

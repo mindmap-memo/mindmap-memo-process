@@ -10,22 +10,25 @@ import { isEmailExcluded } from '../utils/excludedEmails';
  * - 세션 시작/종료 자동 추적
  * - 이벤트 기록 함수 제공
  * - 제외된 이메일 계정은 추적하지 않음
+ * - 세션 중복 생성 방지
  */
 export const useAnalytics = () => {
   const { data: session } = useSession();
   const sessionIdRef = useRef<string | null>(null);
   const sessionStartTimeRef = useRef<number | null>(null);
+  const isSessionActiveRef = useRef<boolean>(false);
+  const sessionEndedRef = useRef<boolean>(false);
 
-  // 세션 시작
-  const startSession = useCallback(async () => {
-    if (!session?.user?.email) return;
-
-    // 제외된 이메일은 추적하지 않음
-    if (isEmailExcluded(session.user.email)) return;
+  // 세션 시작 (useEffect 내부에서만 호출됨)
+  const startSession = async (email: string) => {
+    // 이미 세션이 활성화되어 있으면 중복 생성 방지
+    if (isSessionActiveRef.current) return;
 
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     sessionIdRef.current = sessionId;
     sessionStartTimeRef.current = Date.now();
+    isSessionActiveRef.current = true;
+    sessionEndedRef.current = false;
 
     try {
       await fetch('/api/analytics/session', {
@@ -33,21 +36,24 @@ export const useAnalytics = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId,
-          userEmail: session.user.email,
+          userEmail: email,
           action: 'start'
         })
       });
     } catch (error) {
       console.error('Failed to start analytics session:', error);
     }
-  }, [session]);
+  };
 
-  // 세션 종료
-  const endSession = useCallback(async () => {
-    if (!sessionIdRef.current || !sessionStartTimeRef.current || !session?.user?.email) return;
+  // 세션 종료 (useEffect cleanup이나 beforeunload에서 호출됨)
+  const endSession = async (email: string) => {
+    if (!sessionIdRef.current || !sessionStartTimeRef.current) return;
 
-    // 제외된 이메일은 추적하지 않음
-    if (isEmailExcluded(session.user.email)) return;
+    // 이미 종료된 세션은 다시 종료하지 않음
+    if (sessionEndedRef.current) return;
+
+    sessionEndedRef.current = true;
+    isSessionActiveRef.current = false;
 
     const durationSeconds = Math.floor((Date.now() - sessionStartTimeRef.current) / 1000);
 
@@ -57,7 +63,7 @@ export const useAnalytics = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId: sessionIdRef.current,
-          userEmail: session.user.email,
+          userEmail: email,
           action: 'end',
           durationSeconds
         })
@@ -65,7 +71,7 @@ export const useAnalytics = () => {
     } catch (error) {
       console.error('Failed to end analytics session:', error);
     }
-  }, [session]);
+  };
 
   // 이벤트 추적
   const trackEvent = useCallback(async (
@@ -95,32 +101,31 @@ export const useAnalytics = () => {
 
   // 세션 시작/종료 자동 추적
   useEffect(() => {
-    if (!session?.user?.email) return;
+    const email = session?.user?.email;
+    if (!email) return;
+
+    // 제외된 이메일은 추적하지 않음
+    if (isEmailExcluded(email)) return;
+
+    // 이미 세션이 활성화되어 있으면 중복 시작 방지 (Strict Mode 대응)
+    if (isSessionActiveRef.current && sessionIdRef.current) return;
 
     // 세션 시작
-    startSession();
+    startSession(email);
 
     // 페이지 종료 시 세션 종료
     const handleBeforeUnload = () => {
-      endSession();
-    };
-
-    // 페이지 숨김 시 세션 종료 (모바일 대응)
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        endSession();
-      }
+      endSession(email);
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      endSession();
+      // cleanup 시에만 세션 종료 (beforeunload에서 이미 처리되므로 중복 호출되지 않음)
+      endSession(email);
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [session, startSession, endSession]);
+  }, [session?.user?.email]);
 
   return {
     trackEvent

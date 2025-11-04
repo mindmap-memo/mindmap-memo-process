@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export type MobileView = 'canvas' | 'editor';
+export type MobileView = 'pages' | 'canvas' | 'editor';
 
 /**
  * useMobileLayout

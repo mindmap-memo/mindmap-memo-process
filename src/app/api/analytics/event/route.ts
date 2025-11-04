@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
+import { isEmailExcluded } from '@/features/analytics/utils/excludedEmails';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -16,6 +17,11 @@ export async function POST(request: NextRequest) {
     }
 
     const { sessionId, userEmail, eventType, eventData } = JSON.parse(text);
+
+    // 제외 이메일은 데이터베이스에 저장하지 않음
+    if (isEmailExcluded(userEmail)) {
+      return NextResponse.json({ success: true, excluded: true });
+    }
 
     const eventId = `evt_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 

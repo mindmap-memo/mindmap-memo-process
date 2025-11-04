@@ -45,6 +45,7 @@ interface RightPanelProps {
   activeImportanceFilters?: Set<ImportanceLevel>;
   showGeneralContent?: boolean;
   onResetFilters?: () => void;
+  onClose?: () => void;
 }
 
 const RightPanel: React.FC<RightPanelProps> = ({
@@ -64,7 +65,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
   onToggleFullscreen,
   activeImportanceFilters,
   showGeneralContent = true,
-  onResetFilters
+  onResetFilters,
+  onClose
 }) => {
   const [selectedBlocks, setSelectedBlocks] = React.useState<string[]>([]);
   const [dragSelectedBlocks, setDragSelectedBlocks] = React.useState<string[]>([]);
@@ -492,6 +494,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
         activeImportanceFilters={activeImportanceFilters}
         showGeneralContent={showGeneralContent}
         onResetFilters={onResetFilters}
+        onClose={onClose}
       />
 
       <div

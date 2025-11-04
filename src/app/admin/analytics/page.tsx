@@ -19,11 +19,19 @@ interface StatsData {
     totalUsers: number;
     totalSessions: number;
     avgSessionDuration: number;
-    returningUsers: number;
     newUsers: number;
+    weekly2Days: number;
+    weekly3Days: number;
+    weekly4Plus: number;
   };
   dailyActiveUsers: { date: string; users: number }[];
-  dailyUserTypes: { date: string; returningUsers: number; newUsers: number }[];
+  dailyUserTypes: {
+    date: string;
+    newUsers: number;
+    weekly2Days: number;
+    weekly3Days: number;
+    weekly4Plus: number;
+  }[];
   eventCounts: { eventType: string; count: number; uniqueUsers: number }[];
   dailyEvents: { date: string; count: number }[];
   newUsers: { date: string; count: number }[];
@@ -198,21 +206,31 @@ export default function AnalyticsPage() {
                 <div className={styles.statValue}>{statsData?.overview.totalUsers || 0}</div>
               </div>
               <div className={styles.statCard}>
-                <div className={styles.statLabel}>재방문자</div>
-                <div className={styles.statValue}>{statsData?.overview.returningUsers || 0}</div>
-                <div className={styles.statSubtext}>
-                  {statsData?.overview.totalUsers
-                    ? `${((statsData.overview.returningUsers / statsData.overview.totalUsers) * 100).toFixed(1)}%`
-                    : '0%'}
+                <div className={styles.statLabel}>신규 사용자</div>
+                <div className={styles.statValue}>{statsData?.overview.newUsers || 0}</div>
+                <div className={styles.statSubtext} style={{ color: '#10b981' }}>
+                  최근 7일
                 </div>
               </div>
               <div className={styles.statCard}>
-                <div className={styles.statLabel}>신규 사용자</div>
-                <div className={styles.statValue}>{statsData?.overview.newUsers || 0}</div>
-                <div className={styles.statSubtext}>
-                  {statsData?.overview.totalUsers
-                    ? `${((statsData.overview.newUsers / statsData.overview.totalUsers) * 100).toFixed(1)}%`
-                    : '0%'}
+                <div className={styles.statLabel}>주 2일 사용자</div>
+                <div className={styles.statValue}>{statsData?.overview.weekly2Days || 0}</div>
+                <div className={styles.statSubtext} style={{ color: '#fbbf24' }}>
+                  최근 7일
+                </div>
+              </div>
+              <div className={styles.statCard}>
+                <div className={styles.statLabel}>주 3일 사용자</div>
+                <div className={styles.statValue}>{statsData?.overview.weekly3Days || 0}</div>
+                <div className={styles.statSubtext} style={{ color: '#f97316' }}>
+                  최근 7일
+                </div>
+              </div>
+              <div className={styles.statCard}>
+                <div className={styles.statLabel}>주 4일+ 사용자</div>
+                <div className={styles.statValue}>{statsData?.overview.weekly4Plus || 0}</div>
+                <div className={styles.statSubtext} style={{ color: '#8b5cf6' }}>
+                  최근 7일 (최고 리텐션)
                 </div>
               </div>
               <div className={styles.statCard}>
@@ -250,10 +268,14 @@ export default function AnalyticsPage() {
               {userFilter === 'all' ? (
                 <div className={styles.chartContainer}>
                   {statsData?.dailyUserTypes.slice(0, 14).reverse().map((day) => {
-                    const maxUsers = Math.max(...(statsData?.dailyUserTypes.map(d => d.returningUsers + d.newUsers) || [1]));
-                    const totalUsers = day.returningUsers + day.newUsers;
-                    const returningPercent = totalUsers > 0 ? (day.returningUsers / totalUsers) * 100 : 0;
+                    const maxUsers = Math.max(...(statsData?.dailyUserTypes.map(d =>
+                      d.newUsers + d.weekly2Days + d.weekly3Days + d.weekly4Plus
+                    ) || [1]));
+                    const totalUsers = day.newUsers + day.weekly2Days + day.weekly3Days + day.weekly4Plus;
                     const newPercent = totalUsers > 0 ? (day.newUsers / totalUsers) * 100 : 0;
+                    const week2Percent = totalUsers > 0 ? (day.weekly2Days / totalUsers) * 100 : 0;
+                    const week3Percent = totalUsers > 0 ? (day.weekly3Days / totalUsers) * 100 : 0;
+                    const week4Percent = totalUsers > 0 ? (day.weekly4Plus / totalUsers) * 100 : 0;
 
                     return (
                       <div key={day.date} className={styles.barItem}>
@@ -263,18 +285,34 @@ export default function AnalyticsPage() {
                             <div
                               className={styles.stackedBarSegment}
                               style={{
-                                width: `${returningPercent}%`,
-                                backgroundColor: '#8b5cf6',
-                              }}
-                              title={`재방문자: ${day.returningUsers}`}
-                            />
-                            <div
-                              className={styles.stackedBarSegment}
-                              style={{
                                 width: `${newPercent}%`,
                                 backgroundColor: '#10b981',
                               }}
                               title={`신규: ${day.newUsers}`}
+                            />
+                            <div
+                              className={styles.stackedBarSegment}
+                              style={{
+                                width: `${week2Percent}%`,
+                                backgroundColor: '#fbbf24',
+                              }}
+                              title={`주 2일: ${day.weekly2Days}`}
+                            />
+                            <div
+                              className={styles.stackedBarSegment}
+                              style={{
+                                width: `${week3Percent}%`,
+                                backgroundColor: '#f97316',
+                              }}
+                              title={`주 3일: ${day.weekly3Days}`}
+                            />
+                            <div
+                              className={styles.stackedBarSegment}
+                              style={{
+                                width: `${week4Percent}%`,
+                                backgroundColor: '#8b5cf6',
+                              }}
+                              title={`주 4일+: ${day.weekly4Plus}`}
                             />
                             <span className={styles.stackedBarLabel}>{totalUsers}</span>
                           </div>
@@ -286,7 +324,10 @@ export default function AnalyticsPage() {
               ) : userFilter === 'returning' ? (
                 <div className={styles.chartContainer}>
                   {statsData?.dailyUserTypes.slice(0, 14).reverse().map((day) => {
-                    const maxUsers = Math.max(...(statsData?.dailyUserTypes.map(d => d.returningUsers) || [1]));
+                    const returningUsers = day.weekly2Days + day.weekly3Days + day.weekly4Plus;
+                    const maxUsers = Math.max(...(statsData?.dailyUserTypes.map(d =>
+                      d.weekly2Days + d.weekly3Days + d.weekly4Plus
+                    ) || [1]));
                     return (
                       <div key={day.date} className={styles.barItem}>
                         <div className={styles.barLabel}>{day.date.slice(5)}</div>
@@ -294,11 +335,11 @@ export default function AnalyticsPage() {
                           <div
                             className={styles.bar}
                             style={{
-                              width: `${(day.returningUsers / maxUsers) * 100}%`,
+                              width: `${(returningUsers / maxUsers) * 100}%`,
                               backgroundColor: '#8b5cf6'
                             }}
                           >
-                            {day.returningUsers}
+                            {returningUsers}
                           </div>
                         </div>
                       </div>

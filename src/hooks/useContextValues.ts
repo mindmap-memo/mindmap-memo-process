@@ -55,10 +55,14 @@ interface UseContextValuesProps {
   setDragHoveredCategoryIds: React.Dispatch<React.SetStateAction<string[]>>;
   isDragSelectingWithShift: boolean;
   setIsDragSelectingWithShift: React.Dispatch<React.SetStateAction<boolean>>;
+  handleMemoSelect: (memoId: string, isShiftClick?: boolean) => void;
+  selectCategory: (categoryId: string | null, isShiftClick?: boolean) => void;
   activeImportanceFilters: Set<ImportanceLevel>;
   setActiveImportanceFilters: React.Dispatch<React.SetStateAction<Set<ImportanceLevel>>>;
   showGeneralContent: boolean;
   setShowGeneralContent: React.Dispatch<React.SetStateAction<boolean>>;
+  toggleImportanceFilter: (level: ImportanceLevel) => void;
+  toggleGeneralContent: () => void;
   isDraggingMemo: boolean;
   setIsDraggingMemo: React.Dispatch<React.SetStateAction<boolean>>;
   draggingMemoId: string | null;
@@ -143,10 +147,14 @@ export const useContextValues = (props: UseContextValuesProps) => {
     setDragHoveredCategoryIds: props.setDragHoveredCategoryIds,
     isDragSelectingWithShift: props.isDragSelectingWithShift,
     setIsDragSelectingWithShift: props.setIsDragSelectingWithShift,
+    handleMemoSelect: props.handleMemoSelect,
+    selectCategory: props.selectCategory,
     activeImportanceFilters: props.activeImportanceFilters,
     setActiveImportanceFilters: props.setActiveImportanceFilters,
     showGeneralContent: props.showGeneralContent,
     setShowGeneralContent: props.setShowGeneralContent,
+    toggleImportanceFilter: props.toggleImportanceFilter,
+    toggleGeneralContent: props.toggleGeneralContent,
     isDraggingMemo: props.isDraggingMemo,
     setIsDraggingMemo: props.setIsDraggingMemo,
     draggingMemoId: props.draggingMemoId,
@@ -160,9 +168,11 @@ export const useContextValues = (props: UseContextValuesProps) => {
     props.isDragSelecting, props.setIsDragSelecting, props.dragSelectStart, props.setDragSelectStart,
     props.dragSelectEnd, props.setDragSelectEnd, props.dragHoveredMemoIds, props.setDragHoveredMemoIds,
     props.dragHoveredCategoryIds, props.setDragHoveredCategoryIds, props.isDragSelectingWithShift,
-    props.setIsDragSelectingWithShift, props.activeImportanceFilters, props.setActiveImportanceFilters,
-    props.showGeneralContent, props.setShowGeneralContent, props.isDraggingMemo, props.setIsDraggingMemo,
-    props.draggingMemoId, props.setDraggingMemoId, props.isDraggingCategory, props.setIsDraggingCategory
+    props.setIsDragSelectingWithShift, props.handleMemoSelect, props.selectCategory,
+    props.activeImportanceFilters, props.setActiveImportanceFilters,
+    props.showGeneralContent, props.setShowGeneralContent, props.toggleImportanceFilter, props.toggleGeneralContent,
+    props.isDraggingMemo, props.setIsDraggingMemo, props.draggingMemoId, props.setDraggingMemoId,
+    props.isDraggingCategory, props.setIsDraggingCategory
   ]);
 
   // ===== Panel Context =====

@@ -84,6 +84,8 @@ interface CanvasProps {
   onDeleteMemoById?: (id: string) => void;
   onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
   isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
+  fullscreen?: boolean;  // Mobile fullscreen mode
+  onOpenEditor?: () => void;  // Mobile: Open editor on double-tap
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -158,7 +160,9 @@ const Canvas: React.FC<CanvasProps> = ({
   setCanvasScale: externalSetCanvasScale,
   onDeleteMemoById,
   onAddQuickNav,
-  isQuickNavExists
+  isQuickNavExists,
+  fullscreen = false,
+  onOpenEditor
 }) => {
   // ===== Canvas 로컬 상태 (useCanvasState 훅 사용) =====
   const canvasState = useCanvasState();
@@ -279,6 +283,9 @@ const Canvas: React.FC<CanvasProps> = ({
     handleWheel,
     handleMouseMove,
     handleMouseUp,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
     handleCanvasDrop,
     handleCanvasDragOver,
     handleDropOnCategoryArea,
@@ -301,6 +308,7 @@ const Canvas: React.FC<CanvasProps> = ({
     draggingMemoId,
     isDraggingCategory,
     draggingCategoryId,
+    onOpenEditor,
     isShiftPressed,
     dragHoveredCategoryIds,
     draggedCategoryAreas,
@@ -446,7 +454,7 @@ const Canvas: React.FC<CanvasProps> = ({
       id="main-canvas"
       data-canvas="true"
       data-tutorial="canvas"
-      className={styles.canvas}
+      className={`${styles.canvas} ${fullscreen ? styles.fullscreen : ''}`}
       style={{
         cursor: currentTool === 'pan' ? 'grab' : currentTool === 'zoom' ? 'zoom-in' : 'default',
         position: 'relative',
@@ -461,6 +469,9 @@ const Canvas: React.FC<CanvasProps> = ({
       onMouseEnter={() => setIsMouseOverCanvas(true)}
       onMouseLeave={() => setIsMouseOverCanvas(false)}
       onWheel={handleWheel}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       onDrop={handleCanvasDrop}
       onDragOver={handleCanvasDragOver}
     >
@@ -522,7 +533,7 @@ const Canvas: React.FC<CanvasProps> = ({
                 key={memo.id}
                 memo={memo}
                 isSelected={selectedMemoId === memo.id || selectedMemoIds.includes(memo.id)}
-                isDragHovered={dragHoveredMemoIds.includes(memo.id)}
+                isDragHovered={dragHoveredMemoIds?.includes(memo.id) || false}
                 onClick={(isShiftClick?: boolean) => onMemoSelect(memo.id, isShiftClick)}
                 onPositionChange={handleMemoPositionChange}
                 onSizeChange={onMemoSizeChange}
@@ -547,6 +558,7 @@ const Canvas: React.FC<CanvasProps> = ({
                 onDelete={onDeleteMemoById}
                 onAddQuickNav={onAddQuickNav}
                 isQuickNavExists={isQuickNavExists}
+                onOpenEditor={onOpenEditor}
               />
             );
           })}
@@ -693,13 +705,15 @@ const Canvas: React.FC<CanvasProps> = ({
         {Math.round(Math.min(canvasScale * 100, 200))}%
       </div>
 
-      {/* 중요도 필터 UI */}
-      <ImportanceFilter
-        activeFilters={activeImportanceFilters}
-        onToggleFilter={onToggleImportanceFilter}
-        showGeneralContent={showGeneralContent}
-        onToggleGeneralContent={onToggleGeneralContent}
-      />
+      {/* 중요도 필터 UI - 모바일/태블릿에서는 숨김 */}
+      {!fullscreen && (
+        <ImportanceFilter
+          activeFilters={activeImportanceFilters}
+          onToggleFilter={onToggleImportanceFilter}
+          showGeneralContent={showGeneralContent}
+          onToggleGeneralContent={onToggleGeneralContent}
+        />
+      )}
 
       {/* 카테고리 영역/라벨 컨텍스트 메뉴 */}
       {areaContextMenu && (

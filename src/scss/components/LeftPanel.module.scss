@@ -10,6 +10,12 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+
+  &.fullscreen {
+    width: 100% !important;
+    height: 100%;
+    border-right: none;
+  }
 }
 
 .header {

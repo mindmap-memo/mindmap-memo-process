@@ -86,60 +86,60 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   const panel = usePanel();
 
   // 임시: appState에 없는 핸들러들의 기본값
-  const noopHandler = () => {};
-  const safeAppState = {
+  const noopHandler: any = () => {};
+  const safeAppState: any = {
     ...appState,
-    onMemoPositionChange: appState.onMemoPositionChange || noopHandler,
-    onCategoryPositionChange: appState.onCategoryPositionChange || noopHandler,
-    onCategoryLabelPositionChange: appState.onCategoryLabelPositionChange || noopHandler,
-    onMemoSizeChange: appState.onMemoSizeChange || noopHandler,
-    onCategorySizeChange: appState.onCategorySizeChange || noopHandler,
-    onMemoDisplaySizeChange: appState.onMemoDisplaySizeChange || noopHandler,
-    onMemoTitleUpdate: appState.onMemoTitleUpdate || noopHandler,
-    onMemoBlockUpdate: appState.onMemoBlockUpdate || noopHandler,
-    onCategoryUpdate: appState.onCategoryUpdate || noopHandler,
-    onCategoryToggleExpanded: appState.onCategoryToggleExpanded || noopHandler,
-    onMoveToCategory: appState.onMoveToCategory || noopHandler,
-    onDetectCategoryOnDrop: appState.onDetectCategoryOnDrop || noopHandler,
-    onDetectCategoryDropForCategory: appState.onDetectCategoryDropForCategory || noopHandler,
-    onDeleteMemo: appState.onDeleteMemo || noopHandler,
-    onDeleteCategory: appState.onDeleteCategory || noopHandler,
-    onDeleteSelected: appState.onDeleteSelected || noopHandler,
-    onMemoUpdate: appState.onMemoUpdate || noopHandler,
-    onFocusMemo: appState.onFocusMemo || noopHandler,
-    onResetFilters: appState.onResetFilters || noopHandler,
-    onCategoryPositionDragEnd: appState.onCategoryPositionDragEnd || noopHandler,
-    onCategoryDragStart: appState.onCategoryDragStart || noopHandler,
-    onCategoryDragEnd: appState.onCategoryDragEnd || noopHandler,
-    onMemoDragStart: appState.onMemoDragStart || noopHandler,
-    onMemoDragEnd: appState.onMemoDragEnd || noopHandler,
-    onShiftDropCategory: appState.onShiftDropCategory || noopHandler,
-    onClearCategoryCache: appState.onClearCategoryCache || noopHandler,
-    onDeleteMemoById: appState.onDeleteMemoById || noopHandler,
-    onAddQuickNav: appState.onAddQuickNav || noopHandler,
-    isQuickNavExists: appState.isQuickNavExists || (() => false),
-    onAddMemo: appState.onAddMemo || onAddMemo,
-    onAddCategory: appState.onAddCategory || onAddCategory,
-    isDragSelecting: appState.isDragSelecting || false,
-    dragSelectStart: appState.dragSelectStart || null,
-    dragSelectEnd: appState.dragSelectEnd || null,
-    dragHoveredMemoIds: appState.dragHoveredMemoIds || [],
-    dragHoveredCategoryIds: appState.dragHoveredCategoryIds || [],
-    onDragSelectStart: appState.onDragSelectStart || noopHandler,
-    onDragSelectMove: appState.onDragSelectMove || noopHandler,
-    onDragSelectEnd: appState.onDragSelectEnd || noopHandler,
-    activeImportanceFilters: appState.activeImportanceFilters || [],
-    canUndo: appState.canUndo || false,
-    canRedo: appState.canRedo || false,
-    onUndo: appState.onUndo || noopHandler,
-    onRedo: appState.onRedo || noopHandler,
-    isDraggingMemo: appState.isDraggingMemo || false,
-    draggingMemoId: appState.draggingMemoId || null,
-    shiftDragAreaCacheRef: appState.shiftDragAreaCacheRef || { current: new Map() },
-    isDraggingCategory: appState.isDraggingCategory || false,
-    draggingCategoryId: appState.draggingCategoryId || null,
-    onDisconnectMemo: appState.onDisconnectMemo || connection.disconnectMemo,
-    dragLineEnd: appState.dragLineEnd || null,
+    onMemoPositionChange: noopHandler,
+    onCategoryPositionChange: noopHandler,
+    onCategoryLabelPositionChange: noopHandler,
+    onMemoSizeChange: noopHandler,
+    onCategorySizeChange: noopHandler,
+    onMemoDisplaySizeChange: noopHandler,
+    onMemoTitleUpdate: noopHandler,
+    onMemoBlockUpdate: noopHandler,
+    onCategoryUpdate: noopHandler,
+    onCategoryToggleExpanded: noopHandler,
+    onMoveToCategory: noopHandler,
+    onDetectCategoryOnDrop: noopHandler,
+    onDetectCategoryDropForCategory: noopHandler,
+    onDeleteMemo: noopHandler,
+    onDeleteCategory: noopHandler,
+    onDeleteSelected: noopHandler,
+    onMemoUpdate: noopHandler,
+    onFocusMemo: noopHandler,
+    onResetFilters: noopHandler,
+    onCategoryPositionDragEnd: noopHandler,
+    onCategoryDragStart: noopHandler,
+    onCategoryDragEnd: noopHandler,
+    onMemoDragStart: noopHandler,
+    onMemoDragEnd: noopHandler,
+    onShiftDropCategory: noopHandler,
+    onClearCategoryCache: noopHandler,
+    onDeleteMemoById: noopHandler,
+    onAddQuickNav: noopHandler,
+    isQuickNavExists: () => false,
+    onAddMemo,
+    onAddCategory,
+    isDragSelecting: false,
+    dragSelectStart: null,
+    dragSelectEnd: null,
+    dragHoveredMemoIds: [],
+    dragHoveredCategoryIds: [],
+    onDragSelectStart: noopHandler,
+    onDragSelectMove: noopHandler,
+    onDragSelectEnd: noopHandler,
+    activeImportanceFilters: [],
+    canUndo: false,
+    canRedo: false,
+    onUndo: noopHandler,
+    onRedo: noopHandler,
+    isDraggingMemo: false,
+    draggingMemoId: null,
+    shiftDragAreaCacheRef: { current: new Map() },
+    isDraggingCategory: false,
+    draggingCategoryId: null,
+    onDisconnectMemo: noopHandler,
+    dragLineEnd: null,
   };
 
   // 현재 페이지 찾기
@@ -216,11 +216,11 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
               connectingFromId={connection.connectingFromId}
               connectingFromDirection={connection.connectingFromDirection}
               dragLineEnd={safeAppState.dragLineEnd}
-              onStartConnection={connection.onStartConnection}
-              onConnectMemos={connection.onConnectMemos}
-              onCancelConnection={connection.onCancelConnection}
-              onRemoveConnection={connection.onRemoveConnection}
-              onUpdateDragLine={connection.onUpdateDragLine}
+              onStartConnection={(connection as any).onStartConnection || noopHandler}
+              onConnectMemos={(connection as any).onConnectMemos || noopHandler}
+              onCancelConnection={(connection as any).onCancelConnection || noopHandler}
+              onRemoveConnection={(connection as any).onRemoveConnection || noopHandler}
+              onUpdateDragLine={(connection as any).onUpdateDragLine || noopHandler}
               isDragSelecting={safeAppState.isDragSelecting}
               dragSelectStart={safeAppState.dragSelectStart}
               dragSelectEnd={safeAppState.dragSelectEnd}
@@ -285,11 +285,11 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
                 onCategorySelect={selection.selectCategory}
                 onFocusMemo={safeAppState.onFocusMemo}
                 width={panel.rightPanelWidth}
-                onResize={panel.handleRightPanelResize}
+                onResize={(panel as any).handleRightPanelResize || noopHandler}
                 isFullscreen={true}
                 onToggleFullscreen={() => {}}
                 activeImportanceFilters={safeAppState.activeImportanceFilters}
-                showGeneralContent={appState.showGeneralContent}
+                showGeneralContent={(appState as any).showGeneralContent || true}
                 onResetFilters={safeAppState.onResetFilters}
                 onClose={() => setShowEditor(false)}
               />

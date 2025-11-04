@@ -29,6 +29,7 @@ interface LeftPanelProps {
   onStartTutorial?: () => void;
   userEmail?: string;
   onLogout?: () => void;
+  fullscreen?: boolean; // 모바일 풀스크린 모드
 }
 
 const LeftPanel: React.FC<LeftPanelProps> = ({
@@ -47,7 +48,8 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
   onNavigateToCategory,
   onStartTutorial,
   userEmail,
-  onLogout
+  onLogout,
+  fullscreen = false
 }) => {
   // 상태 관리
   const {
@@ -143,8 +145,8 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
   return (
     <div
       data-tutorial="left-panel"
-      className={styles.leftPanel}
-      style={{ width: `${width}px` }}>
+      className={`${styles.leftPanel} ${fullscreen ? styles.fullscreen : ''}`}
+      style={{ width: fullscreen ? '100%' : `${width}px` }}>
       <Header
         userEmail={userEmail}
         searchQuery={searchQuery}
@@ -224,7 +226,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
         </div>
       </div>
 
-      <Resizer direction="left" onResize={onResize} />
+      {!fullscreen && <Resizer direction="left" onResize={onResize} />}
     </div>
   );
 };
