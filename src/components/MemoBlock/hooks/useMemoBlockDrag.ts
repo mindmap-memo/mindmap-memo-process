@@ -99,6 +99,31 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
   };
 
   /**
+   * 터치 시작 핸들러 - 모바일 드래그 준비
+   */
+  const handleTouchStart = (e: React.TouchEvent) => {
+    // 캔버스의 드래그 선택이 시작되지 않도록 이벤트 전파 중단
+    e.stopPropagation();
+
+    // 다른 메모가 이미 드래그 중이면 무시
+    if (isDraggingAnyMemo && !isDragging) {
+      return;
+    }
+
+    // 연결 모드가 아닐 때만 드래그 준비
+    if (!isConnecting && e.touches.length === 1) {
+      const touch = e.touches[0];
+      // 터치 다운 위치 저장 (임계값 판단용)
+      setMouseDownPos({ x: touch.clientX, y: touch.clientY });
+      setDragMoved(false);
+      setDragStart({
+        x: touch.clientX - (memo.position.x * canvasScale + canvasOffset.x),
+        y: touch.clientY - (memo.position.y * canvasScale + canvasOffset.y)
+      });
+    }
+  };
+
+  /**
    * 연결점 마우스 다운 핸들러
    */
   const handleConnectionPointMouseDown = (e: React.MouseEvent) => {
@@ -123,6 +148,101 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
   };
 
   /**
+   * 위치 업데이트 공통 로직
+   */
+  const updatePosition = (clientX: number, clientY: number) => {
+    // 커서 위치 저장 (힌트 UI용)
+    setCursorPosition({ x: clientX, y: clientY });
+
+    if (!dragMoved) {
+      setDragMoved(true);
+    }
+
+    // 현재 위치에서 드래그 시작 오프셋을 빼고 캔버스 좌표계로 변환
+    let newPosition = {
+      x: (clientX - dragStart.x - canvasOffset.x) / canvasScale,
+      y: (clientY - dragStart.y - canvasOffset.y) / canvasScale
+    };
+
+    // 루트 메모이고 Shift 드래그가 아닐 때, 영역과 충돌하면 방향별 이동 차단
+    if (!memo.parentId && !isShiftPressed && currentPage) {
+      const deltaX = newPosition.x - memo.position.x;
+      const deltaY = newPosition.y - memo.position.y;
+
+      const categories = currentPage.categories || [];
+      const memoWidth = memo.size?.width || 200;
+      const memoHeight = memo.size?.height || 95;
+
+      for (const category of categories) {
+        // 루트 레벨 카테고리만 확인 (parentId가 null 또는 undefined)
+        if (category.parentId != null) {
+          continue;
+        }
+        if (!category.isExpanded) {
+          continue;
+        }
+
+        const categoryArea = calculateCategoryArea(category, currentPage);
+        if (!categoryArea) {
+          continue;
+        }
+
+        // 새 위치에서 메모의 경계
+        const newMemoBounds = {
+          left: newPosition.x,
+          top: newPosition.y,
+          right: newPosition.x + memoWidth,
+          bottom: newPosition.y + memoHeight
+        };
+
+        const areaBounds = {
+          left: categoryArea.x,
+          top: categoryArea.y,
+          right: categoryArea.x + categoryArea.width,
+          bottom: categoryArea.y + categoryArea.height
+        };
+
+        // 겹침 계산
+        const overlapLeft = Math.max(newMemoBounds.left, areaBounds.left);
+        const overlapTop = Math.max(newMemoBounds.top, areaBounds.top);
+        const overlapRight = Math.min(newMemoBounds.right, areaBounds.right);
+        const overlapBottom = Math.min(newMemoBounds.bottom, areaBounds.bottom);
+
+        const hasOverlap = overlapLeft < overlapRight && overlapTop < overlapBottom;
+
+        // 겹침이 발생하면 해당 방향으로 이동 차단
+        if (hasOverlap) {
+          // 어느 방향에서 충돌했는지 판단하고, 해당 방향으로의 이동만 차단 (현재 위치 유지)
+          if (deltaX < 0) {
+            // 왼쪽으로 이동 중 → x 좌표는 현재 메모 위치 유지
+            newPosition.x = memo.position.x;
+          } else if (deltaX > 0) {
+            // 오른쪽으로 이동 중 → x 좌표는 현재 메모 위치 유지
+            newPosition.x = memo.position.x;
+          }
+
+          if (deltaY < 0) {
+            // 위로 이동 중 → y 좌표는 현재 메모 위치 유지
+            newPosition.y = memo.position.y;
+          } else if (deltaY > 0) {
+            // 아래로 이동 중 → y 좌표는 현재 메모 위치 유지
+            newPosition.y = memo.position.y;
+          }
+        }
+      }
+    }
+
+    // 빠른 드래그 시 업데이트 빈도 조절 (50ms마다만 업데이트)
+    const now = Date.now();
+    pendingPosition.current = newPosition;
+
+    if (now - lastUpdateTime.current >= 50) {
+      onPositionChange(memo.id, newPosition);
+      lastUpdateTime.current = now;
+    }
+  };
+
+  /**
    * 마우스 이동 핸들러 - 드래그 처리
    */
   const handleMouseMove = (e: MouseEvent) => {
@@ -141,95 +261,33 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     }
 
     if (isDragging) {
-      // 커서 위치 저장 (힌트 UI용)
-      setCursorPosition({ x: e.clientX, y: e.clientY });
+      updatePosition(e.clientX, e.clientY);
+    }
+  };
 
-      if (!dragMoved) {
-        setDragMoved(true);
+  /**
+   * 터치 이동 핸들러 - 모바일 드래그 처리
+   */
+  const handleTouchMove = (e: TouchEvent) => {
+    // 터치 다운 후 드래그 임계값 확인
+    if (mouseDownPos && !isDragging && e.touches.length === 1) {
+      const touch = e.touches[0];
+      const distance = Math.sqrt(
+        Math.pow(touch.clientX - mouseDownPos.x, 2) +
+        Math.pow(touch.clientY - mouseDownPos.y, 2)
+      );
+
+      // 임계값을 넘으면 드래그 시작
+      if (distance >= DRAG_THRESHOLD) {
+        setIsDragging(true);
+        onDragStart?.(memo.id);
       }
+    }
 
-      // 마우스 현재 위치에서 드래그 시작 오프셋을 빼고 캔버스 좌표계로 변환
-      let newPosition = {
-        x: (e.clientX - dragStart.x - canvasOffset.x) / canvasScale,
-        y: (e.clientY - dragStart.y - canvasOffset.y) / canvasScale
-      };
-
-      // 루트 메모이고 Shift 드래그가 아닐 때, 영역과 충돌하면 방향별 이동 차단
-      if (!memo.parentId && !isShiftPressed && currentPage) {
-        const deltaX = newPosition.x - memo.position.x;
-        const deltaY = newPosition.y - memo.position.y;
-
-        const categories = currentPage.categories || [];
-        const memoWidth = memo.size?.width || 200;
-        const memoHeight = memo.size?.height || 95;
-
-        for (const category of categories) {
-          // 루트 레벨 카테고리만 확인 (parentId가 null 또는 undefined)
-          if (category.parentId != null) {
-            continue;
-          }
-          if (!category.isExpanded) {
-            continue;
-          }
-
-          const categoryArea = calculateCategoryArea(category, currentPage);
-          if (!categoryArea) {
-            continue;
-          }
-
-          // 새 위치에서 메모의 경계
-          const newMemoBounds = {
-            left: newPosition.x,
-            top: newPosition.y,
-            right: newPosition.x + memoWidth,
-            bottom: newPosition.y + memoHeight
-          };
-
-          const areaBounds = {
-            left: categoryArea.x,
-            top: categoryArea.y,
-            right: categoryArea.x + categoryArea.width,
-            bottom: categoryArea.y + categoryArea.height
-          };
-
-          // 겹침 계산
-          const overlapLeft = Math.max(newMemoBounds.left, areaBounds.left);
-          const overlapTop = Math.max(newMemoBounds.top, areaBounds.top);
-          const overlapRight = Math.min(newMemoBounds.right, areaBounds.right);
-          const overlapBottom = Math.min(newMemoBounds.bottom, areaBounds.bottom);
-
-          const hasOverlap = overlapLeft < overlapRight && overlapTop < overlapBottom;
-
-          // 겹침이 발생하면 해당 방향으로 이동 차단
-          if (hasOverlap) {
-            // 어느 방향에서 충돌했는지 판단하고, 해당 방향으로의 이동만 차단 (현재 위치 유지)
-            if (deltaX < 0) {
-              // 왼쪽으로 이동 중 → x 좌표는 현재 메모 위치 유지
-              newPosition.x = memo.position.x;
-            } else if (deltaX > 0) {
-              // 오른쪽으로 이동 중 → x 좌표는 현재 메모 위치 유지
-              newPosition.x = memo.position.x;
-            }
-
-            if (deltaY < 0) {
-              // 위로 이동 중 → y 좌표는 현재 메모 위치 유지
-              newPosition.y = memo.position.y;
-            } else if (deltaY > 0) {
-              // 아래로 이동 중 → y 좌표는 현재 메모 위치 유지
-              newPosition.y = memo.position.y;
-            }
-          }
-        }
-      }
-
-      // 빠른 드래그 시 업데이트 빈도 조절 (50ms마다만 업데이트)
-      const now = Date.now();
-      pendingPosition.current = newPosition;
-
-      if (now - lastUpdateTime.current >= 50) {
-        onPositionChange(memo.id, newPosition);
-        lastUpdateTime.current = now;
-      }
+    if (isDragging && e.touches.length === 1) {
+      const touch = e.touches[0];
+      updatePosition(touch.clientX, touch.clientY);
+      e.preventDefault(); // 스크롤 방지
     }
   };
 
@@ -237,14 +295,14 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
   handleMouseMoveRef.current = handleMouseMove;
 
   /**
-   * 마우스 업 핸들러 - 드래그 종료
+   * 드래그 종료 공통 로직
    */
-  const handleMouseUp = (e: MouseEvent) => {
+  const finishDrag = (clientX: number, clientY: number) => {
     if (isDragging) {
       // 드래그가 끝날 때 최종 위치 업데이트 (대기 중인 위치가 있으면 사용)
       const finalPosition = pendingPosition.current || {
-        x: (e.clientX - dragStart.x - canvasOffset.x) / canvasScale,
-        y: (e.clientY - dragStart.y - canvasOffset.y) / canvasScale
+        x: (clientX - dragStart.x - canvasOffset.x) / canvasScale,
+        y: (clientY - dragStart.y - canvasOffset.y) / canvasScale
       };
 
       // Shift 모드가 아닐 때만 최종 위치 업데이트 (Shift 모드는 handleShiftDrop에서 처리)
@@ -269,23 +327,57 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     onDragEnd?.();
   };
 
+  /**
+   * 마우스 업 핸들러 - 드래그 종료
+   */
+  const handleMouseUp = (e: MouseEvent) => {
+    finishDrag(e.clientX, e.clientY);
+  };
+
+  /**
+   * 터치 종료 핸들러 - 모바일 드래그 종료
+   */
+  const handleTouchEnd = (e: TouchEvent) => {
+    // 터치가 끝날 때 마지막 터치 위치 사용
+    if (e.changedTouches.length > 0) {
+      const touch = e.changedTouches[0];
+      finishDrag(touch.clientX, touch.clientY);
+    } else {
+      finishDrag(0, 0); // 폴백
+    }
+  };
+
   // ref에 최신 핸들러 저장
   handleMouseUpRef.current = handleMouseUp;
 
+  // 터치 이벤트 핸들러 ref
+  const handleTouchMoveRef = React.useRef<((e: TouchEvent) => void) | null>(null);
+  const handleTouchEndRef = React.useRef<((e: TouchEvent) => void) | null>(null);
+
+  handleTouchMoveRef.current = handleTouchMove;
+  handleTouchEndRef.current = handleTouchEnd;
+
   /**
-   * 드래그 이벤트 리스너 등록 (마우스 다운 또는 드래그 중일 때)
+   * 드래그 이벤트 리스너 등록 (마우스/터치 다운 또는 드래그 중일 때)
    */
   React.useEffect(() => {
     // 마우스 다운 상태이거나 드래그 중일 때 이벤트 리스너 등록
     if (mouseDownPos || isDragging) {
       const moveHandler = (e: MouseEvent) => handleMouseMoveRef.current?.(e);
       const upHandler = (e: MouseEvent) => handleMouseUpRef.current?.(e);
+      const touchMoveHandler = (e: TouchEvent) => handleTouchMoveRef.current?.(e);
+      const touchEndHandler = (e: TouchEvent) => handleTouchEndRef.current?.(e);
 
       document.addEventListener('mousemove', moveHandler);
       document.addEventListener('mouseup', upHandler);
+      document.addEventListener('touchmove', touchMoveHandler, { passive: false });
+      document.addEventListener('touchend', touchEndHandler);
+
       return () => {
         document.removeEventListener('mousemove', moveHandler);
         document.removeEventListener('mouseup', upHandler);
+        document.removeEventListener('touchmove', touchMoveHandler);
+        document.removeEventListener('touchend', touchEndHandler);
       };
     }
   }, [mouseDownPos, isDragging]);
@@ -296,6 +388,7 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     dragMoved,
     cursorPosition,
     handleMouseDown,
+    handleTouchStart,
     handleConnectionPointMouseDown,
     handleConnectionPointMouseUp
   };

@@ -42,7 +42,8 @@
       "Bash(if exist .next rmdir /s /q .next)",
       "Bash(npm uninstall:*)",
       "Bash(Stop-Process -Name node -Force -ErrorAction SilentlyContinue)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(Remove-Item -Force nul)"
     ],
     "deny": [],
     "ask": []

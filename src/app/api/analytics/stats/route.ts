@@ -112,40 +112,83 @@ export async function GET(request: NextRequest) {
       ORDER BY last_active DESC
     `;
 
-    // 9. 재방문자 vs 신규 사용자 통계 (제외된 이메일 제외)
-    // 재방문자: 해당 기간 내에 활동했고, 최초 로그인이 해당 기간 이전인 사용자
-    const returningUsers = await sql`
-      SELECT COUNT(DISTINCT s.user_email) as count
-      FROM analytics_sessions s
-      JOIN user_cohorts c ON s.user_email = c.user_email
-      WHERE s.session_start >= ${startDate.toISOString()}
-        AND c.first_login < ${startDate.toISOString()}
-        AND s.user_email != ${EXCLUDED_EMAILS[0]}
-        AND s.user_email != ${EXCLUDED_EMAILS[1]}
-    `;
+    // 9. 사용자 활동 빈도별 분류 (제외된 이메일 제외)
+    // 지난 7일간 활동한 사용자들을 활동 일수로 분류 (신규 포함)
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    // 신규 사용자: 해당 기간 내에 최초 로그인한 사용자
-    const newUsersCount = await sql`
-      SELECT COUNT(DISTINCT user_email) as count
-      FROM user_cohorts
-      WHERE first_login >= ${startDate.toISOString()}
-        AND user_email != ${EXCLUDED_EMAILS[0]}
-        AND user_email != ${EXCLUDED_EMAILS[1]}
-    `;
-
-    // 10. 일별 재방문자 vs 신규 사용자 수
-    const dailyUserTypes = await sql`
+    const userRetention = await sql`
+      WITH last_week_sessions AS (
+        SELECT
+          user_email,
+          COUNT(DISTINCT DATE(session_start)) as active_days
+        FROM analytics_sessions
+        WHERE session_start >= ${sevenDaysAgo.toISOString()}
+          AND user_email != ${EXCLUDED_EMAILS[0]}
+          AND user_email != ${EXCLUDED_EMAILS[1]}
+        GROUP BY user_email
+      ),
+      new_users_last_week AS (
+        SELECT user_email
+        FROM user_cohorts
+        WHERE first_login >= ${sevenDaysAgo.toISOString()}
+          AND user_email != ${EXCLUDED_EMAILS[0]}
+          AND user_email != ${EXCLUDED_EMAILS[1]}
+      )
       SELECT
-        DATE(s.session_start) as date,
-        COUNT(DISTINCT CASE WHEN c.first_login < DATE(s.session_start) THEN s.user_email END) as returning_users,
-        COUNT(DISTINCT CASE WHEN c.first_login >= DATE(s.session_start) AND c.first_login < DATE(s.session_start) + INTERVAL '1 day' THEN s.user_email END) as new_users
-      FROM analytics_sessions s
-      JOIN user_cohorts c ON s.user_email = c.user_email
-      WHERE s.session_start >= ${startDate.toISOString()}
-        AND s.user_email != ${EXCLUDED_EMAILS[0]}
-        AND s.user_email != ${EXCLUDED_EMAILS[1]}
-      GROUP BY DATE(s.session_start)
-      ORDER BY date DESC
+        COUNT(DISTINCT CASE WHEN lw.active_days = 1 OR nu.user_email IS NOT NULL THEN lw.user_email END) as new_users,
+        COUNT(DISTINCT CASE WHEN lw.active_days = 2 THEN lw.user_email END) as weekly_2days,
+        COUNT(DISTINCT CASE WHEN lw.active_days = 3 THEN lw.user_email END) as weekly_3days,
+        COUNT(DISTINCT CASE WHEN lw.active_days >= 4 THEN lw.user_email END) as weekly_4plus
+      FROM last_week_sessions lw
+      LEFT JOIN new_users_last_week nu ON lw.user_email = nu.user_email
+    `;
+
+    // 10. 일별 사용자 활동 빈도별 분류
+    const dailyUserTypes = await sql`
+      WITH daily_sessions AS (
+        SELECT
+          DATE(session_start) as date,
+          user_email
+        FROM analytics_sessions
+        WHERE session_start >= ${startDate.toISOString()}
+          AND user_email != ${EXCLUDED_EMAILS[0]}
+          AND user_email != ${EXCLUDED_EMAILS[1]}
+      ),
+      user_activity AS (
+        SELECT
+          ds.date,
+          ds.user_email,
+          COUNT(DISTINCT DATE(s.session_start)) as active_days_total
+        FROM daily_sessions ds
+        LEFT JOIN analytics_sessions s ON
+          s.user_email = ds.user_email
+          AND DATE(s.session_start) >= ds.date - INTERVAL '7 days'
+          AND DATE(s.session_start) <= ds.date
+          AND s.user_email != ${EXCLUDED_EMAILS[0]}
+          AND s.user_email != ${EXCLUDED_EMAILS[1]}
+        GROUP BY ds.date, ds.user_email
+      ),
+      new_users_by_date AS (
+        SELECT
+          DATE(first_login) as date,
+          user_email
+        FROM user_cohorts
+        WHERE first_login >= ${startDate.toISOString()}
+          AND user_email != ${EXCLUDED_EMAILS[0]}
+          AND user_email != ${EXCLUDED_EMAILS[1]}
+      )
+      SELECT
+        ds.date,
+        COUNT(DISTINCT CASE WHEN ua.active_days_total = 1 OR nu.user_email IS NOT NULL THEN ds.user_email END) as new_users,
+        COUNT(DISTINCT CASE WHEN ua.active_days_total = 2 THEN ds.user_email END) as weekly_2days,
+        COUNT(DISTINCT CASE WHEN ua.active_days_total = 3 THEN ds.user_email END) as weekly_3days,
+        COUNT(DISTINCT CASE WHEN ua.active_days_total >= 4 THEN ds.user_email END) as weekly_4plus
+      FROM daily_sessions ds
+      LEFT JOIN user_activity ua ON ds.date = ua.date AND ds.user_email = ua.user_email
+      LEFT JOIN new_users_by_date nu ON ds.date = nu.date AND ds.user_email = nu.user_email
+      GROUP BY ds.date
+      ORDER BY ds.date DESC
     `;
 
     return NextResponse.json({
@@ -153,8 +196,10 @@ export async function GET(request: NextRequest) {
         totalUsers: Number(totalUsers[0]?.count || 0),
         totalSessions: Number(totalSessions[0]?.count || 0),
         avgSessionDuration: Math.round(Number(avgSessionDuration[0]?.avg_duration || 0)),
-        returningUsers: Number(returningUsers[0]?.count || 0),
-        newUsers: Number(newUsersCount[0]?.count || 0),
+        newUsers: Number(userRetention[0]?.new_users || 0),
+        weekly2Days: Number(userRetention[0]?.weekly_2days || 0),
+        weekly3Days: Number(userRetention[0]?.weekly_3days || 0),
+        weekly4Plus: Number(userRetention[0]?.weekly_4plus || 0),
       },
       dailyActiveUsers: dailyActiveUsers.map((d: any) => ({
         date: d.date,
@@ -162,8 +207,10 @@ export async function GET(request: NextRequest) {
       })),
       dailyUserTypes: dailyUserTypes.map((d: any) => ({
         date: d.date,
-        returningUsers: Number(d.returning_users),
         newUsers: Number(d.new_users),
+        weekly2Days: Number(d.weekly_2days),
+        weekly3Days: Number(d.weekly_3days),
+        weekly4Plus: Number(d.weekly_4plus),
       })),
       eventCounts: eventCounts.map((e: any) => ({
         eventType: e.event_type,

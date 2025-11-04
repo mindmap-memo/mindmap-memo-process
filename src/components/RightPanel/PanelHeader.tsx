@@ -1,4 +1,5 @@
 import React from 'react';
+import { X } from 'lucide-react';
 import { ImportanceLevel } from '../../types';
 import { isDefaultFilterState } from './utils/blockUtils';
 
@@ -8,6 +9,7 @@ interface PanelHeaderProps {
   activeImportanceFilters?: Set<ImportanceLevel>;
   showGeneralContent?: boolean;
   onResetFilters?: () => void;
+  onClose?: () => void;
 }
 
 /**
@@ -20,7 +22,8 @@ const PanelHeader: React.FC<PanelHeaderProps> = ({
   onToggleFullscreen,
   activeImportanceFilters,
   showGeneralContent,
-  onResetFilters
+  onResetFilters,
+  onClose
 }) => {
   return (
     <div style={{
@@ -32,6 +35,34 @@ const PanelHeader: React.FC<PanelHeaderProps> = ({
       justifyContent: 'space-between'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {onClose && (
+          <button
+            onClick={onClose}
+            style={{
+              padding: '4px',
+              border: 'none',
+              backgroundColor: 'transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#6b7280',
+              borderRadius: '4px',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f3f4f6';
+              e.currentTarget.style.color = '#374151';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = '#6b7280';
+            }}
+            title="닫기"
+          >
+            <X size={20} />
+          </button>
+        )}
         <h2 style={{
           margin: '0',
           fontSize: '16px',

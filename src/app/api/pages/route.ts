@@ -10,63 +10,43 @@ export async function GET() {
     // Require authentication
     const user = await requireAuth();
 
-    // Fetch all pages for this user (including NULL for migration)
+    // Fetch all pages for this user
     const pages = await sql`
       SELECT id, name, created_at, updated_at
       FROM pages
-      WHERE user_id = ${user.id} OR user_id IS NULL
+      WHERE user_id = ${user.id}
       ORDER BY created_at ASC
     `;
 
-    // Auto-assign NULL user_id to current user
-    await sql`
-      UPDATE pages SET user_id = ${user.id} WHERE user_id IS NULL
-    `;
-
-    // Fetch all memos for this user (including NULL for migration)
+    // Fetch all memos for this user
     const memos = await sql`
       SELECT
         id, page_id, title, blocks, tags, connections,
         position_x, position_y, width, height,
         display_size, importance, parent_id
       FROM memos
-      WHERE user_id = ${user.id} OR user_id IS NULL
+      WHERE user_id = ${user.id}
       ORDER BY created_at ASC
     `;
 
-    // Auto-assign NULL user_id to current user
-    await sql`
-      UPDATE memos SET user_id = ${user.id} WHERE user_id IS NULL
-    `;
-
-    // Fetch all categories for this user (including NULL for migration)
+    // Fetch all categories for this user
     const categories = await sql`
       SELECT
         id, page_id, title, tags, connections,
         position_x, position_y, original_position_x, original_position_y,
         width, height, is_expanded, children, parent_id
       FROM categories
-      WHERE user_id = ${user.id} OR user_id IS NULL
+      WHERE user_id = ${user.id}
       ORDER BY created_at ASC
     `;
 
-    // Auto-assign NULL user_id to current user
-    await sql`
-      UPDATE categories SET user_id = ${user.id} WHERE user_id IS NULL
-    `;
-
-    // Fetch all quick nav items for this user (including NULL for migration)
+    // Fetch all quick nav items for this user
     const quickNavItems = await sql`
       SELECT
         id, type, target_id, page_id, title, created_at
       FROM quick_nav_items
-      WHERE user_id = ${user.id} OR user_id IS NULL
+      WHERE user_id = ${user.id}
       ORDER BY created_at DESC
-    `;
-
-    // Auto-assign NULL user_id to current user
-    await sql`
-      UPDATE quick_nav_items SET user_id = ${user.id} WHERE user_id IS NULL
     `;
 
     // Organize data by page

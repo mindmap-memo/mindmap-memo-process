@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
+import { isEmailExcluded } from '@/features/analytics/utils/excludedEmails';
+import { detectDeviceType } from '@/features/analytics/utils/deviceDetection';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -17,11 +19,21 @@ export async function POST(request: NextRequest) {
 
     const { sessionId, userEmail, action, durationSeconds } = JSON.parse(text);
 
+    // 제외 이메일은 데이터베이스에 저장하지 않음
+    if (isEmailExcluded(userEmail)) {
+      return NextResponse.json({ success: true, excluded: true });
+    }
+
     if (action === 'start') {
-      // 세션 시작
+      // User Agent에서 기기 타입 감지
+      const userAgent = request.headers.get('user-agent') || '';
+      const deviceType = detectDeviceType(userAgent);
+
+      // 세션 시작 (중복 방지)
       await sql`
-        INSERT INTO analytics_sessions (id, user_email, session_start)
-        VALUES (${sessionId}, ${userEmail}, NOW())
+        INSERT INTO analytics_sessions (id, user_email, session_start, device_type)
+        VALUES (${sessionId}, ${userEmail}, NOW(), ${deviceType})
+        ON CONFLICT (id) DO NOTHING
       `;
 
       // 사용자 코호트 정보 업데이트 (첫 로그인 시)

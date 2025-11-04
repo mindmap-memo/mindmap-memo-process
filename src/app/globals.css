@@ -23,3 +23,9 @@ body {
   width: 100%;
   height: 100%;
 }
+
+/* Responsive media elements */
+img, video, iframe {
+  max-width: 100%;
+  height: auto;
+}

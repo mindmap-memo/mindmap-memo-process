@@ -1,94 +1,56 @@
 /**
- * 기기 정보 감지 유틸리티
+ * Device Detection Utility
+ * User Agent를 파싱하여 기기 타입을 감지합니다.
  */
 
-export interface DeviceInfo {
-  deviceType: 'desktop' | 'mobile' | 'tablet';
-  browser: string;
-  os: string;
-  screenResolution: string;
-}
+export type DeviceType = 'mobile' | 'tablet' | 'desktop';
 
 /**
- * User Agent에서 기기 타입 감지
+ * User Agent 문자열에서 기기 타입을 감지
+ * @param userAgent - User Agent 문자열
+ * @returns 'mobile' | 'tablet' | 'desktop'
  */
-export function getDeviceType(userAgent: string): 'desktop' | 'mobile' | 'tablet' {
+export function detectDeviceType(userAgent: string): DeviceType {
+  if (!userAgent) {
+    return 'desktop';
+  }
+
   const ua = userAgent.toLowerCase();
 
-  // 태블릿 체크
-  if (/(ipad|tablet|playbook|silk)|(android(?!.*mobile))/i.test(userAgent)) {
+  // 태블릿 감지 (모바일보다 먼저 체크해야 함)
+  if (
+    ua.includes('ipad') ||
+    (ua.includes('tablet') && !ua.includes('mobile')) ||
+    (ua.includes('android') && !ua.includes('mobile'))
+  ) {
     return 'tablet';
   }
 
-  // 모바일 체크
-  if (/mobile|iphone|ipod|android|blackberry|opera mini|iemobile|wpdesktop/i.test(userAgent)) {
+  // 모바일 감지
+  if (
+    ua.includes('mobile') ||
+    ua.includes('iphone') ||
+    ua.includes('ipod') ||
+    ua.includes('android') ||
+    ua.includes('blackberry') ||
+    ua.includes('windows phone') ||
+    ua.includes('webos')
+  ) {
     return 'mobile';
   }
 
+  // 기본값: 데스크톱
   return 'desktop';
 }
 
 /**
- * User Agent에서 브라우저 정보 추출
+ * 브라우저에서 현재 기기 타입을 감지
+ * @returns 'mobile' | 'tablet' | 'desktop'
  */
-export function getBrowser(userAgent: string): string {
-  const ua = userAgent.toLowerCase();
-
-  if (ua.includes('edg/')) return 'Edge';
-  if (ua.includes('chrome/')) return 'Chrome';
-  if (ua.includes('safari/') && !ua.includes('chrome')) return 'Safari';
-  if (ua.includes('firefox/')) return 'Firefox';
-  if (ua.includes('opera/') || ua.includes('opr/')) return 'Opera';
-  if (ua.includes('trident/')) return 'IE';
-
-  return 'Unknown';
-}
-
-/**
- * User Agent에서 운영체제 정보 추출
- */
-export function getOS(userAgent: string): string {
-  const ua = userAgent.toLowerCase();
-
-  if (ua.includes('win')) return 'Windows';
-  if (ua.includes('mac')) return 'macOS';
-  if (ua.includes('linux')) return 'Linux';
-  if (ua.includes('android')) return 'Android';
-  if (ua.includes('ios') || ua.includes('iphone') || ua.includes('ipad')) return 'iOS';
-
-  return 'Unknown';
-}
-
-/**
- * 화면 해상도 가져오기 (클라이언트 측에서만 가능)
- */
-export function getScreenResolution(): string {
+export function getClientDeviceType(): DeviceType {
   if (typeof window === 'undefined') {
-    return 'Unknown';
+    return 'desktop';
   }
 
-  return `${window.screen.width}x${window.screen.height}`;
-}
-
-/**
- * 모든 기기 정보를 한 번에 가져오기
- */
-export function getDeviceInfo(): DeviceInfo {
-  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
-    return {
-      deviceType: 'desktop',
-      browser: 'Unknown',
-      os: 'Unknown',
-      screenResolution: 'Unknown'
-    };
-  }
-
-  const userAgent = navigator.userAgent;
-
-  return {
-    deviceType: getDeviceType(userAgent),
-    browser: getBrowser(userAgent),
-    os: getOS(userAgent),
-    screenResolution: getScreenResolution()
-  };
+  return detectDeviceType(window.navigator.userAgent);
 }

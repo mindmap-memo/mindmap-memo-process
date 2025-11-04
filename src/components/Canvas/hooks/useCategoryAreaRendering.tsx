@@ -98,6 +98,7 @@ interface UseCategoryAreaRenderingParams {
   onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
   isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
   onCategoryUpdate: (category: CategoryBlock) => void;
+  onOpenEditor?: () => void;
 
   // 상태 Setters
   setIsDraggingCategoryArea: (value: string | null) => void;
@@ -256,7 +257,7 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
       const isShiftDragTarget = isShiftPressed && dragTargetCategoryId === category.id && (isDraggingMemo || isDraggingCategory || isDraggingCategoryArea) && !isCurrentParent;
 
       // 드래그 선택 중 하이라이트
-      const isDragHovered = dragHoveredCategoryIds.includes(category.id);
+      const isDragHovered = dragHoveredCategoryIds?.includes(category.id) || false;
 
       // 드래그 중인 카테고리는 transform을 사용하여 GPU 가속 활용
       // 일반 드래그 또는 Shift+드래그 시 GPU 가속 적용
@@ -867,7 +868,7 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             key={memo.id}
             memo={memo}
             isSelected={selectedMemoId === memo.id || selectedMemoIds.includes(memo.id)}
-            isDragHovered={dragHoveredMemoIds.includes(memo.id)}
+            isDragHovered={dragHoveredMemoIds?.includes(memo.id) || false}
             onClick={(isShiftClick?: boolean) => onMemoSelect(memo.id, isShiftClick)}
             onPositionChange={onMemoPositionChange}
             onSizeChange={onMemoSizeChange}
