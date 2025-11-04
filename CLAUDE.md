@@ -376,6 +376,52 @@ The application implements Shift+drag functionality for adding/removing memos an
 
 ## Responsive Design Guidelines (Desktop-Down Approach)
 
+### ⚠️ CRITICAL: PC 버전 보호 원칙
+
+**모바일 기능 개발 시 PC 버전이 망가지지 않도록 반드시 준수해야 할 규칙:**
+
+1. **조건부 로직 필수**: 모바일 전용 코드는 반드시 `isMobile` 체크 또는 `onOpenEditor` 존재 여부로 조건 분기
+   ```typescript
+   // GOOD - 조건부 분기
+   if (onOpenEditor) {
+     // 모바일 전용 로직
+     onOpenEditor();
+   } else {
+     // PC 전용 로직
+     setIsEditing(true);
+   }
+
+   // BAD - 무조건 실행
+   if (onOpenEditor) {
+     onOpenEditor();
+   }
+   // PC에서는 아무 일도 안 일어남!
+   ```
+
+2. **이벤트 핸들러 차단 금지**: `e.stopPropagation()`, `e.preventDefault()`, `return` 등으로 이벤트를 차단할 때 PC 버전에 영향이 없는지 확인
+   - **특히 주의**: `data-*` 속성으로 특정 영역을 감지하여 이벤트를 차단하는 코드는 PC 드래그까지 막을 수 있음
+
+3. **테스트 필수**: 모바일 코드를 수정한 후 반드시 PC 버전(768px 초과)에서 테스트
+   - 드래그 앤 드롭이 정상 작동하는지 확인
+   - 더블클릭 편집이 정상 작동하는지 확인
+   - 선택, 연결 등 모든 인터랙션이 정상인지 확인
+
+4. **CSS 미디어 쿼리 사용**: 스타일 변경은 JavaScript가 아닌 CSS 미디어 쿼리 사용
+   ```scss
+   // GOOD
+   .button {
+     padding: 10px; // PC 기본값
+   }
+
+   @media (max-width: 768px) {
+     .button {
+       padding: 20px; // 모바일에서만 오버라이드
+     }
+   }
+   ```
+
+5. **공통 로직 재사용**: PC와 모바일이 같은 기능을 다르게 구현할 때, 가능하면 공통 로직을 공유하고 UI만 다르게 처리
+
 ### 1. 기본 원칙: Desktop-Down (점진적 축소)
 
 - **현재 상태**: 데스크톱 버전 웹 애플리케이션이 이미 완성됨

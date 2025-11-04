@@ -19,6 +19,16 @@ export interface AppStateContextType {
   // Shift 키 상태
   isShiftPressed: boolean;
   setIsShiftPressed: React.Dispatch<React.SetStateAction<boolean>>;
+
+  // 드래그 상태
+  isDraggingMemo: boolean;
+  setIsDraggingMemo: React.Dispatch<React.SetStateAction<boolean>>;
+  draggingMemoId: string | null;
+  setDraggingMemoId: React.Dispatch<React.SetStateAction<string | null>>;
+  isDraggingCategory: boolean;
+  setIsDraggingCategory: React.Dispatch<React.SetStateAction<boolean>>;
+  draggingCategoryId: string | null;
+  setDraggingCategoryId: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
 // Context 생성

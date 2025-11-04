@@ -145,10 +145,10 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
   /**
    * 메모 위치 변경 핸들러 (경계 제한 제거)
    */
-  const handleMemoPositionChange = React.useCallback((memoId: string, position: { x: number; y: number }) => {
+  const handleMemoPositionChange = (memoId: string, position: { x: number; y: number }) => {
     // 경계 제한 없이 직접 전달
     onMemoPositionChange(memoId, position);
-  }, [onMemoPositionChange]);
+  };
 
   // 카테고리 드래그 & 드롭 핸들러
   const {

@@ -630,6 +630,7 @@ export const usePositionHandlers = ({
     // 메모가 이동하면 부모 카테고리의 캐시 제거 (영역 재계산을 위해)
     const currentPage = pages.find(p => p.id === currentPageId);
     const movedMemo = currentPage?.memos.find(m => m.id === memoId);
+
     if (movedMemo?.parentId) {
       clearCategoryCache(movedMemo.parentId);
     }
@@ -655,7 +656,9 @@ export const usePositionHandlers = ({
       }
 
       const movedMemo = currentPage.memos.find(m => m.id === memoId);
-      if (!movedMemo) return prev;
+      if (!movedMemo) {
+        return prev;
+      }
 
       // 위치 제한 로직 제거 - 충돌 검사는 resolveUnifiedCollisions에서 처리
       const finalPosition = position;

@@ -115,14 +115,16 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   } = useCategoryBlockState(category);
 
   // 제목 편집 핸들러
-  const { handleTitleClick, handleTitleSave, handleTitleKeyDown } = useCategoryTitleHandlers({
+  const { handleTitleClick, handleTitleDoubleClick, handleTitleSave, handleTitleKeyDown } = useCategoryTitleHandlers({
     category,
     isEditing,
     editTitle,
     setIsEditing,
     setEditTitle,
     titleRef,
-    onUpdate
+    onUpdate,
+    onOpenEditor,
+    isSelected
   });
 
   // 드래그 핸들러
@@ -337,7 +339,6 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        onClick={handleClick}
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
         onContextMenu={handleContextMenu}
@@ -379,7 +380,8 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
           <div
             style={titleStyle}
             onClick={handleTitleClick}
-            title="클릭하여 편집"
+            onDoubleClick={handleTitleDoubleClick}
+            title="더블클릭하여 편집"
           >
             {isShiftDragging && (
               <span style={{ color: 'white', fontSize: '18px', fontWeight: 'bold', marginRight: '4px' }}>+</span>

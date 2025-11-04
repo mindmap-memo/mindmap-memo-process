@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Type, Image as ImageIcon, FileText } from 'lucide-react';
+import { Paperclip, Type, Image as ImageIcon, FileText } from 'lucide-react';
 
 interface UseAddBlockButtonProps {
   onAddBlock: (type: string) => void;
@@ -50,8 +50,7 @@ export const useAddBlockButton = ({ onAddBlock, show }: UseAddBlockButtonProps) 
             e.currentTarget.style.transform = 'scale(1)';
           }}
         >
-          <Plus size={28} color="white" style={{
-            transform: showBlockMenu ? 'rotate(45deg)' : 'rotate(0deg)',
+          <Paperclip size={28} color="white" style={{
             transition: 'transform 0.2s ease'
           }} />
         </button>

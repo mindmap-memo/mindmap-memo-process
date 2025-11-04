@@ -1,7 +1,7 @@
 import React from 'react';
-import { Page, CategoryBlock, MemoBlock as MemoBlockType } from '../../../types';
+import { Page, CategoryBlock, MemoBlock as MemoBlockType, MemoDisplaySize } from '../../../types';
 import MemoBlock from '../../MemoBlock';
-import { createCategoryAreaDragHandler } from '../utils/categoryAreaDragHandlers';
+import { createCategoryAreaDragHandler, createCategoryAreaTouchHandler } from '../utils/categoryAreaDragHandlers';
 import { useCategoryAreaColors } from './useCategoryAreaColors';
 
 /**
@@ -88,7 +88,7 @@ interface UseCategoryAreaRenderingParams {
   onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }) => void;
   onMemoPositionChange: (memoId: string, position: { x: number; y: number }) => void;
   onMemoSizeChange: (memoId: string, size: { width: number; height: number }) => void;
-  onMemoDisplaySizeChange?: (memoId: string, size: any) => void;
+  onMemoDisplaySizeChange?: (memoId: string, displaySize: MemoDisplaySize) => void;
   onMemoTitleUpdate?: (memoId: string, title: string) => void;
   onMemoBlockUpdate?: (memoId: string, blockId: string, content: string) => void;
   onDetectCategoryOnDrop: (memoId: string, position: { x: number; y: number }) => void;
@@ -175,6 +175,7 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
     onAddQuickNav,
     isQuickNavExists,
     onCategoryUpdate,
+    onOpenEditor,
     setIsDraggingCategoryArea,
     setShiftDragInfo,
     setDraggedCategoryAreas,
@@ -317,6 +318,25 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
           onDrop={(e) => handleDropOnCategoryArea(e, category.id)}
           onDragOver={handleCategoryAreaDragOver}
           onMouseDown={createCategoryAreaDragHandler({
+            category,
+            isConnecting,
+            isShiftPressed,
+            canvasScale,
+            canvasOffset,
+            currentPage,
+            area,
+            draggedCategoryAreas,
+            shiftDragAreaCache,
+            calculateCategoryAreaWithColor,
+            onCategorySelect,
+            setIsDraggingCategoryArea,
+            setShiftDragInfo,
+            setDraggedCategoryAreas,
+            onCategoryPositionChange,
+            onCategoryPositionDragEnd,
+            onDetectCategoryDropForCategory
+          })}
+          onTouchStart={createCategoryAreaTouchHandler({
             category,
             isConnecting,
             isShiftPressed,
@@ -599,6 +619,14 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
           onClick={() => !isEditing && onCategorySelect(category.id)}
           onDoubleClick={(e) => {
             e.stopPropagation();
+
+            // 모바일(onOpenEditor가 있을 때)에서는 에디터 열기
+            if (onOpenEditor) {
+              onOpenEditor();
+              return;
+            }
+
+            // 데스크톱에서는 편집 모드로
             setEditingCategoryId(category.id);
             setEditingCategoryTitle(category.title);
           }}
@@ -617,17 +645,30 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
               // 라벨 드래그 시작 - 라벨만 이동
               e.stopPropagation();
 
-              // 라벨 드래그 시작 시 카테고리 선택 (우측 패널 표시)
-              onCategorySelect(category.id);
-
               let startX = e.clientX;
               let startY = e.clientY;
               const originalLabelPosition = { x: category.position.x, y: category.position.y };
               let hasMoved = false;
-              let isDragging = true;
+              let isDragging = false; // 임계값 통과 전까지는 false
+              const DRAG_THRESHOLD = 5; // 드래그 임계값 (픽셀)
 
               const handleMouseMove = (moveEvent: MouseEvent) => {
-                if (!isDragging) return; // 드래그 종료 후 이벤트 무시
+                // 임계값 확인
+                if (!isDragging) {
+                  const distance = Math.sqrt(
+                    Math.pow(moveEvent.clientX - startX, 2) +
+                    Math.pow(moveEvent.clientY - startY, 2)
+                  );
+
+                  // 임계값을 넘으면 드래그 시작
+                  if (distance >= DRAG_THRESHOLD) {
+                    isDragging = true;
+                    hasMoved = true;
+                    onCategorySelect(category.id); // 드래그 시작 시 선택
+                  }
+                }
+
+                if (!isDragging) return; // 드래그 시작 전까지 위치 업데이트 안함
 
                 hasMoved = true;
 
@@ -647,10 +688,20 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
                 console.log('[Label handleMouseUp] 호출됨', {
                   categoryId: category.id,
                   hasMoved,
+                  isDragging,
                   isShiftPressed,
                   upEventShiftKey: upEvent?.shiftKey,
                   upEventExists: !!upEvent
                 });
+
+                // 드래그가 발생하지 않았을 때: 클릭으로 처리 (카테고리 선택)
+                if (!hasMoved && !isDragging) {
+                  onCategorySelect(category.id);
+                  document.removeEventListener('mousemove', handleMouseMove);
+                  document.removeEventListener('mouseup', handleMouseUp);
+                  document.removeEventListener('mouseleave', handleMouseLeave);
+                  return;
+                }
 
                 isDragging = false; // 즉시 드래그 종료 플래그 설정
 
@@ -715,6 +766,125 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
               document.addEventListener('mouseleave', handleMouseLeave);
               e.preventDefault();
             }
+          }}
+          onTouchStart={(e) => {
+            // 편집 모드일 때는 드래그 방지
+            if (isEditing || e.touches.length !== 1) {
+              return;
+            }
+
+            // 라벨 터치 드래그 시작 - 라벨만 이동
+            e.stopPropagation();
+
+            const touch = e.touches[0];
+            let startX = touch.clientX;
+            let startY = touch.clientY;
+            const originalLabelPosition = { x: category.position.x, y: category.position.y };
+            let hasMoved = false;
+            let isDragging = false; // 임계값 통과 전까지는 false
+            const DRAG_THRESHOLD = 5; // 드래그 임계값 (픽셀)
+
+            const handleTouchMove = (moveEvent: TouchEvent) => {
+              if (moveEvent.touches.length !== 1) return;
+
+              const touch = moveEvent.touches[0];
+              const distance = Math.sqrt(
+                Math.pow(touch.clientX - startX, 2) +
+                Math.pow(touch.clientY - startY, 2)
+              );
+
+              // 임계값을 넘으면 드래그 시작
+              if (!isDragging && distance >= DRAG_THRESHOLD) {
+                isDragging = true;
+                hasMoved = true;
+                // 드래그 시작 시 카테고리 선택 (우측 패널 표시)
+                onCategorySelect(category.id);
+              }
+
+              // 드래그 중일 때만 위치 업데이트
+              if (!isDragging) return;
+
+              const deltaX = (touch.clientX - startX) / canvasScale;
+              const deltaY = (touch.clientY - startY) / canvasScale;
+
+              const newLabelPosition = {
+                x: originalLabelPosition.x + deltaX,
+                y: originalLabelPosition.y + deltaY
+              };
+
+              // 라벨만 이동
+              onCategoryLabelPositionChange(category.id, newLabelPosition);
+              moveEvent.preventDefault(); // 스크롤 방지
+            };
+
+            // 더블탭 감지를 위한 타임스탬프
+            let lastTapTime = 0;
+            const DOUBLE_TAP_DELAY = 300;
+
+            const handleTouchEnd = (upEvent?: TouchEvent) => {
+              // 드래그가 없었을 때만 탭/더블탭 감지
+              if (!hasMoved && !isDragging) {
+                const currentTime = new Date().getTime();
+                const tapTimeDiff = currentTime - lastTapTime;
+
+                if (tapTimeDiff < DOUBLE_TAP_DELAY && tapTimeDiff > 0) {
+                  // 더블탭: 에디터 열기
+                  if (onOpenEditor) {
+                    onOpenEditor();
+                  } else {
+                    // 데스크톱: 편집 모드
+                    setEditingCategoryId(category.id);
+                    setEditingCategoryTitle(category.title);
+                  }
+                  lastTapTime = 0; // 리셋
+                } else {
+                  // 싱글탭: 카테고리 선택
+                  onCategorySelect(category.id);
+                  lastTapTime = currentTime;
+                }
+              }
+
+              isDragging = false; // 드래그 종료
+
+              // Shift+드래그는 모바일에서 지원하지 않음 (isShiftPressed는 항상 false)
+              const wasShiftPressed = isShiftPressed;
+
+              if (hasMoved && wasShiftPressed && upEvent?.changedTouches.length) {
+                const touch = upEvent.changedTouches[0];
+                // 카테고리 라벨의 최종 위치 (라벨 이동용)
+                const finalLabelPosition = {
+                  x: originalLabelPosition.x + (touch.clientX - startX) / canvasScale,
+                  y: originalLabelPosition.y + (touch.clientY - startY) / canvasScale
+                };
+
+                // 터치 포인터의 실제 위치 계산 (충돌 검사용)
+                const canvasElement = document.getElementById('main-canvas');
+                let touchPointerPosition = finalLabelPosition; // fallback
+
+                if (canvasElement && canvasOffset) {
+                  const rect = canvasElement.getBoundingClientRect();
+                  const clientX = touch.clientX;
+                  const clientY = touch.clientY;
+
+                  // 캔버스 좌표계로 변환
+                  const touchX = (clientX - rect.left - canvasOffset.x) / canvasScale;
+                  const touchY = (clientY - rect.top - canvasOffset.y) / canvasScale;
+
+                  touchPointerPosition = { x: touchX, y: touchY };
+                }
+
+                // 터치 포인터 위치로 전달 (점 충돌 검사용)
+                onDetectCategoryDropForCategory?.(category.id, touchPointerPosition);
+              }
+
+              document.removeEventListener('touchmove', handleTouchMove);
+              document.removeEventListener('touchend', handleTouchEnd);
+              document.removeEventListener('touchcancel', handleTouchEnd);
+            };
+
+            document.addEventListener('touchmove', handleTouchMove, { passive: false });
+            document.addEventListener('touchend', handleTouchEnd);
+            document.addEventListener('touchcancel', handleTouchEnd);
           }}
         >
           {isShiftDragging && (
@@ -893,6 +1063,7 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             onDelete={onDeleteMemoById}
             onAddQuickNav={onAddQuickNav}
             isQuickNavExists={isQuickNavExists}
+            onOpenEditor={onOpenEditor}
           />
         ))}
         {childCategories.map(childCategory => (

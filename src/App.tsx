@@ -664,6 +664,14 @@ const App: React.FC = () => {
     setCanvasScale,
     isShiftPressed,
     setIsShiftPressed,
+    isDraggingMemo: appState.isDraggingMemo,
+    setIsDraggingMemo: appState.setIsDraggingMemo,
+    draggingMemoId: appState.draggingMemoId,
+    setDraggingMemoId: appState.setDraggingMemoId,
+    isDraggingCategory: appState.isDraggingCategory,
+    setIsDraggingCategory: appState.setIsDraggingCategory,
+    draggingCategoryId: appState.draggingCategoryId,
+    setDraggingCategoryId: appState.setDraggingCategoryId,
 
     // Selection
     selectedMemoId,
@@ -698,12 +706,6 @@ const App: React.FC = () => {
     setShowGeneralContent: appState.setShowGeneralContent,
     toggleImportanceFilter,
     toggleGeneralContent: () => appState.setShowGeneralContent(!appState.showGeneralContent),
-    isDraggingMemo: appState.isDraggingMemo,
-    setIsDraggingMemo: appState.setIsDraggingMemo,
-    draggingMemoId: appState.draggingMemoId,
-    setDraggingMemoId: appState.setDraggingMemoId,
-    isDraggingCategory: appState.isDraggingCategory,
-    setIsDraggingCategory: appState.setIsDraggingCategory,
 
     // Panel
     leftPanelOpen,
@@ -790,8 +792,64 @@ const App: React.FC = () => {
           showQuickNavPanel={showQuickNavPanel}
           setShowQuickNavPanel={setShowQuickNavPanel}
           QuickNavPanelComponent={QuickNavPanel}
+          onAddPage={addPage}
+          onPageNameChange={updatePageName}
+          onDeletePage={deletePage}
           onAddMemo={addMemoBlock}
           onAddCategory={addCategory}
+          // Canvas 핸들러들
+          onMemoPositionChange={updateMemoPosition}
+          onCategoryPositionChange={updateCategoryPosition}
+          onCategoryLabelPositionChange={updateCategoryLabelPosition}
+          onMemoSizeChange={updateMemoSize}
+          onCategorySizeChange={updateCategorySize}
+          onMemoDisplaySizeChange={updateMemoDisplaySize}
+          onMemoTitleUpdate={updateMemoTitle}
+          onMemoBlockUpdate={updateMemoBlockContent}
+          onCategoryUpdate={updateCategory}
+          onCategoryToggleExpanded={toggleCategoryExpanded}
+          onMoveToCategory={moveToCategory}
+          onDetectCategoryOnDrop={detectCategoryOnDrop}
+          onDetectCategoryDropForCategory={detectCategoryDropForCategory}
+          onDeleteMemo={deleteMemoBlock}
+          onDeleteCategory={deleteCategory}
+          onDeleteSelected={deleteSelectedItem}
+          onDisconnectMemo={disconnectMemo}
+          onStartConnection={startConnection}
+          onConnectMemos={connectMemos}
+          onCancelConnection={cancelConnection}
+          onRemoveConnection={removeConnection}
+          onUpdateDragLine={updateDragLine}
+          onCategoryPositionDragEnd={handleCategoryPositionDragEnd}
+          onCategoryDragStart={() => appState.setIsDraggingCategory(true)}
+          onCategoryDragEnd={() => {
+            appState.setIsDraggingCategory(false);
+            appState.setDraggingCategoryId(null);
+          }}
+          onMemoDragStart={(memoId: string) => {
+            appState.setIsDraggingMemo(true);
+            appState.setDraggingMemoId(memoId);
+          }}
+          onMemoDragEnd={() => {
+            appState.setIsDraggingMemo(false);
+            appState.setDraggingMemoId(null);
+          }}
+          onShiftDropCategory={handleCategoryAreaShiftDrop}
+          onClearCategoryCache={clearCategoryCache}
+          onDeleteMemoById={deleteMemoById}
+          onAddQuickNav={addQuickNavItem}
+          isQuickNavExists={isQuickNavExists}
+          onMemoUpdate={updateMemo}
+          onFocusMemo={focusOnMemo}
+          onResetFilters={resetFiltersToDefault}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onUndo={undoCanvasAction}
+          onRedo={redoCanvasAction}
+          shiftDragAreaCacheRef={shiftDragAreaCache}
+          onDragSelectStart={handleDragSelectStart}
+          onDragSelectMove={handleDragSelectMove}
+          onDragSelectEnd={handleDragSelectEnd}
         />
       </AppProviders>
     );

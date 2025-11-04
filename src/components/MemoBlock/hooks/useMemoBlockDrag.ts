@@ -22,6 +22,7 @@ interface UseMemoBlockDragParams {
   canvasScale: number;
   canvasOffset: { x: number; y: number };
   currentPage?: Page;
+  onClick?: (isShiftClick?: boolean) => void;
   onPositionChange: (id: string, position: { x: number; y: number }) => void;
   onDetectCategoryOnDrop?: (memoId: string, position: { x: number; y: number }) => void;
   onStartConnection?: (memoId: string) => void;
@@ -29,6 +30,7 @@ interface UseMemoBlockDragParams {
   onDragStart?: (memoId: string) => void;
   onDragEnd?: () => void;
   connectingFromId?: string | null;
+  memoRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
@@ -40,13 +42,15 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     canvasScale,
     canvasOffset,
     currentPage,
+    onClick,
     onPositionChange,
     onDetectCategoryOnDrop,
     onStartConnection,
     onConnectMemos,
     onDragStart,
     onDragEnd,
-    connectingFromId
+    connectingFromId,
+    memoRef
   } = params;
 
   // 드래그 상태
@@ -94,7 +98,7 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
         x: e.clientX - (memo.position.x * canvasScale + canvasOffset.x),
         y: e.clientY - (memo.position.y * canvasScale + canvasOffset.y)
       });
-      e.preventDefault(); // HTML5 드래그 방지, 마우스 드래그 우선
+      // preventDefault 제거: 더블클릭 이벤트가 발생하도록 허용
     }
   };
 
@@ -102,17 +106,22 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
    * 터치 시작 핸들러 - 모바일 드래그 준비
    */
   const handleTouchStart = (e: React.TouchEvent) => {
+    console.log('[MemoBlock TouchStart]', { memoId: memo.id, touches: e.touches.length });
+
     // 캔버스의 드래그 선택이 시작되지 않도록 이벤트 전파 중단
     e.stopPropagation();
 
     // 다른 메모가 이미 드래그 중이면 무시
     if (isDraggingAnyMemo && !isDragging) {
+      console.log('[MemoBlock TouchStart] 다른 메모가 드래그 중이라 무시');
       return;
     }
 
     // 연결 모드가 아닐 때만 드래그 준비
     if (!isConnecting && e.touches.length === 1) {
       const touch = e.touches[0];
+      console.log('[MemoBlock TouchStart] 드래그 준비 완료', { x: touch.clientX, y: touch.clientY });
+
       // 터치 다운 위치 저장 (임계값 판단용)
       setMouseDownPos({ x: touch.clientX, y: touch.clientY });
       setDragMoved(false);
@@ -120,6 +129,7 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
         x: touch.clientX - (memo.position.x * canvasScale + canvasOffset.x),
         y: touch.clientY - (memo.position.y * canvasScale + canvasOffset.y)
       });
+      e.preventDefault(); // 기본 터치 동작 방지
     }
   };
 
@@ -237,8 +247,17 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     pendingPosition.current = newPosition;
 
     if (now - lastUpdateTime.current >= 50) {
+      console.log('[MemoBlock updatePosition] onPositionChange 호출', {
+        memoId: memo.id,
+        newPosition,
+        timeSinceLastUpdate: now - lastUpdateTime.current
+      });
       onPositionChange(memo.id, newPosition);
       lastUpdateTime.current = now;
+    } else {
+      console.log('[MemoBlock updatePosition] 쓰로틀링으로 스킵', {
+        timeSinceLastUpdate: now - lastUpdateTime.current
+      });
     }
   };
 
@@ -297,7 +316,7 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
   /**
    * 드래그 종료 공통 로직
    */
-  const finishDrag = (clientX: number, clientY: number) => {
+  const finishDrag = (clientX: number, clientY: number, shiftKey?: boolean) => {
     if (isDragging) {
       // 드래그가 끝날 때 최종 위치 업데이트 (대기 중인 위치가 있으면 사용)
       const finalPosition = pendingPosition.current || {
@@ -319,6 +338,9 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
       pendingPosition.current = null;
       lastUpdateTime.current = 0;
       setCursorPosition(null); // 커서 위치 리셋
+    } else if (!dragMoved) {
+      // 드래그가 발생하지 않았을 때: 메모 선택
+      onClick?.(shiftKey || false);
     }
 
     // 모든 경우에 상태 초기화 (드래그 임계값 미달로 드래그가 시작되지 않은 경우 포함)
@@ -331,7 +353,7 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
    * 마우스 업 핸들러 - 드래그 종료
    */
   const handleMouseUp = (e: MouseEvent) => {
-    finishDrag(e.clientX, e.clientY);
+    finishDrag(e.clientX, e.clientY, e.shiftKey);
   };
 
   /**
@@ -341,9 +363,9 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     // 터치가 끝날 때 마지막 터치 위치 사용
     if (e.changedTouches.length > 0) {
       const touch = e.changedTouches[0];
-      finishDrag(touch.clientX, touch.clientY);
+      finishDrag(touch.clientX, touch.clientY, false);
     } else {
-      finishDrag(0, 0); // 폴백
+      finishDrag(0, 0, false); // 폴백
     }
   };
 
@@ -356,6 +378,40 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
 
   handleTouchMoveRef.current = handleTouchMove;
   handleTouchEndRef.current = handleTouchEnd;
+
+  /**
+   * 네이티브 터치 시작 이벤트 리스너 등록 (passive: false)
+   */
+  React.useEffect(() => {
+    if (!memoRef?.current) return;
+
+    const nativeTouchStart = (e: TouchEvent) => {
+      // 다른 메모가 이미 드래그 중이면 무시
+      if (isDraggingAnyMemo && !isDragging) {
+        return;
+      }
+
+      // 연결 모드가 아닐 때만 드래그 준비
+      if (!isConnecting && e.touches.length === 1) {
+        const touch = e.touches[0];
+
+        setMouseDownPos({ x: touch.clientX, y: touch.clientY });
+        setDragMoved(false);
+        setDragStart({
+          x: touch.clientX - (memo.position.x * canvasScale + canvasOffset.x),
+          y: touch.clientY - (memo.position.y * canvasScale + canvasOffset.y)
+        });
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    memoRef.current.addEventListener('touchstart', nativeTouchStart, { passive: false });
+
+    return () => {
+      memoRef.current?.removeEventListener('touchstart', nativeTouchStart);
+    };
+  }, [memo.id, memo.position, canvasScale, canvasOffset, isConnecting, isDraggingAnyMemo, isDragging, memoRef]);
 
   /**
    * 드래그 이벤트 리스너 등록 (마우스/터치 다운 또는 드래그 중일 때)
@@ -388,7 +444,6 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     dragMoved,
     cursorPosition,
     handleMouseDown,
-    handleTouchStart,
     handleConnectionPointMouseDown,
     handleConnectionPointMouseUp
   };

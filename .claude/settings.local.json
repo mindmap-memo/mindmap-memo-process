@@ -43,7 +43,12 @@
       "Bash(npm uninstall:*)",
       "Bash(Stop-Process -Name node -Force -ErrorAction SilentlyContinue)",
       "Bash(timeout:*)",
-      "Bash(Remove-Item -Force nul)"
+      "Bash(Remove-Item -Force nul)",
+      "Bash(git commit:*)",
+      "Bash(Remove-Item -Force \".next\\dev\\lock\" -ErrorAction SilentlyContinue)",
+      "Bash(Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue)",
+      "Bash(Remove-Item -Force nul -ErrorAction SilentlyContinue)",
+      "Bash(del nul 2)"
     ],
     "deny": [],
     "ask": []

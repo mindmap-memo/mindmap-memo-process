@@ -44,14 +44,6 @@ export interface SelectionContextType {
   setShowGeneralContent: React.Dispatch<React.SetStateAction<boolean>>;
   toggleImportanceFilter: (level: ImportanceLevel) => void;
   toggleGeneralContent: () => void;
-
-  // 드래그 상태
-  isDraggingMemo: boolean;
-  setIsDraggingMemo: React.Dispatch<React.SetStateAction<boolean>>;
-  draggingMemoId: string | null;
-  setDraggingMemoId: React.Dispatch<React.SetStateAction<string | null>>;
-  isDraggingCategory: boolean;
-  setIsDraggingCategory: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 // Context 생성

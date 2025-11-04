@@ -115,8 +115,15 @@ const FileBlockComponent: React.FC<FileBlockProps> = ({
       </div>
 
       {/* 파일 정보 */}
-      <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: '500', fontSize: '14px', color: '#212529' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontWeight: '500',
+          fontSize: '14px',
+          color: '#212529',
+          wordBreak: 'break-all',
+          overflowWrap: 'break-word',
+          whiteSpace: 'normal'
+        }}>
           {block.name || '파일'}
         </div>
         {block.size && (

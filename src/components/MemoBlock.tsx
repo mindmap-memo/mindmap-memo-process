@@ -75,36 +75,6 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   onBlockUpdate,
   onOpenEditor
 }) => {
-  // 더블탭 감지를 위한 상태
-  const lastTapTimeRef = React.useRef<number>(0);
-  const DOUBLE_TAP_DELAY = 300; // 300ms 이내 두 번 탭하면 더블탭으로 인식
-  // 드래그 관련 상태 및 핸들러 (커스텀 훅)
-  const {
-    isDragging,
-    isConnectionDragging,
-    dragMoved,
-    cursorPosition,
-    handleMouseDown,
-    handleTouchStart,
-    handleConnectionPointMouseDown,
-    handleConnectionPointMouseUp
-  } = useMemoBlockDrag({
-    memo,
-    isConnecting,
-    isDraggingAnyMemo,
-    isShiftPressed,
-    canvasScale,
-    canvasOffset,
-    currentPage,
-    onPositionChange,
-    onDetectCategoryOnDrop,
-    onStartConnection,
-    onConnectMemos,
-    onDragStart,
-    onDragEnd,
-    connectingFromId
-  });
-
   // 상태 관리 훅 사용
   const state = useMemoBlockState(memo);
   const {
@@ -131,6 +101,34 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
     memoRef
   } = state;
 
+  // 드래그 관련 상태 및 핸들러 (커스텀 훅) - memoRef를 전달
+  const {
+    isDragging,
+    isConnectionDragging,
+    dragMoved,
+    cursorPosition,
+    handleMouseDown,
+    handleConnectionPointMouseDown,
+    handleConnectionPointMouseUp
+  } = useMemoBlockDrag({
+    memo,
+    isConnecting,
+    isDraggingAnyMemo,
+    isShiftPressed,
+    canvasScale,
+    canvasOffset,
+    currentPage,
+    onClick,
+    onPositionChange,
+    onDetectCategoryOnDrop,
+    onStartConnection,
+    onConnectMemos,
+    onDragStart,
+    onDragEnd,
+    connectingFromId,
+    memoRef
+  });
+
   // 핸들러 훅 사용
   const handlers = useMemoBlockHandlers({
     memo,
@@ -152,7 +150,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
     setScrollTimeout,
     onTitleUpdate,
     onBlockUpdate,
-    onAddQuickNav
+    onAddQuickNav,
+    onOpenEditor
   });
 
   const {
@@ -164,7 +163,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
     handleAllBlocksDoubleClick,
     handleAllBlocksBlur,
     handleAllBlocksKeyDown,
-    handleScroll
+    handleScroll,
+    handleTouchEnd
   } = handlers;
 
   // 크기별 스타일 정의
@@ -344,29 +344,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
           styles.notSelected
         } ${isDragging ? styles.dragging : styles.notDragging}`}
         data-memo-block="true"
-        onClick={(e) => {
-          // 드래그로 이동했다면 클릭 이벤트를 무시
-          if (dragMoved) return;
-
-          // 더블탭 감지
-          const currentTime = new Date().getTime();
-          const tapTimeDiff = currentTime - lastTapTimeRef.current;
-
-          if (tapTimeDiff < DOUBLE_TAP_DELAY && tapTimeDiff > 0) {
-            // 더블탭: 에디터 열기
-            if (onOpenEditor) {
-              onOpenEditor();
-            }
-            lastTapTimeRef.current = 0; // 리셋
-          } else {
-            // 싱글탭: 메모 선택만
-            onClick(e.shiftKey);
-            lastTapTimeRef.current = currentTime;
-          }
-        }}
         onContextMenu={handleContextMenu}
         onMouseDown={handleMouseDown}
-        onTouchStart={handleTouchStart}
         onMouseUp={(e) => {
           // 연결 모드일 때 메모 블록 전체에서 연결 처리
           if (isConnecting && connectingFromId && connectingFromId !== memo.id) {
@@ -387,6 +366,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         <div className={styles.titleContainer}>
           <div
             onDoubleClick={handleTitleDoubleClick}
+            onTouchEnd={handleTouchEnd}
             className={`${styles.title} ${memo.title ? styles.withTitle : styles.withoutTitle} ${isSelected ? styles.editable : styles.notEditable}`}
           >
             {isDragging && isShiftPressed && (
@@ -436,6 +416,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         {sizeConfig.showContent && (
           <div
             onDoubleClick={handleAllBlocksDoubleClick}
+            onTouchEnd={handleTouchEnd}
             className={`${styles.contentContainer} ${isSelected ? styles.editable : styles.notEditable}`}
           >
             {isEditingAllBlocks ? (

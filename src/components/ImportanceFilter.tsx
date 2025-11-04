@@ -31,7 +31,7 @@ const IMPORTANCE_LABELS: Record<ImportanceLevel, string> = {
   reference: '🔵 참고',
   question: '🟡 질문',
   idea: '🟢 아이디어',
-  data: '⚫ 데이터',
+  data: '데이터',
   none: '없음'
 };
 
@@ -65,8 +65,15 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
       <div className={styles.mobileFilter}>
         <div className={styles.mobileHeader}>
           <span>중요도 필터</span>
+          <button
+            className={styles.mobileToggleButton}
+            onClick={() => setIsCollapsed(!isCollapsed)}
+          >
+            {isCollapsed ? '▼' : '▲'}
+          </button>
         </div>
 
+        {!isCollapsed && (
         <div className={styles.mobileContent}>
           {importanceLevels.map(level => {
             const isActive = activeFilters?.has(level) || false;
@@ -78,16 +85,16 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
                 key={level}
                 className={styles.mobileItem}
                 onClick={() => onToggleFilter(level)}
-                style={{
-                  backgroundColor: isActive ? bgColor : 'transparent',
-                  opacity: isActive ? 0.9 : 1,
-                }}
               >
-                <span style={{ color: isActive ? '#000' : '#374151' }}>{label}</span>
                 <div
                   className={styles.mobileColorSwatch}
-                  style={{ backgroundColor: bgColor }}
-                />
+                  style={{
+                    backgroundColor: bgColor,
+                    opacity: isActive ? 1 : 0.5
+                  }}
+                >
+                  <span className={styles.swatchLabel}>{label}</span>
+                </div>
               </div>
             );
           })}
@@ -96,18 +103,19 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
           <div
             className={styles.mobileItem}
             onClick={onToggleGeneralContent}
-            style={{
-              backgroundColor: showGeneralContent ? '#f3f4f6' : 'transparent',
-              opacity: showGeneralContent ? 0.9 : 1,
-            }}
           >
-            <span style={{ color: showGeneralContent ? '#000' : '#374151' }}>일반 내용</span>
             <div
               className={styles.mobileColorSwatch}
-              style={{ backgroundColor: '#f3f4f6' }}
-            />
+              style={{
+                backgroundColor: '#f3f4f6',
+                opacity: showGeneralContent ? 1 : 0.5
+              }}
+            >
+              <span className={styles.swatchLabel}>일반</span>
+            </div>
           </div>
         </div>
+        )}
       </div>
     );
   }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Page, CategoryBlock, MemoBlock as MemoBlockType } from '../../types';
+import { Page, CategoryBlock, MemoBlock as MemoBlockType, MemoDisplaySize } from '../../types';
 import { useConnectionPoints } from './hooks/useConnectionPoints';
 import { useCategoryAreaColors } from './hooks/useCategoryAreaColors';
 import { useCategoryAreaCalculation } from './hooks/useCategoryAreaCalculation';
@@ -95,7 +95,7 @@ interface UseCanvasRenderingParams {
   onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }) => void;
   onMemoPositionChange: (memoId: string, position: { x: number; y: number }) => void;
   onMemoSizeChange: (memoId: string, size: { width: number; height: number }) => void;
-  onMemoDisplaySizeChange?: (memoId: string, size: any) => void;
+  onMemoDisplaySizeChange?: (memoId: string, displaySize: MemoDisplaySize) => void;
   onMemoTitleUpdate?: (memoId: string, title: string) => void;
   onMemoBlockUpdate?: (memoId: string, blockId: string, content: string) => void;
   onDetectCategoryOnDrop: (memoId: string, position: { x: number; y: number }) => void;
