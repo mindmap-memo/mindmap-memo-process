@@ -113,11 +113,12 @@ export async function GET(request: NextRequest) {
     `;
 
     // 9. 사용자 활동 빈도별 분류 (제외된 이메일 제외)
-    const sevenDaysAgo = new Date();
+    // 지난 7일간 활동한 사용자들을 활동 일수로 분류 (신규 포함)
+    const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     const userRetention = await sql`
-      WITH user_activity AS (
+      WITH last_week_sessions AS (
         SELECT
           user_email,
           COUNT(DISTINCT DATE(session_start)) as active_days
@@ -127,7 +128,7 @@ export async function GET(request: NextRequest) {
           AND user_email != ${EXCLUDED_EMAILS[1]}
         GROUP BY user_email
       ),
-      new_users AS (
+      new_users_last_week AS (
         SELECT user_email
         FROM user_cohorts
         WHERE first_login >= ${sevenDaysAgo.toISOString()}
@@ -135,12 +136,12 @@ export async function GET(request: NextRequest) {
           AND user_email != ${EXCLUDED_EMAILS[1]}
       )
       SELECT
-        COUNT(DISTINCT CASE WHEN nu.user_email IS NOT NULL THEN ua.user_email END) as new_users,
-        COUNT(DISTINCT CASE WHEN nu.user_email IS NULL AND ua.active_days = 2 THEN ua.user_email END) as weekly_2days,
-        COUNT(DISTINCT CASE WHEN nu.user_email IS NULL AND ua.active_days = 3 THEN ua.user_email END) as weekly_3days,
-        COUNT(DISTINCT CASE WHEN nu.user_email IS NULL AND ua.active_days >= 4 THEN ua.user_email END) as weekly_4plus
-      FROM user_activity ua
-      LEFT JOIN new_users nu ON ua.user_email = nu.user_email
+        COUNT(DISTINCT CASE WHEN lw.active_days = 1 OR nu.user_email IS NOT NULL THEN lw.user_email END) as new_users,
+        COUNT(DISTINCT CASE WHEN lw.active_days = 2 THEN lw.user_email END) as weekly_2days,
+        COUNT(DISTINCT CASE WHEN lw.active_days = 3 THEN lw.user_email END) as weekly_3days,
+        COUNT(DISTINCT CASE WHEN lw.active_days >= 4 THEN lw.user_email END) as weekly_4plus
+      FROM last_week_sessions lw
+      LEFT JOIN new_users_last_week nu ON lw.user_email = nu.user_email
     `;
 
     // 10. 일별 사용자 활동 빈도별 분류
@@ -158,12 +159,12 @@ export async function GET(request: NextRequest) {
         SELECT
           ds.date,
           ds.user_email,
-          COUNT(DISTINCT DATE(s.session_start)) as active_days_last_week
+          COUNT(DISTINCT DATE(s.session_start)) as active_days_total
         FROM daily_sessions ds
         LEFT JOIN analytics_sessions s ON
           s.user_email = ds.user_email
           AND DATE(s.session_start) >= ds.date - INTERVAL '7 days'
-          AND DATE(s.session_start) < ds.date
+          AND DATE(s.session_start) <= ds.date
           AND s.user_email != ${EXCLUDED_EMAILS[0]}
           AND s.user_email != ${EXCLUDED_EMAILS[1]}
         GROUP BY ds.date, ds.user_email
@@ -179,10 +180,10 @@ export async function GET(request: NextRequest) {
       )
       SELECT
         ds.date,
-        COUNT(DISTINCT nu.user_email) as new_users,
-        COUNT(DISTINCT CASE WHEN nu.user_email IS NULL AND ua.active_days_last_week = 2 THEN ds.user_email END) as weekly_2days,
-        COUNT(DISTINCT CASE WHEN nu.user_email IS NULL AND ua.active_days_last_week = 3 THEN ds.user_email END) as weekly_3days,
-        COUNT(DISTINCT CASE WHEN nu.user_email IS NULL AND ua.active_days_last_week >= 4 THEN ds.user_email END) as weekly_4plus
+        COUNT(DISTINCT CASE WHEN ua.active_days_total = 1 OR nu.user_email IS NOT NULL THEN ds.user_email END) as new_users,
+        COUNT(DISTINCT CASE WHEN ua.active_days_total = 2 THEN ds.user_email END) as weekly_2days,
+        COUNT(DISTINCT CASE WHEN ua.active_days_total = 3 THEN ds.user_email END) as weekly_3days,
+        COUNT(DISTINCT CASE WHEN ua.active_days_total >= 4 THEN ds.user_email END) as weekly_4plus
       FROM daily_sessions ds
       LEFT JOIN user_activity ua ON ds.date = ua.date AND ds.user_email = ua.user_email
       LEFT JOIN new_users_by_date nu ON ds.date = nu.date AND ds.user_email = nu.user_email

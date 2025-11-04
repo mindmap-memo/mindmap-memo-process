@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { isEmailExcluded } from '@/features/analytics/utils/excludedEmails';
+import { detectDeviceType } from '@/features/analytics/utils/deviceDetection';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -24,10 +25,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'start') {
+      // User Agent에서 기기 타입 감지
+      const userAgent = request.headers.get('user-agent') || '';
+      const deviceType = detectDeviceType(userAgent);
+
       // 세션 시작
       await sql`
-        INSERT INTO analytics_sessions (id, user_email, session_start)
-        VALUES (${sessionId}, ${userEmail}, NOW())
+        INSERT INTO analytics_sessions (id, user_email, session_start, device_type)
+        VALUES (${sessionId}, ${userEmail}, NOW(), ${deviceType})
       `;
 
       // 사용자 코호트 정보 업데이트 (첫 로그인 시)
