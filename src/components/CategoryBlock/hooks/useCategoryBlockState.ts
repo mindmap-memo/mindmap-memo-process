@@ -16,12 +16,16 @@ export const useCategoryBlockState = (category: CategoryBlock) => {
   const [mouseDownPos, setMouseDownPos] = useState<{ x: number; y: number } | null>(null);
   const [dragMoved, setDragMoved] = useState(false);
 
+  // 롱프레스 상태
+  const [isLongPressActive, setIsLongPressActive] = useState(false);
+
   // Refs
   const lastUpdateTime = useRef<number>(0);
   const pendingPosition = useRef<{ x: number; y: number } | null>(null);
   const isDraggingRef = useRef<boolean>(false);
   const titleRef = useRef<HTMLInputElement>(null);
   const categoryRef = useRef<HTMLDivElement>(null);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   return {
     // 편집 상태
@@ -51,12 +55,15 @@ export const useCategoryBlockState = (category: CategoryBlock) => {
     setMouseDownPos,
     dragMoved,
     setDragMoved,
+    isLongPressActive,
+    setIsLongPressActive,
 
     // Refs
     lastUpdateTime,
     pendingPosition,
     isDraggingRef,
     titleRef,
-    categoryRef
+    categoryRef,
+    longPressTimerRef
   };
 };

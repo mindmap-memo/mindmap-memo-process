@@ -107,6 +107,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
     isConnectionDragging,
     dragMoved,
     cursorPosition,
+    isLongPressActive,
+    mouseDownPos,
     handleMouseDown,
     handleConnectionPointMouseDown,
     handleConnectionPointMouseUp
@@ -338,7 +340,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       <div
         ref={memoRef}
         className={`${styles.memoBlockContainer} ${
-          isDragging && isShiftPressed ? styles.shiftDragging :
+          isDragging && (isShiftPressed || isLongPressActive) ? styles.shiftDragging :
           isDragHovered ? styles.dragHovered :
           isSelected ? styles.selected :
           styles.notSelected
@@ -369,7 +371,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
             onTouchEnd={handleTouchEnd}
             className={`${styles.title} ${memo.title ? styles.withTitle : styles.withoutTitle} ${isSelected ? styles.editable : styles.notEditable}`}
           >
-            {isDragging && isShiftPressed && (
+            {isDragging && (isShiftPressed || isLongPressActive) && (
               <span className={styles.shiftDragIcon}>+</span>
             )}
             {!isEditingTitle ? (
@@ -672,10 +674,20 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} />
       </div>
 
-      {/* 드래그 중 힌트 UI - 메모 상단에 표시 */}
-      {isDragging && !isShiftPressed && (
-        <div className={styles.dragHint}>
-          SHIFT + 드래그로 메모나 카테고리를 다른 카테고리 영역에 종속, 제거하세요
+      {/* 클릭/터치 시작 시 힌트 UI - 메모 상단에 표시 */}
+      {mouseDownPos && (
+        <div
+          className={styles.dragHint}
+          style={
+            isShiftPressed || isLongPressActive
+              ? { backgroundColor: '#10b981', color: 'white' }
+              : undefined
+          }
+        >
+          {isShiftPressed || isLongPressActive
+            ? '메모를 카테고리에 추가/제거하려면 드롭하세요'
+            : '0.5초 이상 꾹 누르면 메모를 카테고리에 종속/제거할 수 있습니다'
+          }
         </div>
       )}
 

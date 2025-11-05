@@ -368,6 +368,52 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             onCategorySelect(category.id);
             setAreaContextMenu({ x: e.clientX, y: e.clientY, categoryId: category.id });
           }}
+          onTouchEnd={(e) => {
+            // 카테고리 영역에서도 더블탭 감지 (라벨과 동일한 로직)
+            const currentTime = Date.now();
+            const lastTapTime = (window as any)[`lastTapTime_area_${category.id}`] || 0;
+            const timeSinceLastTap = currentTime - lastTapTime;
+
+            console.log('[CategoryArea Area] touchEnd', {
+              categoryId: category.id,
+              timeSinceLastTap,
+              onOpenEditor: !!onOpenEditor
+            });
+
+            // 300ms 이내에 두 번째 탭이 발생하면 더블탭으로 인식
+            if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
+              console.log('[CategoryArea Area] 더블탭 감지!');
+              e.preventDefault(); // 기본 더블탭 줌 방지
+              e.stopPropagation();
+
+              // 타임아웃 취소
+              const timeoutId = (window as any)[`tapTimeout_area_${category.id}`];
+              if (timeoutId) {
+                clearTimeout(timeoutId);
+                delete (window as any)[`tapTimeout_area_${category.id}`];
+              }
+
+              // 모바일에서는 에디터 열기
+              if (onOpenEditor) {
+                onOpenEditor();
+              }
+
+              // 리셋
+              delete (window as any)[`lastTapTime_area_${category.id}`];
+            } else {
+              // 첫 번째 탭 기록
+              (window as any)[`lastTapTime_area_${category.id}`] = currentTime;
+
+              // 300ms 후 리셋
+              const timeoutId = (window as any)[`tapTimeout_area_${category.id}`];
+              if (timeoutId) {
+                clearTimeout(timeoutId);
+              }
+              (window as any)[`tapTimeout_area_${category.id}`] = setTimeout(() => {
+                delete (window as any)[`lastTapTime_area_${category.id}`];
+              }, 300);
+            }
+          }}
         >
           {isShiftDragTarget && (
             <div style={{
@@ -885,6 +931,57 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             document.addEventListener('touchmove', handleTouchMove, { passive: false });
             document.addEventListener('touchend', handleTouchEnd);
             document.addEventListener('touchcancel', handleTouchEnd);
+          }}
+          onTouchEnd={(e) => {
+            // MemoBlock과 동일한 더블탭 감지 로직 추가
+            // 드래그와 관계없이 터치 종료 시점에 더블탭 감지
+            const currentTime = Date.now();
+            const lastTapTime = (window as any)[`lastTapTime_${category.id}`] || 0;
+            const timeSinceLastTap = currentTime - lastTapTime;
+
+            console.log('[CategoryArea Label] touchEnd', {
+              categoryId: category.id,
+              timeSinceLastTap,
+              onOpenEditor: !!onOpenEditor
+            });
+
+            // 300ms 이내에 두 번째 탭이 발생하면 더블탭으로 인식
+            if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
+              console.log('[CategoryArea Label] 더블탭 감지!');
+              e.preventDefault(); // 기본 더블탭 줌 방지
+              e.stopPropagation();
+
+              // 타임아웃 취소
+              const timeoutId = (window as any)[`tapTimeout_${category.id}`];
+              if (timeoutId) {
+                clearTimeout(timeoutId);
+                delete (window as any)[`tapTimeout_${category.id}`];
+              }
+
+              // 모바일에서는 에디터 열기
+              if (onOpenEditor) {
+                onOpenEditor();
+              } else {
+                // 데스크톱에서는 편집 모드
+                setEditingCategoryId(category.id);
+                setEditingCategoryTitle(category.title);
+              }
+
+              // 리셋
+              delete (window as any)[`lastTapTime_${category.id}`];
+            } else {
+              // 첫 번째 탭 기록
+              (window as any)[`lastTapTime_${category.id}`] = currentTime;
+
+              // 300ms 후 리셋
+              const timeoutId = (window as any)[`tapTimeout_${category.id}`];
+              if (timeoutId) {
+                clearTimeout(timeoutId);
+              }
+              (window as any)[`tapTimeout_${category.id}`] = setTimeout(() => {
+                delete (window as any)[`lastTapTime_${category.id}`];
+              }, 300);
+            }
           }}
         >
           {isShiftDragging && (
