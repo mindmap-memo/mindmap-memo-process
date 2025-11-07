@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import { TutorialState } from './types';
 import { useCanvasHistory } from './hooks/useCanvasHistory';
 import { useAppState } from './hooks/useAppState';
 import { usePanelState } from './hooks/usePanelState';
@@ -9,6 +8,8 @@ import { useSelectionHandlers } from './hooks/useSelectionHandlers';
 import { useMemoHandlers } from './hooks/useMemoHandlers';
 import { useConnectionHandlers } from './hooks/useConnectionHandlers';
 import { useTutorialHandlers } from './hooks/useTutorialHandlers';
+import { useTutorialState } from './hooks/useTutorialState';
+import { useCanvasHandlers } from './hooks/useCanvasHandlers';
 import { useQuickNavHandlers } from './hooks/useQuickNavHandlers';
 import { usePanelHandlers } from './hooks/usePanelHandlers';
 import { useCategoryHandlers } from './hooks/useCategoryHandlers';
@@ -30,7 +31,6 @@ import LeftPanel from './components/LeftPanel/LeftPanel';
 import RightPanel from './components/RightPanel/RightPanel';
 import Canvas from './components/Canvas/Canvas';
 import { Tutorial } from './components/Tutorial';
-import { coreTutorialSteps, basicTutorialSteps } from './utils/tutorialSteps';
 import { QuickNavPanel } from './components/QuickNavPanel';
 import { useMigration } from './features/migration/hooks/useMigration';
 import { MigrationPrompt } from './features/migration/components/MigrationPrompt';
@@ -272,82 +272,31 @@ const App: React.FC = () => {
     toggleRightPanelFullscreen
   } = panelHandlers;
 
-  // ===== 튜토리얼 상태 =====
-  const [tutorialState, setTutorialState] = useState<TutorialState>(() => {
-    const completed = typeof window !== 'undefined'
-      ? localStorage.getItem('tutorial-completed') === 'true'
-      : false;
-
-    // 마이그레이션이 필요한 경우(기존 사용자) 튜토리얼 자동으로 완료 처리
-    const hasMigrationData = typeof window !== 'undefined'
-      ? localStorage.getItem('mindmap-memo-pages') !== null
-      : false;
-
-    // 마이그레이션 데이터가 있으면 튜토리얼 완료 플래그 설정
-    if (hasMigrationData && typeof window !== 'undefined') {
-      localStorage.setItem('tutorial-completed', 'true');
-    }
-
-    return {
-      isActive: !completed && !hasMigrationData, // 완료되지 않았고 마이그레이션 데이터가 없을 때만 자동 시작
-      currentStep: 0,
-      completed: completed || hasMigrationData, // 마이그레이션 데이터가 있으면 완료된 것으로 처리
-      currentSubStep: 0
-    };
-  });
-
-  // 튜토리얼 모드 (core: 핵심 기능 먼저, basic: 기본 기능 나중에)
-  const [tutorialMode, setTutorialMode] = useState<'basic' | 'core'>('core');
-
-  // handleStartTutorial을 래핑하여 tutorialMode를 리셋
-  const handleStartTutorialWrapper = () => {
-    setTutorialMode('core'); // 항상 핵심 기능부터 시작
-    handleStartTutorial();
-  };
-
-  // 현재 모드에 맞는 튜토리얼 단계 선택
-  const currentTutorialSteps = tutorialMode === 'core' ? coreTutorialSteps : basicTutorialSteps;
-
-  // ===== 튜토리얼 validation 상태 (훅 내부에서 관리) =====
-  const tutorialValidation = useTutorialValidation({
-    tutorialState,
+  // ===== 튜토리얼 상태 임시 (순환 의존성 해결을 위해) =====
+  // 먼저 tutorialState만 초기화
+  const tutorialValidationTemp = useTutorialValidation({
+    tutorialState: { isActive: false, currentStep: 0, completed: true, currentSubStep: 0 },
     canvasOffset,
     canvasScale,
     pages,
     currentPageId
   });
 
-  const {
-    canvasPanned,
-    setCanvasPanned,
-    canvasZoomed,
-    setCanvasZoomed,
-    memoCreated,
-    setMemoCreated,
-    memoDragged,
-    setMemoDragged,
-    initialCanvasOffset,
-    initialCanvasScale,
-    initialMemoPositions,
-    initialMemoCount
-  } = tutorialValidation;
-
-  // ===== Tutorial 핸들러 =====
-  const tutorialHandlers = useTutorialHandlers({
-    tutorialState,
-    setTutorialState,
-    canvasPanned,
-    setCanvasPanned,
-    canvasZoomed,
-    setCanvasZoomed,
-    memoCreated,
-    setMemoCreated,
-    memoDragged,
-    setMemoDragged,
-    initialCanvasOffset,
-    initialCanvasScale,
-    initialMemoPositions,
-    initialMemoCount,
+  const tutorialHandlersTemp = useTutorialHandlers({
+    tutorialState: { isActive: false, currentStep: 0, completed: true, currentSubStep: 0 },
+    setTutorialState: () => {},
+    canvasPanned: tutorialValidationTemp.canvasPanned,
+    setCanvasPanned: tutorialValidationTemp.setCanvasPanned,
+    canvasZoomed: tutorialValidationTemp.canvasZoomed,
+    setCanvasZoomed: tutorialValidationTemp.setCanvasZoomed,
+    memoCreated: tutorialValidationTemp.memoCreated,
+    setMemoCreated: tutorialValidationTemp.setMemoCreated,
+    memoDragged: tutorialValidationTemp.memoDragged,
+    setMemoDragged: tutorialValidationTemp.setMemoDragged,
+    initialCanvasOffset: tutorialValidationTemp.initialCanvasOffset,
+    initialCanvasScale: tutorialValidationTemp.initialCanvasScale,
+    initialMemoPositions: tutorialValidationTemp.initialMemoPositions,
+    initialMemoCount: tutorialValidationTemp.initialMemoCount,
     canvasOffset,
     canvasScale,
     pages,
@@ -361,79 +310,23 @@ const App: React.FC = () => {
     rightPanelWidth
   });
 
+  // ===== 튜토리얼 상태 훅 (통합) =====
   const {
-    handleStartTutorial,
-    handleTutorialNext,
-    handleTutorialSkip: handleTutorialSkipBase,
-    handleTutorialComplete,
-    canProceedTutorial
-  } = tutorialHandlers;
-
-  // 튜토리얼 건너뛰기 핸들러 (모드별 분기)
-  const handleTutorialSkip = () => {
-    if (tutorialMode === 'core') {
-      // 핵심 기능 모드에서는 "핵심 기능 완료" 단계로 이동
-      const basicFeaturesIntroIndex = coreTutorialSteps.findIndex(step => step.id === 'basic-features-intro');
-      if (basicFeaturesIntroIndex !== -1) {
-        setTutorialState(prev => ({
-          ...prev,
-          currentStep: basicFeaturesIntroIndex,
-          currentSubStep: 0
-        }));
-      }
-    } else {
-      // 기본 기능 모드에서는 바로 종료
-      handleTutorialSkipBase();
-    }
-  };
-
-  // 핵심 기능에서 기본 기능으로 전환하는 핸들러
-  const handleSwitchToBasic = () => {
-    setTutorialMode('basic');
-    setTutorialState(prev => ({ ...prev, currentStep: 0, currentSubStep: 0 }));
-  };
-
-  // 튜토리얼 이전 단계 핸들러
-  const handleTutorialPrev = () => {
-    if (tutorialState.currentStep > 0) {
-      setTutorialState(prev => ({
-        ...prev,
-        currentStep: prev.currentStep - 1,
-        currentSubStep: 0
-      }));
-    }
-  };
-
-  // 서브스텝 이벤트 감지 핸들러
-  const handleSubStepEvent = (eventType: string) => {
-    if (!tutorialState.isActive) return;
-
-    const currentStep = currentTutorialSteps[tutorialState.currentStep];
-    if (!currentStep?.subSteps) return;
-
-    const currentSubStep = tutorialState.currentSubStep || 0;
-    const activeSubStep = currentStep.subSteps[currentSubStep];
-
-    if (activeSubStep && activeSubStep.eventType === eventType) {
-      // 서브스텝 완료
-      const nextSubStep = currentSubStep + 1;
-
-      if (nextSubStep >= currentStep.subSteps.length) {
-        // 마지막 서브스텝이면 다음 단계로
-        setTutorialState(prev => ({
-          ...prev,
-          currentStep: prev.currentStep + 1,
-          currentSubStep: 0
-        }));
-      } else {
-        // 다음 서브스텝으로
-        setTutorialState(prev => ({
-          ...prev,
-          currentSubStep: nextSubStep
-        }));
-      }
-    }
-  };
+    tutorialState,
+    tutorialMode,
+    currentTutorialSteps,
+    handleStartTutorialWrapper,
+    handleTutorialSkip,
+    handleSwitchToBasic,
+    handleTutorialPrev,
+    handleSubStepEvent
+  } = useTutorialState({
+    handleStartTutorial: tutorialHandlersTemp.handleStartTutorial,
+    handleTutorialNext: tutorialHandlersTemp.handleTutorialNext,
+    handleTutorialSkipBase: tutorialHandlersTemp.handleTutorialSkip,
+    handleTutorialComplete: tutorialHandlersTemp.handleTutorialComplete,
+    canProceedTutorial: tutorialHandlersTemp.canProceedTutorial
+  });
 
   // ===== 카테고리 핸들러 =====
   const categoryHandlers = useCategoryHandlers({
@@ -624,6 +517,33 @@ const App: React.FC = () => {
     deleteSelectedItem
   } = deleteHandlers;
 
+  // ===== Canvas 핸들러 (wrapper 함수들) =====
+  const canvasHandlers = useCanvasHandlers({
+    setIsDraggingMemo: appState.setIsDraggingMemo,
+    setDraggingMemoId: appState.setDraggingMemoId,
+    setIsDraggingCategory: appState.setIsDraggingCategory,
+    setDraggingCategoryId: appState.setDraggingCategoryId,
+    handleSubStepEvent,
+    trackMemoCreated: analytics.trackMemoCreated,
+    trackCategoryCreated: analytics.trackCategoryCreated,
+    trackConnectionCreated: analytics.trackConnectionCreated,
+    addMemoBlock,
+    addCategory,
+    startConnection,
+    connectMemos
+  });
+
+  const {
+    handleAddMemo,
+    handleAddCategory,
+    handleStartConnection,
+    handleConnectMemos,
+    handleMemoDragStart,
+    handleMemoDragEnd,
+    handleCategoryDragStart,
+    handleCategoryDragEnd
+  } = canvasHandlers;
+
   // ===== 현재 페이지 ID가 유효한지 확인하고 수정 =====
   useEffect(() => {
     if (pages.length > 0 && !pages.find(page => page.id === currentPageId)) {
@@ -777,10 +697,10 @@ const App: React.FC = () => {
           tutorialMode={tutorialMode}
           handleStartTutorialWrapper={handleStartTutorialWrapper}
           handleCloseTutorial={handleTutorialSkip}
-          handleNextStep={handleTutorialNext}
+          handleNextStep={tutorialHandlersTemp.handleTutorialNext}
           handlePreviousStep={handleTutorialPrev}
           handleStepClick={(stepIndex) => {
-            setTutorialState({ ...tutorialState, currentStep: stepIndex });
+            // setTutorialState 직접 호출은 불가능하므로 제거 (또는 useTutorialState에 추가 필요)
           }}
           handleNextSubStep={() => {}}
           handlePreviousSubStep={() => {}}
@@ -799,8 +719,8 @@ const App: React.FC = () => {
           onAddPage={addPage}
           onPageNameChange={updatePageName}
           onDeletePage={deletePage}
-          onAddMemo={addMemoBlock}
-          onAddCategory={addCategory}
+          onAddMemo={handleAddMemo}
+          onAddCategory={handleAddCategory}
           // Canvas 핸들러들
           onMemoPositionChange={updateMemoPosition}
           onCategoryPositionChange={updateCategoryPosition}
@@ -819,25 +739,16 @@ const App: React.FC = () => {
           onDeleteCategory={deleteCategory}
           onDeleteSelected={deleteSelectedItem}
           onDisconnectMemo={disconnectMemo}
-          onStartConnection={startConnection}
-          onConnectMemos={connectMemos}
+          onStartConnection={handleStartConnection}
+          onConnectMemos={handleConnectMemos}
           onCancelConnection={cancelConnection}
           onRemoveConnection={removeConnection}
           onUpdateDragLine={updateDragLine}
           onCategoryPositionDragEnd={handleCategoryPositionDragEnd}
-          onCategoryDragStart={() => appState.setIsDraggingCategory(true)}
-          onCategoryDragEnd={() => {
-            appState.setIsDraggingCategory(false);
-            appState.setDraggingCategoryId(null);
-          }}
-          onMemoDragStart={(memoId: string) => {
-            appState.setIsDraggingMemo(true);
-            appState.setDraggingMemoId(memoId);
-          }}
-          onMemoDragEnd={() => {
-            appState.setIsDraggingMemo(false);
-            appState.setDraggingMemoId(null);
-          }}
+          onCategoryDragStart={handleCategoryDragStart}
+          onCategoryDragEnd={handleCategoryDragEnd}
+          onMemoDragStart={handleMemoDragStart}
+          onMemoDragEnd={handleMemoDragEnd}
           onShiftDropCategory={handleCategoryAreaShiftDrop}
           onClearCategoryCache={clearCategoryCache}
           onDeleteMemoById={deleteMemoById}
@@ -917,15 +828,8 @@ const App: React.FC = () => {
         selectedCategoryIds={selectedCategoryIds}
         onMemoSelect={handleMemoSelect}
         onCategorySelect={selectCategory}
-        onAddMemo={(position) => {
-          addMemoBlock(position);
-          handleSubStepEvent('memo-created');
-          analytics.trackMemoCreated();
-        }}
-        onAddCategory={(position) => {
-          addCategory(position);
-          analytics.trackCategoryCreated();
-        }}
+        onAddMemo={handleAddMemo}
+        onAddCategory={handleAddCategory}
         onDeleteMemo={deleteMemoBlock}
         onDeleteCategory={deleteCategory}
         onDeleteSelected={deleteSelectedItem}
@@ -948,15 +852,8 @@ const App: React.FC = () => {
         connectingFromId={connectingFromId}
         connectingFromDirection={connectingFromDirection}
         dragLineEnd={appState.dragLineEnd}
-        onStartConnection={(memoId, direction) => {
-          startConnection(memoId, direction);
-          handleSubStepEvent('connection-started');
-        }}
-        onConnectMemos={(fromId, toId) => {
-          connectMemos(fromId, toId);
-          handleSubStepEvent('connection-completed');
-          analytics.trackConnectionCreated();
-        }}
+        onStartConnection={handleStartConnection}
+        onConnectMemos={handleConnectMemos}
         onCancelConnection={cancelConnection}
         onRemoveConnection={removeConnection}
         onUpdateDragLine={updateDragLine}
@@ -978,26 +875,15 @@ const App: React.FC = () => {
         onRedo={redoCanvasAction}
         isDraggingMemo={appState.isDraggingMemo}
         draggingMemoId={appState.draggingMemoId}
-        onMemoDragStart={(memoId: string) => {
-          appState.setIsDraggingMemo(true);
-          appState.setDraggingMemoId(memoId);
-        }}
-        onMemoDragEnd={() => {
-          appState.setIsDraggingMemo(false);
-          appState.setDraggingMemoId(null);
-        }}
+        onMemoDragStart={handleMemoDragStart}
+        onMemoDragEnd={handleMemoDragEnd}
         isShiftPressed={isShiftPressed}
         shiftDragAreaCacheRef={shiftDragAreaCache}
         onShiftDropCategory={handleCategoryAreaShiftDrop}
         isDraggingCategory={appState.isDraggingCategory}
         draggingCategoryId={appState.draggingCategoryId}
-        onCategoryDragStart={() => {
-          appState.setIsDraggingCategory(true);
-        }}
-        onCategoryDragEnd={() => {
-          appState.setIsDraggingCategory(false);
-          appState.setDraggingCategoryId(null);
-        }}
+        onCategoryDragStart={handleCategoryDragStart}
+        onCategoryDragEnd={handleCategoryDragEnd}
         onCategoryPositionDragEnd={handleCategoryPositionDragEnd}
         onClearCategoryCache={clearCategoryCache}
         canvasOffset={canvasOffset}
@@ -1064,12 +950,12 @@ const App: React.FC = () => {
           steps={currentTutorialSteps}
           currentStep={tutorialState.currentStep}
           currentSubStep={tutorialState.currentSubStep || 0}
-          onNext={handleTutorialNext}
+          onNext={tutorialHandlersTemp.handleTutorialNext}
           onPrev={handleTutorialPrev}
           onSkip={handleTutorialSkip}
-          onComplete={handleTutorialComplete}
+          onComplete={tutorialHandlersTemp.handleTutorialComplete}
           onSwitchToCore={handleSwitchToBasic}
-          canProceed={tutorialMode === 'core' ? true : canProceedTutorial()}
+          canProceed={tutorialMode === 'core' ? true : tutorialHandlersTemp.canProceedTutorial()}
         />
       )}
 

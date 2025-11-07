@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { CategoryBlock, Page, MemoBlock, CanvasActionType } from '../types';
 import { calculateCategoryArea, centerCanvasOnPosition } from '../utils/categoryAreaUtils';
-import { resolveAreaCollisions } from '../utils/collisionUtils';
+import { resolveAreaCollisions } from '../utils/collision';
 import { createCategory as createCategoryApi, deleteCategory as deleteCategoryAPI, deleteQuickNavItem } from '../utils/api';
 import { removeInvalidConnectionsAfterHierarchyChange } from '../utils/categoryHierarchyUtils';
 

@@ -1,7 +1,7 @@
 import { useCallback, MutableRefObject } from 'react';
 import { Page, CategoryBlock } from '../types';
 import { calculateCategoryArea, clearCollisionDirections } from '../utils/categoryAreaUtils';
-import { resolveUnifiedCollisions } from '../utils/collisionUtils';
+import { resolveUnifiedCollisions } from '../utils/collision';
 
 interface UseCategoryPositionHandlersProps {
   pages: Page[];

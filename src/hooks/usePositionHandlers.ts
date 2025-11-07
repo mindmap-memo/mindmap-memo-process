@@ -1,7 +1,7 @@
 import { useCallback, MutableRefObject } from 'react';
 import { Page, CanvasActionType } from '../types';
 import { calculateCategoryArea, CategoryArea } from '../utils/categoryAreaUtils';
-import { resolveUnifiedCollisions, resolveAreaCollisions } from '../utils/collisionUtils';
+import { resolveUnifiedCollisions, resolveAreaCollisions } from '../utils/collision';
 import {
   getAllDescendantCategoryIds,
   getAllParentCategoryIds,

@@ -50,7 +50,8 @@
       "Bash(Remove-Item -Force nul -ErrorAction SilentlyContinue)",
       "Bash(del nul 2)",
       "Bash(psql:*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(collision/unified.ts.tmp)"
     ],
     "deny": [],
     "ask": []

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Page } from '../types';
 import { calculateCategoryArea } from '../utils/categoryAreaUtils';
-import { resolveAreaCollisions } from '../utils/collisionUtils';
+import { resolveAreaCollisions } from '../utils/collision';
 
 /**
  * useCategoryAreaCollision
