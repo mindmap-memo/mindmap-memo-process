@@ -17,12 +17,14 @@ interface UseCategoryDragHandlersProps {
   lastUpdateTime: React.MutableRefObject<number>;
   longPressTimerRef: React.MutableRefObject<NodeJS.Timeout | null>;
   isLongPressActive: boolean;
+  isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref 추가
   setMouseDownPos: (value: { x: number; y: number } | null) => void;
   setDragMoved: (value: boolean) => void;
   setDragStart: (value: { x: number; y: number }) => void;
   setIsDraggingPosition: (value: boolean) => void;
   setIsLongPressActive: (value: boolean) => void;
   setIsLongPressActiveGlobal?: (value: boolean) => void;  // 전역 롱프레스 상태 업데이트
+  setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수 추가
   onClick?: (categoryId: string, isShiftClick?: boolean) => void;
   onDragStart?: (e: React.DragEvent) => void;
   onDragEnd?: (e: React.DragEvent) => void;
@@ -46,12 +48,14 @@ export const useCategoryDragHandlers = ({
   lastUpdateTime,
   longPressTimerRef,
   isLongPressActive,
+  isShiftPressedRef,  // Shift ref 추가
   setMouseDownPos,
   setDragMoved,
   setDragStart,
   setIsDraggingPosition,
   setIsLongPressActive,
   setIsLongPressActiveGlobal,
+  setIsShiftPressed,  // Shift 상태 업데이트 함수
   onClick,
   onDragStart,
   onDragEnd,
@@ -78,6 +82,15 @@ export const useCategoryDragHandlers = ({
       setIsLongPressActive(true);
       // 전역 상태 업데이트
       setIsLongPressActiveGlobal?.(true);
+
+      // Shift 상태도 함께 업데이트 (충돌 판정 예외 처리를 위해 필수!)
+      // ⚠️ 중요: ref를 직접 업데이트하여 즉시 반영 (state는 비동기)
+      if (isShiftPressedRef) {
+        isShiftPressedRef.current = true;
+        console.log('[CategoryBlock] isShiftPressedRef.current = true 직접 설정');
+      }
+      setIsShiftPressed?.(true);
+      console.log('[CategoryBlock] setIsShiftPressed(true) 호출 완료');
 
       // 햅틱 피드백 (모바일)
       if (navigator.vibrate) {
@@ -272,10 +285,26 @@ export const useCategoryDragHandlers = ({
     // 모든 경우에 상태 초기화 (드래그 임계값 미달로 드래그가 시작되지 않은 경우 포함)
     setIsDraggingPosition(false);
     setMouseDownPos(null);
+
+    // Shift 상태도 함께 리셋 (롱프레스로 활성화된 경우)
+    // ⚠️ 중요: state가 아닌 현재 시점의 isLongPressActive 값을 체크
+    const wasLongPressActive = isLongPressActive;
+
     setIsLongPressActive(false); // 롱프레스 상태 리셋
     // 전역 상태 업데이트
     setIsLongPressActiveGlobal?.(false);
-  }, [onPositionDragEnd, category.id, dragStart, canvasOffset, canvasScale, isDraggingRef, pendingPosition, lastUpdateTime, setIsDraggingPosition, setMouseDownPos, dragMoved, onClick, isLongPressActive, setIsLongPressActive, setIsLongPressActiveGlobal]);
+
+    // 롱프레스가 활성화되어 있었다면 Shift도 리셋
+    if (wasLongPressActive) {
+      console.log('[CategoryBlock] 롱프레스 종료 - Shift 리셋');
+      // ref도 직접 리셋
+      if (isShiftPressedRef) {
+        isShiftPressedRef.current = false;
+        console.log('[CategoryBlock] isShiftPressedRef.current = false 직접 설정');
+      }
+      setIsShiftPressed?.(false);
+    }
+  }, [onPositionDragEnd, category.id, dragStart, canvasOffset, canvasScale, isDraggingRef, pendingPosition, lastUpdateTime, setIsDraggingPosition, setMouseDownPos, dragMoved, onClick, isLongPressActive, setIsLongPressActive, setIsLongPressActiveGlobal, setIsShiftPressed]);
 
   const handleMouseUp = React.useCallback((e: MouseEvent) => {
     finishDrag(e.clientX, e.clientY, e.shiftKey);

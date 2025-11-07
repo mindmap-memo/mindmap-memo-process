@@ -20,6 +20,7 @@ interface UseMemoBlockDragParams {
   isConnecting?: boolean;
   isDraggingAnyMemo?: boolean;
   isShiftPressed?: boolean;
+  isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref 추가
   canvasScale: number;
   canvasOffset: { x: number; y: number };
   currentPage?: Page;
@@ -33,6 +34,7 @@ interface UseMemoBlockDragParams {
   connectingFromId?: string | null;
   memoRef?: React.RefObject<HTMLDivElement | null>;
   setIsLongPressActive?: (active: boolean) => void;
+  setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수 추가
 }
 
 export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
@@ -41,6 +43,7 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     isConnecting,
     isDraggingAnyMemo,
     isShiftPressed,
+    isShiftPressedRef,  // Shift ref 추가
     canvasScale,
     canvasOffset,
     currentPage,
@@ -53,7 +56,8 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     onDragEnd,
     connectingFromId,
     memoRef,
-    setIsLongPressActive: externalSetIsLongPressActive
+    setIsLongPressActive: externalSetIsLongPressActive,
+    setIsShiftPressed  // Shift 상태 업데이트 함수
   } = params;
 
   // 드래그 상태
@@ -94,6 +98,18 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
       setIsLongPressActive(true);
       // 전역 상태 업데이트
       externalSetIsLongPressActive?.(true);
+
+      // Shift 상태도 함께 업데이트 (충돌 판정 예외 처리를 위해 필수!)
+      // ⚠️ 중요: ref를 직접 업데이트하여 즉시 반영 (state는 비동기)
+      console.log('[MemoBlock] isShiftPressedRef 값:', isShiftPressedRef);
+      if (isShiftPressedRef) {
+        isShiftPressedRef.current = true;
+        console.log('[MemoBlock] isShiftPressedRef.current = true 직접 설정');
+      } else {
+        console.error('[MemoBlock] ❌ isShiftPressedRef가 undefined입니다!');
+      }
+      setIsShiftPressed?.(true);
+      console.log('[MemoBlock] setIsShiftPressed(true) 호출 완료');
 
       // 햅틱 피드백 (모바일)
       if (navigator.vibrate) {
@@ -407,9 +423,25 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     // 모든 경우에 상태 초기화 (드래그 임계값 미달로 드래그가 시작되지 않은 경우 포함)
     setIsDragging(false);
     setMouseDownPos(null);
+
+    // Shift 상태도 함께 리셋 (롱프레스로 활성화된 경우)
+    // ⚠️ 중요: state가 아닌 현재 시점의 isLongPressActive 값을 체크
+    const wasLongPressActive = isLongPressActive;
+
     setIsLongPressActive(false); // 롱프레스 상태 리셋
     // 전역 상태 업데이트
     externalSetIsLongPressActive?.(false);
+
+    // 롱프레스가 활성화되어 있었다면 Shift도 리셋
+    if (wasLongPressActive) {
+      console.log('[MemoBlock] 롱프레스 종료 - Shift 리셋');
+      // ref도 직접 리셋
+      if (isShiftPressedRef) {
+        isShiftPressedRef.current = false;
+        console.log('[MemoBlock] isShiftPressedRef.current = false 직접 설정');
+      }
+      setIsShiftPressed?.(false);
+    }
     onDragEnd?.();
   };
 

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Page, QuickNavItem, ImportanceLevel } from '../types';
 import { DEFAULT_PAGES } from '../constants/defaultData';
 import { fetchPages, createPage, createMemo, createCategory } from '../utils/api';
@@ -269,12 +269,19 @@ export const useAppState = (isAuthenticated: boolean = false) => {
   const [dragLineEnd, setDragLineEnd] = useState<{ x: number; y: number } | null>(null);
 
   // ===== Shift 키 상태 =====
-  const [isShiftPressed, setIsShiftPressed] = useState<boolean>(false);
+  const [isShiftPressed, setIsShiftPressedState] = useState<boolean>(false);
   const isShiftPressedRef = useRef<boolean>(false);
 
-  // Shift 키 상태가 변경될 때마다 ref 업데이트
-  useEffect(() => {
-    isShiftPressedRef.current = isShiftPressed;
+  console.log('[useAppState] 렌더링 - isShiftPressedRef:', isShiftPressedRef);
+
+  // Shift 키 상태 업데이트 함수 (state와 ref를 동시에 업데이트)
+  const setIsShiftPressed = useCallback((value: React.SetStateAction<boolean>) => {
+    const newValue = typeof value === 'function' ? value(isShiftPressed) : value;
+    console.log(`[useAppState] setIsShiftPressed 호출됨: ${newValue}`);
+    console.log(`[useAppState] 업데이트 전 ref 값: ${isShiftPressedRef.current}`);
+    setIsShiftPressedState(newValue);
+    isShiftPressedRef.current = newValue; // 즉시 ref 업데이트
+    console.log(`[useAppState] 업데이트 후 ref 값: ${isShiftPressedRef.current}`);
   }, [isShiftPressed]);
 
   // ===== 드래그 상태 =====

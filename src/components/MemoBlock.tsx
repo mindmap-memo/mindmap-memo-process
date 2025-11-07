@@ -44,6 +44,8 @@ interface MemoBlockProps {
   onBlockUpdate?: (memoId: string, blockId: string, content: string) => void;
   onOpenEditor?: () => void;
   setIsLongPressActive?: (active: boolean) => void;
+  setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수 추가
+  isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref 추가
 }
 
 const MemoBlock: React.FC<MemoBlockProps> = ({
@@ -75,7 +77,9 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   onTitleUpdate,
   onBlockUpdate,
   onOpenEditor,
-  setIsLongPressActive
+  setIsLongPressActive,
+  setIsShiftPressed,  // Shift 상태 업데이트 함수
+  isShiftPressedRef  // Shift ref 추가
 }) => {
   // 상태 관리 훅 사용
   const state = useMemoBlockState(memo);
@@ -131,7 +135,9 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
     onDragEnd,
     connectingFromId,
     memoRef,
-    setIsLongPressActive
+    setIsLongPressActive,
+    setIsShiftPressed,  // Shift 상태 업데이트 함수 전달
+    isShiftPressedRef  // Shift ref 전달
   });
 
   // 핸들러 훅 사용

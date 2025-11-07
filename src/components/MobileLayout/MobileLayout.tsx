@@ -93,6 +93,9 @@ interface MobileLayoutProps {
   onDragSelectStart: (position: { x: number; y: number }) => void;
   onDragSelectMove: (position: { x: number; y: number }) => void;
   onDragSelectEnd: () => void;
+  setIsLongPressActive?: (active: boolean) => void;  // 롱프레스 상태 업데이트
+  setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수
+  isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref
 }
 
 /**
@@ -174,6 +177,9 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   onDragSelectStart,
   onDragSelectMove,
   onDragSelectEnd,
+  setIsLongPressActive,
+  setIsShiftPressed,
+  isShiftPressedRef,
 }) => {
   const { showEditor, setShowEditor, showPages, setShowPages } = useMobileLayout();
   const [showFabMenu, setShowFabMenu] = React.useState(false);
@@ -334,6 +340,9 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
               onAddQuickNav={onAddQuickNav}
               isQuickNavExists={isQuickNavExists}
               onOpenEditor={() => setShowEditor(true)}
+              setIsLongPressActive={setIsLongPressActive}
+              setIsShiftPressed={setIsShiftPressed}
+              isShiftPressedRef={isShiftPressedRef}
             />
         </div>
 

@@ -87,6 +87,8 @@ interface CanvasProps {
   fullscreen?: boolean;  // Mobile fullscreen mode
   onOpenEditor?: () => void;  // Mobile: Open editor on double-tap
   setIsLongPressActive?: (active: boolean) => void;  // 롱프레스 상태 업데이트
+  setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수
+  isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref 추가
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -164,8 +166,13 @@ const Canvas: React.FC<CanvasProps> = ({
   isQuickNavExists,
   fullscreen = false,
   onOpenEditor,
-  setIsLongPressActive
+  setIsLongPressActive,
+  setIsShiftPressed,  // Shift 상태 업데이트 함수
+  isShiftPressedRef  // Shift ref 추가
 }) => {
+  // 디버깅: isShiftPressedRef 확인
+  console.log('[Canvas] isShiftPressedRef 받음:', isShiftPressedRef);
+
   // ===== Canvas 로컬 상태 (useCanvasState 훅 사용) =====
   const canvasState = useCanvasState();
   const {
@@ -363,7 +370,9 @@ const Canvas: React.FC<CanvasProps> = ({
     canvasOffset,
     handleDropOnCategoryArea,
     handleCategoryAreaDragOver,
-    setIsLongPressActive
+    setIsLongPressActive,
+    setIsShiftPressed,
+    isShiftPressedRef
   });
 
   // ===== useCanvasEffects 훅 사용 =====
@@ -563,6 +572,8 @@ const Canvas: React.FC<CanvasProps> = ({
                 isQuickNavExists={isQuickNavExists}
                 onOpenEditor={onOpenEditor}
                 setIsLongPressActive={setIsLongPressActive}
+                setIsShiftPressed={setIsShiftPressed}
+                isShiftPressedRef={isShiftPressedRef}
               />
             );
           })}

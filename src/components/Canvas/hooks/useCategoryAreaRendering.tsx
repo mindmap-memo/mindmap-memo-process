@@ -129,6 +129,8 @@ interface UseCategoryAreaRenderingParams {
 
   // 롱프레스 상태
   setIsLongPressActive?: (active: boolean) => void;
+  setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수
+  isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref 추가
 }
 
 export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams) => {
@@ -182,6 +184,8 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
     onCategoryUpdate,
     onOpenEditor,
     setIsLongPressActive,
+    setIsShiftPressed,  // Shift 상태 업데이트 함수
+    isShiftPressedRef,  // Shift ref 추가
     setIsDraggingCategoryArea,
     setShiftDragInfo,
     setDraggedCategoryAreas,
@@ -864,6 +868,7 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             isQuickNavExists={isQuickNavExists}
             onOpenEditor={onOpenEditor}
             setIsLongPressActive={setIsLongPressActive}
+            setIsShiftPressed={setIsShiftPressed}
           />
         ))}
         {childCategories.map(childCategory => (

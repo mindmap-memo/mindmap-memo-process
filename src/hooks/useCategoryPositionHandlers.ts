@@ -17,10 +17,9 @@ interface UseCategoryPositionHandlersProps {
   clearCategoryCache: (categoryId: string) => void;
   // Shift 드래그 상태
   isShiftPressed: boolean;
+  isShiftPressedRef: MutableRefObject<boolean>;  // ref 추가
   isDraggingMemo: boolean;
   isDraggingCategory: boolean;
-  // 롱프레스 상태
-  isLongPressActive: boolean;
 }
 
 export const useCategoryPositionHandlers = ({
@@ -36,9 +35,9 @@ export const useCategoryPositionHandlers = ({
   cacheCreationStarted,
   clearCategoryCache,
   isShiftPressed,
+  isShiftPressedRef,  // ref 추가
   isDraggingMemo,
-  isDraggingCategory,
-  isLongPressActive
+  isDraggingCategory
 }: UseCategoryPositionHandlersProps) => {
 
   // 카테고리 라벨만 이동 (영역은 변경하지 않음)
@@ -65,7 +64,7 @@ export const useCategoryPositionHandlers = ({
       };
 
       // 충돌 판정 적용 (영역 크기 조절로 인한 충돌)
-      // 롱프레스 활성화 시 충돌 판정 스킵
+      // 롱프레스 활성화 시 충돌 판정 스킵 (ref 사용)
       const collisionResult = resolveUnifiedCollisions(
         categoryId,
         'area',
@@ -73,7 +72,7 @@ export const useCategoryPositionHandlers = ({
         10,
         undefined,
         undefined,
-        isLongPressActive
+        isShiftPressedRef.current  // ref 사용
       );
 
       return {
@@ -82,7 +81,7 @@ export const useCategoryPositionHandlers = ({
         memos: collisionResult.updatedMemos
       };
     }));
-  }, [setPages, currentPageId, isLongPressActive]);
+  }, [setPages, currentPageId, isShiftPressedRef]);
 
   // 카테고리 드래그 종료 시 드롭 감지 및 캐시 제거
   const handleCategoryPositionDragEnd = useCallback((
@@ -144,9 +143,9 @@ export const useCategoryPositionHandlers = ({
   // 카테고리 라벨 위치 자동 업데이트 (영역의 좌상단으로)
   // 메모가 이동할 때만 업데이트
   const updateCategoryPositions = useCallback(() => {
-    // ⚠️ Shift 드래그 또는 롱프레스 중에는 영역 계산 스킵 (영역이 freeze된 상태)
-    const isShiftDragging = isShiftPressed && (isDraggingMemo || isDraggingCategory);
-    if (isShiftDragging || isLongPressActive) return;
+    // ⚠️ Shift 드래그 중에는 영역 계산 스킵 (영역이 freeze된 상태)
+    const isShiftDragging = isShiftPressedRef.current && (isDraggingMemo || isDraggingCategory);
+    if (isShiftDragging) return;
 
     const currentPage = pages.find(p => p.id === currentPageId);
     if (!currentPage || !currentPage.categories) return;
@@ -191,7 +190,7 @@ export const useCategoryPositionHandlers = ({
         return page;
       }));
     }
-  }, [pages, currentPageId, setPages, isShiftPressed, isDraggingMemo, isDraggingCategory, isLongPressActive]);
+  }, [pages, currentPageId, setPages, isShiftPressedRef, isDraggingMemo, isDraggingCategory]);
 
   return {
     updateCategoryLabelPosition,

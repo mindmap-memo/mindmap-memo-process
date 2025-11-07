@@ -102,6 +102,9 @@ const App: React.FC = () => {
     isShiftPressedRef
   } = appState;
 
+  console.log('[App.tsx] 렌더링 - appState.isShiftPressedRef:', appState.isShiftPressedRef);
+  console.log('[App.tsx] 렌더링 - 구조분해된 isShiftPressedRef:', isShiftPressedRef);
+
   const panelState = usePanelState();
   const {
     leftPanelOpen,
@@ -454,9 +457,9 @@ const App: React.FC = () => {
     cacheCreationStarted,
     clearCategoryCache,
     isShiftPressed: appState.isShiftPressed,
+    isShiftPressedRef: appState.isShiftPressedRef,  // ref 추가
     isDraggingMemo: appState.isDraggingMemo,
-    isDraggingCategory: appState.isDraggingCategory,
-    isLongPressActive
+    isDraggingCategory: appState.isDraggingCategory
   });
 
   const {
@@ -486,8 +489,7 @@ const App: React.FC = () => {
     memoPositionTimers,
     clearCategoryCache,
     saveCanvasState,
-    updateCategoryPositions,
-    isLongPressActive
+    updateCategoryPositions
   });
 
   const {
@@ -587,7 +589,7 @@ const App: React.FC = () => {
     canvasScale,
     setCanvasScale,
     isShiftPressed,
-    setIsShiftPressed,
+    setIsShiftPressed: appState.setIsShiftPressed,
     isDraggingMemo: appState.isDraggingMemo,
     setIsDraggingMemo: appState.setIsDraggingMemo,
     draggingMemoId: appState.draggingMemoId,
@@ -765,6 +767,9 @@ const App: React.FC = () => {
           onDragSelectStart={handleDragSelectStart}
           onDragSelectMove={handleDragSelectMove}
           onDragSelectEnd={handleDragSelectEnd}
+          setIsLongPressActive={setIsLongPressActive}
+          setIsShiftPressed={setIsShiftPressed}
+          isShiftPressedRef={appState.isShiftPressedRef}
         />
       </AppProviders>
     );
@@ -894,6 +899,8 @@ const App: React.FC = () => {
         onAddQuickNav={addQuickNavItem}
         isQuickNavExists={isQuickNavExists}
         setIsLongPressActive={setIsLongPressActive}
+        setIsShiftPressed={setIsShiftPressed}
+        isShiftPressedRef={appState.isShiftPressedRef}
       />
 
       {/* 숨기기/보이기 버튼 (오른쪽) */}

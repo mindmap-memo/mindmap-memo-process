@@ -27,8 +27,6 @@ interface UsePositionHandlersProps {
   clearCategoryCache: (categoryId: string) => void;
   saveCanvasState: (actionType: CanvasActionType, description: string) => void;
   updateCategoryPositions: () => void;
-  // 롱프레스 상태
-  isLongPressActive: boolean;
 }
 
 export const usePositionHandlers = ({
@@ -48,8 +46,7 @@ export const usePositionHandlers = ({
   memoPositionTimers,
   clearCategoryCache,
   saveCanvasState,
-  updateCategoryPositions,
-  isLongPressActive
+  updateCategoryPositions
 }: UsePositionHandlersProps) => {
 
   // 카테고리 위치 업데이트
@@ -180,11 +177,11 @@ export const usePositionHandlers = ({
       }
 
       // 모든 하위 depth의 메모들도 함께 이동 (절대 위치 계산)
-      // 롱프레스 활성화 시 하위 요소를 이동시키지 않음
+      // Shift 드래그 시 하위 요소를 이동시키지 않음
       const updatedMemos = page.memos.map(memo => {
         // 1. 드래그 중인 카테고리의 하위 메모들 이동 (절대 위치)
-        // 롱프레스 모드면 하위 메모 이동 스킵
-        if (!isLongPressActive && memo.parentId && allDescendantCategoryIds.has(memo.parentId)) {
+        // Shift 모드면 하위 메모 이동 스킵
+        if (!isShiftPressedRef.current && memo.parentId && allDescendantCategoryIds.has(memo.parentId)) {
           const originalPos = dragStartMemoPositions.current.get(categoryId)?.get(memo.id);
           if (originalPos) {
             return {
@@ -207,8 +204,8 @@ export const usePositionHandlers = ({
         }
 
         // 2. 다중 선택된 다른 카테고리들의 하위 메모들도 이동 (절대 위치)
-        // 롱프레스 모드면 다중 선택 하위 메모 이동 스킵
-        if (!isLongPressActive && isMultiSelected && memo.parentId && allSelectedCategoriesDescendants.has(memo.parentId)) {
+        // Shift 모드면 다중 선택 하위 메모 이동 스킵
+        if (!isShiftPressedRef.current && isMultiSelected && memo.parentId && allSelectedCategoriesDescendants.has(memo.parentId)) {
           // 이미 위에서 처리했으면 스킵
           if (!allDescendantCategoryIds.has(memo.parentId)) {
             const originalPos = dragStartMemoPositions.current.get(categoryId)?.get(memo.id);
@@ -269,7 +266,7 @@ export const usePositionHandlers = ({
 
         // 1. 드래그 중인 카테고리의 하위 카테고리들 이동 (절대 위치)
         // 롱프레스 모드면 하위 카테고리 이동 스킵
-        if (!isLongPressActive && allDescendantCategoryIds.has(category.id) && category.id !== categoryId) {
+        if (!isShiftPressedRef.current && allDescendantCategoryIds.has(category.id) && category.id !== categoryId) {
           const originalPos = dragStartCategoryPositions.current.get(categoryId)?.get(category.id);
           if (originalPos) {
             return {
@@ -293,7 +290,7 @@ export const usePositionHandlers = ({
 
         // 2. 다중 선택된 다른 카테고리들의 하위 카테고리들도 이동 (절대 위치)
         // 롱프레스 모드면 다중 선택 하위 카테고리 이동 스킵
-        if (!isLongPressActive && isMultiSelected && allSelectedCategoriesDescendants.has(category.id)) {
+        if (!isShiftPressedRef.current && isMultiSelected && allSelectedCategoriesDescendants.has(category.id)) {
           // 이미 위에서 처리했으면 스킵
           if (!allDescendantCategoryIds.has(category.id)) {
             const originalPos = dragStartCategoryPositions.current.get(categoryId)?.get(category.id);
@@ -346,9 +343,9 @@ export const usePositionHandlers = ({
         return category;
       });
 
-      // 충돌 검사 수행 (Shift 누르거나 롱프레스 활성화 시 충돌 검사 건너뛰기)
+      // 충돌 검사 수행 (Shift 드래그 시 충돌 검사 건너뛰기)
       // Ref를 사용하여 드래그 중 Shift 상태 변경을 실시간으로 반영
-      if (!isShiftPressedRef.current && !isLongPressActive) {
+      if (!isShiftPressedRef.current) {
         const pageWithUpdates = {
           ...page,
           memos: updatedMemos,
@@ -362,7 +359,6 @@ export const usePositionHandlers = ({
           : [categoryId];
 
         // 프레임 delta 전달 (충돌 당한 객체가 같은 속도로 밀려나도록)
-        // 롱프레스 활성화 시 충돌 판정 스킵
         const collisionResult = resolveUnifiedCollisions(
           categoryId,
           'area',
@@ -370,7 +366,7 @@ export const usePositionHandlers = ({
           10,
           allMovingIds,
           { x: frameDeltaX, y: frameDeltaY },
-          isLongPressActive
+          isShiftPressedRef.current
         );
 
         // 영역 이동 시 메모와 충돌 처리 추가
@@ -496,7 +492,8 @@ export const usePositionHandlers = ({
         }
 
         // 카테고리가 다른 카테고리 내부에 있다면, 모든 상위 카테고리의 영역 변경을 재귀적으로 확인
-        if (pageTargetCategory.parentId) {
+        // Shift 드래그 중에는 스킵
+        if (pageTargetCategory.parentId && !isShiftPressedRef.current) {
           const allParentIds = getAllParentCategoryIds(pageTargetCategory.parentId, finalPage.categories || []);
 
           // 원본 페이지 상태 가져오기
@@ -531,7 +528,6 @@ export const usePositionHandlers = ({
                 if (!parentCategory) continue;
 
                 // 영역 드래그와 동일하게 통합 충돌 검사 사용
-                // 롱프레스 활성화 시 충돌 판정 스킵
                 const collisionResult = resolveUnifiedCollisions(
                   parentId,
                   'area',
@@ -539,7 +535,7 @@ export const usePositionHandlers = ({
                   10,
                   [parentId], // 이동 중인 영역으로 취급
                   { x: frameDeltaX, y: frameDeltaY }, // 하위 카테고리 이동 속도 전달
-                  isLongPressActive
+                  isShiftPressedRef.current
                 );
 
                 finalPage = {
@@ -580,7 +576,6 @@ export const usePositionHandlers = ({
     selectedMemoIds,
     selectedCategoryIds,
     isShiftPressed,
-    isLongPressActive,
     draggedCategoryAreas,
     previousFramePosition,
     cacheCreationStarted,
@@ -588,7 +583,8 @@ export const usePositionHandlers = ({
     dragStartCategoryPositions,
     setPages,
     categoryPositionTimers,
-    saveCanvasState
+    saveCanvasState,
+    isShiftPressedRef
   ]);
 
   // 메모 위치 업데이트
@@ -697,11 +693,11 @@ export const usePositionHandlers = ({
         })
       };
 
-      // Shift 드래그 또는 롱프레스 중에는 충돌 검사 안 함
+      // Shift 드래그 중에는 충돌 검사 안 함
       // Ref를 사용하여 드래그 중 Shift 상태 변경을 실시간으로 반영
-      console.log('[Memo Drag] Shift 상태:', isShiftPressedRef.current, '롱프레스:', isLongPressActive);
-      if (isShiftPressedRef.current || isLongPressActive) {
-        console.log('[Memo Drag] Shift/롱프레스 드래그 중 - 충돌 검사 스킵');
+      console.log('[Memo Drag] Shift 상태:', isShiftPressedRef.current);
+      if (isShiftPressedRef.current) {
+        console.log('[Memo Drag] Shift 드래그 중 - 충돌 검사 스킵');
         return prev.map(page =>
           page.id === currentPageId
             ? updatedPage
@@ -715,7 +711,6 @@ export const usePositionHandlers = ({
         ? [...selectedMemoIds, ...selectedCategoryIds]
         : [memoId];
 
-      // 롱프레스 활성화 시 충돌 판정 스킵
       const collisionResult = resolveUnifiedCollisions(
         memoId,
         'memo',
@@ -723,7 +718,7 @@ export const usePositionHandlers = ({
         10,
         allMovingIds,
         undefined,
-        isLongPressActive
+        isShiftPressedRef.current
       );
 
       let finalPage = {
@@ -733,9 +728,9 @@ export const usePositionHandlers = ({
       };
 
       // 메모가 카테고리 내부에 있다면, 모든 상위 카테고리의 영역 변경을 재귀적으로 확인
-      // 롱프레스 활성화 시 스킵
-      console.log('[Memo Drag] 메모 parentId:', movedMemo?.parentId, '롱프레스:', isLongPressActive);
-      if (movedMemo?.parentId && !isLongPressActive) {
+      // Shift 드래그 중에는 스킵
+      console.log('[Memo Drag] 메모 parentId:', movedMemo?.parentId, 'Shift:', isShiftPressedRef.current);
+      if (movedMemo?.parentId && !isShiftPressedRef.current) {
         const allParentIds = getAllParentCategoryIds(movedMemo.parentId, finalPage.categories || []);
         console.log('[Memo Drag] 모든 상위 카테고리 ID:', allParentIds);
 
@@ -783,7 +778,6 @@ export const usePositionHandlers = ({
             });
 
             // 영역 드래그와 동일하게 통합 충돌 검사 사용
-            // 롱프레스 활성화 시 충돌 판정 스킵
             const collisionResult = resolveUnifiedCollisions(
               parentId,
               'area',
@@ -791,7 +785,7 @@ export const usePositionHandlers = ({
               10,
               [parentId], // 이동 중인 영역으로 취급
               { x: deltaX, y: deltaY }, // 메모 이동 속도 전달
-              isLongPressActive
+              isShiftPressedRef.current
             );
 
             console.log('[Memo Drag] resolveUnifiedCollisions 호출 후:', {
@@ -826,8 +820,8 @@ export const usePositionHandlers = ({
     });
 
     // 메모 이동 후 부모 카테고리의 라벨 위치 업데이트
-    // 롱프레스 중에는 업데이트 스킵
-    if (movedMemo?.parentId && !isLongPressActive) {
+    // Shift 드래그 중에는 업데이트 스킵
+    if (movedMemo?.parentId && !isShiftPressedRef.current) {
       setTimeout(() => updateCategoryPositions(), 0);
     }
 
@@ -849,12 +843,12 @@ export const usePositionHandlers = ({
     selectedMemoIds,
     selectedCategoryIds,
     isShiftPressed,
-    isLongPressActive,
     clearCategoryCache,
     setPages,
     updateCategoryPositions,
     memoPositionTimers,
-    saveCanvasState
+    saveCanvasState,
+    isShiftPressedRef
   ]);
 
   return {

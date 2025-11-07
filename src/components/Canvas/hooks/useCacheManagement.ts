@@ -69,6 +69,31 @@ export const useCacheManagement = (params: UseCacheManagementParams) => {
         }
       });
 
+      // 상위 카테고리(조상)도 모두 캐시 제거 대상에 추가
+      const getAllAncestors = (categoryId: string): string[] => {
+        const ancestors: string[] = [];
+        let currentId: string | undefined = categoryId;
+
+        while (currentId) {
+          const category = currentPage.categories?.find(c => c.id === currentId);
+          if (category?.parentId && category.parentId !== isDraggingCategoryArea) {
+            ancestors.push(category.parentId);
+            currentId = category.parentId;
+          } else {
+            currentId = undefined;
+          }
+        }
+
+        return ancestors;
+      };
+
+      // 모든 영향받은 카테고리와 그들의 조상을 추가
+      const initialAffectedIds = Array.from(affectedCategoryIds);
+      initialAffectedIds.forEach(catId => {
+        const ancestors = getAllAncestors(catId);
+        ancestors.forEach(ancestorId => affectedCategoryIds.add(ancestorId));
+      });
+
       if (affectedCategoryIds.size > 0) {
         setDraggedCategoryAreas(prev => {
           const newAreas = { ...prev };
@@ -89,21 +114,58 @@ export const useCacheManagement = (params: UseCacheManagementParams) => {
         });
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    // 메모 위치만 감지 (카테고리 위치는 제외)
-    currentPage?.memos?.map(m => `${m.id}:${m.position.x}:${m.position.y}:${m.size?.width}:${m.size?.height}:${m.parentId}`).join('|'),
-    isDraggingCategoryArea,
-    onClearCategoryCache,
-    setDraggedCategoryAreas
+    // 메모 위치와 드래그 상태를 하나의 문자열로 결합 (배열 크기 고정)
+    `${currentPage?.memos?.map(m => `${m.id}:${m.position.x}:${m.position.y}:${m.size?.width}:${m.size?.height}:${m.parentId}`).join('|')}|dragging:${isDraggingCategoryArea || 'none'}`
+    // onClearCategoryCache, setDraggedCategoryAreas는 안정적인 참조이므로 의존성 배열에서 제외
   ]);
 
-  // 3. 카테고리 상태 변경 시 영역 업데이트 트리거만 실행 (캐시 제거 안 함)
+  // 3. 카테고리 상태 변경 시 캐시 제거 및 영역 업데이트
   useEffect(() => {
     if (currentPage) {
+      // 변경된 카테고리와 그 상위 카테고리들의 캐시 제거
+      const affectedCategoryIds = new Set<string>();
+
+      // 모든 카테고리를 순회하며 변경 감지
+      currentPage.categories?.forEach(category => {
+        if (category.id !== isDraggingCategoryArea) {
+          affectedCategoryIds.add(category.id);
+
+          // 상위 카테고리도 추가
+          let currentId: string | undefined = category.parentId;
+          while (currentId && currentId !== isDraggingCategoryArea) {
+            affectedCategoryIds.add(currentId);
+            const parentCat = currentPage.categories?.find(c => c.id === currentId);
+            currentId = parentCat?.parentId;
+          }
+        }
+      });
+
+      if (affectedCategoryIds.size > 0) {
+        setDraggedCategoryAreas(prev => {
+          const newAreas = { ...prev };
+          affectedCategoryIds.forEach(catId => {
+            if (catId !== isDraggingCategoryArea) {
+              delete newAreas[catId];
+            }
+          });
+          return newAreas;
+        });
+
+        affectedCategoryIds.forEach(catId => {
+          if (catId !== isDraggingCategoryArea) {
+            onClearCategoryCache?.(catId);
+          }
+        });
+      }
+
       setAreaUpdateTrigger(prev => prev + 1);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     currentPage?.categories?.map(c => `${c.id}:${c.size?.width}:${c.size?.height}:${c.isExpanded}`).join('|'),
-    setAreaUpdateTrigger
+    isDraggingCategoryArea
+    // onClearCategoryCache, setAreaUpdateTrigger, setDraggedCategoryAreas는 안정적인 참조이므로 의존성 배열에서 제외
   ]);
 };

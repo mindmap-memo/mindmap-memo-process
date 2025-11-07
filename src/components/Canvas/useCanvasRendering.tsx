@@ -131,6 +131,8 @@ interface UseCanvasRenderingParams {
 
   // 롱프레스 상태
   setIsLongPressActive?: (active: boolean) => void;
+  setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수
+  isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref 추가
 }
 
 export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
@@ -198,7 +200,9 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     canvasOffset,
     handleDropOnCategoryArea,
     handleCategoryAreaDragOver,
-    setIsLongPressActive
+    setIsLongPressActive,
+    setIsShiftPressed,  // Shift 상태 업데이트 함수
+    isShiftPressedRef  // Shift ref 추가
   } = params;
 
   // 연결점 계산 훅 사용
@@ -301,7 +305,9 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     handleDropOnCategoryArea,
     handleCategoryAreaDragOver,
     calculateArea,
-    setIsLongPressActive
+    setIsLongPressActive,
+    setIsShiftPressed,  // Shift 상태 업데이트 함수
+    isShiftPressedRef  // Shift ref 추가
   });
 
   return {

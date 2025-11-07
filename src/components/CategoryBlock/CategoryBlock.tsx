@@ -47,6 +47,8 @@ interface CategoryBlockProps {
   isShiftPressed?: boolean;
   onOpenEditor?: () => void;
   setIsLongPressActive?: (active: boolean) => void;  // 롱프레스 상태 업데이트
+  setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수 추가
+  isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref 추가
 }
 
 const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
@@ -83,7 +85,9 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   isCategoryBeingDragged = false,
   isShiftPressed = false,
   onOpenEditor,
-  setIsLongPressActive: externalSetIsLongPressActive
+  setIsLongPressActive: externalSetIsLongPressActive,
+  setIsShiftPressed,  // Shift 상태 업데이트 함수
+  isShiftPressedRef  // Shift ref 추가
 }) => {
   // 상태 관리
   const {
@@ -153,6 +157,8 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     setIsDraggingPosition,
     setIsLongPressActive,
     setIsLongPressActiveGlobal: externalSetIsLongPressActive,
+    setIsShiftPressed,  // Shift 상태 업데이트 함수 전달
+    isShiftPressedRef,  // Shift ref 전달
     onClick,
     onDragStart,
     onDragEnd,
