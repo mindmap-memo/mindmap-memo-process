@@ -60,8 +60,9 @@ export const useCategoryDrop = ({
   /**
    * 카테고리 드래그 완료 시 카테고리 블록 겹침 감지 (Shift 드래그)
    */
-  const detectCategoryDropForCategory = useCallback((categoryId: string, position: { x: number; y: number }) => {
-    const isShiftPressed = isShiftPressedRef.current;
+  const detectCategoryDropForCategory = useCallback((categoryId: string, position: { x: number; y: number }, isShiftMode?: boolean) => {
+    // isShiftMode 파라미터 우선, 없으면 ref 체크 (롱프레스 지원)
+    const isShiftPressed = isShiftMode !== undefined ? isShiftMode : isShiftPressedRef.current;
 
     console.log('[detectCategoryDropForCategory] 호출됨', {
       categoryId,
@@ -98,8 +99,9 @@ export const useCategoryDrop = ({
   /**
    * 드래그 완료 시 카테고리 블록 겹침 감지
    */
-  const detectCategoryOnDrop = useCallback((memoId: string, position: { x: number; y: number }) => {
-    const isShiftPressed = isShiftPressedRef.current;
+  const detectCategoryOnDrop = useCallback((memoId: string, position: { x: number; y: number }, isShiftMode?: boolean) => {
+    // isShiftMode 파라미터 우선, 없으면 ref 체크 (롱프레스 지원)
+    const isShiftPressed = isShiftMode !== undefined ? isShiftMode : isShiftPressedRef.current;
 
     // Shift 드래그로 이미 처리된 메모면 중복 처리 방지
     if (shiftDropProcessedMemos.current.has(memoId)) {

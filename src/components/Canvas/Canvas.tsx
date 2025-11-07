@@ -35,7 +35,7 @@ interface CanvasProps {
   onMoveToCategory: (itemId: string, categoryId: string | null) => void;
   onDetectCategoryOnDrop: (memoId: string, position: { x: number; y: number }) => void;
   onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }) => void;
-  onMemoDisplaySizeChange?: (memoId: string, size: MemoDisplaySize) => void;
+  onMemoDisplaySizeChange?: (memoId: string, displaySize: MemoDisplaySize) => void;
   onMemoTitleUpdate?: (memoId: string, title: string) => void;
   onMemoBlockUpdate?: (memoId: string, blockId: string, content: string) => void;
   isConnecting: boolean;
@@ -568,7 +568,8 @@ const Canvas: React.FC<CanvasProps> = ({
         </div>
       </div>
 
-      {/* Toolbar - fixed position */}
+      {/* Toolbar - fixed position (모바일에서는 숨김) */}
+      {!fullscreen && (
       <div className={styles.toolbar}>
         <button
           onClick={() => setCurrentTool('select')}
@@ -664,8 +665,10 @@ const Canvas: React.FC<CanvasProps> = ({
           삭제 {(selectedMemoIds.length > 0 || selectedCategoryIds.length > 0) && `(${selectedMemoIds.length + selectedCategoryIds.length})`}
         </button>
       </div>
+      )}
 
-      {/* Canvas Undo/Redo Controls */}
+      {/* Canvas Undo/Redo Controls (모바일에서는 숨김) */}
+      {!fullscreen && (
       <div className={styles['undo-redo-controls']}>
         <button
           data-tutorial="undo-btn"
@@ -685,6 +688,7 @@ const Canvas: React.FC<CanvasProps> = ({
           ↷ 다시실행
         </button>
       </div>
+      )}
 
       {/* 확대율 표시 (좌측 하단) */}
       <div style={{

@@ -33,7 +33,8 @@ interface CategoryBlockProps {
   onConnectItems?: (fromId: string, toId: string) => void;
   onRemoveConnection?: (fromId: string, toId: string) => void;
   onPositionChange?: (categoryId: string, position: { x: number; y: number }) => void;
-  onPositionDragEnd?: (categoryId: string, finalPosition: { x: number; y: number }) => void;
+  onPositionDragEnd?: (categoryId: string, finalPosition: { x: number; y: number }, isShiftMode?: boolean) => void;
+  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }, isShiftMode?: boolean) => void;
   onSizeChange?: (id: string, size: { width: number; height: number }) => void;
   onMoveToCategory?: (itemId: string, categoryId: string | null) => void;
   canvasScale?: number;
@@ -69,6 +70,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   onRemoveConnection,
   onPositionChange,
   onPositionDragEnd,
+  onDetectCategoryDropForCategory,
   onSizeChange,
   onMoveToCategory,
   canvasScale = 1,
@@ -107,22 +109,27 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     setMouseDownPos,
     dragMoved,
     setDragMoved,
+    isLongPressActive,
+    setIsLongPressActive,
     lastUpdateTime,
     pendingPosition,
     isDraggingRef,
     titleRef,
-    categoryRef
+    categoryRef,
+    longPressTimerRef
   } = useCategoryBlockState(category);
 
   // 제목 편집 핸들러
-  const { handleTitleClick, handleTitleSave, handleTitleKeyDown } = useCategoryTitleHandlers({
+  const { handleTitleClick, handleTitleDoubleClick, handleTitleSave, handleTitleKeyDown } = useCategoryTitleHandlers({
     category,
     isEditing,
     editTitle,
     setIsEditing,
     setEditTitle,
     titleRef,
-    onUpdate
+    onUpdate,
+    onOpenEditor,
+    isSelected
   });
 
   // 드래그 핸들러
@@ -139,15 +146,19 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     pendingPosition,
     lastUpdateTime,
     lastTapTimeRef,
+    longPressTimerRef,
+    isLongPressActive,
     setMouseDownPos,
     setDragMoved,
     setDragStart,
     setIsDraggingPosition,
+    setIsLongPressActive,
     onClick,
     onDragStart,
     onDragEnd,
     onPositionChange,
     onPositionDragEnd,
+    onDetectCategoryDropForCategory,
     onOpenEditor
   });
 
@@ -207,6 +218,50 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     onToggleExpanded(category.id);
   };
 
+  /**
+   * 네이티브 터치 이벤트 리스너 등록
+   * React 합성 이벤트보다 먼저 실행되어 롱프레스 타이머를 정확하게 시작
+   */
+  React.useEffect(() => {
+    if (!categoryRef?.current) return;
+
+    const handleNativeTouchStart = (e: TouchEvent) => {
+      console.log('[CategoryBlock Native TouchStart] 이벤트 발생!', { categoryId: category.id });
+
+      // 편집 모드거나 연결 모드면 무시
+      if (isEditing || isConnecting) {
+        console.log('[CategoryBlock Native TouchStart] 편집/연결 모드라 무시');
+        return;
+      }
+
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        console.log('[CategoryBlock Native TouchStart] 드래그 준비 및 롱프레스 타이머 시작');
+
+        // 롱프레스 타이머 시작
+        if (longPressTimerRef.current) {
+          clearTimeout(longPressTimerRef.current);
+        }
+
+        longPressTimerRef.current = setTimeout(() => {
+          console.log('[CategoryBlock Native TouchStart] 롱프레스 감지! Shift+드래그 모드 활성화');
+          setIsLongPressActive(true);
+
+          // 햅틱 피드백
+          if (navigator.vibrate) {
+            navigator.vibrate(50);
+          }
+        }, 500);
+      }
+    };
+
+    categoryRef.current.addEventListener('touchstart', handleNativeTouchStart, { passive: false });
+
+    return () => {
+      categoryRef.current?.removeEventListener('touchstart', handleNativeTouchStart);
+    };
+  }, [category.id, isEditing, isConnecting, longPressTimerRef, setIsLongPressActive, categoryRef]);
+
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     setContextMenu(null);
@@ -219,8 +274,8 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   const isHighlighted = isDragOver || (isMemoBeingDragged && isHovered) || (isCategoryBeingDragged && isHovered);
   const isTagMode = hasChildren && !isHighlighted;
 
-  // Shift+드래그 스타일 적용
-  const isShiftDragging = isDraggingPosition && isShiftPressed;
+  // Shift+드래그 또는 롱프레스 스타일 적용
+  const isShiftDragging = isDraggingPosition && (isShiftPressed || isLongPressActive);
 
   const categoryStyle: React.CSSProperties = {
     width: isTagMode ? 'auto' : '100%',
@@ -337,7 +392,6 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        onClick={handleClick}
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
         onContextMenu={handleContextMenu}
@@ -379,7 +433,8 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
           <div
             style={titleStyle}
             onClick={handleTitleClick}
-            title="클릭하여 편집"
+            onDoubleClick={handleTitleDoubleClick}
+            title="더블클릭하여 편집"
           >
             {isShiftDragging && (
               <span style={{ color: 'white', fontSize: '18px', fontWeight: 'bold', marginRight: '4px' }}>+</span>
@@ -556,13 +611,13 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
       )}
       </div>
 
-      {isDraggingPosition && !isShiftPressed && (
+      {mouseDownPos && (
         <div
           style={{
             position: 'absolute',
             left: (category.size?.width || 200) + 10,
             top: 0,
-            backgroundColor: '#374151',
+            backgroundColor: isShiftPressed || isLongPressActive ? '#10b981' : '#374151',
             color: 'white',
             padding: '8px 12px',
             borderRadius: '6px',
@@ -573,7 +628,10 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
             pointerEvents: 'none'
           }}
         >
-          SHIFT + 드래그로 메모나 카테고리를 다른 카테고리 영역에 종속, 제거하세요
+          {isShiftPressed || isLongPressActive
+            ? '카테고리를 다른 카테고리에 추가/제거하려면 드롭하세요'
+            : '0.5초 이상 꾹 누르면 카테고리를 다른 카테고리에 종속/제거할 수 있습니다'
+          }
         </div>
       )}
 

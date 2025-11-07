@@ -6,8 +6,10 @@ import { MobileHeader } from './MobileHeader';
 import { useMobileLayout } from './hooks/useMobileLayout';
 import Canvas from '../Canvas/Canvas';
 import RightPanel from '../RightPanel/RightPanel';
+import LeftPanel from '../LeftPanel/LeftPanel';
 import ImportanceFilter from '../ImportanceFilter';
 import { useAppStateContext, useSelection, useConnection, usePanel } from '../../contexts';
+import { MemoDisplaySize, CategoryBlock, MemoBlock } from '../../types';
 import styles from '../../scss/components/MobileLayout/MobileLayout.module.scss';
 
 interface MobileLayoutProps {
@@ -38,9 +40,59 @@ interface MobileLayoutProps {
   setShowQuickNavPanel: (show: boolean) => void;
   QuickNavPanelComponent: React.ComponentType<any>;
 
+  // 페이지 관련 핸들러
+  onAddPage: () => void;
+  onPageNameChange: (pageId: string, newName: string) => void;
+  onDeletePage: (pageId: string) => void;
+
   // 액션 핸들러
-  onAddMemo: (position: { x: number; y: number }) => void;
-  onAddCategory: (position: { x: number; y: number }) => void;
+  onAddMemo: (position?: { x: number; y: number }) => void;
+  onAddCategory: (position?: { x: number; y: number }) => void;
+
+  // Canvas 핸들러들
+  onMemoPositionChange: (memoId: string, position: { x: number; y: number }) => void;
+  onCategoryPositionChange: (categoryId: string, position: { x: number; y: number }) => void;
+  onCategoryLabelPositionChange: (categoryId: string, position: { x: number; y: number }) => void;
+  onMemoSizeChange: (memoId: string, size: { width: number; height: number }) => void;
+  onCategorySizeChange: (categoryId: string, size: { width: number; height: number }) => void;
+  onMemoDisplaySizeChange: (memoId: string, displaySize: MemoDisplaySize) => void;
+  onMemoTitleUpdate: (memoId: string, title: string) => void;
+  onMemoBlockUpdate: (memoId: string, blockId: string, content: string) => void;
+  onCategoryUpdate: (category: CategoryBlock) => void;
+  onCategoryToggleExpanded: (categoryId: string) => void;
+  onMoveToCategory: (itemId: string, categoryId: string | null) => void;
+  onDetectCategoryOnDrop: (memoId: string, position: { x: number; y: number }) => void;
+  onDetectCategoryDropForCategory: (categoryId: string, position: { x: number; y: number }) => void;
+  onDeleteMemo: (memoId: string) => void;
+  onDeleteCategory: (categoryId: string) => void;
+  onDeleteSelected: () => void;
+  onDisconnectMemo: (memoId: string) => void;
+  onStartConnection: (memoId: string, direction?: 'top' | 'bottom' | 'left' | 'right') => void;
+  onConnectMemos: (fromId: string, toId: string) => void;
+  onCancelConnection: () => void;
+  onRemoveConnection: (fromId: string, toId: string) => void;
+  onUpdateDragLine: (position: { x: number; y: number }) => void;
+  onCategoryPositionDragEnd: (categoryId: string, position: { x: number; y: number }) => void;
+  onCategoryDragStart: () => void;
+  onCategoryDragEnd: () => void;
+  onMemoDragStart: (memoId: string) => void;
+  onMemoDragEnd: () => void;
+  onShiftDropCategory: (category: CategoryBlock, position: { x: number; y: number }) => void;
+  onClearCategoryCache: (categoryId: string) => void;
+  onDeleteMemoById: (memoId: string) => void;
+  onAddQuickNav: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
+  isQuickNavExists: (targetId: string, targetType: 'memo' | 'category') => boolean;
+  onMemoUpdate: (memoId: string, updates: Partial<MemoBlock>) => void;
+  onFocusMemo: (memoId: string) => void;
+  onResetFilters: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+  shiftDragAreaCacheRef: any;
+  onDragSelectStart: (position: { x: number; y: number }) => void;
+  onDragSelectMove: (position: { x: number; y: number }) => void;
+  onDragSelectEnd: () => void;
 }
 
 /**
@@ -73,10 +125,57 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   showQuickNavPanel,
   setShowQuickNavPanel,
   QuickNavPanelComponent,
+  onAddPage,
+  onPageNameChange,
+  onDeletePage,
   onAddMemo,
   onAddCategory,
+  // Canvas 핸들러들
+  onMemoPositionChange,
+  onCategoryPositionChange,
+  onCategoryLabelPositionChange,
+  onMemoSizeChange,
+  onCategorySizeChange,
+  onMemoDisplaySizeChange,
+  onMemoTitleUpdate,
+  onMemoBlockUpdate,
+  onCategoryUpdate,
+  onCategoryToggleExpanded,
+  onMoveToCategory,
+  onDetectCategoryOnDrop,
+  onDetectCategoryDropForCategory,
+  onDeleteMemo,
+  onDeleteCategory,
+  onDeleteSelected,
+  onDisconnectMemo,
+  onStartConnection,
+  onConnectMemos,
+  onCancelConnection,
+  onRemoveConnection,
+  onUpdateDragLine,
+  onCategoryPositionDragEnd,
+  onCategoryDragStart,
+  onCategoryDragEnd,
+  onMemoDragStart,
+  onMemoDragEnd,
+  onShiftDropCategory,
+  onClearCategoryCache,
+  onDeleteMemoById,
+  onAddQuickNav,
+  isQuickNavExists,
+  onMemoUpdate,
+  onFocusMemo,
+  onResetFilters,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
+  shiftDragAreaCacheRef,
+  onDragSelectStart,
+  onDragSelectMove,
+  onDragSelectEnd,
 }) => {
-  const { showEditor, setShowEditor } = useMobileLayout();
+  const { showEditor, setShowEditor, showPages, setShowPages } = useMobileLayout();
   const [showFabMenu, setShowFabMenu] = React.useState(false);
 
   // Context에서 필요한 상태와 핸들러 가져오기
@@ -84,63 +183,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   const selection = useSelection();
   const connection = useConnection();
   const panel = usePanel();
-
-  // 임시: appState에 없는 핸들러들의 기본값
-  const noopHandler: any = () => {};
-  const safeAppState: any = {
-    ...appState,
-    onMemoPositionChange: noopHandler,
-    onCategoryPositionChange: noopHandler,
-    onCategoryLabelPositionChange: noopHandler,
-    onMemoSizeChange: noopHandler,
-    onCategorySizeChange: noopHandler,
-    onMemoDisplaySizeChange: noopHandler,
-    onMemoTitleUpdate: noopHandler,
-    onMemoBlockUpdate: noopHandler,
-    onCategoryUpdate: noopHandler,
-    onCategoryToggleExpanded: noopHandler,
-    onMoveToCategory: noopHandler,
-    onDetectCategoryOnDrop: noopHandler,
-    onDetectCategoryDropForCategory: noopHandler,
-    onDeleteMemo: noopHandler,
-    onDeleteCategory: noopHandler,
-    onDeleteSelected: noopHandler,
-    onMemoUpdate: noopHandler,
-    onFocusMemo: noopHandler,
-    onResetFilters: noopHandler,
-    onCategoryPositionDragEnd: noopHandler,
-    onCategoryDragStart: noopHandler,
-    onCategoryDragEnd: noopHandler,
-    onMemoDragStart: noopHandler,
-    onMemoDragEnd: noopHandler,
-    onShiftDropCategory: noopHandler,
-    onClearCategoryCache: noopHandler,
-    onDeleteMemoById: noopHandler,
-    onAddQuickNav: noopHandler,
-    isQuickNavExists: () => false,
-    onAddMemo,
-    onAddCategory,
-    isDragSelecting: false,
-    dragSelectStart: null,
-    dragSelectEnd: null,
-    dragHoveredMemoIds: [],
-    dragHoveredCategoryIds: [],
-    onDragSelectStart: noopHandler,
-    onDragSelectMove: noopHandler,
-    onDragSelectEnd: noopHandler,
-    activeImportanceFilters: [],
-    canUndo: false,
-    canRedo: false,
-    onUndo: noopHandler,
-    onRedo: noopHandler,
-    isDraggingMemo: false,
-    draggingMemoId: null,
-    shiftDragAreaCacheRef: { current: new Map() },
-    isDraggingCategory: false,
-    draggingCategoryId: null,
-    onDisconnectMemo: noopHandler,
-    dragLineEnd: null,
-  };
 
   // 현재 페이지 찾기
   const currentPage = appState.pages.find(p => p.id === appState.currentPageId);
@@ -172,12 +214,38 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         />
       )}
 
-      {/* 상단 헤더 - 페이지 이동 버튼 */}
-      <MobileHeader
-        currentPageId={appState.currentPageId}
-        pages={appState.pages}
-        onPageChange={appState.setCurrentPageId}
-      />
+      {/* 상단 헤더 - 뒤로가기, 검색, 실행취소/다시실행 */}
+      {!showPages && (
+        <MobileHeader
+          onBackToPages={() => setShowPages(true)}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onUndo={onUndo}
+          onRedo={onRedo}
+        />
+      )}
+
+      {/* 페이지 선택 뷰 */}
+      {showPages && (
+        <div className={styles.pagesOverlay}>
+          <div className={styles.pagesContainer}>
+            <LeftPanel
+              fullscreen={true}
+              pages={appState.pages}
+              currentPageId={appState.currentPageId}
+              onPageSelect={(pageId) => {
+                appState.setCurrentPageId(pageId);
+                setShowPages(false);
+              }}
+              onAddPage={onAddPage}
+              onPageNameChange={onPageNameChange}
+              onDeletePage={onDeletePage}
+              width={0}
+              onResize={() => {}}
+            />
+          </div>
+        </div>
+      )}
 
       {/* 뷰 컨테이너 */}
       <div className={styles.viewContainer}>
@@ -192,71 +260,79 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
               selectedCategoryIds={selection.selectedCategoryIds}
               onMemoSelect={selection.handleMemoSelect}
               onCategorySelect={selection.selectCategory}
-              onAddMemo={safeAppState.onAddMemo}
-              onAddCategory={safeAppState.onAddCategory}
-              onDeleteMemo={safeAppState.onDeleteMemo}
-              onDeleteCategory={safeAppState.onDeleteCategory}
-              onDeleteSelected={safeAppState.onDeleteSelected}
-              onDisconnectMemo={safeAppState.onDisconnectMemo}
-              onMemoPositionChange={safeAppState.onMemoPositionChange}
-              onCategoryPositionChange={safeAppState.onCategoryPositionChange}
-              onCategoryLabelPositionChange={safeAppState.onCategoryLabelPositionChange}
-              onMemoSizeChange={safeAppState.onMemoSizeChange}
-              onCategorySizeChange={safeAppState.onCategorySizeChange}
-              onMemoDisplaySizeChange={safeAppState.onMemoDisplaySizeChange}
-              onMemoTitleUpdate={safeAppState.onMemoTitleUpdate}
-              onMemoBlockUpdate={safeAppState.onMemoBlockUpdate}
-              onCategoryUpdate={safeAppState.onCategoryUpdate}
-              onCategoryToggleExpanded={safeAppState.onCategoryToggleExpanded}
-              onMoveToCategory={safeAppState.onMoveToCategory}
-              onDetectCategoryOnDrop={safeAppState.onDetectCategoryOnDrop}
-              onDetectCategoryDropForCategory={safeAppState.onDetectCategoryDropForCategory}
+              onAddMemo={onAddMemo}
+              onAddCategory={onAddCategory}
+              onDeleteMemo={() => {
+                if (selection.selectedMemoId) {
+                  onDeleteMemo(selection.selectedMemoId);
+                }
+              }}
+              onDeleteCategory={onDeleteCategory}
+              onDeleteSelected={onDeleteSelected}
+              onDisconnectMemo={() => {
+                if (selection.selectedMemoId) {
+                  onDisconnectMemo(selection.selectedMemoId);
+                }
+              }}
+              onMemoPositionChange={onMemoPositionChange}
+              onCategoryPositionChange={onCategoryPositionChange}
+              onCategoryLabelPositionChange={onCategoryLabelPositionChange}
+              onMemoSizeChange={onMemoSizeChange}
+              onCategorySizeChange={onCategorySizeChange}
+              onMemoDisplaySizeChange={onMemoDisplaySizeChange}
+              onMemoTitleUpdate={onMemoTitleUpdate}
+              onMemoBlockUpdate={onMemoBlockUpdate}
+              onCategoryUpdate={onCategoryUpdate}
+              onCategoryToggleExpanded={onCategoryToggleExpanded}
+              onMoveToCategory={onMoveToCategory}
+              onDetectCategoryOnDrop={onDetectCategoryOnDrop}
+              onDetectCategoryDropForCategory={onDetectCategoryDropForCategory}
               isConnecting={connection.isConnecting}
               isDisconnectMode={connection.isDisconnectMode}
               connectingFromId={connection.connectingFromId}
               connectingFromDirection={connection.connectingFromDirection}
-              dragLineEnd={safeAppState.dragLineEnd}
-              onStartConnection={(connection as any).onStartConnection || noopHandler}
-              onConnectMemos={(connection as any).onConnectMemos || noopHandler}
-              onCancelConnection={(connection as any).onCancelConnection || noopHandler}
-              onRemoveConnection={(connection as any).onRemoveConnection || noopHandler}
-              onUpdateDragLine={(connection as any).onUpdateDragLine || noopHandler}
-              isDragSelecting={safeAppState.isDragSelecting}
-              dragSelectStart={safeAppState.dragSelectStart}
-              dragSelectEnd={safeAppState.dragSelectEnd}
-              dragHoveredMemoIds={safeAppState.dragHoveredMemoIds}
-              dragHoveredCategoryIds={safeAppState.dragHoveredCategoryIds}
-              onDragSelectStart={safeAppState.onDragSelectStart}
-              onDragSelectMove={safeAppState.onDragSelectMove}
-              onDragSelectEnd={safeAppState.onDragSelectEnd}
+              dragLineEnd={connection.dragLineEnd}
+              onStartConnection={onStartConnection}
+              onConnectMemos={onConnectMemos}
+              onCancelConnection={onCancelConnection}
+              onRemoveConnection={onRemoveConnection}
+              onUpdateDragLine={onUpdateDragLine}
+              isDragSelecting={selection.isDragSelecting}
+              dragSelectStart={selection.dragSelectStart}
+              dragSelectEnd={selection.dragSelectEnd}
+              dragHoveredMemoIds={selection.dragHoveredMemoIds}
+              dragHoveredCategoryIds={selection.dragHoveredCategoryIds}
+              onDragSelectStart={onDragSelectStart}
+              onDragSelectMove={onDragSelectMove}
+              onDragSelectEnd={onDragSelectEnd}
               activeImportanceFilters={selection.activeImportanceFilters}
               onToggleImportanceFilter={selection.toggleImportanceFilter}
               showGeneralContent={selection.showGeneralContent}
               onToggleGeneralContent={selection.toggleGeneralContent}
-              canUndo={safeAppState.canUndo}
-              canRedo={safeAppState.canRedo}
-              onUndo={safeAppState.onUndo}
-              onRedo={safeAppState.onRedo}
-              isDraggingMemo={safeAppState.isDraggingMemo}
-              draggingMemoId={safeAppState.draggingMemoId}
-              onMemoDragStart={safeAppState.onMemoDragStart}
-              onMemoDragEnd={safeAppState.onMemoDragEnd}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onUndo={onUndo}
+              onRedo={onRedo}
+              isDraggingMemo={appState.isDraggingMemo}
+              draggingMemoId={appState.draggingMemoId}
+              onMemoDragStart={onMemoDragStart}
+              onMemoDragEnd={onMemoDragEnd}
               isShiftPressed={appState.isShiftPressed}
-              shiftDragAreaCacheRef={safeAppState.shiftDragAreaCacheRef}
-              onShiftDropCategory={safeAppState.onShiftDropCategory}
-              isDraggingCategory={safeAppState.isDraggingCategory}
-              draggingCategoryId={safeAppState.draggingCategoryId}
-              onCategoryDragStart={safeAppState.onCategoryDragStart}
-              onCategoryDragEnd={safeAppState.onCategoryDragEnd}
-              onCategoryPositionDragEnd={safeAppState.onCategoryPositionDragEnd}
-              onClearCategoryCache={safeAppState.onClearCategoryCache}
+              shiftDragAreaCacheRef={shiftDragAreaCacheRef}
+              onShiftDropCategory={onShiftDropCategory}
+              isDraggingCategory={appState.isDraggingCategory}
+              draggingCategoryId={appState.draggingCategoryId}
+              onCategoryDragStart={onCategoryDragStart}
+              onCategoryDragEnd={onCategoryDragEnd}
+              onCategoryPositionDragEnd={onCategoryPositionDragEnd}
+              onClearCategoryCache={onClearCategoryCache}
               canvasOffset={appState.canvasOffset}
               setCanvasOffset={appState.setCanvasOffset}
               canvasScale={appState.canvasScale}
               setCanvasScale={appState.setCanvasScale}
-              onDeleteMemoById={safeAppState.onDeleteMemoById}
-              onAddQuickNav={safeAppState.onAddQuickNav}
-              isQuickNavExists={safeAppState.isQuickNavExists}
+              onDeleteMemoById={onDeleteMemoById}
+              onAddQuickNav={onAddQuickNav}
+              isQuickNavExists={isQuickNavExists}
               onOpenEditor={() => setShowEditor(true)}
             />
         </div>
@@ -279,18 +355,18 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
                 selectedCategory={selectedCategory}
                 selectedCategories={selectedCategories}
                 currentPage={currentPage}
-                onMemoUpdate={safeAppState.onMemoUpdate}
-                onCategoryUpdate={safeAppState.onCategoryUpdate}
+                onMemoUpdate={onMemoUpdate}
+                onCategoryUpdate={onCategoryUpdate}
                 onMemoSelect={selection.handleMemoSelect}
                 onCategorySelect={selection.selectCategory}
-                onFocusMemo={safeAppState.onFocusMemo}
+                onFocusMemo={onFocusMemo}
                 width={panel.rightPanelWidth}
-                onResize={(panel as any).handleRightPanelResize || noopHandler}
+                onResize={(panel as any).handleRightPanelResize || (() => {})}
                 isFullscreen={true}
                 onToggleFullscreen={() => {}}
-                activeImportanceFilters={safeAppState.activeImportanceFilters}
-                showGeneralContent={(appState as any).showGeneralContent || true}
-                onResetFilters={safeAppState.onResetFilters}
+                activeImportanceFilters={selection.activeImportanceFilters}
+                showGeneralContent={selection.showGeneralContent}
+                onResetFilters={onResetFilters}
                 onClose={() => setShowEditor(false)}
               />
             </div>

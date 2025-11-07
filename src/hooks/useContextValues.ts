@@ -29,6 +29,14 @@ interface UseContextValuesProps {
   setCanvasScale: React.Dispatch<React.SetStateAction<number>>;
   isShiftPressed: boolean;
   setIsShiftPressed: React.Dispatch<React.SetStateAction<boolean>>;
+  isDraggingMemo: boolean;
+  setIsDraggingMemo: React.Dispatch<React.SetStateAction<boolean>>;
+  draggingMemoId: string | null;
+  setDraggingMemoId: React.Dispatch<React.SetStateAction<string | null>>;
+  isDraggingCategory: boolean;
+  setIsDraggingCategory: React.Dispatch<React.SetStateAction<boolean>>;
+  draggingCategoryId: string | null;
+  setDraggingCategoryId: React.Dispatch<React.SetStateAction<string | null>>;
 
   // Selection
   selectedMemoId: string | null;
@@ -63,12 +71,6 @@ interface UseContextValuesProps {
   setShowGeneralContent: React.Dispatch<React.SetStateAction<boolean>>;
   toggleImportanceFilter: (level: ImportanceLevel) => void;
   toggleGeneralContent: () => void;
-  isDraggingMemo: boolean;
-  setIsDraggingMemo: React.Dispatch<React.SetStateAction<boolean>>;
-  draggingMemoId: string | null;
-  setDraggingMemoId: React.Dispatch<React.SetStateAction<string | null>>;
-  isDraggingCategory: boolean;
-  setIsDraggingCategory: React.Dispatch<React.SetStateAction<boolean>>;
 
   // Panel
   leftPanelOpen: boolean;
@@ -113,12 +115,24 @@ export const useContextValues = (props: UseContextValuesProps) => {
     canvasScale: props.canvasScale,
     setCanvasScale: props.setCanvasScale,
     isShiftPressed: props.isShiftPressed,
-    setIsShiftPressed: props.setIsShiftPressed
+    setIsShiftPressed: props.setIsShiftPressed,
+    isDraggingMemo: props.isDraggingMemo,
+    setIsDraggingMemo: props.setIsDraggingMemo,
+    draggingMemoId: props.draggingMemoId,
+    setDraggingMemoId: props.setDraggingMemoId,
+    isDraggingCategory: props.isDraggingCategory,
+    setIsDraggingCategory: props.setIsDraggingCategory,
+    draggingCategoryId: props.draggingCategoryId,
+    setDraggingCategoryId: props.setDraggingCategoryId
   }), [
     props.pages, props.setPages, props.currentPageId, props.setCurrentPageId,
     props.currentPage, props.canvasOffset, props.setCanvasOffset,
     props.canvasScale, props.setCanvasScale,
-    props.isShiftPressed, props.setIsShiftPressed
+    props.isShiftPressed, props.setIsShiftPressed,
+    props.isDraggingMemo, props.setIsDraggingMemo,
+    props.draggingMemoId, props.setDraggingMemoId,
+    props.isDraggingCategory, props.setIsDraggingCategory,
+    props.draggingCategoryId, props.setDraggingCategoryId
   ]);
 
   // ===== Selection Context =====
@@ -154,13 +168,7 @@ export const useContextValues = (props: UseContextValuesProps) => {
     showGeneralContent: props.showGeneralContent,
     setShowGeneralContent: props.setShowGeneralContent,
     toggleImportanceFilter: props.toggleImportanceFilter,
-    toggleGeneralContent: props.toggleGeneralContent,
-    isDraggingMemo: props.isDraggingMemo,
-    setIsDraggingMemo: props.setIsDraggingMemo,
-    draggingMemoId: props.draggingMemoId,
-    setDraggingMemoId: props.setDraggingMemoId,
-    isDraggingCategory: props.isDraggingCategory,
-    setIsDraggingCategory: props.setIsDraggingCategory
+    toggleGeneralContent: props.toggleGeneralContent
   }), [
     props.selectedMemoId, props.setSelectedMemoId, props.selectedMemoIds, props.setSelectedMemoIds,
     props.selectedMemo, props.selectedMemos, props.selectedCategoryId, props.setSelectedCategoryId,
@@ -170,9 +178,7 @@ export const useContextValues = (props: UseContextValuesProps) => {
     props.dragHoveredCategoryIds, props.setDragHoveredCategoryIds, props.isDragSelectingWithShift,
     props.setIsDragSelectingWithShift, props.handleMemoSelect, props.selectCategory,
     props.activeImportanceFilters, props.setActiveImportanceFilters,
-    props.showGeneralContent, props.setShowGeneralContent, props.toggleImportanceFilter, props.toggleGeneralContent,
-    props.isDraggingMemo, props.setIsDraggingMemo, props.draggingMemoId, props.setDraggingMemoId,
-    props.isDraggingCategory, props.setIsDraggingCategory
+    props.showGeneralContent, props.setShowGeneralContent, props.toggleImportanceFilter, props.toggleGeneralContent
   ]);
 
   // ===== Panel Context =====

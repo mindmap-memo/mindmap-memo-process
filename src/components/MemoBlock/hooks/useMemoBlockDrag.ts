@@ -22,13 +22,15 @@ interface UseMemoBlockDragParams {
   canvasScale: number;
   canvasOffset: { x: number; y: number };
   currentPage?: Page;
+  onClick?: (isShiftClick?: boolean) => void;
   onPositionChange: (id: string, position: { x: number; y: number }) => void;
-  onDetectCategoryOnDrop?: (memoId: string, position: { x: number; y: number }) => void;
+  onDetectCategoryOnDrop?: (memoId: string, position: { x: number; y: number }, isShiftMode?: boolean) => void;
   onStartConnection?: (memoId: string) => void;
   onConnectMemos?: (fromId: string, toId: string) => void;
   onDragStart?: (memoId: string) => void;
   onDragEnd?: () => void;
   connectingFromId?: string | null;
+  memoRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
@@ -40,13 +42,15 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     canvasScale,
     canvasOffset,
     currentPage,
+    onClick,
     onPositionChange,
     onDetectCategoryOnDrop,
     onStartConnection,
     onConnectMemos,
     onDragStart,
     onDragEnd,
-    connectingFromId
+    connectingFromId,
+    memoRef
   } = params;
 
   // 드래그 상태
@@ -57,8 +61,13 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
   const [dragMoved, setDragMoved] = useState(false);
   const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
 
+  // 롱프레스 상태
+  const [isLongPressActive, setIsLongPressActive] = useState(false);
+  const longPressTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
   // 드래그 임계값 (픽셀 단위)
   const DRAG_THRESHOLD = 5;
+  const LONG_PRESS_DURATION = 500; // 0.5초
 
   // 빠른 드래그 최적화를 위한 상태
   const lastUpdateTime = React.useRef<number>(0);
@@ -67,6 +76,41 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
   // 이벤트 핸들러 ref (useEffect 의존성 문제 해결)
   const handleMouseMoveRef = React.useRef<((e: MouseEvent) => void) | null>(null);
   const handleMouseUpRef = React.useRef<((e: MouseEvent) => void) | null>(null);
+
+  /**
+   * 롱프레스 타이머 시작
+   */
+  const startLongPressTimer = () => {
+    console.log('[MemoBlock] 롱프레스 타이머 시작됨 - 1초 후 활성화 예정');
+
+    // 기존 타이머가 있으면 취소
+    if (longPressTimerRef.current) {
+      console.log('[MemoBlock] 기존 타이머 취소');
+      clearTimeout(longPressTimerRef.current);
+    }
+
+    // 1초 후 롱프레스 활성화
+    longPressTimerRef.current = setTimeout(() => {
+      console.log('[MemoBlock] 롱프레스 감지! Shift+드래그 모드 활성화');
+      setIsLongPressActive(true);
+
+      // 햅틱 피드백 (모바일)
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+    }, LONG_PRESS_DURATION);
+  };
+
+  /**
+   * 롱프레스 타이머 취소
+   */
+  const cancelLongPressTimer = () => {
+    if (longPressTimerRef.current) {
+      console.log('[MemoBlock] 롱프레스 타이머 취소됨');
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
 
   /**
    * 마우스 다운 핸들러 - 드래그 준비
@@ -94,7 +138,11 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
         x: e.clientX - (memo.position.x * canvasScale + canvasOffset.x),
         y: e.clientY - (memo.position.y * canvasScale + canvasOffset.y)
       });
-      e.preventDefault(); // HTML5 드래그 방지, 마우스 드래그 우선
+
+      // 롱프레스 타이머 시작
+      startLongPressTimer();
+
+      // preventDefault 제거: 더블클릭 이벤트가 발생하도록 허용
     }
   };
 
@@ -102,17 +150,22 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
    * 터치 시작 핸들러 - 모바일 드래그 준비
    */
   const handleTouchStart = (e: React.TouchEvent) => {
+    console.log('[MemoBlock TouchStart]', { memoId: memo.id, touches: e.touches.length });
+
     // 캔버스의 드래그 선택이 시작되지 않도록 이벤트 전파 중단
     e.stopPropagation();
 
     // 다른 메모가 이미 드래그 중이면 무시
     if (isDraggingAnyMemo && !isDragging) {
+      console.log('[MemoBlock TouchStart] 다른 메모가 드래그 중이라 무시');
       return;
     }
 
     // 연결 모드가 아닐 때만 드래그 준비
     if (!isConnecting && e.touches.length === 1) {
       const touch = e.touches[0];
+      console.log('[MemoBlock TouchStart] 드래그 준비 완료', { x: touch.clientX, y: touch.clientY });
+
       // 터치 다운 위치 저장 (임계값 판단용)
       setMouseDownPos({ x: touch.clientX, y: touch.clientY });
       setDragMoved(false);
@@ -120,6 +173,12 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
         x: touch.clientX - (memo.position.x * canvasScale + canvasOffset.x),
         y: touch.clientY - (memo.position.y * canvasScale + canvasOffset.y)
       });
+
+      // 롱프레스 타이머 시작
+      startLongPressTimer();
+      console.log('[MemoBlock TouchStart] 롱프레스 타이머 시작');
+
+      e.preventDefault(); // 기본 터치 동작 방지
     }
   };
 
@@ -164,8 +223,8 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
       y: (clientY - dragStart.y - canvasOffset.y) / canvasScale
     };
 
-    // 루트 메모이고 Shift 드래그가 아닐 때, 영역과 충돌하면 방향별 이동 차단
-    if (!memo.parentId && !isShiftPressed && currentPage) {
+    // 루트 메모이고 Shift 드래그가 아닐 때 (롱프레스 포함), 영역과 충돌하면 방향별 이동 차단
+    if (!memo.parentId && !isShiftPressed && !isLongPressActive && currentPage) {
       const deltaX = newPosition.x - memo.position.x;
       const deltaY = newPosition.y - memo.position.y;
 
@@ -237,8 +296,17 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     pendingPosition.current = newPosition;
 
     if (now - lastUpdateTime.current >= 50) {
+      console.log('[MemoBlock updatePosition] onPositionChange 호출', {
+        memoId: memo.id,
+        newPosition,
+        timeSinceLastUpdate: now - lastUpdateTime.current
+      });
       onPositionChange(memo.id, newPosition);
       lastUpdateTime.current = now;
+    } else {
+      console.log('[MemoBlock updatePosition] 쓰로틀링으로 스킵', {
+        timeSinceLastUpdate: now - lastUpdateTime.current
+      });
     }
   };
 
@@ -255,6 +323,8 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
 
       // 임계값을 넘으면 드래그 시작
       if (distance >= DRAG_THRESHOLD) {
+        // 드래그가 시작되면 롱프레스 타이머 취소
+        cancelLongPressTimer();
         setIsDragging(true);
         onDragStart?.(memo.id);
       }
@@ -279,6 +349,8 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
 
       // 임계값을 넘으면 드래그 시작
       if (distance >= DRAG_THRESHOLD) {
+        // 드래그가 시작되면 롱프레스 타이머 취소
+        cancelLongPressTimer();
         setIsDragging(true);
         onDragStart?.(memo.id);
       }
@@ -297,7 +369,13 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
   /**
    * 드래그 종료 공통 로직
    */
-  const finishDrag = (clientX: number, clientY: number) => {
+  const finishDrag = (clientX: number, clientY: number, shiftKey?: boolean) => {
+    // 롱프레스 타이머 취소
+    cancelLongPressTimer();
+
+    // 실제 Shift 키 또는 롱프레스로 인한 가상 Shift 모드
+    const effectiveShiftMode = shiftKey || isLongPressActive;
+
     if (isDragging) {
       // 드래그가 끝날 때 최종 위치 업데이트 (대기 중인 위치가 있으면 사용)
       const finalPosition = pendingPosition.current || {
@@ -306,24 +384,29 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
       };
 
       // Shift 모드가 아닐 때만 최종 위치 업데이트 (Shift 모드는 handleShiftDrop에서 처리)
-      if (!isShiftPressed) {
+      // 롱프레스도 Shift 모드와 동일하게 처리
+      if (!effectiveShiftMode) {
         onPositionChange(memo.id, finalPosition);
       }
 
-      // 카테고리 감지
+      // 카테고리 감지 (effectiveShiftMode 전달)
       if (dragMoved && onDetectCategoryOnDrop) {
-        onDetectCategoryOnDrop(memo.id, finalPosition);
+        onDetectCategoryOnDrop(memo.id, finalPosition, effectiveShiftMode);
       }
 
       // 상태 초기화
       pendingPosition.current = null;
       lastUpdateTime.current = 0;
       setCursorPosition(null); // 커서 위치 리셋
+    } else if (!dragMoved) {
+      // 드래그가 발생하지 않았을 때: 메모 선택
+      onClick?.(effectiveShiftMode);
     }
 
     // 모든 경우에 상태 초기화 (드래그 임계값 미달로 드래그가 시작되지 않은 경우 포함)
     setIsDragging(false);
     setMouseDownPos(null);
+    setIsLongPressActive(false); // 롱프레스 상태 리셋
     onDragEnd?.();
   };
 
@@ -331,7 +414,7 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
    * 마우스 업 핸들러 - 드래그 종료
    */
   const handleMouseUp = (e: MouseEvent) => {
-    finishDrag(e.clientX, e.clientY);
+    finishDrag(e.clientX, e.clientY, e.shiftKey);
   };
 
   /**
@@ -341,9 +424,9 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     // 터치가 끝날 때 마지막 터치 위치 사용
     if (e.changedTouches.length > 0) {
       const touch = e.changedTouches[0];
-      finishDrag(touch.clientX, touch.clientY);
+      finishDrag(touch.clientX, touch.clientY, false);
     } else {
-      finishDrag(0, 0); // 폴백
+      finishDrag(0, 0, false); // 폴백
     }
   };
 
@@ -356,6 +439,48 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
 
   handleTouchMoveRef.current = handleTouchMove;
   handleTouchEndRef.current = handleTouchEnd;
+
+  /**
+   * 네이티브 터치 시작 이벤트 리스너 등록 (passive: false)
+   */
+  React.useEffect(() => {
+    if (!memoRef?.current) return;
+
+    const nativeTouchStart = (e: TouchEvent) => {
+      console.log('[MemoBlock Native TouchStart] 이벤트 발생!', { memoId: memo.id });
+
+      // 다른 메모가 이미 드래그 중이면 무시
+      if (isDraggingAnyMemo && !isDragging) {
+        console.log('[MemoBlock Native TouchStart] 다른 메모가 드래그 중');
+        return;
+      }
+
+      // 연결 모드가 아닐 때만 드래그 준비
+      if (!isConnecting && e.touches.length === 1) {
+        const touch = e.touches[0];
+
+        console.log('[MemoBlock Native TouchStart] 드래그 준비 및 롱프레스 타이머 시작');
+        setMouseDownPos({ x: touch.clientX, y: touch.clientY });
+        setDragMoved(false);
+        setDragStart({
+          x: touch.clientX - (memo.position.x * canvasScale + canvasOffset.x),
+          y: touch.clientY - (memo.position.y * canvasScale + canvasOffset.y)
+        });
+
+        // 롱프레스 타이머 시작 - 여기가 핵심!
+        startLongPressTimer();
+
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    memoRef.current.addEventListener('touchstart', nativeTouchStart, { passive: false });
+
+    return () => {
+      memoRef.current?.removeEventListener('touchstart', nativeTouchStart);
+    };
+  }, [memo.id, memo.position, canvasScale, canvasOffset, isConnecting, isDraggingAnyMemo, isDragging, memoRef]);
 
   /**
    * 드래그 이벤트 리스너 등록 (마우스/터치 다운 또는 드래그 중일 때)
@@ -387,8 +512,9 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     isConnectionDragging,
     dragMoved,
     cursorPosition,
+    isLongPressActive, // 롱프레스 상태 반환
+    mouseDownPos, // 클릭/터치 시작 여부 확인용
     handleMouseDown,
-    handleTouchStart,
     handleConnectionPointMouseDown,
     handleConnectionPointMouseUp
   };

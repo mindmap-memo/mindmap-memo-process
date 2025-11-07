@@ -1,57 +1,66 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Undo, Redo, Search } from 'lucide-react';
 import styles from '../../scss/components/MobileLayout/MobileHeader.module.scss';
 
 interface MobileHeaderProps {
-  currentPageId: string;
-  pages: any[];
-  onPageChange: (pageId: string) => void;
+  onBackToPages: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
 }
 
 export const MobileHeader: React.FC<MobileHeaderProps> = ({
-  currentPageId,
-  pages,
-  onPageChange,
+  onBackToPages,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
 }) => {
-  const currentPageIndex = pages.findIndex(p => p.id === currentPageId);
-  const currentPage = pages[currentPageIndex];
-
-  const handlePrevPage = () => {
-    if (currentPageIndex > 0) {
-      onPageChange(pages[currentPageIndex - 1].id);
-    }
-  };
-
-  const handleNextPage = () => {
-    if (currentPageIndex < pages.length - 1) {
-      onPageChange(pages[currentPageIndex + 1].id);
-    }
-  };
+  const [searchQuery, setSearchQuery] = React.useState('');
 
   return (
     <div className={styles.mobileHeader}>
+      {/* 왼쪽: 뒤로가기 버튼 */}
       <button
-        className={styles.navButton}
-        onClick={handlePrevPage}
-        disabled={currentPageIndex === 0}
+        className={styles.backButton}
+        onClick={onBackToPages}
+        aria-label="페이지 선택으로 돌아가기"
       >
-        <ChevronLeft size={20} />
+        <ArrowLeft size={24} />
       </button>
 
-      <div className={styles.pageInfo}>
-        <span className={styles.pageName}>{currentPage?.name || 'Page'}</span>
-        <span className={styles.pageCount}>
-          {currentPageIndex + 1} / {pages.length}
-        </span>
+      {/* 중앙: 검색창 */}
+      <div className={styles.searchContainer}>
+        <Search size={16} className={styles.searchIcon} />
+        <input
+          type="text"
+          placeholder="검색..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className={styles.searchInput}
+        />
       </div>
 
-      <button
-        className={styles.navButton}
-        onClick={handleNextPage}
-        disabled={currentPageIndex === pages.length - 1}
-      >
-        <ChevronRight size={20} />
-      </button>
+      {/* 오른쪽: 실행 취소/다시 실행 */}
+      <div className={styles.undoRedoGroup}>
+        <button
+          className={`${styles.undoRedoButton} ${!canUndo ? styles.disabled : ''}`}
+          onClick={onUndo}
+          disabled={!canUndo}
+          aria-label="실행 취소"
+        >
+          <Undo size={20} />
+        </button>
+        <button
+          className={`${styles.undoRedoButton} ${!canRedo ? styles.disabled : ''}`}
+          onClick={onRedo}
+          disabled={!canRedo}
+          aria-label="다시 실행"
+        >
+          <Redo size={20} />
+        </button>
+      </div>
     </div>
   );
 };

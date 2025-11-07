@@ -101,7 +101,8 @@ const PanelHeader: React.FC<PanelHeaderProps> = ({
         )}
       </div>
 
-      {onToggleFullscreen && (
+      {/* 전체화면 버튼 - 모바일에서는 숨김 (onClose가 있으면 모바일) */}
+      {onToggleFullscreen && !onClose && (
         <button
           onClick={onToggleFullscreen}
           style={{

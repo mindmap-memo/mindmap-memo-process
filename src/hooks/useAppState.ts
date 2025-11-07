@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Page, QuickNavItem, ImportanceLevel } from '../types';
 import { DEFAULT_PAGES } from '../constants/defaultData';
-import { fetchPages } from '../utils/api';
+import { fetchPages, createPage, createMemo, createCategory } from '../utils/api';
 
 /**
  * useAppState
@@ -22,6 +22,7 @@ import { fetchPages } from '../utils/api';
  * - 데이터베이스에서 데이터 로드
  * - 실패 시 기본값 제공
  *
+ * @param isAuthenticated - 사용자 인증 여부
  * @returns 앱 상태 및 setter 함수들
  *
  * @example
@@ -33,10 +34,10 @@ import { fetchPages } from '../utils/api';
  *   setCurrentPageId,
  *   selectedMemoId,
  *   setSelectedMemoId
- * } = useAppState();
+ * } = useAppState(!!session);
  * ```
  */
-export const useAppState = () => {
+export const useAppState = (isAuthenticated: boolean = false) => {
   // ===== 페이지 & 데이터 상태 =====
   const [pages, setPages] = useState<Page[]>([]);
   const [currentPageId, setCurrentPageId] = useState<string>('1');
@@ -45,6 +46,15 @@ export const useAppState = () => {
 
   // 초기 데이터 로드
   useEffect(() => {
+    // 인증되지 않았으면 로딩 완료 처리
+    if (!isAuthenticated) {
+      setPages(DEFAULT_PAGES);
+      setCurrentPageId('1');
+      setIsInitialLoadDone(true);
+      setLoadingProgress(100);
+      return;
+    }
+
     const loadInitialData = async () => {
       try {
         setLoadingProgress(10);
@@ -56,13 +66,141 @@ export const useAppState = () => {
         setLoadingProgress(60);
 
         if (loadedPages.length > 0) {
-          setPages(loadedPages);
-          setCurrentPageId(loadedPages[0].id);
+          // 페이지가 있지만 메모/카테고리가 비어있는지 확인
+          const needsInitialData = loadedPages.every(
+            p => p.memos.length === 0 && p.categories.length === 0
+          );
+
+          if (needsInitialData) {
+            console.log('⚠️ 페이지는 있지만 데이터가 비어있습니다. 샘플 데이터를 추가합니다.');
+
+            // 각 페이지에 샘플 데이터 추가
+            const updatedPages: Page[] = [];
+            for (let i = 0; i < loadedPages.length; i++) {
+              const existingPage = loadedPages[i];
+              const defaultPage = DEFAULT_PAGES[i] || DEFAULT_PAGES[0]; // 기본값 사용
+
+              try {
+                // 메모 생성
+                const createdMemos = [];
+                for (const memo of defaultPage.memos) {
+                  try {
+                    console.log(`📝 메모 생성 시도: ${memo.title}`, {
+                      tags: memo.tags,
+                      connections: memo.connections,
+                      position: memo.position,
+                    });
+                    const createdMemo = await createMemo({
+                      ...memo,
+                      pageId: existingPage.id,
+                    });
+                    createdMemos.push(createdMemo);
+                  } catch (memoError) {
+                    console.error(`❌ 메모 생성 실패: ${memo.title}`, memoError);
+                  }
+                }
+                console.log(`✅ 메모 ${createdMemos.length}개 생성 완료`);
+
+                // 카테고리 생성
+                const createdCategories = [];
+                for (const category of defaultPage.categories) {
+                  try {
+                    const createdCategory = await createCategory({
+                      ...category,
+                      pageId: existingPage.id,
+                    });
+                    createdCategories.push(createdCategory);
+                  } catch (categoryError) {
+                    console.error(`❌ 카테고리 생성 실패: ${category.title}`, categoryError);
+                  }
+                }
+                console.log(`✅ 카테고리 ${createdCategories.length}개 생성 완료`);
+
+                updatedPages.push({
+                  ...existingPage,
+                  memos: createdMemos,
+                  categories: createdCategories,
+                });
+              } catch (error) {
+                console.error(`❌ 페이지 데이터 추가 실패: ${existingPage.name}`, error);
+                updatedPages.push(existingPage);
+              }
+            }
+
+            setPages(updatedPages);
+            setCurrentPageId(updatedPages[0].id);
+          } else {
+            // 이미 데이터가 있으면 그대로 사용
+            setPages(loadedPages);
+            setCurrentPageId(loadedPages[0].id);
+          }
         } else {
-          // 페이지가 없으면 기본 페이지 사용
-          console.log('데이터베이스에 페이지가 없습니다. 기본 페이지를 사용합니다.');
-          setPages(DEFAULT_PAGES);
-          setCurrentPageId('1');
+          // 첫 로그인: 기본 페이지를 DB에 생성
+          console.log('첫 로그인 감지. 기본 페이지를 데이터베이스에 생성합니다.');
+
+          // DEFAULT_PAGES를 DB에 생성
+          const createdPages: Page[] = [];
+          for (const page of DEFAULT_PAGES) {
+            try {
+              // 1. 페이지 생성
+              const newPage = await createPage(page.id, page.name);
+              console.log(`✅ 페이지 생성 완료: ${page.name}`);
+
+              // 2. 메모 생성
+              const createdMemos = [];
+              for (const memo of page.memos) {
+                try {
+                  console.log(`📝 메모 생성 시도: ${memo.title}`, {
+                    tags: memo.tags,
+                    connections: memo.connections,
+                    position: memo.position,
+                  });
+                  const createdMemo = await createMemo({
+                    ...memo,
+                    pageId: page.id,
+                  });
+                  createdMemos.push(createdMemo);
+                } catch (memoError) {
+                  console.error(`❌ 메모 생성 실패: ${memo.title}`, memoError);
+                }
+              }
+              console.log(`✅ 메모 ${createdMemos.length}개 생성 완료`);
+
+              // 3. 카테고리 생성
+              const createdCategories = [];
+              for (const category of page.categories) {
+                try {
+                  const createdCategory = await createCategory({
+                    ...category,
+                    pageId: page.id,
+                  });
+                  createdCategories.push(createdCategory);
+                } catch (categoryError) {
+                  console.error(`❌ 카테고리 생성 실패: ${category.title}`, categoryError);
+                }
+              }
+              console.log(`✅ 카테고리 ${createdCategories.length}개 생성 완료`);
+
+              // 생성된 페이지에 메모와 카테고리 추가
+              createdPages.push({
+                ...newPage,
+                memos: createdMemos,
+                categories: createdCategories,
+              });
+            } catch (pageError) {
+              console.error(`❌ 페이지 생성 실패: ${page.name}`, pageError);
+            }
+          }
+
+          if (createdPages.length > 0) {
+            setPages(createdPages);
+            setCurrentPageId(createdPages[0].id);
+          } else {
+            // 페이지 생성 실패 시 로컬 DEFAULT_PAGES 사용
+            console.warn('페이지 생성 실패. 로컬 페이지를 사용합니다.');
+            setPages(DEFAULT_PAGES);
+            setCurrentPageId('1');
+          }
         }
 
         setLoadingProgress(90);
@@ -86,7 +224,7 @@ export const useAppState = () => {
     };
 
     loadInitialData();
-  }, []);
+  }, [isAuthenticated]);
 
   // ===== 선택 상태 (메모) =====
   const [selectedMemoId, setSelectedMemoId] = useState<string | null>(null);

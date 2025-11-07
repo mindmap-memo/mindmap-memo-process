@@ -10,11 +10,14 @@ export type MobileView = 'pages' | 'canvas' | 'editor';
 export const useMobileLayout = () => {
   const [activeView, setActiveView] = useState<MobileView>('canvas');
   const [showEditor, setShowEditor] = useState(false);
+  const [showPages, setShowPages] = useState(false);
 
   return {
     activeView,
     setActiveView,
     showEditor,
     setShowEditor,
+    showPages,
+    setShowPages,
   };
 };
