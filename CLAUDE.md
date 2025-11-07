@@ -332,6 +332,89 @@ The application implements Shift+drag functionality for adding/removing memos an
      - 타입 정의도 함께 이동
      - 의존성 배열 확인
 
+10. **새 로직 추가 시 필수 규칙 (CRITICAL)**
+    - **절대 금지**: 기존 파일에 직접 로직을 작성하는 방식
+    - **필수 원칙**: 모든 새로운 로직은 커스텀 훅 또는 유틸 함수로 만들어서 import하는 형태로 추가
+    - **적용 범위**:
+      - 새로운 기능 추가
+      - 기존 기능 수정 및 확장
+      - 반응형 로직 추가 (모바일, 태블릿 대응)
+      - 이벤트 핸들러 추가
+      - 상태 관리 로직 추가
+    - **올바른 절차**:
+      1. 새로운 기능이 필요하면 먼저 커스텀 훅 또는 유틸 함수 파일을 생성
+      2. 해당 파일에서 로직을 완성
+      3. 필요한 컴포넌트나 훅에서 import하여 사용
+      4. 기존 파일에는 훅/함수 호출 코드만 추가
+    - **예시 (반응형 로직 추가)**:
+      ```typescript
+      // ❌ 잘못된 방법 - App.tsx에 직접 작성
+      const App = () => {
+        const [isMobile, setIsMobile] = useState(false);
+
+        useEffect(() => {
+          const checkMobile = () => {
+            setIsMobile(window.innerWidth <= 768);
+          };
+          window.addEventListener('resize', checkMobile);
+          checkMobile();
+          return () => window.removeEventListener('resize', checkMobile);
+        }, []);
+        // ... 나머지 코드
+      };
+
+      // ✅ 올바른 방법 - 커스텀 훅으로 분리
+      // src/hooks/useMediaQuery.ts
+      export const useMediaQuery = (query: string) => {
+        const [matches, setMatches] = useState(false);
+        useEffect(() => {
+          const media = window.matchMedia(query);
+          setMatches(media.matches);
+          const listener = () => setMatches(media.matches);
+          media.addEventListener('change', listener);
+          return () => media.removeEventListener('change', listener);
+        }, [query]);
+        return matches;
+      };
+
+      // App.tsx
+      const App = () => {
+        const isMobile = useMediaQuery('(max-width: 768px)');
+        // ... 나머지 코드
+      };
+      ```
+    - **예시 (유틸 함수)**:
+      ```typescript
+      // ❌ 잘못된 방법 - 컴포넌트 내부에 함수 정의
+      const Component = () => {
+        const getAllDescendantIds = (parentId: string): string[] => {
+          // ... 로직
+        };
+        const result = getAllDescendantIds(id);
+      };
+
+      // ✅ 올바른 방법 - 유틸 함수로 분리
+      // src/utils/categoryHierarchyUtils.ts
+      export const getAllDescendantCategoryIds = (
+        parentId: string,
+        categories: CategoryBlock[]
+      ): string[] => {
+        // ... 로직
+      };
+
+      // Component.tsx
+      import { getAllDescendantCategoryIds } from '../utils/categoryHierarchyUtils';
+      const Component = () => {
+        const result = getAllDescendantCategoryIds(id, categories);
+      };
+      ```
+    - **장점**:
+      - 코드 재사용성 극대화
+      - 테스트 용이성 향상
+      - 파일별 책임 명확화
+      - 유지보수 및 디버깅 용이
+      - 팀 협업 시 충돌 최소화
+
 ### Specific Implementation Guidelines
 
 - **File Management**: Always prefer editing existing files to creating new ones; never create files unless absolutely necessary

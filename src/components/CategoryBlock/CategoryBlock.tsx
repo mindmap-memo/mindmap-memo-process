@@ -2,6 +2,7 @@ import React from 'react';
 import { CategoryBlock } from '../../types';
 import ContextMenu from '../ContextMenu';
 import QuickNavModal from '../QuickNavModal';
+import { detectDoubleTap } from '../../utils/doubleTapUtils';
 import { useCategoryBlockState } from './hooks/useCategoryBlockState';
 import { useCategoryTitleHandlers } from './hooks/useCategoryTitleHandlers';
 import { useCategoryDragHandlers } from './hooks/useCategoryDragHandlers';
@@ -45,6 +46,7 @@ interface CategoryBlockProps {
   isCategoryBeingDragged?: boolean;
   isShiftPressed?: boolean;
   onOpenEditor?: () => void;
+  setIsLongPressActive?: (active: boolean) => void;  // 롱프레스 상태 업데이트
 }
 
 const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
@@ -80,11 +82,9 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   isDragTarget = false,
   isCategoryBeingDragged = false,
   isShiftPressed = false,
-  onOpenEditor
+  onOpenEditor,
+  setIsLongPressActive: externalSetIsLongPressActive
 }) => {
-  // 더블탭 감지를 위한 상태
-  const lastTapTimeRef = React.useRef<number>(0);
-  const DOUBLE_TAP_DELAY = 300; // 300ms 이내 두 번 탭하면 더블탭으로 인식
   // 상태 관리
   const {
     isEditing,
@@ -145,7 +145,6 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     canvasOffset,
     pendingPosition,
     lastUpdateTime,
-    lastTapTimeRef,
     longPressTimerRef,
     isLongPressActive,
     setMouseDownPos,
@@ -153,6 +152,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     setDragStart,
     setIsDraggingPosition,
     setIsLongPressActive,
+    setIsLongPressActiveGlobal: externalSetIsLongPressActive,
     onClick,
     onDragStart,
     onDragEnd,

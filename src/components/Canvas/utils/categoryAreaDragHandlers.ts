@@ -1,4 +1,5 @@
 import { CategoryBlock, Page } from '../../../types';
+import { DRAG_THRESHOLD } from '../../../utils/constants';
 
 /**
  * categoryAreaDragHandlers
@@ -78,7 +79,6 @@ export const createCategoryAreaDragHandler = (params: CreateCategoryAreaDragHand
       let hasMoved = false;
       let isDraggingArea = false; // 임계값 통과 전까지는 false
       let isShiftMode = isShiftPressed || false;
-      const DRAG_THRESHOLD = 5; // 드래그 임계값 (픽셀)
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         // 임계값 확인
@@ -312,7 +312,6 @@ export const createCategoryAreaTouchHandler = (params: CreateCategoryAreaDragHan
       let hasMoved = false;
       let isDraggingArea = false; // 임계값 통과 전까지는 false
       let isShiftMode = isShiftPressed || false;
-      const DRAG_THRESHOLD = 5; // 드래그 임계값 (픽셀)
 
       const handleTouchMove = (moveEvent: TouchEvent) => {
         if (moveEvent.touches.length !== 1) return;

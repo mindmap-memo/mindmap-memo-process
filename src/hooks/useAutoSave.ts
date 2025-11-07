@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Page } from '../types';
 import { updateMemo, updateCategory, updatePage } from '../utils/api';
+import { AUTO_SAVE_DEBOUNCE } from '../utils/constants';
 
 /**
  * useAutoSave
@@ -108,7 +109,7 @@ export const useAutoSave = (
 
       // 현재 상태를 이전 상태로 업데이트
       previousPagesRef.current = pages;
-    }, 300);
+    }, AUTO_SAVE_DEBOUNCE);
 
     return () => {
       if (saveTimeoutRef.current) {

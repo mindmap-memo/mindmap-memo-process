@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MemoBlock as MemoBlockType, Page } from '../../../types';
 import { calculateCategoryArea } from '../../../utils/categoryAreaUtils';
+import { DRAG_THRESHOLD, LONG_PRESS_DURATION } from '../../../utils/constants';
 
 /**
  * useMemoBlockDrag
@@ -31,6 +32,7 @@ interface UseMemoBlockDragParams {
   onDragEnd?: () => void;
   connectingFromId?: string | null;
   memoRef?: React.RefObject<HTMLDivElement | null>;
+  setIsLongPressActive?: (active: boolean) => void;
 }
 
 export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
@@ -50,7 +52,8 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     onDragStart,
     onDragEnd,
     connectingFromId,
-    memoRef
+    memoRef,
+    setIsLongPressActive: externalSetIsLongPressActive
   } = params;
 
   // 드래그 상태
@@ -64,10 +67,6 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
   // 롱프레스 상태
   const [isLongPressActive, setIsLongPressActive] = useState(false);
   const longPressTimerRef = React.useRef<NodeJS.Timeout | null>(null);
-
-  // 드래그 임계값 (픽셀 단위)
-  const DRAG_THRESHOLD = 5;
-  const LONG_PRESS_DURATION = 500; // 0.5초
 
   // 빠른 드래그 최적화를 위한 상태
   const lastUpdateTime = React.useRef<number>(0);
@@ -93,6 +92,8 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     longPressTimerRef.current = setTimeout(() => {
       console.log('[MemoBlock] 롱프레스 감지! Shift+드래그 모드 활성화');
       setIsLongPressActive(true);
+      // 전역 상태 업데이트
+      externalSetIsLongPressActive?.(true);
 
       // 햅틱 피드백 (모바일)
       if (navigator.vibrate) {
@@ -407,6 +408,8 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     setIsDragging(false);
     setMouseDownPos(null);
     setIsLongPressActive(false); // 롱프레스 상태 리셋
+    // 전역 상태 업데이트
+    externalSetIsLongPressActive?.(false);
     onDragEnd?.();
   };
 

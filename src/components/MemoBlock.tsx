@@ -43,6 +43,7 @@ interface MemoBlockProps {
   onTitleUpdate?: (id: string, title: string) => void;
   onBlockUpdate?: (memoId: string, blockId: string, content: string) => void;
   onOpenEditor?: () => void;
+  setIsLongPressActive?: (active: boolean) => void;
 }
 
 const MemoBlock: React.FC<MemoBlockProps> = ({
@@ -73,7 +74,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   isQuickNavExists,
   onTitleUpdate,
   onBlockUpdate,
-  onOpenEditor
+  onOpenEditor,
+  setIsLongPressActive
 }) => {
   // 상태 관리 훅 사용
   const state = useMemoBlockState(memo);
@@ -128,7 +130,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
     onDragStart,
     onDragEnd,
     connectingFromId,
-    memoRef
+    memoRef,
+    setIsLongPressActive
   });
 
   // 핸들러 훅 사용

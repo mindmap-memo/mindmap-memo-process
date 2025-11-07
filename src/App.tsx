@@ -127,6 +127,8 @@ const App: React.FC = () => {
     categoryPositionTimers,
     previousFramePosition,
     cacheCreationStarted,
+    isLongPressActive,
+    setIsLongPressActive,
     clearCategoryCache: clearCategoryCacheFromHook
   } = dragState;
 
@@ -560,7 +562,8 @@ const App: React.FC = () => {
     clearCategoryCache,
     isShiftPressed: appState.isShiftPressed,
     isDraggingMemo: appState.isDraggingMemo,
-    isDraggingCategory: appState.isDraggingCategory
+    isDraggingCategory: appState.isDraggingCategory,
+    isLongPressActive
   });
 
   const {
@@ -590,7 +593,8 @@ const App: React.FC = () => {
     memoPositionTimers,
     clearCategoryCache,
     saveCanvasState,
-    updateCategoryPositions
+    updateCategoryPositions,
+    isLongPressActive
   });
 
   const {
@@ -981,22 +985,6 @@ const App: React.FC = () => {
         onMemoDragEnd={() => {
           appState.setIsDraggingMemo(false);
           appState.setDraggingMemoId(null);
-          // 드래그 완료 시 충돌 검사 - 주석 처리 (무한 반복 문제)
-          // setTimeout(() => {
-          //   const currentPage = pages.find(p => p.id === currentPageId);
-          //   if (currentPage) {
-          //     // 모든 카테고리에 대해 충돌 검사 실행
-          //     currentPage.categories?.forEach(category => {
-          //       const categoryArea = calculateCategoryArea(category, currentPage);
-          //       if (categoryArea) {
-          //         // 카운터 리셋
-          //         collisionCheckCount.current.set(category.id, 0);
-          //         console.log('메모 드래그 완료 시 충돌 검사 시작:', category.id);
-          //         pushAwayConflictingBlocks(categoryArea, category.id, currentPage);
-          //       }
-          //     });
-          //   }
-          // }, 100);
         }}
         isShiftPressed={isShiftPressed}
         shiftDragAreaCacheRef={shiftDragAreaCache}
@@ -1009,22 +997,6 @@ const App: React.FC = () => {
         onCategoryDragEnd={() => {
           appState.setIsDraggingCategory(false);
           appState.setDraggingCategoryId(null);
-          // 드래그 완료 시 충돌 검사 - 일단 주석 처리 (영역 깜빡임 문제 해결)
-          // setTimeout(() => {
-          //   const currentPage = pages.find(p => p.id === currentPageId);
-          //   if (currentPage) {
-          //     // 모든 카테고리에 대해 충돌 검사 실행
-          //     currentPage.categories?.forEach(category => {
-          //       const categoryArea = calculateCategoryArea(category, currentPage);
-          //       if (categoryArea) {
-          //         // 카운터 리셋
-          //         collisionCheckCount.current.set(category.id, 0);
-          //         console.log('카테고리 드래그 완료 시 충돌 검사 시작:', category.id);
-          //         pushAwayConflictingBlocks(categoryArea, category.id, currentPage);
-          //       }
-          //     });
-          //   }
-          // }, 100);
         }}
         onCategoryPositionDragEnd={handleCategoryPositionDragEnd}
         onClearCategoryCache={clearCategoryCache}
@@ -1035,6 +1007,7 @@ const App: React.FC = () => {
         onDeleteMemoById={deleteMemoById}
         onAddQuickNav={addQuickNavItem}
         isQuickNavExists={isQuickNavExists}
+        setIsLongPressActive={setIsLongPressActive}
       />
 
       {/* 숨기기/보이기 버튼 (오른쪽) */}

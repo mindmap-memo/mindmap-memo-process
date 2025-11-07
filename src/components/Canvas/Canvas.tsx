@@ -86,6 +86,7 @@ interface CanvasProps {
   isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
   fullscreen?: boolean;  // Mobile fullscreen mode
   onOpenEditor?: () => void;  // Mobile: Open editor on double-tap
+  setIsLongPressActive?: (active: boolean) => void;  // 롱프레스 상태 업데이트
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -162,7 +163,8 @@ const Canvas: React.FC<CanvasProps> = ({
   onAddQuickNav,
   isQuickNavExists,
   fullscreen = false,
-  onOpenEditor
+  onOpenEditor,
+  setIsLongPressActive
 }) => {
   // ===== Canvas 로컬 상태 (useCanvasState 훅 사용) =====
   const canvasState = useCanvasState();
@@ -360,7 +362,8 @@ const Canvas: React.FC<CanvasProps> = ({
     setEditingCategoryTitle,
     canvasOffset,
     handleDropOnCategoryArea,
-    handleCategoryAreaDragOver
+    handleCategoryAreaDragOver,
+    setIsLongPressActive
   });
 
   // ===== useCanvasEffects 훅 사용 =====
@@ -559,6 +562,7 @@ const Canvas: React.FC<CanvasProps> = ({
                 onAddQuickNav={onAddQuickNav}
                 isQuickNavExists={isQuickNavExists}
                 onOpenEditor={onOpenEditor}
+                setIsLongPressActive={setIsLongPressActive}
               />
             );
           })}

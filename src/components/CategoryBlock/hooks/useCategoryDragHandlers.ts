@@ -1,5 +1,7 @@
 import React from 'react';
 import { CategoryBlock } from '../../../types';
+import { detectDoubleTap } from '../../../utils/doubleTapUtils';
+import { DRAG_THRESHOLD, LONG_PRESS_DURATION, POSITION_UPDATE_THROTTLE } from '../../../utils/constants';
 
 interface UseCategoryDragHandlersProps {
   category: CategoryBlock;
@@ -13,7 +15,6 @@ interface UseCategoryDragHandlersProps {
   canvasOffset: { x: number; y: number };
   pendingPosition: React.MutableRefObject<{ x: number; y: number } | null>;
   lastUpdateTime: React.MutableRefObject<number>;
-  lastTapTimeRef: React.MutableRefObject<number>;
   longPressTimerRef: React.MutableRefObject<NodeJS.Timeout | null>;
   isLongPressActive: boolean;
   setMouseDownPos: (value: { x: number; y: number } | null) => void;
@@ -21,6 +22,7 @@ interface UseCategoryDragHandlersProps {
   setDragStart: (value: { x: number; y: number }) => void;
   setIsDraggingPosition: (value: boolean) => void;
   setIsLongPressActive: (value: boolean) => void;
+  setIsLongPressActiveGlobal?: (value: boolean) => void;  // 전역 롱프레스 상태 업데이트
   onClick?: (categoryId: string, isShiftClick?: boolean) => void;
   onDragStart?: (e: React.DragEvent) => void;
   onDragEnd?: (e: React.DragEvent) => void;
@@ -29,10 +31,6 @@ interface UseCategoryDragHandlersProps {
   onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }, isShiftMode?: boolean) => void;
   onOpenEditor?: () => void;
 }
-
-const DRAG_THRESHOLD = 5;
-const DOUBLE_TAP_DELAY = 300;
-const LONG_PRESS_DURATION = 500; // 0.5초
 
 export const useCategoryDragHandlers = ({
   category,
@@ -46,7 +44,6 @@ export const useCategoryDragHandlers = ({
   canvasOffset,
   pendingPosition,
   lastUpdateTime,
-  lastTapTimeRef,
   longPressTimerRef,
   isLongPressActive,
   setMouseDownPos,
@@ -54,6 +51,7 @@ export const useCategoryDragHandlers = ({
   setDragStart,
   setIsDraggingPosition,
   setIsLongPressActive,
+  setIsLongPressActiveGlobal,
   onClick,
   onDragStart,
   onDragEnd,
@@ -62,7 +60,6 @@ export const useCategoryDragHandlers = ({
   onDetectCategoryDropForCategory,
   onOpenEditor
 }: UseCategoryDragHandlersProps) => {
-
   /**
    * 롱프레스 타이머 시작
    */
@@ -79,6 +76,8 @@ export const useCategoryDragHandlers = ({
     longPressTimerRef.current = setTimeout(() => {
       console.log('[CategoryBlock] 롱프레스 감지! Shift+드래그 모드 활성화');
       setIsLongPressActive(true);
+      // 전역 상태 업데이트
+      setIsLongPressActiveGlobal?.(true);
 
       // 햅틱 피드백 (모바일)
       if (navigator.vibrate) {
@@ -162,11 +161,11 @@ export const useCategoryDragHandlers = ({
         y: (clientY - dragStart.y - canvasOffset.y) / canvasScale
       };
 
-      // 빠른 드래그 시 업데이트 빈도 조절 (50ms마다만 업데이트)
+      // 빠른 드래그 시 업데이트 빈도 조절
       const now = Date.now();
       pendingPosition.current = newPosition;
 
-      if (now - lastUpdateTime.current >= 50) {
+      if (now - lastUpdateTime.current >= POSITION_UPDATE_THROTTLE) {
         onPositionChange(category.id, newPosition);
         lastUpdateTime.current = now;
       }
@@ -274,7 +273,9 @@ export const useCategoryDragHandlers = ({
     setIsDraggingPosition(false);
     setMouseDownPos(null);
     setIsLongPressActive(false); // 롱프레스 상태 리셋
-  }, [onPositionDragEnd, category.id, dragStart, canvasOffset, canvasScale, isDraggingRef, pendingPosition, lastUpdateTime, setIsDraggingPosition, setMouseDownPos, dragMoved, onClick, isLongPressActive, setIsLongPressActive]);
+    // 전역 상태 업데이트
+    setIsLongPressActiveGlobal?.(false);
+  }, [onPositionDragEnd, category.id, dragStart, canvasOffset, canvasScale, isDraggingRef, pendingPosition, lastUpdateTime, setIsDraggingPosition, setMouseDownPos, dragMoved, onClick, isLongPressActive, setIsLongPressActive, setIsLongPressActiveGlobal]);
 
   const handleMouseUp = React.useCallback((e: MouseEvent) => {
     finishDrag(e.clientX, e.clientY, e.shiftKey);
@@ -297,19 +298,16 @@ export const useCategoryDragHandlers = ({
     if (dragMoved || isEditing) return;
 
     // 더블탭 감지
-    const currentTime = new Date().getTime();
-    const tapTimeDiff = currentTime - lastTapTimeRef.current;
+    const isDoubleTap = detectDoubleTap(category.id);
 
-    if (tapTimeDiff < DOUBLE_TAP_DELAY && tapTimeDiff > 0) {
+    if (isDoubleTap) {
       // 더블탭: 에디터 열기
       if (onOpenEditor) {
         onOpenEditor();
       }
-      lastTapTimeRef.current = 0; // 리셋
     } else {
       // 싱글탭: 카테고리 선택만
       onClick?.(category.id, e.shiftKey);
-      lastTapTimeRef.current = currentTime;
     }
   };
 

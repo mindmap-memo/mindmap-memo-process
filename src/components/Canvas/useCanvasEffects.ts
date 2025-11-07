@@ -4,6 +4,7 @@ import { calculateCategoryArea } from '../../utils/categoryAreaUtils';
 import { useCacheManagement } from './hooks/useCacheManagement';
 import { useContextMenuEffect } from './hooks/useContextMenuEffect';
 import { useCanvasKeyboard } from './hooks/useCanvasKeyboard';
+import { POSITION_UPDATE_THROTTLE } from '../../utils/constants';
 
 interface UseCanvasEffectsProps {
   // Context menu
@@ -415,11 +416,10 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
       }
 
       let lastUpdateTime = 0;
-      const throttleDelay = 50; // 50ms마다 한 번만 업데이트
 
       const handleMouseMove = (e: MouseEvent) => {
         const now = Date.now();
-        if (now - lastUpdateTime < throttleDelay) {
+        if (now - lastUpdateTime < POSITION_UPDATE_THROTTLE) {
           return; // 너무 자주 업데이트하지 않음
         }
         lastUpdateTime = now;

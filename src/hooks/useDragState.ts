@@ -121,6 +121,13 @@ export const useDragState = (onCacheCleared?: () => void) => {
    */
   const cacheCreationStarted = useRef<Set<string>>(new Set());
 
+  // ===== 롱프레스 상태 =====
+  /**
+   * 롱프레스 활성화 상태 (메모 또는 카테고리)
+   * - 롱프레스 중일 때 충돌 판정 및 하위 요소 이동 비활성화
+   */
+  const [isLongPressActive, setIsLongPressActive] = useState(false);
+
   // ===== 캐시 제거 함수 =====
   /**
    * 특정 카테고리의 모든 캐시를 제거합니다.
@@ -195,6 +202,10 @@ export const useDragState = (onCacheCleared?: () => void) => {
     categoryPositionTimers,
     previousFramePosition,
     cacheCreationStarted,
+
+    // 롱프레스 상태
+    isLongPressActive,
+    setIsLongPressActive,
 
     // 유틸리티 함수
     clearCategoryCache

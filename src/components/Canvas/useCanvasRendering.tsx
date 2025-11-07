@@ -128,6 +128,9 @@ interface UseCanvasRenderingParams {
   canvasOffset?: { x: number; y: number };
   handleDropOnCategoryArea: (e: React.DragEvent, categoryId: string) => void;
   handleCategoryAreaDragOver: (e: React.DragEvent) => void;
+
+  // 롱프레스 상태
+  setIsLongPressActive?: (active: boolean) => void;
 }
 
 export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
@@ -194,7 +197,8 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     setEditingCategoryTitle,
     canvasOffset,
     handleDropOnCategoryArea,
-    handleCategoryAreaDragOver
+    handleCategoryAreaDragOver,
+    setIsLongPressActive
   } = params;
 
   // 연결점 계산 훅 사용
@@ -296,7 +300,8 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     canvasOffset,
     handleDropOnCategoryArea,
     handleCategoryAreaDragOver,
-    calculateArea
+    calculateArea,
+    setIsLongPressActive
   });
 
   return {
