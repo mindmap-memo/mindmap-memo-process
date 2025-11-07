@@ -66,7 +66,7 @@ const App: React.FC = () => {
   } = migration;
 
   // ===== 커스텀 훅으로 상태 관리 =====
-  const appState = useAppState();
+  const appState = useAppState(!!session);
   const {
     pages,
     setPages,

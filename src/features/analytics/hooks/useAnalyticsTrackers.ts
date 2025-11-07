@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useAnalytics } from './useAnalytics';
 
 /**
@@ -6,9 +6,18 @@ import { useAnalytics } from './useAnalytics';
  *
  * 각 이벤트별 추적 함수를 제공하는 래퍼 훅
  * App.tsx에서 간편하게 사용할 수 있도록 함
+ *
+ * **디바운싱 처리:**
+ * - 제목/내용 수정 이벤트는 2초 디바운싱 적용
+ * - 마지막 입력 후 2초 동안 추가 입력이 없을 때만 이벤트 기록
  */
 export const useAnalyticsTrackers = () => {
   const { trackEvent } = useAnalytics();
+
+  // 디바운스 타이머 ref
+  const memoTitleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const memoContentTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const categoryTitleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const trackMemoCreated = useCallback(() => {
     trackEvent('memo_created');
@@ -66,20 +75,38 @@ export const useAnalyticsTrackers = () => {
     trackEvent('tutorial_abandoned', { step });
   }, [trackEvent]);
 
+  // 디바운싱 처리: 2초 동안 추가 입력이 없을 때만 이벤트 기록
   const trackMemoTitleEdited = useCallback(() => {
-    trackEvent('memo_title_edited');
+    if (memoTitleTimerRef.current) {
+      clearTimeout(memoTitleTimerRef.current);
+    }
+    memoTitleTimerRef.current = setTimeout(() => {
+      trackEvent('memo_title_edited');
+    }, 2000);
   }, [trackEvent]);
 
+  // 디바운싱 처리: 2초 동안 추가 입력이 없을 때만 이벤트 기록
   const trackMemoContentEdited = useCallback(() => {
-    trackEvent('memo_content_edited');
+    if (memoContentTimerRef.current) {
+      clearTimeout(memoContentTimerRef.current);
+    }
+    memoContentTimerRef.current = setTimeout(() => {
+      trackEvent('memo_content_edited');
+    }, 2000);
   }, [trackEvent]);
 
   const trackFileAttached = useCallback((fileType: string) => {
     trackEvent('file_attached', { fileType });
   }, [trackEvent]);
 
+  // 디바운싱 처리: 2초 동안 추가 입력이 없을 때만 이벤트 기록
   const trackCategoryTitleEdited = useCallback(() => {
-    trackEvent('category_title_edited');
+    if (categoryTitleTimerRef.current) {
+      clearTimeout(categoryTitleTimerRef.current);
+    }
+    categoryTitleTimerRef.current = setTimeout(() => {
+      trackEvent('category_title_edited');
+    }, 2000);
   }, [trackEvent]);
 
   const trackCategoryChildAdded = useCallback((childType: 'memo' | 'category') => {

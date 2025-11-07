@@ -23,52 +23,6 @@ export const useMigration = (isAuthenticated: boolean) => {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<MigrationResult | null>(null);
 
-  // 마이그레이션 필요 여부 확인
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const checkMigration = () => {
-      const hasLegacy = hasLegacyData();
-      const isCompleted = isMigrationCompleted();
-
-      // 구버전 데이터가 있고, 아직 마이그레이션이 완료되지 않았으면
-      if (hasLegacy && !isCompleted) {
-        setNeedsMigration(true);
-        setStatus('pending');
-        console.log('🔍 [useMigration] 마이그레이션 필요 감지:', { hasLegacy, isCompleted, isAuthenticated });
-      } else {
-        setNeedsMigration(false);
-        setStatus('idle');
-        console.log('🔍 [useMigration] 마이그레이션 불필요:', { hasLegacy, isCompleted, isAuthenticated });
-      }
-    };
-
-    // 초기 체크
-    checkMigration();
-
-    // localStorage 변경 감지 (다른 탭이나 프로그래매틱 변경)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'mindmap-memo-pages' || e.key === null) {
-        // mindmap-memo-pages 또는 전체 localStorage가 변경되면 재체크
-        setTimeout(checkMigration, 100); // 약간의 지연을 줘서 데이터 저장이 완료되도록
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-
-    // 같은 탭 내에서의 변경을 감지하기 위한 커스텀 이벤트 리스너
-    const handleCustomStorageChange = () => {
-      setTimeout(checkMigration, 100);
-    };
-
-    window.addEventListener('localStorageUpdated', handleCustomStorageChange);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('localStorageUpdated', handleCustomStorageChange);
-    };
-  }, [isAuthenticated]); // isAuthenticated 변경 시 다시 체크
-
   // 마이그레이션 실행
   const migrate = useCallback(async () => {
     if (!isAuthenticated) {
@@ -124,6 +78,71 @@ export const useMigration = (isAuthenticated: boolean) => {
       return false;
     }
   }, [isAuthenticated]);
+
+  // 마이그레이션 필요 여부 확인 및 자동 실행
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const checkMigration = async () => {
+      const hasLegacy = hasLegacyData();
+      const isCompleted = isMigrationCompleted();
+
+      // 구버전 데이터가 있고, 아직 마이그레이션이 완료되지 않았으면
+      if (hasLegacy && !isCompleted) {
+        setNeedsMigration(true);
+        setStatus('pending');
+        console.log('🔍 [useMigration] 마이그레이션 필요 감지:', { hasLegacy, isCompleted, isAuthenticated });
+
+        // 로그인 상태면 자동으로 마이그레이션 실행
+        if (isAuthenticated) {
+          console.log('🚀 [useMigration] 자동 마이그레이션 시작...');
+          // 약간의 지연을 주어 세션이 안정화되도록
+          setTimeout(async () => {
+            const success = await migrate();
+            if (success) {
+              console.log('✅ [useMigration] 자동 마이그레이션 성공!');
+              // 마이그레이션 성공 후 구버전 데이터 자동 삭제
+              setTimeout(() => {
+                clearLegacyData();
+                console.log('🗑️ [useMigration] 구버전 데이터 자동 삭제 완료');
+              }, 1000);
+            } else {
+              console.error('❌ [useMigration] 자동 마이그레이션 실패');
+            }
+          }, 1000);
+        }
+      } else {
+        setNeedsMigration(false);
+        setStatus('idle');
+        console.log('🔍 [useMigration] 마이그레이션 불필요:', { hasLegacy, isCompleted, isAuthenticated });
+      }
+    };
+
+    // 초기 체크
+    checkMigration();
+
+    // localStorage 변경 감지 (다른 탭이나 프로그래매틱 변경)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'mindmap-memo-pages' || e.key === null) {
+        // mindmap-memo-pages 또는 전체 localStorage가 변경되면 재체크
+        setTimeout(checkMigration, 100); // 약간의 지연을 줘서 데이터 저장이 완료되도록
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // 같은 탭 내에서의 변경을 감지하기 위한 커스텀 이벤트 리스너
+    const handleCustomStorageChange = () => {
+      setTimeout(checkMigration, 100);
+    };
+
+    window.addEventListener('localStorageUpdated', handleCustomStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('localStorageUpdated', handleCustomStorageChange);
+    };
+  }, [isAuthenticated, migrate]); // migrate 의존성 추가
 
   // 마이그레이션 건너뛰기
   const skipMigration = useCallback(() => {
