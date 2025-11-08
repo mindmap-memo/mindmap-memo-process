@@ -716,6 +716,9 @@ const App: React.FC = () => {
           showQuickNavPanel={showQuickNavPanel}
           setShowQuickNavPanel={setShowQuickNavPanel}
           QuickNavPanelComponent={QuickNavPanel}
+          onExecuteQuickNav={executeQuickNav}
+          onUpdateQuickNavItem={updateQuickNavItem}
+          onDeleteQuickNavItem={deleteQuickNavItem}
           onAddPage={addPage}
           onPageNameChange={updatePageName}
           onDeletePage={deletePage}

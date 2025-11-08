@@ -174,15 +174,6 @@ const Canvas: React.FC<CanvasProps> = ({
   setIsShiftPressed,  // Shift 상태 업데이트 함수
   isShiftPressedRef  // Shift ref 추가
 }) => {
-  // 디버깅: 롱프레스 상태 추적 (Canvas 컴포넌트 리렌더링 확인)
-  console.log('[Canvas Render] 컴포넌트 렌더링됨:', {
-    isLongPressActive,
-    longPressTargetId
-  });
-
-  // 디버깅: isShiftPressedRef 확인
-  console.log('[Canvas] isShiftPressedRef 받음:', isShiftPressedRef);
-
   // ===== Canvas 로컬 상태 (useCanvasState 훅 사용) =====
   const canvasState = useCanvasState();
   const {
@@ -734,7 +725,7 @@ const Canvas: React.FC<CanvasProps> = ({
         zIndex: 1000,
         userSelect: 'none'
       }}>
-        {Math.round(Math.min(canvasScale * 100, 200))}%
+        {Math.round(Math.min((canvasScale / 0.35) * 100, 571))}%
       </div>
 
       {/* 중요도 필터 UI - 모바일/태블릿에서는 숨김 */}

@@ -209,12 +209,6 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     isShiftPressedRef  // Shift ref 추가
   } = params;
 
-  // 🔍 디버깅: useCanvasRendering 훅 실행 추적
-  console.log('[useCanvasRendering] 훅 실행됨:', {
-    isLongPressActive,
-    longPressTargetId
-  });
-
   // 연결점 계산 훅 사용
   const { getBlockConnectionPoints, getConnectionPoints } = useConnectionPoints({
     renderedCategoryAreas
