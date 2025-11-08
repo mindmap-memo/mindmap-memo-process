@@ -237,11 +237,11 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   });
 
   // 현재 페이지 찾기
-  const currentPage = appState.pages.find(p => p.id === appState.currentPageId);
+  const currentPage = appState.pages?.find(p => p.id === appState.currentPageId);
 
   // 선택된 메모 및 카테고리 찾기
-  const selectedMemo = currentPage?.memos.find(m => m.id === selection.selectedMemoId);
-  const selectedMemos = currentPage?.memos.filter(m => selection.selectedMemoIds.includes(m.id)) || [];
+  const selectedMemo = currentPage?.memos?.find(m => m.id === selection.selectedMemoId);
+  const selectedMemos = currentPage?.memos?.filter(m => selection.selectedMemoIds.includes(m.id)) || [];
   const selectedCategory = currentPage?.categories?.find(c => c.id === selection.selectedCategoryId);
   const selectedCategories = currentPage?.categories?.filter(c => selection.selectedCategoryIds.includes(c.id)) || [];
 
