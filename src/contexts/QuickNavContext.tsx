@@ -3,7 +3,7 @@ import { QuickNavItem } from '../types';
 
 // QuickNav Context 타입 정의
 export interface QuickNavContextType {
-  // 단축 이동 항목들 (현재 페이지의 항목만)
+  // 즐겨찾기 항목들 (현재 페이지의 항목만)
   quickNavItems: QuickNavItem[];
 
   // 패널 표시 상태

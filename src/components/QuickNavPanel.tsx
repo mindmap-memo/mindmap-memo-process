@@ -18,7 +18,7 @@ interface QuickNavPanelProps {
 /**
  * QuickNavPanel
  *
- * 단축 이동 기능을 위한 패널 컴포넌트
+ * 즐겨찾기 기능을 위한 패널 컴포넌트
  * 메모와 카테고리에 대한 빠른 이동을 제공합니다.
  */
 export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
@@ -56,7 +56,7 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
   };
   return (
     <>
-      {/* 단축 이동 버튼 */}
+      {/* 즐겨찾기 버튼 */}
       <button
         data-tutorial="quick-nav-btn"
         onClick={onTogglePanel}
@@ -68,7 +68,7 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path d="M8 2L9.5 5.5L13 6L10.5 8.5L11 12L8 10L5 12L5.5 8.5L3 6L6.5 5.5L8 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
-        <span>단축 이동</span>
+        <span>즐겨찾기</span>
         {quickNavItems.length > 0 && (
           <span className={styles['quick-nav-badge']}>
             {quickNavItems.length}
@@ -95,11 +95,11 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
           >
             {quickNavItems.length === 0 ? (
               <div className={styles['quick-nav-empty']}>
-                등록된 단축 이동이 없습니다
+                등록된 즐겨찾기가 없습니다
               </div>
             ) : (
               <>
-                {/* 메모 단축 이동 */}
+                {/* 메모 즐겨찾기 */}
                 {quickNavItems.filter(item => item.targetType === 'memo').length > 0 && (
                   <div className={styles['quick-nav-section']}>
                     {quickNavItems
@@ -179,7 +179,7 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (window.confirm(`"${item.name}" 단축 이동을 삭제하시겠습니까?`)) {
+                                    if (window.confirm(`"${item.name}" 즐겨찾기를 삭제하시겠습니까?`)) {
                                       onDeleteQuickNavItem(item.id);
                                     }
                                   }}
@@ -195,7 +195,7 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
                   </div>
                 )}
 
-                {/* 카테고리 단축 이동 */}
+                {/* 카테고리 즐겨찾기 */}
                 {quickNavItems.filter(item => item.targetType === 'category').length > 0 && (
                   <div className={styles['quick-nav-section']}>
                     {quickNavItems
@@ -274,7 +274,7 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (window.confirm(`"${item.name}" 단축 이동을 삭제하시겠습니까?`)) {
+                                    if (window.confirm(`"${item.name}" 즐겨찾기를 삭제하시겠습니까?`)) {
                                       onDeleteQuickNavItem(item.id);
                                     }
                                   }}
