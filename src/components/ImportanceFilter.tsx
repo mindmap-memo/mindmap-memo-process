@@ -68,10 +68,10 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
           className={styles.mobileCircleButton}
           onClick={() => setIsCollapsed(!isCollapsed)}
         >
-          <span className={styles.circleButtonText}>중요도 필터</span>
+          <span className={styles.circleButtonText}>중요도{'\n'}필터</span>
         </button>
 
-        {/* 필터 목록 (세로 레이아웃) */}
+        {/* 필터 목록 (원형 버튼 그리드) */}
         {!isCollapsed && (
           <div className={styles.mobileContent}>
             {importanceLevels.map(level => {
@@ -91,8 +91,11 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
                       backgroundColor: bgColor,
                       opacity: isActive ? 1 : 0.5
                     }}
-                  />
-                  <span className={styles.swatchLabel}>{label}</span>
+                  >
+                    <span className={styles.swatchLabel} style={{ color: '#000', fontSize: '10px', fontWeight: 700 }}>
+                      {label}
+                    </span>
+                  </div>
                 </div>
               );
             })}
@@ -108,8 +111,11 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
                   backgroundColor: '#f3f4f6',
                   opacity: showGeneralContent ? 1 : 0.5
                 }}
-              />
-              <span className={styles.swatchLabel}>일반</span>
+              >
+                <span className={styles.swatchLabel} style={{ color: '#000', fontSize: '10px', fontWeight: 700 }}>
+                  일반
+                </span>
+              </div>
             </div>
           </div>
         )}

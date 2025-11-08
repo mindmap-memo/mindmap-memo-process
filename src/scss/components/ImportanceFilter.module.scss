@@ -119,21 +119,21 @@
 // 모바일 레이아웃 스타일
 .mobileFilter {
   position: fixed;
-  top: 20px;
+  top: 60px;
   left: 20px;
-  z-index: 1500;
+  z-index: 1700;
   cursor: default;
   user-select: none;
 }
 
 .mobileCircleButton {
-  width: 100px;
-  height: 100px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  background-color: rgba(255, 255, 255, 0.95);
+  background-color: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(8px);
-  border: 2px solid #e5e7eb;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -142,102 +142,74 @@
 
   &:active {
     transform: scale(0.95);
-    background-color: rgba(243, 244, 246, 0.95);
+    background-color: rgba(240, 240, 240, 0.9);
   }
 
   @media (hover: hover) {
     &:hover {
-      background-color: rgba(243, 244, 246, 0.95);
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+      background-color: rgba(240, 240, 240, 0.9);
     }
   }
 }
 
 .circleButtonText {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
-  color: #374151;
+  color: #333;
   text-align: center;
   line-height: 1.3;
-  padding: 8px;
+  padding: 6px;
   word-break: keep-all;
+  white-space: pre-line;
 }
 
 .mobileContent {
   margin-top: 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  background-color: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(8px);
-  border: 2px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  max-height: calc(100vh - 180px);
-  overflow-y: auto;
-
-  /* 스크롤바 스타일 */
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: #f3f4f6;
-    border-radius: 3px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: #d1d5db;
-    border-radius: 3px;
-
-    &:hover {
-      background: #9ca3af;
-    }
-  }
+  gap: 12px;
 }
 
 .mobileItem {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 4px;
   cursor: pointer;
-  padding: 8px 12px;
-  background-color: transparent;
   transition: all 0.2s;
-  border-radius: 8px;
-
-  &:active {
-    background-color: #f3f4f6;
-    transform: scale(0.98);
-  }
-
-  @media (hover: hover) {
-    &:hover {
-      background-color: #f9fafb;
-    }
-  }
 }
 
 .mobileColorSwatch {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
   transition: all 0.2s;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   flex-shrink: 0;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+  }
 }
 
 .swatchLabel {
-  font-size: 13px;
-  color: #374151;
+  font-size: 11px;
+  color: #333;
   font-weight: 600;
-  text-align: left;
-  line-height: 1.3;
-  flex: 1;
+  text-align: center;
+  line-height: 1.2;
+  white-space: nowrap;
 }
