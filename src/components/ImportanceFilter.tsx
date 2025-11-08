@@ -63,58 +63,55 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
   if (isMobile) {
     return (
       <div className={styles.mobileFilter}>
-        <div className={styles.mobileHeader}>
-          <span>중요도 필터</span>
-          <button
-            className={styles.mobileToggleButton}
-            onClick={() => setIsCollapsed(!isCollapsed)}
-          >
-            {isCollapsed ? '▼' : '▲'}
-          </button>
-        </div>
+        {/* 원형 토글 버튼 */}
+        <button
+          className={styles.mobileCircleButton}
+          onClick={() => setIsCollapsed(!isCollapsed)}
+        >
+          <span className={styles.circleButtonText}>중요도 필터</span>
+        </button>
 
+        {/* 필터 목록 (세로 레이아웃) */}
         {!isCollapsed && (
-        <div className={styles.mobileContent}>
-          {importanceLevels.map(level => {
-            const isActive = activeFilters?.has(level) || false;
-            const bgColor = getImportanceStyle(level);
-            const label = IMPORTANCE_LABELS[level].replace(/^.{2}\s/, ''); // 이모지 제거
+          <div className={styles.mobileContent}>
+            {importanceLevels.map(level => {
+              const isActive = activeFilters?.has(level) || false;
+              const bgColor = getImportanceStyle(level);
+              const label = IMPORTANCE_LABELS[level].replace(/^.{2}\s/, ''); // 이모지 제거
 
-            return (
-              <div
-                key={level}
-                className={styles.mobileItem}
-                onClick={() => onToggleFilter(level)}
-              >
+              return (
                 <div
-                  className={styles.mobileColorSwatch}
-                  style={{
-                    backgroundColor: bgColor,
-                    opacity: isActive ? 1 : 0.5
-                  }}
+                  key={level}
+                  className={styles.mobileItem}
+                  onClick={() => onToggleFilter(level)}
                 >
+                  <div
+                    className={styles.mobileColorSwatch}
+                    style={{
+                      backgroundColor: bgColor,
+                      opacity: isActive ? 1 : 0.5
+                    }}
+                  />
                   <span className={styles.swatchLabel}>{label}</span>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
 
-          {/* 일반 내용 필터 */}
-          <div
-            className={styles.mobileItem}
-            onClick={onToggleGeneralContent}
-          >
+            {/* 일반 내용 필터 */}
             <div
-              className={styles.mobileColorSwatch}
-              style={{
-                backgroundColor: '#f3f4f6',
-                opacity: showGeneralContent ? 1 : 0.5
-              }}
+              className={styles.mobileItem}
+              onClick={onToggleGeneralContent}
             >
+              <div
+                className={styles.mobileColorSwatch}
+                style={{
+                  backgroundColor: '#f3f4f6',
+                  opacity: showGeneralContent ? 1 : 0.5
+                }}
+              />
               <span className={styles.swatchLabel}>일반</span>
             </div>
           </div>
-        </div>
         )}
       </div>
     );
