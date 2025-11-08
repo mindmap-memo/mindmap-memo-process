@@ -1,7 +1,7 @@
 import React from 'react';
 import { Page, CategoryBlock, MemoBlock as MemoBlockType, MemoDisplaySize } from '../../../types';
 import MemoBlock from '../../MemoBlock';
-import { createCategoryAreaDragHandler, createCategoryAreaTouchHandler } from '../utils/categoryAreaDragHandlers';
+import { createCategoryAreaDragHandler } from '../utils/categoryAreaDragHandlers';
 import { useCategoryAreaColors } from './useCategoryAreaColors';
 import { useCategoryLabelDrag } from './useCategoryLabelDrag';
 import { detectDoubleTap } from '../../../utils/doubleTapUtils';
@@ -128,7 +128,9 @@ interface UseCategoryAreaRenderingParams {
   calculateArea: (category: CategoryBlock) => any;
 
   // 롱프레스 상태
-  setIsLongPressActive?: (active: boolean) => void;
+  isLongPressActive?: boolean;  // 롱프레스 활성화 상태
+  longPressTargetId?: string | null;  // 롱프레스 대상 ID
+  setIsLongPressActive?: (active: boolean, targetId?: string | null) => void;
   setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수
   isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref 추가
 }
@@ -183,6 +185,8 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
     isQuickNavExists,
     onCategoryUpdate,
     onOpenEditor,
+    isLongPressActive,  // 롱프레스 활성화 상태
+    longPressTargetId,  // 롱프레스 대상 ID
     setIsLongPressActive,
     setIsShiftPressed,  // Shift 상태 업데이트 함수
     isShiftPressedRef,  // Shift ref 추가
@@ -272,9 +276,21 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
         }
       }
 
+      // Shift+드래그 중인지 확인
+      // - 영역 드래그: isCurrentCategoryDragging && isShiftPressed
+      // - 블록 드래그: isCurrentCategoryBlockDragging && isShiftPressed
+      // - 롱프레스: 이 카테고리가 롱프레스 대상인지 확인 (드래그 없이도 UI 변경)
+      const isThisCategoryLongPressed = isLongPressActive && longPressTargetId === category.id;
+
       // 타겟 영역 확인 (추가 UI)
-      // 조건: 마우스가 올라간 영역이면서, 현재 부모가 아님
+      // 조건: 드래그 중 + 마우스가 올라간 영역이면서, 현재 부모가 아님
+      // ⚠️ 롱프레스는 여기 포함하지 않음 (롱프레스는 자기 자신이므로 "추가" UI를 보여주면 안 됨)
       const isShiftDragTarget = isShiftPressed && dragTargetCategoryId === category.id && (isDraggingMemo || isDraggingCategory || isDraggingCategoryArea) && !isCurrentParent;
+
+      // 롱프레스 또는 Shift 드래그 타겟 (초록색 테두리용)
+      // - 롱프레스: 자기 자신 (드래그 없이도 초록색 표시)
+      // - Shift 드래그 타겟: 다른 요소를 드래그해서 이 영역 위로 가져온 경우
+      const isShiftModeActive = isShiftDragTarget || isThisCategoryLongPressed;
 
       // 드래그 선택 중 하이라이트
       const isDragHovered = dragHoveredCategoryIds?.includes(category.id) || false;
@@ -282,7 +298,14 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
       // 드래그 중인 카테고리는 transform을 사용하여 GPU 가속 활용
       // 일반 드래그 또는 Shift+드래그 시 GPU 가속 적용
       const isDragging = draggedCategoryAreas[category.id] !== undefined;
-      const isShiftDragging = isShiftPressed && isDraggingCategoryArea === category.id && shiftDragInfo !== null;
+      // 현재 카테고리가 드래그 중인지 확인
+      const isCurrentCategoryDragging = isDraggingCategoryArea === category.id;
+      // 현재 카테고리가 블록으로 드래그 중인지 확인 (CategoryBlock 컴포넌트)
+      const isCurrentCategoryBlockDragging = isDraggingCategory && draggingCategoryId === category.id;
+
+      const isShiftDragging = isThisCategoryLongPressed ||
+                             (isCurrentCategoryDragging && (isShiftPressed || isThisCategoryLongPressed)) ||
+                             (isCurrentCategoryBlockDragging && (isShiftPressed || isThisCategoryLongPressed));
       const isAnyDragging = isDragging || isShiftDragging;
 
       const basePosition = isDragging && draggedCategoryAreas[category.id]
@@ -299,9 +322,13 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
           }
         : { x: 0, y: 0 };
 
+      const calculatedBgColor = isParentBeingLeftBehind
+        ? 'rgba(239, 68, 68, 0.2)'
+        : (isShiftModeActive ? 'rgba(16, 185, 129, 0.2)' : (isDragHovered ? 'rgba(59, 130, 246, 0.3)' : area.color));
+
       areas.push(
         <div
-          key={`area-${category.id}`}
+          key={`area-${category.id}-${isShiftModeActive ? 'shift' : 'normal'}`}
           data-category-area="true"
           data-category-id={category.id}
           draggable={false}
@@ -311,19 +338,17 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             top: `${basePosition.top}px`,
             width: `${area.width}px`,
             height: `${area.height}px`,
-            backgroundColor: isParentBeingLeftBehind
-              ? 'rgba(239, 68, 68, 0.2)'  // 빨간색 (하위 요소 빼기)
-              : (isShiftDragTarget ? 'rgba(16, 185, 129, 0.2)' : (isDragHovered ? 'rgba(59, 130, 246, 0.3)' : area.color)),  // 드래그 선택: 파란색
+            backgroundColor: calculatedBgColor,
             border: isParentBeingLeftBehind
               ? '3px solid rgba(239, 68, 68, 0.6)'
-              : (isShiftDragTarget ? '3px solid rgba(16, 185, 129, 0.6)' : (isDragHovered ? '3px solid rgba(59, 130, 246, 0.6)' : '2px dashed rgba(139, 92, 246, 0.3)')),
+              : (isShiftModeActive ? '3px solid rgba(16, 185, 129, 0.6)' : (isDragHovered ? '3px solid rgba(59, 130, 246, 0.6)' : '2px dashed rgba(139, 92, 246, 0.3)')),
             borderRadius: '12px',
             pointerEvents: 'auto',
             cursor: 'move',
             zIndex: -1,
             transform: isDragging
-              ? `translate(${deltaTransform.x}px, ${deltaTransform.y}px) ${(isShiftDragTarget || isParentBeingLeftBehind || isDragHovered) ? 'scale(1.02)' : 'scale(1)'}`
-              : (isShiftDragTarget || isParentBeingLeftBehind || isDragHovered) ? 'scale(1.02)' : 'scale(1)',
+              ? `translate(${deltaTransform.x}px, ${deltaTransform.y}px) ${(isShiftModeActive || isParentBeingLeftBehind || isDragHovered) ? 'scale(1.02)' : 'scale(1)'}`
+              : (isShiftModeActive || isParentBeingLeftBehind || isDragHovered) ? 'scale(1.02)' : 'scale(1)',
             transition: isAnyDragging ? 'none' : 'background-color 0.2s ease, border 0.2s ease',
             willChange: 'transform',
             display: 'flex',
@@ -355,25 +380,154 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             onCategoryPositionDragEnd,
             onDetectCategoryDropForCategory
           })}
-          onTouchStart={createCategoryAreaTouchHandler({
-            category,
-            isConnecting,
-            isShiftPressed,
-            canvasScale,
-            canvasOffset,
-            currentPage,
-            area,
-            draggedCategoryAreas,
-            shiftDragAreaCache,
-            calculateCategoryAreaWithColor,
-            onCategorySelect,
-            setIsDraggingCategoryArea,
-            setShiftDragInfo,
-            setDraggedCategoryAreas,
-            onCategoryPositionChange,
-            onCategoryPositionDragEnd,
-            onDetectCategoryDropForCategory
-          })}
+          onTouchStart={(e) => {
+            if (isConnecting || e.touches.length !== 1) return;
+
+            e.stopPropagation();
+
+            const touch = e.touches[0];
+            const startX = touch.clientX;
+            const startY = touch.clientY;
+            const originalPosition = { x: category.position.x, y: category.position.y };
+            let hasMoved = false;
+            let isDragging = false;
+            let longPressTimer: NodeJS.Timeout | null = null;
+            let isLongPressActive = false;
+
+            // 롱프레스 타이머 시작 (0.5초)
+            longPressTimer = setTimeout(() => {
+              isLongPressActive = true;
+              // 롱프레스 감지 시 Shift 모드 활성화
+              console.log('[CategoryArea] 롱프레스 감지! Shift+드래그 모드 활성화', category.id);
+            }, 500);
+
+            const handleTouchMove = (moveEvent: TouchEvent) => {
+              if (moveEvent.touches.length !== 1) return;
+
+              const touch = moveEvent.touches[0];
+              const distance = Math.sqrt(
+                Math.pow(touch.clientX - startX, 2) +
+                Math.pow(touch.clientY - startY, 2)
+              );
+
+              // 타이머 취소 (이동이 시작되면 롱프레스 취소)
+              if (longPressTimer && distance >= 5) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+              }
+
+              // 롱프레스가 활성화되었거나 임계값을 넘으면 드래그 시작
+              if (!isDragging && (isLongPressActive || distance >= 5)) {
+                isDragging = true;
+                onCategorySelect(category.id);
+                setIsDraggingCategoryArea(category.id);
+
+                // Shift 모드일 때만 캐시 설정
+                if (isShiftPressed) {
+                  if (currentPage && Object.keys(shiftDragAreaCache.current).length === 0) {
+                    currentPage.categories?.forEach(cat => {
+                      if (cat.isExpanded) {
+                        const catArea = calculateCategoryAreaWithColor(cat, new Set(), category.id);
+                        if (catArea) {
+                          shiftDragAreaCache.current[cat.id] = catArea;
+                        }
+                      }
+                    });
+                  }
+                } else {
+                  if (!draggedCategoryAreas[category.id]) {
+                    const currentArea = area || calculateCategoryAreaWithColor(category);
+                    if (currentArea) {
+                      setDraggedCategoryAreas(prev => ({
+                        ...prev,
+                        [category.id]: {
+                          area: currentArea,
+                          originalPosition: { x: category.position.x, y: category.position.y }
+                        }
+                      }));
+                    }
+                  }
+                }
+              }
+
+              if (isDragging) {
+                if (!hasMoved) {
+                  hasMoved = true;
+                }
+
+                const deltaX = (touch.clientX - startX) / canvasScale;
+                const deltaY = (touch.clientY - startY) / canvasScale;
+
+                const newPosition = {
+                  x: originalPosition.x + deltaX,
+                  y: originalPosition.y + deltaY
+                };
+
+                onCategoryPositionChange(category.id, newPosition);
+
+                if (isShiftPressed) {
+                  setShiftDragInfo({
+                    categoryId: category.id,
+                    offset: { x: deltaX, y: deltaY }
+                  });
+                }
+
+                moveEvent.preventDefault();
+              }
+            };
+
+            const handleTouchEnd = (upEvent: TouchEvent) => {
+              // 타이머 취소
+              if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+              }
+
+              if (isDragging && upEvent.changedTouches.length > 0) {
+                const touch = upEvent.changedTouches[0];
+                const deltaX = (touch.clientX - startX) / canvasScale;
+                const deltaY = (touch.clientY - startY) / canvasScale;
+
+                const finalPosition = {
+                  x: originalPosition.x + deltaX,
+                  y: originalPosition.y + deltaY
+                };
+
+                const canvasElement = document.getElementById('main-canvas');
+                if (canvasElement && canvasOffset) {
+                  const rect = canvasElement.getBoundingClientRect();
+                  const mouseX = (touch.clientX - rect.left - canvasOffset.x) / canvasScale;
+                  const mouseY = (touch.clientY - rect.top - canvasOffset.y) / canvasScale;
+
+                  onCategoryPositionDragEnd?.(category.id, finalPosition);
+
+                  if (isShiftPressed) {
+                    onDetectCategoryDropForCategory?.(category.id, { x: mouseX, y: mouseY });
+                  }
+                } else {
+                  onCategoryPositionDragEnd?.(category.id, finalPosition);
+
+                  if (isShiftPressed) {
+                    onDetectCategoryDropForCategory?.(category.id, finalPosition);
+                  }
+                }
+              } else if (!hasMoved) {
+                onCategorySelect(category.id);
+              }
+
+              // 상태 초기화
+              setIsDraggingCategoryArea(null);
+              setShiftDragInfo(null);
+
+              document.removeEventListener('touchmove', handleTouchMove);
+              document.removeEventListener('touchend', handleTouchEnd);
+              document.removeEventListener('touchcancel', handleTouchEnd);
+            };
+
+            document.addEventListener('touchmove', handleTouchMove, { passive: false });
+            document.addEventListener('touchend', handleTouchEnd);
+            document.addEventListener('touchcancel', handleTouchEnd);
+          }}
           onMouseUp={(e) => {
             // 연결 모드일 때 영역 어디에나 연결선을 놓으면 연결
             if (isConnecting && connectingFromId && connectingFromId !== category.id) {
@@ -384,6 +538,13 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
           onContextMenu={(e) => {
             e.preventDefault();
             e.stopPropagation();
+
+            // 모바일(터치) 환경에서는 컨텍스트 메뉴 비활성화
+            // @ts-ignore - nativeEvent의 sourceCapabilities 체크
+            if (e.nativeEvent && e.nativeEvent.sourceCapabilities && e.nativeEvent.sourceCapabilities.firesTouchEvents) {
+              return;
+            }
+
             onCategorySelect(category.id);
             setAreaContextMenu({ x: e.clientX, y: e.clientY, categoryId: category.id });
           }}
@@ -615,9 +776,9 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
 
     // 카테고리 이름 라벨은 항상 표시
     if (true) {
-      // 라벨 위치는 영역의 좌상단에 고정
+      // 라벨 위치는 영역의 좌상단 위쪽에 고정 (영역과 겹치지 않도록)
       const labelX = area?.x || category.position.x;
-      const labelY = area?.y || category.position.y;
+      const labelY = (area?.y || category.position.y) - 60; // 라벨 높이만큼 위로 이동하여 영역과 겹치지 않도록
 
       // Shift+드래그 중인지 확인 (카테고리 블록 드래그 또는 카테고리 영역 드래그)
       const isCurrentCategoryBeingDragged = (isDraggingCategory && draggingCategoryId === category.id) || (isDraggingCategoryArea === category.id);
@@ -666,6 +827,13 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
           onContextMenu={(e) => {
             e.preventDefault();
             e.stopPropagation();
+
+            // 모바일(터치) 환경에서는 컨텍스트 메뉴 비활성화
+            // @ts-ignore - nativeEvent의 sourceCapabilities 체크
+            if (e.nativeEvent && e.nativeEvent.sourceCapabilities && e.nativeEvent.sourceCapabilities.firesTouchEvents) {
+              return;
+            }
+
             onCategorySelect(category.id);
             setAreaContextMenu({ x: e.clientX, y: e.clientY, categoryId: category.id });
           }}
@@ -801,7 +969,9 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
     isDraggingCategoryArea,
     isShiftPressed,
     isDraggingMemo,
-    isDraggingCategory
+    isDraggingCategory,
+    isLongPressActive,  // 롱프레스 상태 추가
+    longPressTargetId  // 롱프레스 대상 ID 추가
   ]);
 
   /**

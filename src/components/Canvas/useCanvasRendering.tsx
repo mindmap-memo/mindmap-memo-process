@@ -130,7 +130,9 @@ interface UseCanvasRenderingParams {
   handleCategoryAreaDragOver: (e: React.DragEvent) => void;
 
   // 롱프레스 상태
-  setIsLongPressActive?: (active: boolean) => void;
+  isLongPressActive?: boolean;  // 롱프레스 활성화 상태
+  longPressTargetId?: string | null;  // 롱프레스 대상 ID
+  setIsLongPressActive?: (active: boolean, targetId?: string | null) => void;
   setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수
   isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref 추가
 }
@@ -200,10 +202,18 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     canvasOffset,
     handleDropOnCategoryArea,
     handleCategoryAreaDragOver,
+    isLongPressActive,  // 롱프레스 활성화 상태
+    longPressTargetId,  // 롱프레스 대상 ID
     setIsLongPressActive,
     setIsShiftPressed,  // Shift 상태 업데이트 함수
     isShiftPressedRef  // Shift ref 추가
   } = params;
+
+  // 🔍 디버깅: useCanvasRendering 훅 실행 추적
+  console.log('[useCanvasRendering] 훅 실행됨:', {
+    isLongPressActive,
+    longPressTargetId
+  });
 
   // 연결점 계산 훅 사용
   const { getBlockConnectionPoints, getConnectionPoints } = useConnectionPoints({
@@ -305,6 +315,8 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     handleDropOnCategoryArea,
     handleCategoryAreaDragOver,
     calculateArea,
+    isLongPressActive,  // 롱프레스 활성화 상태
+    longPressTargetId,  // 롱프레스 대상 ID
     setIsLongPressActive,
     setIsShiftPressed,  // Shift 상태 업데이트 함수
     isShiftPressedRef  // Shift ref 추가

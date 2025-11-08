@@ -33,7 +33,7 @@ interface UseMemoBlockDragParams {
   onDragEnd?: () => void;
   connectingFromId?: string | null;
   memoRef?: React.RefObject<HTMLDivElement | null>;
-  setIsLongPressActive?: (active: boolean) => void;
+  setIsLongPressActive?: (active: boolean, targetId?: string | null) => void;
   setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수 추가
 }
 
@@ -94,10 +94,10 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
 
     // 1초 후 롱프레스 활성화
     longPressTimerRef.current = setTimeout(() => {
-      console.log('[MemoBlock] 롱프레스 감지! Shift+드래그 모드 활성화');
+      console.log('[MemoBlock] 롱프레스 감지! Shift+드래그 모드 활성화', memo.id);
       setIsLongPressActive(true);
       // 전역 상태 업데이트
-      externalSetIsLongPressActive?.(true);
+      externalSetIsLongPressActive?.(true, memo.id);
 
       // Shift 상태도 함께 업데이트 (충돌 판정 예외 처리를 위해 필수!)
       // ⚠️ 중요: ref를 직접 업데이트하여 즉시 반영 (state는 비동기)
@@ -364,9 +364,19 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
         Math.pow(touch.clientY - mouseDownPos.y, 2)
       );
 
-      // 임계값을 넘으면 드래그 시작
-      if (distance >= DRAG_THRESHOLD) {
-        // 드래그가 시작되면 롱프레스 타이머 취소
+      console.log('[MemoBlock TouchMove] 임계값 체크', {
+        distance,
+        threshold: DRAG_THRESHOLD,
+        isLongPressActive
+      });
+
+      // 롱프레스가 활성화되었거나 임계값을 넘으면 드래그 시작
+      if (isLongPressActive || distance >= DRAG_THRESHOLD) {
+        console.log('[MemoBlock TouchMove] 드래그 시작!', {
+          isLongPressActive,
+          distance
+        });
+        // 드래그가 시작되면 롱프레스 타이머 취소 (아직 발동 전인 경우)
         cancelLongPressTimer();
         setIsDragging(true);
         onDragStart?.(memo.id);
@@ -430,7 +440,7 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
 
     setIsLongPressActive(false); // 롱프레스 상태 리셋
     // 전역 상태 업데이트
-    externalSetIsLongPressActive?.(false);
+    externalSetIsLongPressActive?.(false, null);
 
     // 롱프레스가 활성화되어 있었다면 Shift도 리셋
     if (wasLongPressActive) {

@@ -58,6 +58,14 @@ export const useMemoBlockHandlers = (params: UseMemoBlockHandlersParams) => {
   const handleContextMenu = React.useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // 모바일(터치) 환경에서는 컨텍스트 메뉴 비활성화
+    // @ts-ignore - nativeEvent의 sourceCapabilities 체크
+    if (e.nativeEvent && e.nativeEvent.sourceCapabilities && e.nativeEvent.sourceCapabilities.firesTouchEvents) {
+      console.log('[MemoBlock] 모바일 환경이므로 컨텍스트 메뉴 표시 안 함');
+      return false;
+    }
+
     setContextMenu({ x: e.clientX, y: e.clientY });
 
     if (e.nativeEvent) {

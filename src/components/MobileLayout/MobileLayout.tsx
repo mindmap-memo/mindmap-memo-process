@@ -93,7 +93,9 @@ interface MobileLayoutProps {
   onDragSelectStart: (position: { x: number; y: number }) => void;
   onDragSelectMove: (position: { x: number; y: number }) => void;
   onDragSelectEnd: () => void;
-  setIsLongPressActive?: (active: boolean) => void;  // 롱프레스 상태 업데이트
+  isLongPressActive?: boolean;  // 롱프레스 활성화 상태
+  longPressTargetId?: string | null;  // 롱프레스 대상 ID
+  setIsLongPressActive?: (active: boolean, targetId?: string | null) => void;  // 롱프레스 상태 업데이트
   setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수
   isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref
 }
@@ -107,6 +109,12 @@ interface MobileLayoutProps {
  * - Context API를 통해 모든 상태 접근
  */
 export const MobileLayout: React.FC<MobileLayoutProps> = ({
+  // 롱프레스 상태
+  isLongPressActive,
+  longPressTargetId,
+  setIsLongPressActive,
+  setIsShiftPressed,
+  isShiftPressedRef,
   tutorialState,
   tutorialMode,
   handleStartTutorialWrapper,
@@ -177,9 +185,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   onDragSelectStart,
   onDragSelectMove,
   onDragSelectEnd,
-  setIsLongPressActive,
-  setIsShiftPressed,
-  isShiftPressedRef,
 }) => {
   const { showEditor, setShowEditor, showPages, setShowPages } = useMobileLayout();
   const [showFabMenu, setShowFabMenu] = React.useState(false);
@@ -340,6 +345,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
               onAddQuickNav={onAddQuickNav}
               isQuickNavExists={isQuickNavExists}
               onOpenEditor={() => setShowEditor(true)}
+              isLongPressActive={isLongPressActive}
+              longPressTargetId={longPressTargetId}
               setIsLongPressActive={setIsLongPressActive}
               setIsShiftPressed={setIsShiftPressed}
               isShiftPressedRef={isShiftPressedRef}

@@ -46,7 +46,9 @@ interface CategoryBlockProps {
   isCategoryBeingDragged?: boolean;
   isShiftPressed?: boolean;
   onOpenEditor?: () => void;
-  setIsLongPressActive?: (active: boolean) => void;  // 롱프레스 상태 업데이트
+  isLongPressActive?: boolean;  // 롱프레스 상태
+  longPressTargetId?: string | null;  // 롱프레스된 타겟 ID
+  setIsLongPressActive?: (active: boolean, targetId?: string | null) => void;  // 롱프레스 상태 업데이트
   setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수 추가
   isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref 추가
 }
@@ -85,6 +87,8 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   isCategoryBeingDragged = false,
   isShiftPressed = false,
   onOpenEditor,
+  isLongPressActive: globalIsLongPressActive = false,
+  longPressTargetId = null,
   setIsLongPressActive: externalSetIsLongPressActive,
   setIsShiftPressed,  // Shift 상태 업데이트 함수
   isShiftPressedRef  // Shift ref 추가
@@ -136,6 +140,17 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     isSelected
   });
 
+  // 컨텍스트 메뉴 핸들러 (lastLongPressEndRef를 드래그 핸들러보다 먼저 선언)
+  const { handleContextMenu, handleAddQuickNav, handleQuickNavConfirm, lastLongPressEndRef } = useCategoryContextMenu({
+    categoryId: category.id,
+    contextMenu,
+    setContextMenu,
+    setShowQuickNavModal,
+    onDelete,
+    onAddQuickNav,
+    isQuickNavExists
+  });
+
   // 드래그 핸들러
   const { handleMouseDown, handleTouchStart, handleMouseMove, handleMouseUp, handleClick } = useCategoryDragHandlers({
     category,
@@ -159,6 +174,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     setIsLongPressActiveGlobal: externalSetIsLongPressActive,
     setIsShiftPressed,  // Shift 상태 업데이트 함수 전달
     isShiftPressedRef,  // Shift ref 전달
+    lastLongPressEndRef,  // 롱프레스 종료 시간 ref 전달
     onClick,
     onDragStart,
     onDragEnd,
@@ -176,17 +192,6 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     setIsConnectionDragging,
     onStartConnection,
     onConnectItems
-  });
-
-  // 컨텍스트 메뉴 핸들러
-  const { handleContextMenu, handleAddQuickNav, handleQuickNavConfirm } = useCategoryContextMenu({
-    categoryId: category.id,
-    contextMenu,
-    setContextMenu,
-    setShowQuickNavModal,
-    onDelete,
-    onAddQuickNav,
-    isQuickNavExists
   });
 
   // 드롭 핸들러
@@ -253,6 +258,9 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
           console.log('[CategoryBlock Native TouchStart] 롱프레스 감지! Shift+드래그 모드 활성화');
           setIsLongPressActive(true);
 
+          // 전역 롱프레스 상태 업데이트 (컨텍스트 메뉴 방지용)
+          externalSetIsLongPressActive?.(true, category.id);
+
           // 햅틱 피드백
           if (navigator.vibrate) {
             navigator.vibrate(50);
@@ -266,7 +274,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     return () => {
       categoryRef.current?.removeEventListener('touchstart', handleNativeTouchStart);
     };
-  }, [category.id, isEditing, isConnecting, longPressTimerRef, setIsLongPressActive, categoryRef]);
+  }, [category.id, isEditing, isConnecting, longPressTimerRef, setIsLongPressActive, externalSetIsLongPressActive, categoryRef]);
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -281,7 +289,9 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   const isTagMode = hasChildren && !isHighlighted;
 
   // Shift+드래그 또는 롱프레스 스타일 적용
-  const isShiftDragging = isDraggingPosition && (isShiftPressed || isLongPressActive);
+  // ⚠️ 중요: 롱프레스는 이 카테고리가 타겟일 때만 적용
+  const isThisCategoryLongPressed = isLongPressActive && longPressTargetId === category.id;
+  const isShiftDragging = isDraggingPosition && (isShiftPressed || isThisCategoryLongPressed);
 
   const categoryStyle: React.CSSProperties = {
     width: isTagMode ? 'auto' : '100%',

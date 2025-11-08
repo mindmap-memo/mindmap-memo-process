@@ -178,6 +178,15 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
   const handleCanvasMouseDown = React.useCallback((e: React.MouseEvent) => {
     const target = e.target as Element;
 
+    // 카테고리 영역인지 확인
+    const isCategoryArea = target.hasAttribute('data-category-area');
+
+    // 카테고리 영역을 드래그할 때는 팬을 시작하지 않음
+    if (isCategoryArea) {
+      // 카테고리 영역 자체 드래그 핸들러가 처리하므로 여기서는 아무것도 하지 않음
+      return;
+    }
+
     // 스페이스바가 눌린 상태에서는 항상 팬 모드 (메모 블록 위에서도)
     if (isSpacePressed && !isConnecting) {
       setIsPanning(true);
@@ -192,9 +201,6 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
       return;
     }
 
-    // 카테고리 영역인지 확인
-    const isCategoryArea = target.hasAttribute('data-category-area');
-
     // 캔버스 배경 영역에서만 팬 도구 활성화
     const isCanvasBackground = target.hasAttribute('data-canvas') ||
                               target.tagName === 'svg' ||
@@ -202,8 +208,7 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
                               (target.tagName === 'DIV' &&
                                !target.closest('[data-memo-block="true"]') &&
                                !target.closest('[data-category-block="true"]') &&
-                               !target.closest('button') &&
-                               !isCategoryArea);
+                               !target.closest('button'));
 
     if (isCanvasBackground && !isConnecting) {
       if (currentTool === 'pan') {
@@ -225,8 +230,8 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
       }
     }
 
-    // 선택 도구이고 연결 모드가 아닐 때 전역 드래그 선택 시작 준비 (캔버스 배경 또는 카테고리 영역에서)
-    if (currentTool === 'select' && !isConnecting && !isPanning && (isCanvasBackground || isCategoryArea)) {
+    // 선택 도구이고 연결 모드가 아닐 때 전역 드래그 선택 시작 준비 (캔버스 배경에서만)
+    if (currentTool === 'select' && !isConnecting && !isPanning && isCanvasBackground) {
       setGlobalDragSelecting(true);
       setGlobalDragStart({ x: e.clientX, y: e.clientY });
       setGlobalDragWithShift(e.shiftKey);
@@ -307,10 +312,14 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
   const handleTouchStart = React.useCallback((e: React.TouchEvent) => {
     const target = e.target as Element;
 
-    // 메모 블록이나 카테고리 블록을 터치한 경우는 패닝하지 않음
+    // 카테고리 영역인지 확인
+    const isCategoryArea = target.hasAttribute('data-category-area');
+
+    // 메모 블록, 카테고리 블록, 카테고리 영역을 터치한 경우는 패닝하지 않음
     const isMemoOrCategory = target.closest('[data-memo-block="true"]') ||
                              target.closest('[data-category-block="true"]') ||
-                             target.closest('button');
+                             target.closest('button') ||
+                             isCategoryArea;
 
     if (isMemoOrCategory) {
       return;

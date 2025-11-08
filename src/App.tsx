@@ -102,9 +102,6 @@ const App: React.FC = () => {
     isShiftPressedRef
   } = appState;
 
-  console.log('[App.tsx] 렌더링 - appState.isShiftPressedRef:', appState.isShiftPressedRef);
-  console.log('[App.tsx] 렌더링 - 구조분해된 isShiftPressedRef:', isShiftPressedRef);
-
   const panelState = usePanelState();
   const {
     leftPanelOpen,
@@ -131,6 +128,7 @@ const App: React.FC = () => {
     previousFramePosition,
     cacheCreationStarted,
     isLongPressActive,
+    longPressTargetId,
     setIsLongPressActive,
     clearCategoryCache: clearCategoryCacheFromHook
   } = dragState;
@@ -767,6 +765,8 @@ const App: React.FC = () => {
           onDragSelectStart={handleDragSelectStart}
           onDragSelectMove={handleDragSelectMove}
           onDragSelectEnd={handleDragSelectEnd}
+          isLongPressActive={isLongPressActive}
+          longPressTargetId={longPressTargetId}
           setIsLongPressActive={setIsLongPressActive}
           setIsShiftPressed={setIsShiftPressed}
           isShiftPressedRef={appState.isShiftPressedRef}
@@ -898,6 +898,8 @@ const App: React.FC = () => {
         onDeleteMemoById={deleteMemoById}
         onAddQuickNav={addQuickNavItem}
         isQuickNavExists={isQuickNavExists}
+        isLongPressActive={isLongPressActive}
+        longPressTargetId={longPressTargetId}
         setIsLongPressActive={setIsLongPressActive}
         setIsShiftPressed={setIsShiftPressed}
         isShiftPressedRef={appState.isShiftPressedRef}

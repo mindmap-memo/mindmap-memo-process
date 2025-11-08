@@ -695,9 +695,7 @@ export const usePositionHandlers = ({
 
       // Shift 드래그 중에는 충돌 검사 안 함
       // Ref를 사용하여 드래그 중 Shift 상태 변경을 실시간으로 반영
-      console.log('[Memo Drag] Shift 상태:', isShiftPressedRef.current);
       if (isShiftPressedRef.current) {
-        console.log('[Memo Drag] Shift 드래그 중 - 충돌 검사 스킵');
         return prev.map(page =>
           page.id === currentPageId
             ? updatedPage
@@ -729,10 +727,8 @@ export const usePositionHandlers = ({
 
       // 메모가 카테고리 내부에 있다면, 모든 상위 카테고리의 영역 변경을 재귀적으로 확인
       // Shift 드래그 중에는 스킵
-      console.log('[Memo Drag] 메모 parentId:', movedMemo?.parentId, 'Shift:', isShiftPressedRef.current);
       if (movedMemo?.parentId && !isShiftPressedRef.current) {
         const allParentIds = getAllParentCategoryIds(movedMemo.parentId, finalPage.categories || []);
-        console.log('[Memo Drag] 모든 상위 카테고리 ID:', allParentIds);
 
         // 영역이 있는 카테고리 수집 (변경 여부와 무관하게 충돌 검사 필요)
         const changedCategoryIds: string[] = [];
@@ -766,16 +762,8 @@ export const usePositionHandlers = ({
           for (const parentId of changedCategoryIds) {
             const parentCategory = finalPage.categories?.find(c => c.id === parentId);
             if (!parentCategory) {
-              console.log('[Memo Drag] 카테고리를 찾을 수 없음:', parentId);
               continue;
             }
-
-            console.log('[Memo Drag] resolveUnifiedCollisions 호출 전:', {
-              parentId,
-              frameDelta: { x: deltaX, y: deltaY },
-              categoriesCount: finalPage.categories?.length,
-              memosCount: finalPage.memos.length
-            });
 
             // 영역 드래그와 동일하게 통합 충돌 검사 사용
             const collisionResult = resolveUnifiedCollisions(
@@ -788,28 +776,11 @@ export const usePositionHandlers = ({
               isShiftPressedRef.current
             );
 
-            console.log('[Memo Drag] resolveUnifiedCollisions 호출 후:', {
-              parentId,
-              categoriesChanged: collisionResult.updatedCategories.length !== finalPage.categories?.length,
-              memosChanged: collisionResult.updatedMemos.length !== finalPage.memos.length
-            });
-
-            const beforeCategories = finalPage.categories?.length || 0;
-            const beforeMemos = finalPage.memos.length;
-
             finalPage = {
               ...finalPage,
               categories: collisionResult.updatedCategories,
               memos: collisionResult.updatedMemos
             };
-
-            console.log('[Memo Drag] finalPage 업데이트 완료:', {
-              parentId,
-              categoriesBefore: beforeCategories,
-              categoriesAfter: finalPage.categories?.length || 0,
-              memosBefore: beforeMemos,
-              memosAfter: finalPage.memos.length
-            });
           }
         }
       }

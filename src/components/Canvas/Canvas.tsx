@@ -86,7 +86,9 @@ interface CanvasProps {
   isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
   fullscreen?: boolean;  // Mobile fullscreen mode
   onOpenEditor?: () => void;  // Mobile: Open editor on double-tap
-  setIsLongPressActive?: (active: boolean) => void;  // 롱프레스 상태 업데이트
+  isLongPressActive?: boolean;  // 롱프레스 활성화 상태
+  longPressTargetId?: string | null;  // 롱프레스 대상 ID (메모 또는 카테고리)
+  setIsLongPressActive?: (active: boolean, targetId?: string | null) => void;  // 롱프레스 상태 업데이트
   setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수
   isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref 추가
 }
@@ -166,10 +168,18 @@ const Canvas: React.FC<CanvasProps> = ({
   isQuickNavExists,
   fullscreen = false,
   onOpenEditor,
+  isLongPressActive = false,  // 롱프레스 활성화 상태
+  longPressTargetId = null,  // 롱프레스 대상 ID
   setIsLongPressActive,
   setIsShiftPressed,  // Shift 상태 업데이트 함수
   isShiftPressedRef  // Shift ref 추가
 }) => {
+  // 디버깅: 롱프레스 상태 추적 (Canvas 컴포넌트 리렌더링 확인)
+  console.log('[Canvas Render] 컴포넌트 렌더링됨:', {
+    isLongPressActive,
+    longPressTargetId
+  });
+
   // 디버깅: isShiftPressedRef 확인
   console.log('[Canvas] isShiftPressedRef 받음:', isShiftPressedRef);
 
@@ -370,6 +380,8 @@ const Canvas: React.FC<CanvasProps> = ({
     canvasOffset,
     handleDropOnCategoryArea,
     handleCategoryAreaDragOver,
+    isLongPressActive,  // 롱프레스 활성화 상태
+    longPressTargetId,  // 롱프레스 대상 ID
     setIsLongPressActive,
     setIsShiftPressed,
     isShiftPressedRef

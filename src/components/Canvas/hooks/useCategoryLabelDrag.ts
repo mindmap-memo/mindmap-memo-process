@@ -148,6 +148,15 @@ export const useCategoryLabelDrag = (params: UseCategoryLabelDragParams) => {
       const originalLabelPosition = { x: category.position.x, y: category.position.y };
       let hasMoved = false;
       let isDragging = false;
+      let longPressTimer: NodeJS.Timeout | null = null;
+      let isLongPressActive = false;
+
+      // 롱프레스 타이머 시작 (0.5초)
+      longPressTimer = setTimeout(() => {
+        isLongPressActive = true;
+        // 롱프레스 감지 시 Shift 모드 활성화
+        console.log('[CategoryLabel] 롱프레스 감지! Shift+드래그 모드 활성화', category.id);
+      }, 500);
 
       const handleTouchMove = (moveEvent: TouchEvent) => {
         if (moveEvent.touches.length !== 1) return;
@@ -158,7 +167,14 @@ export const useCategoryLabelDrag = (params: UseCategoryLabelDragParams) => {
           Math.pow(touch.clientY - startY, 2)
         );
 
-        if (!isDragging && distance >= DRAG_THRESHOLD) {
+        // 타이머 취소 (이동이 시작되면 롱프레스 취소)
+        if (longPressTimer && distance >= DRAG_THRESHOLD) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+
+        // 롱프레스가 활성화되었거나 임계값을 넘으면 드래그 시작
+        if (!isDragging && (isLongPressActive || distance >= DRAG_THRESHOLD)) {
           isDragging = true;
           hasMoved = true;
           onCategorySelect(category.id);
@@ -179,15 +195,19 @@ export const useCategoryLabelDrag = (params: UseCategoryLabelDragParams) => {
       };
 
       const handleTouchEnd = (upEvent?: TouchEvent) => {
+        // 타이머 취소
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+
         if (!hasMoved && !isDragging) {
           // 싱글탭은 부모에서 처리 (더블탭 감지 로직)
         }
 
         isDragging = false;
 
-        const wasShiftPressed = isShiftPressed;
-
-        if (hasMoved && wasShiftPressed && upEvent?.changedTouches.length) {
+        if (hasMoved && isShiftPressed && upEvent?.changedTouches.length) {
           const touch = upEvent.changedTouches[0];
           const canvasElement = document.getElementById('main-canvas');
           let touchPointerPosition = {
