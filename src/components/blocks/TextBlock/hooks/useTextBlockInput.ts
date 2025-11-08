@@ -244,21 +244,13 @@ export const useTextBlockInput = (params: UseTextBlockInputParams) => {
   };
 
   const handleBlur = () => {
-    // blur 시 현재 textarea의 실제 값을 가져와서 저장
-    const currentValue = textareaRef.current?.value || '';
-
     setIsFocused(false);
 
-    // 내용이 변경되었으면 저장
-    if (currentValue !== block.content && onUpdate) {
-      // 로컬 상태도 업데이트
-      setContent(currentValue);
-      onUpdate({ ...block, content: currentValue, importanceRanges });
-
-      // 실제로 내용이 변경되었을 때만 히스토리 저장
-      if (onSaveToHistory) {
-        setTimeout(() => onSaveToHistory(), 100); // 약간의 지연으로 업데이트 완료 후 저장
-      }
+    // blur 시에는 이미 handleInputChange에서 저장했으므로
+    // 추가 저장이 필요하지 않음
+    // 단, 히스토리 저장만 수행
+    if (onSaveToHistory) {
+      setTimeout(() => onSaveToHistory(), 100);
     }
   };
 
