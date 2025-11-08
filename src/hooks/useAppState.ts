@@ -243,6 +243,9 @@ export const useAppState = (isAuthenticated: boolean = false) => {
 
   // 현재 페이지의 quickNavItems를 가져오기 (페이지별 저장)
   const quickNavItems = useMemo(() => {
+    if (!pages || pages.length === 0) {
+      return [];
+    }
     const currentPage = pages.find(p => p.id === currentPageId);
     return currentPage?.quickNavItems || [];
   }, [pages, currentPageId]);
