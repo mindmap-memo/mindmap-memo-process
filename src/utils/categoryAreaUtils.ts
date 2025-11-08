@@ -334,3 +334,88 @@ export function centerCanvasOnPosition(
 
   return { x: newOffsetX, y: newOffsetY };
 }
+
+/**
+ * 메모를 화면 중앙으로 이동
+ * @param memoId - 메모 ID
+ * @param page - 현재 페이지
+ * @param canvasScale - 캔버스 스케일
+ * @param setCanvasOffset - 캔버스 오프셋 설정 함수
+ */
+export function centerOnMemo(
+  memoId: string,
+  page: Page,
+  canvasScale: number,
+  setCanvasOffset: (offset: { x: number; y: number }) => void
+): void {
+  const memo = page.memos.find(m => m.id === memoId);
+  if (!memo) return;
+
+  const canvasElement = document.getElementById('main-canvas');
+  if (!canvasElement) return;
+
+  const rect = canvasElement.getBoundingClientRect();
+  const centerX = rect.width / 2;
+  const centerY = rect.height / 2;
+
+  const memoWidth = memo.size?.width || 200;
+  const memoHeight = memo.size?.height || 150;
+
+  // 메모의 중심점을 화면 중앙에 위치시키기
+  const itemCenterX = memo.position.x + (memoWidth / 2);
+  const itemCenterY = memo.position.y + (memoHeight / 2);
+
+  const newOffsetX = centerX - (itemCenterX * canvasScale);
+  const newOffsetY = centerY - (itemCenterY * canvasScale);
+
+  setCanvasOffset({ x: newOffsetX, y: newOffsetY });
+}
+
+/**
+ * 카테고리 영역 전체를 화면 중앙으로 이동
+ * @param categoryId - 카테고리 ID
+ * @param page - 현재 페이지
+ * @param canvasScale - 캔버스 스케일
+ * @param setCanvasOffset - 캔버스 오프셋 설정 함수
+ */
+export function centerOnCategory(
+  categoryId: string,
+  page: Page,
+  canvasScale: number,
+  setCanvasOffset: (offset: { x: number; y: number }) => void
+): void {
+  const category = page.categories?.find(c => c.id === categoryId);
+  if (!category) return;
+
+  const canvasElement = document.getElementById('main-canvas');
+  if (!canvasElement) return;
+
+  const rect = canvasElement.getBoundingClientRect();
+  const centerX = rect.width / 2;
+  const centerY = rect.height / 2;
+
+  // 카테고리의 전체 영역 계산
+  const categoryArea = calculateCategoryArea(category, page);
+
+  let targetPosition: { x: number; y: number };
+  let targetSize: { width: number; height: number };
+
+  if (categoryArea) {
+    // 영역 전체를 중앙에 배치
+    targetPosition = { x: categoryArea.x, y: categoryArea.y };
+    targetSize = { width: categoryArea.width, height: categoryArea.height };
+  } else {
+    // 영역이 없으면 라벨만 중앙에 배치
+    targetPosition = category.position;
+    targetSize = category.size || { width: 200, height: 100 };
+  }
+
+  // 카테고리 영역의 중심점을 화면 중앙에 위치시키기
+  const itemCenterX = targetPosition.x + (targetSize.width / 2);
+  const itemCenterY = targetPosition.y + (targetSize.height / 2);
+
+  const newOffsetX = centerX - (itemCenterX * canvasScale);
+  const newOffsetY = centerY - (itemCenterY * canvasScale);
+
+  setCanvasOffset({ x: newOffsetX, y: newOffsetY });
+}

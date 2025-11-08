@@ -53,7 +53,7 @@ export const SearchFilters: React.FC<SearchFiltersProps> = ({
               style={{
                 padding: '4px 8px',
                 fontSize: '12px',
-                backgroundColor: searchCategory === category ? '#3b82f6' : '#ffffff',
+                backgroundColor: searchCategory === category ? '#8b5cf6' : '#ffffff',
                 color: searchCategory === category ? 'white' : '#6b7280',
                 border: '1px solid #e5e7eb',
                 borderRadius: '4px',

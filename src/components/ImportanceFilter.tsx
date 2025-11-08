@@ -50,7 +50,7 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
   onToggleGeneralContent,
   isMobile = false
 }) => {
-  const [isCollapsed, setIsCollapsed] = React.useState(false);
+  const [isCollapsed, setIsCollapsed] = React.useState(isMobile);
   const [position, setPosition] = React.useState({ x: 20, y: 70 });
   const [isDragging, setIsDragging] = React.useState(false);
   const [dragStart, setDragStart] = React.useState({ x: 0, y: 0 });

@@ -119,7 +119,7 @@
 // 모바일 레이아웃 스타일
 .mobileFilter {
   position: fixed;
-  bottom: 0;
+  top: 60px; // MobileHeader 아래
   left: 0;
   right: 0;
   background-color: transparent;

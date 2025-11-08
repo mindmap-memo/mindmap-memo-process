@@ -3,13 +3,16 @@
 import React from 'react';
 import { Plus, Folder } from 'lucide-react';
 import { MobileHeader } from './MobileHeader';
+import { MobileSearchResults } from './MobileSearchResults';
 import { useMobileLayout } from './hooks/useMobileLayout';
+import { useMobileSearch } from './hooks/useMobileSearch';
 import Canvas from '../Canvas/Canvas';
 import RightPanel from '../RightPanel/RightPanel';
 import LeftPanel from '../LeftPanel/LeftPanel';
 import ImportanceFilter from '../ImportanceFilter';
 import { useAppStateContext, useSelection, useConnection, usePanel } from '../../contexts';
 import { MemoDisplaySize, CategoryBlock, MemoBlock } from '../../types';
+import { centerOnMemo, centerOnCategory } from '../../utils/categoryAreaUtils';
 import styles from '../../scss/components/MobileLayout/MobileLayout.module.scss';
 
 interface MobileLayoutProps {
@@ -186,14 +189,46 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   onDragSelectMove,
   onDragSelectEnd,
 }) => {
-  const { showEditor, setShowEditor, showPages, setShowPages } = useMobileLayout();
+  const {
+    showEditor,
+    setShowEditor,
+    showPages,
+    setShowPages,
+    searchQuery,
+    setSearchQuery,
+    searchCategory,
+    setSearchCategory,
+    searchImportanceFilters,
+    handleToggleImportanceFilter,
+    handleSelectAllImportance,
+    handleClearAllImportance,
+    searchShowGeneralContent,
+    setSearchShowGeneralContent,
+    searchResults,
+    setSearchResults,
+    searchCategoryResults,
+    setSearchCategoryResults
+  } = useMobileLayout();
   const [showFabMenu, setShowFabMenu] = React.useState(false);
+  const [showFilters, setShowFilters] = React.useState(false);
 
   // Context에서 필요한 상태와 핸들러 가져오기
   const appState = useAppStateContext();
   const selection = useSelection();
   const connection = useConnection();
   const panel = usePanel();
+
+  // 검색 기능
+  useMobileSearch({
+    pages: appState.pages,
+    currentPageId: appState.currentPageId,
+    searchQuery,
+    searchCategory,
+    searchImportanceFilters,
+    searchShowGeneralContent,
+    setSearchResults,
+    setSearchCategoryResults
+  });
 
   // 현재 페이지 찾기
   const currentPage = appState.pages.find(p => p.id === appState.currentPageId);
@@ -227,13 +262,59 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
 
       {/* 상단 헤더 - 뒤로가기, 검색, 실행취소/다시실행 */}
       {!showPages && (
-        <MobileHeader
-          onBackToPages={() => setShowPages(true)}
-          canUndo={canUndo}
-          canRedo={canRedo}
-          onUndo={onUndo}
-          onRedo={onRedo}
-        />
+        <>
+          <MobileHeader
+            onBackToPages={() => setShowPages(true)}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            onUndo={onUndo}
+            onRedo={onRedo}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchCategory={searchCategory}
+            onSearchCategoryChange={setSearchCategory}
+            searchImportanceFilters={searchImportanceFilters}
+            onToggleImportanceFilter={handleToggleImportanceFilter}
+            onSelectAllImportance={handleSelectAllImportance}
+            onClearAllImportance={handleClearAllImportance}
+            searchShowGeneralContent={searchShowGeneralContent}
+            onToggleGeneralContent={(checked) => setSearchShowGeneralContent(checked)}
+            showFilters={showFilters}
+            onToggleFilters={setShowFilters}
+          />
+
+          {/* 검색 결과 표시 */}
+          {searchQuery.length > 0 && (
+            <MobileSearchResults
+              searchResults={searchResults}
+              searchCategoryResults={searchCategoryResults}
+              searchQuery={searchQuery}
+              showFilters={showFilters}
+              onNavigateToMemo={(memoId) => {
+                const currentPage = appState.pages.find(p => p.id === appState.currentPageId);
+                if (currentPage) {
+                  // 메모 선택
+                  selection.handleMemoSelect(memoId);
+                  // 화면 중앙으로 이동
+                  centerOnMemo(memoId, currentPage, appState.canvasScale, appState.setCanvasOffset);
+                }
+                // 검색창 닫기
+                setSearchQuery('');
+              }}
+              onNavigateToCategory={(categoryId) => {
+                const currentPage = appState.pages.find(p => p.id === appState.currentPageId);
+                if (currentPage) {
+                  // 카테고리 선택
+                  selection.selectCategory(categoryId);
+                  // 카테고리 영역 전체를 화면 중앙으로 이동
+                  centerOnCategory(categoryId, currentPage, appState.canvasScale, appState.setCanvasOffset);
+                }
+                // 검색창 닫기
+                setSearchQuery('');
+              }}
+            />
+          )}
+        </>
       )}
 
       {/* 페이지 선택 뷰 */}

@@ -88,6 +88,9 @@ interface UseCanvasEffectsProps {
 
   // Drag target detection
   setDragTargetCategoryId: (id: string | null) => void;
+
+  // Mobile fullscreen mode
+  fullscreen?: boolean;
 }
 
 /**
@@ -160,7 +163,8 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
     selectedMemoIds,
     selectedCategoryIds,
     onDeleteSelected,
-    setDragTargetCategoryId
+    setDragTargetCategoryId,
+    fullscreen
   } = props;
 
   // 캐시 관리 (Shift 드래그, 메모/카테고리 변경 감지)
@@ -530,4 +534,5 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
     canvasScale,
     setDragTargetCategoryId
   ]);
+
 };

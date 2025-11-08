@@ -10,7 +10,6 @@
   flex: 1;
   overflow: hidden;
   position: relative;
-  /* 헤더는 fixed이므로 padding 제거 */
 }
 
 .view {
@@ -87,7 +86,7 @@
 
 .fabButton {
   position: fixed;
-  bottom: 140px; // ImportanceFilter 위
+  bottom: 24px; // 하단에서 24px
   right: 20px;
   width: 56px;
   height: 56px;
@@ -119,7 +118,7 @@
 
 .fabMenu {
   position: fixed;
-  bottom: 205px; // FAB 버튼 위
+  bottom: 90px; // FAB 버튼 위 (24 + 56 + 10)
   right: 20px;
   display: flex;
   flex-direction: column;

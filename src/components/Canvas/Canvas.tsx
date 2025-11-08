@@ -441,7 +441,8 @@ const Canvas: React.FC<CanvasProps> = ({
     selectedMemoIds,
     selectedCategoryIds,
     onDeleteSelected,
-    setDragTargetCategoryId
+    setDragTargetCategoryId,
+    fullscreen
   });
 
   // 모든 메모들 렌더링 (접힌 카테고리 안의 메모는 렌더링 시 제외)
