@@ -28,7 +28,7 @@ export function calculateCategoryArea(
   }
   visited.add(category.id);
 
-  const childMemos = page.memos.filter(memo => memo.parentId === category.id);
+  const childMemos = page.memos?.filter(memo => memo.parentId === category.id) || [];
   const childCategories = page.categories?.filter(cat => cat.parentId === category.id) || [];
 
   // 카테고리 블록 자체의 위치와 크기
@@ -348,7 +348,7 @@ export function centerOnMemo(
   canvasScale: number,
   setCanvasOffset: (offset: { x: number; y: number }) => void
 ): void {
-  const memo = page.memos.find(m => m.id === memoId);
+  const memo = page.memos?.find(m => m.id === memoId);
   if (!memo) return;
 
   const canvasElement = document.getElementById('main-canvas');
