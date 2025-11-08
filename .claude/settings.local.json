@@ -52,7 +52,8 @@
       "Bash(psql:*)",
       "Bash(npx tsx:*)",
       "Bash(collision/unified.ts.tmp)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(if exist nul del nul 2)"
     ],
     "deny": [],
     "ask": []

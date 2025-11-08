@@ -43,7 +43,7 @@ interface UseCanvasHandlersParams {
   onCategoryDragStart?: () => void;
   onCategoryDragEnd?: () => void;
   onMoveToCategory: (itemId: string, categoryId: string | null) => void;
-  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }) => void;
+  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }, isShiftMode?: boolean) => void;
   onUpdateDragLine: (mousePos: { x: number; y: number }) => void;
   onDeselectAll?: () => void;
 

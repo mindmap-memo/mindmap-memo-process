@@ -293,7 +293,7 @@ export const useShiftDragHandlers = ({
             }
 
             // 새 부모에 추가 (다중 선택된 카테고리들 모두)
-            if (category.id === newParentId) {
+            if (newParentId && category.id === newParentId) {
               const currentChildren = category.children || [];
               const newChildren = [...currentChildren, ...categoriesToMove.filter(id => !currentChildren.includes(id))];
 
@@ -306,7 +306,7 @@ export const useShiftDragHandlers = ({
               return {
                 ...category,
                 children: newChildren,
-                isExpanded: true  // 자동 확장
+                isExpanded: true  // 자동 확장 (추가할 때만)
               };
             }
 
@@ -559,7 +559,7 @@ export const useShiftDragHandlers = ({
             }
 
             // 새 부모에 추가
-            if (category.id === newParentId) {
+            if (newParentId && category.id === newParentId) {
               const currentChildren = category.children || [];
               if (!currentChildren.includes(draggedMemo.id)) {
                 // Track analytics
@@ -568,7 +568,7 @@ export const useShiftDragHandlers = ({
                 return {
                   ...category,
                   children: [...currentChildren, draggedMemo.id],
-                  isExpanded: true  // 자동 확장
+                  isExpanded: true  // 자동 확장 (추가할 때만)
                 };
               }
             }

@@ -87,7 +87,7 @@ interface UseCategoryAreaRenderingParams {
   onCategoryToggleExpanded: (categoryId: string) => void;
   onCategoryPositionDragEnd?: (categoryId: string, finalPosition: { x: number; y: number }) => void;
   onShiftDropCategory?: (category: CategoryBlock, position: { x: number; y: number }) => void;
-  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }) => void;
+  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }, isShiftMode?: boolean) => void;
   onMemoPositionChange: (memoId: string, position: { x: number; y: number }) => void;
   onMemoSizeChange: (memoId: string, size: { width: number; height: number }) => void;
   onMemoDisplaySizeChange?: (memoId: string, displaySize: MemoDisplaySize) => void;
@@ -222,7 +222,9 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
     onCategoryLabelPositionChange,
     onDetectCategoryDropForCategory,
     onLongPressActivate: (categoryId) => setLongPressActiveCategoryId(categoryId),
-    onLongPressDeactivate: () => setLongPressActiveCategoryId(null)
+    onLongPressDeactivate: () => setLongPressActiveCategoryId(null),
+    setIsShiftPressed,
+    isShiftPressedRef
   });
 
   /**
@@ -407,6 +409,15 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
               // 롱프레스 감지 시 즉시 UI 업데이트
               setLongPressActiveCategoryId(category.id);
               console.log('[CategoryArea] 롱프레스 감지! Shift+드래그 모드 활성화', category.id);
+
+              // Shift 상태도 함께 업데이트 (충돌 판정 예외 처리를 위해 필수!)
+              // ⚠️ 중요: ref를 직접 업데이트하여 즉시 반영 (state는 비동기)
+              if (isShiftPressedRef) {
+                isShiftPressedRef.current = true;
+                console.log('[CategoryArea] isShiftPressedRef.current = true 직접 설정');
+              }
+              setIsShiftPressed?.(true);
+              console.log('[CategoryArea] setIsShiftPressed(true) 호출 완료');
             }, 500);
 
             const handleTouchMove = (moveEvent: TouchEvent) => {
@@ -430,8 +441,9 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
                 onCategorySelect(category.id);
                 setIsDraggingCategoryArea(category.id);
 
-                // Shift 모드일 때만 캐시 설정
-                if (isShiftPressed) {
+                // Shift 모드일 때만 캐시 설정 (롱프레스 또는 Shift 키)
+                const effectiveShiftMode = isShiftPressed || isLongPressActive;
+                if (effectiveShiftMode) {
                   if (currentPage && Object.keys(shiftDragAreaCache.current).length === 0) {
                     currentPage.categories?.forEach(cat => {
                       if (cat.isExpanded) {
@@ -473,7 +485,9 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
 
                 onCategoryPositionChange(category.id, newPosition);
 
-                if (isShiftPressed) {
+                // Shift 모드 또는 롱프레스 상태 확인
+                const effectiveShiftMode = isShiftPressed || isLongPressActive;
+                if (effectiveShiftMode) {
                   setShiftDragInfo({
                     categoryId: category.id,
                     offset: { x: deltaX, y: deltaY }
@@ -491,8 +505,25 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
                 longPressTimer = null;
               }
 
+              // 롱프레스가 활성화되어 있었는지 확인
+              const wasLongPressActive = isLongPressActive;
+
+              // 실제 Shift 키 또는 롱프레스로 인한 가상 Shift 모드
+              const effectiveShiftMode = isShiftPressed || wasLongPressActive;
+
               // 롱프레스 상태 초기화
               setLongPressActiveCategoryId(null);
+
+              // 롱프레스가 활성화되어 있었다면 Shift도 리셋
+              if (wasLongPressActive) {
+                console.log('[CategoryArea] 롱프레스 종료 - Shift 리셋');
+                // ref도 직접 리셋
+                if (isShiftPressedRef) {
+                  isShiftPressedRef.current = false;
+                  console.log('[CategoryArea] isShiftPressedRef.current = false 직접 설정');
+                }
+                setIsShiftPressed?.(false);
+              }
 
               if (isDragging && upEvent.changedTouches.length > 0) {
                 const touch = upEvent.changedTouches[0];
@@ -512,14 +543,16 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
 
                   onCategoryPositionDragEnd?.(category.id, finalPosition);
 
-                  if (isShiftPressed) {
-                    onDetectCategoryDropForCategory?.(category.id, { x: mouseX, y: mouseY });
+                  // effectiveShiftMode 사용 (롱프레스 또는 Shift 키)
+                  if (effectiveShiftMode) {
+                    onDetectCategoryDropForCategory?.(category.id, { x: mouseX, y: mouseY }, true);
                   }
                 } else {
                   onCategoryPositionDragEnd?.(category.id, finalPosition);
 
-                  if (isShiftPressed) {
-                    onDetectCategoryDropForCategory?.(category.id, finalPosition);
+                  // effectiveShiftMode 사용 (롱프레스 또는 Shift 키)
+                  if (effectiveShiftMode) {
+                    onDetectCategoryDropForCategory?.(category.id, finalPosition, true);
                   }
                 }
               } else if (!hasMoved) {

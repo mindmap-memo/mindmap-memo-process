@@ -34,7 +34,7 @@ interface CanvasProps {
   onCategoryToggleExpanded: (categoryId: string) => void;
   onMoveToCategory: (itemId: string, categoryId: string | null) => void;
   onDetectCategoryOnDrop: (memoId: string, position: { x: number; y: number }) => void;
-  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }) => void;
+  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }, isShiftMode?: boolean) => void;
   onMemoDisplaySizeChange?: (memoId: string, displaySize: MemoDisplaySize) => void;
   onMemoTitleUpdate?: (memoId: string, title: string) => void;
   onMemoBlockUpdate?: (memoId: string, blockId: string, content: string) => void;

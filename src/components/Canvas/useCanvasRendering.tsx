@@ -92,7 +92,7 @@ interface UseCanvasRenderingParams {
   onCategoryToggleExpanded: (categoryId: string) => void;
   onCategoryPositionDragEnd?: (categoryId: string, finalPosition: { x: number; y: number }) => void;
   onShiftDropCategory?: (category: CategoryBlock, position: { x: number; y: number }) => void;
-  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }) => void;
+  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }, isShiftMode?: boolean) => void;
   onMemoPositionChange: (memoId: string, position: { x: number; y: number }) => void;
   onMemoSizeChange: (memoId: string, size: { width: number; height: number }) => void;
   onMemoDisplaySizeChange?: (memoId: string, displaySize: MemoDisplaySize) => void;

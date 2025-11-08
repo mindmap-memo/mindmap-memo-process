@@ -41,7 +41,7 @@ export interface CreateCategoryAreaDragHandlerParams {
   }>>;
   onCategoryPositionChange: (categoryId: string, position: { x: number; y: number }) => void;
   onCategoryPositionDragEnd?: (categoryId: string, finalPosition: { x: number; y: number }) => void;
-  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }) => void;
+  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }, isShiftMode?: boolean) => void;
   setIsLongPressActive?: (active: boolean, targetId?: string | null) => void;  // 롱프레스 상태 업데이트
   setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트
 }

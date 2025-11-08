@@ -13,9 +13,11 @@ interface UseCategoryLabelDragParams {
   canvasOffset?: { x: number; y: number };
   onCategorySelect: (categoryId: string, isShiftClick?: boolean) => void;
   onCategoryLabelPositionChange: (categoryId: string, position: { x: number; y: number }) => void;
-  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }) => void;
+  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }, isShiftMode?: boolean) => void;
   onLongPressActivate?: (categoryId: string) => void;  // 롱프레스 활성화 콜백
   onLongPressDeactivate?: () => void;  // 롱프레스 비활성화 콜백
+  setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수
+  isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref
 }
 
 export const useCategoryLabelDrag = (params: UseCategoryLabelDragParams) => {
@@ -26,7 +28,9 @@ export const useCategoryLabelDrag = (params: UseCategoryLabelDragParams) => {
     onCategoryLabelPositionChange,
     onDetectCategoryDropForCategory,
     onLongPressActivate,
-    onLongPressDeactivate
+    onLongPressDeactivate,
+    setIsShiftPressed,
+    isShiftPressedRef
   } = params;
 
   /**
@@ -89,10 +93,10 @@ export const useCategoryLabelDrag = (params: UseCategoryLabelDragParams) => {
 
         isDragging = false;
 
-        // Shift+드래그면 카테고리 드롭 감지 호출
-        const wasShiftPressed = upEvent?.shiftKey || isShiftPressed;
+        // 실제 Shift 키가 눌렸는지 확인 (PC에서는 롱프레스 없음)
+        const effectiveShiftMode = upEvent?.shiftKey || isShiftPressed;
 
-        if (hasMoved && wasShiftPressed) {
+        if (hasMoved && effectiveShiftMode) {
           // 마우스 포인터의 실제 위치 계산
           const canvasElement = document.getElementById('main-canvas');
           let mousePointerPosition = {
@@ -111,7 +115,7 @@ export const useCategoryLabelDrag = (params: UseCategoryLabelDragParams) => {
             mousePointerPosition = { x: mouseX, y: mouseY };
           }
 
-          onDetectCategoryDropForCategory?.(category.id, mousePointerPosition);
+          onDetectCategoryDropForCategory?.(category.id, mousePointerPosition, true);
         }
 
         document.removeEventListener('mousemove', handleMouseMove);
@@ -161,6 +165,15 @@ export const useCategoryLabelDrag = (params: UseCategoryLabelDragParams) => {
         // 롱프레스 감지 시 Shift 모드 활성화
         console.log('[CategoryLabel] 롱프레스 감지! Shift+드래그 모드 활성화', category.id);
         onLongPressActivate?.(category.id);  // UI 업데이트를 위한 콜백 호출
+
+        // Shift 상태도 함께 업데이트 (충돌 판정 예외 처리를 위해 필수!)
+        // ⚠️ 중요: ref를 직접 업데이트하여 즉시 반영 (state는 비동기)
+        if (isShiftPressedRef) {
+          isShiftPressedRef.current = true;
+          console.log('[CategoryLabel] isShiftPressedRef.current = true 직접 설정');
+        }
+        setIsShiftPressed?.(true);
+        console.log('[CategoryLabel] setIsShiftPressed(true) 호출 완료');
       }, 500);
 
       const handleTouchMove = (moveEvent: TouchEvent) => {
@@ -206,18 +219,32 @@ export const useCategoryLabelDrag = (params: UseCategoryLabelDragParams) => {
           longPressTimer = null;
         }
 
+        // 롱프레스가 활성화되어 있었는지 확인
+        const wasLongPressActive = isLongPressActive;
+
+        // 실제 Shift 키 또는 롱프레스로 인한 가상 Shift 모드
+        const effectiveShiftMode = isShiftPressed || wasLongPressActive;
+
         // 롱프레스 상태 비활성화
-        if (isLongPressActive) {
+        if (wasLongPressActive) {
           onLongPressDeactivate?.();
+
+          // 롱프레스가 활성화되어 있었다면 Shift도 리셋
+          console.log('[CategoryLabel] 롱프레스 종료 - Shift 리셋');
+          // ref도 직접 리셋
+          if (isShiftPressedRef) {
+            isShiftPressedRef.current = false;
+            console.log('[CategoryLabel] isShiftPressedRef.current = false 직접 설정');
+          }
+          setIsShiftPressed?.(false);
         }
 
         if (!hasMoved && !isDragging) {
           // 싱글탭은 부모에서 처리 (더블탭 감지 로직)
         }
 
-        isDragging = false;
-
-        if (hasMoved && isShiftPressed && upEvent?.changedTouches.length) {
+        // effectiveShiftMode 사용 (롱프레스 또는 Shift 키)
+        if (isDragging && hasMoved && effectiveShiftMode && upEvent?.changedTouches.length) {
           const touch = upEvent.changedTouches[0];
           const canvasElement = document.getElementById('main-canvas');
           let touchPointerPosition = {
@@ -236,8 +263,10 @@ export const useCategoryLabelDrag = (params: UseCategoryLabelDragParams) => {
             touchPointerPosition = { x: touchX, y: touchY };
           }
 
-          onDetectCategoryDropForCategory?.(category.id, touchPointerPosition);
+          onDetectCategoryDropForCategory?.(category.id, touchPointerPosition, true);
         }
+
+        isDragging = false;
 
         document.removeEventListener('touchmove', handleTouchMove);
         document.removeEventListener('touchend', handleTouchEnd);
@@ -248,7 +277,7 @@ export const useCategoryLabelDrag = (params: UseCategoryLabelDragParams) => {
       document.addEventListener('touchend', handleTouchEnd);
       document.addEventListener('touchcancel', handleTouchEnd);
     };
-  }, [canvasScale, canvasOffset, onCategorySelect, onCategoryLabelPositionChange, onDetectCategoryDropForCategory, onLongPressActivate, onLongPressDeactivate]);
+  }, [canvasScale, canvasOffset, onCategorySelect, onCategoryLabelPositionChange, onDetectCategoryDropForCategory, onLongPressActivate, onLongPressDeactivate, setIsShiftPressed, isShiftPressedRef]);
 
   return {
     createMouseDragHandler,

@@ -62,7 +62,7 @@ interface MobileLayoutProps {
   onCategoryToggleExpanded: (categoryId: string) => void;
   onMoveToCategory: (itemId: string, categoryId: string | null) => void;
   onDetectCategoryOnDrop: (memoId: string, position: { x: number; y: number }) => void;
-  onDetectCategoryDropForCategory: (categoryId: string, position: { x: number; y: number }) => void;
+  onDetectCategoryDropForCategory: (categoryId: string, position: { x: number; y: number }, isShiftMode?: boolean) => void;
   onDeleteMemo: (memoId: string) => void;
   onDeleteCategory: (categoryId: string) => void;
   onDeleteSelected: () => void;
