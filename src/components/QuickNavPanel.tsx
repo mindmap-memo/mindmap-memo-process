@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { X } from 'lucide-react';
 import { Page, QuickNavItem } from '../types';
 import styles from '../scss/App.module.scss';
 
@@ -13,6 +14,7 @@ interface QuickNavPanelProps {
   onExecuteQuickNav: (item: QuickNavItem) => void;
   onUpdateQuickNavItem: (itemId: string, newName: string) => void;
   onDeleteQuickNavItem: (itemId: string) => void;
+  hideButton?: boolean; // 모바일에서는 버튼 숨김
 }
 
 /**
@@ -31,7 +33,8 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
   onTogglePanel,
   onExecuteQuickNav,
   onUpdateQuickNavItem,
-  onDeleteQuickNavItem
+  onDeleteQuickNavItem,
+  hideButton = false
 }) => {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState<string>('');
@@ -54,27 +57,30 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
     setEditingItemId(null);
     setEditingName('');
   };
+
   return (
     <>
-      {/* 즐겨찾기 버튼 */}
-      <button
-        data-tutorial="quick-nav-btn"
-        onClick={onTogglePanel}
-        className={styles['quick-nav-button']}
-        style={{
-          right: rightPanelOpen ? `${rightPanelWidth + 20}px` : '20px'
-        }}
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M8 2L9.5 5.5L13 6L10.5 8.5L11 12L8 10L5 12L5.5 8.5L3 6L6.5 5.5L8 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-        <span>즐겨찾기</span>
-        {quickNavItems.length > 0 && (
-          <span className={styles['quick-nav-badge']}>
-            {quickNavItems.length}
-          </span>
-        )}
-      </button>
+      {/* 즐겨찾기 버튼 - PC 버전에서만 표시 */}
+      {!hideButton && (
+        <button
+          data-tutorial="quick-nav-btn"
+          onClick={onTogglePanel}
+          className={styles['quick-nav-button']}
+          style={{
+            right: rightPanelOpen ? `${rightPanelWidth + 20}px` : '20px'
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M8 2L9.5 5.5L13 6L10.5 8.5L11 12L8 10L5 12L5.5 8.5L3 6L6.5 5.5L8 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span>즐겨찾기</span>
+          {quickNavItems.length > 0 && (
+            <span className={styles['quick-nav-badge']}>
+              {quickNavItems.length}
+            </span>
+          )}
+        </button>
+      )}
 
       {/* 단축 이동 패널 */}
       {showQuickNavPanel && (
@@ -93,6 +99,15 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* 모바일 닫기 버튼 */}
+            <button
+              className={styles['quick-nav-mobile-close']}
+              onClick={onTogglePanel}
+              aria-label="닫기"
+            >
+              <X size={24} />
+            </button>
+
             {quickNavItems.length === 0 ? (
               <div className={styles['quick-nav-empty']}>
                 등록된 즐겨찾기가 없습니다

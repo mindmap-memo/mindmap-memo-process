@@ -42,6 +42,9 @@ interface MobileLayoutProps {
   showQuickNavPanel: boolean;
   setShowQuickNavPanel: (show: boolean) => void;
   QuickNavPanelComponent: React.ComponentType<any>;
+  onExecuteQuickNav: (item: any) => void;
+  onUpdateQuickNavItem: (itemId: string, newName: string) => void;
+  onDeleteQuickNavItem: (itemId: string) => void;
 
   // 페이지 관련 핸들러
   onAddPage: () => void;
@@ -139,6 +142,9 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   showQuickNavPanel,
   setShowQuickNavPanel,
   QuickNavPanelComponent,
+  onExecuteQuickNav,
+  onUpdateQuickNavItem,
+  onDeleteQuickNavItem,
   onAddPage,
   onPageNameChange,
   onDeletePage,
@@ -269,6 +275,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
             canRedo={canRedo}
             onUndo={onUndo}
             onRedo={onRedo}
+            onToggleQuickNav={() => setShowQuickNavPanel(!showQuickNavPanel)}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             searchCategory={searchCategory}
@@ -488,7 +495,19 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
 
       {/* Quick Navigation Panel */}
       {showQuickNavPanel && (
-        <QuickNavPanelComponent onClose={() => setShowQuickNavPanel(false)} />
+        <QuickNavPanelComponent
+          quickNavItems={appState.currentPage?.quickNavItems || []}
+          pages={appState.pages}
+          currentPageId={appState.currentPageId}
+          rightPanelOpen={false}
+          rightPanelWidth={0}
+          showQuickNavPanel={showQuickNavPanel}
+          onTogglePanel={() => setShowQuickNavPanel(false)}
+          onExecuteQuickNav={onExecuteQuickNav}
+          onUpdateQuickNavItem={onUpdateQuickNavItem}
+          onDeleteQuickNavItem={onDeleteQuickNavItem}
+          hideButton={true} // 모바일에서는 버튼 숨김 (MobileHeader에 버튼 있음)
+        />
       )}
 
       {/* FAB 메뉴 - 메모/카테고리 선택 */}
