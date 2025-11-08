@@ -17,6 +17,8 @@ interface UseImportanceHandlingParams {
   selectedRange: { start: number; end: number } | null;
   onUpdate?: (block: TextBlock) => void;
   onSaveToHistory?: () => void;
+  isMobile?: boolean;
+  setContent?: React.Dispatch<React.SetStateAction<string>>;
 }
 
 export const useImportanceHandling = (params: UseImportanceHandlingParams) => {
@@ -34,7 +36,9 @@ export const useImportanceHandling = (params: UseImportanceHandlingParams) => {
     setSelectedRange,
     selectedRange,
     onUpdate,
-    onSaveToHistory
+    onSaveToHistory,
+    isMobile = false,
+    setContent
   } = params;
   const analytics = useAnalyticsTrackers();
 
@@ -218,8 +222,114 @@ export const useImportanceHandling = (params: UseImportanceHandlingParams) => {
     }, 50);
   };
 
+  // 모바일용 복사 핸들러
+  const handleCopy = () => {
+    if (!selectedRange || !textareaRef.current) return;
+
+    const selectedText = content.substring(selectedRange.start, selectedRange.end);
+    navigator.clipboard.writeText(selectedText).catch(err => {
+      console.error('복사 실패:', err);
+    });
+  };
+
+  // 모바일용 붙여넣기 핸들러
+  const handlePaste = async () => {
+    if (!selectedRange || !textareaRef.current || !setContent) return;
+
+    try {
+      const text = await navigator.clipboard.readText();
+      const newContent =
+        content.substring(0, selectedRange.start) +
+        text +
+        content.substring(selectedRange.end);
+
+      setContent(newContent);
+
+      // 블록 업데이트
+      const updatedBlock: TextBlock = {
+        id: block.id,
+        type: 'text',
+        content: newContent,
+        importanceRanges: importanceRanges
+      };
+
+      if (onUpdate) {
+        onUpdate(updatedBlock);
+      }
+
+      if (onSaveToHistory) {
+        setTimeout(() => onSaveToHistory(), 50);
+      }
+    } catch (err) {
+      console.error('붙여넣기 실패:', err);
+    }
+  };
+
+  // 모바일용 잘라내기 핸들러
+  const handleCut = () => {
+    if (!selectedRange || !textareaRef.current || !setContent) return;
+
+    const selectedText = content.substring(selectedRange.start, selectedRange.end);
+    navigator.clipboard.writeText(selectedText).catch(err => {
+      console.error('복사 실패:', err);
+    });
+
+    const newContent =
+      content.substring(0, selectedRange.start) +
+      content.substring(selectedRange.end);
+
+    setContent(newContent);
+
+    // 블록 업데이트
+    const updatedBlock: TextBlock = {
+      id: block.id,
+      type: 'text',
+      content: newContent,
+      importanceRanges: importanceRanges
+    };
+
+    if (onUpdate) {
+      onUpdate(updatedBlock);
+    }
+
+    if (onSaveToHistory) {
+      setTimeout(() => onSaveToHistory(), 50);
+    }
+  };
+
+  // 모바일용 삭제 핸들러
+  const handleDelete = () => {
+    if (!selectedRange || !textareaRef.current || !setContent) return;
+
+    const newContent =
+      content.substring(0, selectedRange.start) +
+      content.substring(selectedRange.end);
+
+    setContent(newContent);
+
+    // 블록 업데이트
+    const updatedBlock: TextBlock = {
+      id: block.id,
+      type: 'text',
+      content: newContent,
+      importanceRanges: importanceRanges
+    };
+
+    if (onUpdate) {
+      onUpdate(updatedBlock);
+    }
+
+    if (onSaveToHistory) {
+      setTimeout(() => onSaveToHistory(), 50);
+    }
+  };
+
   return {
     handleTextSelection,
-    applyImportance
+    applyImportance,
+    handleMobileCopy: handleCopy,
+    handleMobilePaste: handlePaste,
+    handleMobileCut: handleCut,
+    handleMobileDelete: handleDelete
   };
 };
