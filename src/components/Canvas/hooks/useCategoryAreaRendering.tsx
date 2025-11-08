@@ -136,6 +136,9 @@ interface UseCategoryAreaRenderingParams {
 }
 
 export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams) => {
+  // 롱프레스 활성화 상태 추적
+  const [longPressActiveCategoryId, setLongPressActiveCategoryId] = React.useState<string | null>(null);
+
   const {
     currentPage,
     areaUpdateTrigger,
@@ -217,7 +220,9 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
     canvasOffset,
     onCategorySelect,
     onCategoryLabelPositionChange,
-    onDetectCategoryDropForCategory
+    onDetectCategoryDropForCategory,
+    onLongPressActivate: (categoryId) => setLongPressActiveCategoryId(categoryId),
+    onLongPressDeactivate: () => setLongPressActiveCategoryId(null)
   });
 
   /**
@@ -339,9 +344,11 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             width: `${area.width}px`,
             height: `${area.height}px`,
             backgroundColor: calculatedBgColor,
-            border: isParentBeingLeftBehind
-              ? '3px solid rgba(239, 68, 68, 0.6)'
-              : (isShiftModeActive ? '3px solid rgba(16, 185, 129, 0.6)' : (isDragHovered ? '3px solid rgba(59, 130, 246, 0.6)' : '2px dashed rgba(139, 92, 246, 0.3)')),
+            border: longPressActiveCategoryId === category.id
+              ? '3px solid rgba(16, 185, 129, 0.8)'
+              : (isParentBeingLeftBehind
+                ? '3px solid rgba(239, 68, 68, 0.6)'
+                : (isShiftModeActive ? '3px solid rgba(16, 185, 129, 0.6)' : (isDragHovered ? '3px solid rgba(59, 130, 246, 0.6)' : '2px dashed rgba(139, 92, 246, 0.3)'))),
             borderRadius: '12px',
             pointerEvents: 'auto',
             cursor: 'move',
@@ -397,7 +404,8 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             // 롱프레스 타이머 시작 (0.5초)
             longPressTimer = setTimeout(() => {
               isLongPressActive = true;
-              // 롱프레스 감지 시 Shift 모드 활성화
+              // 롱프레스 감지 시 즉시 UI 업데이트
+              setLongPressActiveCategoryId(category.id);
               console.log('[CategoryArea] 롱프레스 감지! Shift+드래그 모드 활성화', category.id);
             }, 500);
 
@@ -482,6 +490,9 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
                 clearTimeout(longPressTimer);
                 longPressTimer = null;
               }
+
+              // 롱프레스 상태 초기화
+              setLongPressActiveCategoryId(null);
 
               if (isDragging && upEvent.changedTouches.length > 0) {
                 const touch = upEvent.changedTouches[0];
@@ -795,7 +806,7 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             position: 'absolute',
             top: `${labelY}px`,
             left: `${labelX}px`,
-            backgroundColor: isShiftDragging ? '#10b981' : '#8b5cf6',
+            backgroundColor: (longPressActiveCategoryId === category.id || isShiftDragging) ? '#10b981' : '#8b5cf6',
             color: 'white',
             padding: '12px 24px',
             borderRadius: '12px',
@@ -808,7 +819,7 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             alignItems: 'center',
             gap: '12px',
             zIndex: 10,
-            border: isShiftDragging ? '3px solid #059669' : 'none'
+            border: (longPressActiveCategoryId === category.id || isShiftDragging) ? '3px solid #059669' : 'none'
           }}
           onClick={() => !isEditing && onCategorySelect(category.id)}
           onDoubleClick={(e) => {
@@ -971,7 +982,8 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
     isDraggingMemo,
     isDraggingCategory,
     isLongPressActive,  // 롱프레스 상태 추가
-    longPressTargetId  // 롱프레스 대상 ID 추가
+    longPressTargetId,  // 롱프레스 대상 ID 추가
+    longPressActiveCategoryId  // 카테고리 롱프레스 상태 추가
   ]);
 
   /**

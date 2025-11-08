@@ -14,6 +14,8 @@ interface UseCategoryLabelDragParams {
   onCategorySelect: (categoryId: string, isShiftClick?: boolean) => void;
   onCategoryLabelPositionChange: (categoryId: string, position: { x: number; y: number }) => void;
   onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }) => void;
+  onLongPressActivate?: (categoryId: string) => void;  // 롱프레스 활성화 콜백
+  onLongPressDeactivate?: () => void;  // 롱프레스 비활성화 콜백
 }
 
 export const useCategoryLabelDrag = (params: UseCategoryLabelDragParams) => {
@@ -22,7 +24,9 @@ export const useCategoryLabelDrag = (params: UseCategoryLabelDragParams) => {
     canvasOffset,
     onCategorySelect,
     onCategoryLabelPositionChange,
-    onDetectCategoryDropForCategory
+    onDetectCategoryDropForCategory,
+    onLongPressActivate,
+    onLongPressDeactivate
   } = params;
 
   /**
@@ -156,6 +160,7 @@ export const useCategoryLabelDrag = (params: UseCategoryLabelDragParams) => {
         isLongPressActive = true;
         // 롱프레스 감지 시 Shift 모드 활성화
         console.log('[CategoryLabel] 롱프레스 감지! Shift+드래그 모드 활성화', category.id);
+        onLongPressActivate?.(category.id);  // UI 업데이트를 위한 콜백 호출
       }, 500);
 
       const handleTouchMove = (moveEvent: TouchEvent) => {
@@ -201,6 +206,11 @@ export const useCategoryLabelDrag = (params: UseCategoryLabelDragParams) => {
           longPressTimer = null;
         }
 
+        // 롱프레스 상태 비활성화
+        if (isLongPressActive) {
+          onLongPressDeactivate?.();
+        }
+
         if (!hasMoved && !isDragging) {
           // 싱글탭은 부모에서 처리 (더블탭 감지 로직)
         }
@@ -238,7 +248,7 @@ export const useCategoryLabelDrag = (params: UseCategoryLabelDragParams) => {
       document.addEventListener('touchend', handleTouchEnd);
       document.addEventListener('touchcancel', handleTouchEnd);
     };
-  }, [canvasScale, canvasOffset, onCategorySelect, onCategoryLabelPositionChange, onDetectCategoryDropForCategory]);
+  }, [canvasScale, canvasOffset, onCategorySelect, onCategoryLabelPositionChange, onDetectCategoryDropForCategory, onLongPressActivate, onLongPressDeactivate]);
 
   return {
     createMouseDragHandler,
