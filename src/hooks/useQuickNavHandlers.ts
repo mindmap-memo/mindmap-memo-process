@@ -78,7 +78,7 @@ export const useQuickNavHandlers = ({
       console.log('[handleNavigateToMemo] Called with:', { memoId, pageId, currentPageId });
       const targetPageId = pageId || currentPageId;
       console.log('[handleNavigateToMemo] Target page ID:', targetPageId);
-      const targetPage = pages.find((p) => p.id === targetPageId);
+      const targetPage = pages?.find((p) => p.id === targetPageId);
       if (!targetPage) {
         console.error('[handleNavigateToMemo] Target page not found!');
         return;
@@ -143,7 +143,7 @@ export const useQuickNavHandlers = ({
       console.log('[handleNavigateToCategory] Called with:', { categoryId, pageId, currentPageId });
       const targetPageId = pageId || currentPageId;
       console.log('[handleNavigateToCategory] Target page ID:', targetPageId);
-      const targetPage = pages.find((p) => p.id === targetPageId);
+      const targetPage = pages?.find((p) => p.id === targetPageId);
       if (!targetPage) {
         console.error('[handleNavigateToCategory] Target page not found!');
         return;
@@ -240,7 +240,7 @@ export const useQuickNavHandlers = ({
 
       // 즉시 UI 업데이트
       setPages((prevPages) =>
-        prevPages.map((page) => {
+        prevPages?.map((page) => {
           if (page.id === currentPageId) {
             return {
               ...page,
@@ -316,7 +316,7 @@ export const useQuickNavHandlers = ({
     async (itemId: string, newName: string) => {
       // 즉시 UI 업데이트 (낙관적 업데이트)
       setPages((prevPages) =>
-        prevPages.map((page) => {
+        prevPages?.map((page) => {
           if (page.id === currentPageId) {
             return {
               ...page,
@@ -348,7 +348,7 @@ export const useQuickNavHandlers = ({
 
       // 즉시 UI에서 제거 (낙관적 업데이트)
       setPages((prevPages) =>
-        prevPages.map((page) => {
+        prevPages?.map((page) => {
           if (page.id === currentPageId) {
             deletedItem = (page.quickNavItems || []).find((item) => item.id === itemId);
             return {

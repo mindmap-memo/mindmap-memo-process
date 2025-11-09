@@ -46,7 +46,7 @@ export const useCategoryPositionHandlers = ({
     categoryId: string,
     position: { x: number; y: number }
   ) => {
-    setPages(prev => prev.map(page => {
+    setPages(prev => prev?.map(page => {
       if (page.id !== currentPageId) return page;
 
       // 먼저 라벨 위치 업데이트
@@ -88,7 +88,7 @@ export const useCategoryPositionHandlers = ({
     categoryId: string,
     finalPosition: { x: number; y: number }
   ) => {
-    const currentPage = pages.find(p => p.id === currentPageId);
+    const currentPage = pages?.find(p => p.id === currentPageId);
     if (!currentPage || !currentPage.categories) {
       // Shift 드롭이 완료될 때까지 캐시 클리어를 지연 (500ms)
       setTimeout(() => {
@@ -147,7 +147,7 @@ export const useCategoryPositionHandlers = ({
     const isShiftDragging = isShiftPressedRef.current && (isDraggingMemo || isDraggingCategory);
     if (isShiftDragging) return;
 
-    const currentPage = pages.find(p => p.id === currentPageId);
+    const currentPage = pages?.find(p => p.id === currentPageId);
     if (!currentPage || !currentPage.categories) return;
 
     const categoriesToUpdate: CategoryBlock[] = [];
@@ -177,7 +177,7 @@ export const useCategoryPositionHandlers = ({
 
     // 업데이트가 필요한 카테고리가 있으면 한 번에 업데이트
     if (categoriesToUpdate.length > 0) {
-      setPages(prev => prev.map(page => {
+      setPages(prev => prev?.map(page => {
         if (page.id === currentPageId) {
           return {
             ...page,

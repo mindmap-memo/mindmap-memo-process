@@ -53,7 +53,7 @@ export const usePositionHandlers = ({
   const updateCategoryPosition = useCallback((categoryId: string, position: { x: number; y: number }) => {
 
     // 먼저 현재 카테고리 위치를 찾아서 델타 값 계산 (state 업데이트 전의 원본 위치 기준)
-    const currentPage = pages.find(p => p.id === currentPageId);
+    const currentPage = pages?.find(p => p.id === currentPageId);
     const targetCategory = currentPage?.categories?.find(cat => cat.id === categoryId);
 
     if (!targetCategory || !currentPage) return;
@@ -147,7 +147,7 @@ export const usePositionHandlers = ({
       });
     }
 
-    setPages(prev => prev.map(page => {
+    setPages(prev => prev?.map(page => {
       if (page.id !== currentPageId) return page;
 
       const pageTargetCategory = (page.categories || []).find(cat => cat.id === categoryId);
@@ -497,7 +497,7 @@ export const usePositionHandlers = ({
           const allParentIds = getAllParentCategoryIds(pageTargetCategory.parentId, finalPage.categories || []);
 
           // 원본 페이지 상태 가져오기
-          const originalPageState = pages.find(p => p.id === currentPageId);
+          const originalPageState = pages?.find(p => p.id === currentPageId);
           if (originalPageState) {
             // 영역이 있는 카테고리 수집 (변경 여부와 무관하게 충돌 검사 필요)
             const changedCategoryIds: string[] = [];
@@ -590,7 +590,7 @@ export const usePositionHandlers = ({
   // 메모 위치 업데이트
   const updateMemoPosition = useCallback((memoId: string, position: { x: number; y: number }) => {
     // 메모가 이동하면 부모 카테고리의 캐시 제거 (영역 재계산을 위해)
-    const currentPage = pages.find(p => p.id === currentPageId);
+    const currentPage = pages?.find(p => p.id === currentPageId);
     const movedMemo = currentPage?.memos.find(m => m.id === memoId);
 
     if (movedMemo?.parentId) {
@@ -603,7 +603,7 @@ export const usePositionHandlers = ({
     const deltaY = movedMemo ? position.y - movedMemo.position.y : 0;
 
     setPages(prev => {
-      const currentPage = prev.find(p => p.id === currentPageId);
+      const currentPage = prev?.find(p => p.id === currentPageId);
       if (!currentPage) {
         return prev.map(page =>
           page.id === currentPageId

@@ -45,7 +45,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               </h4>
             )}
             {searchResults.map(memo => {
-              const parentPage = pages.find(p => p.memos?.some(m => m.id === memo.id));
+              const parentPage = pages?.find(p => p.memos?.some(m => m.id === memo.id));
               return (
                 <div
                   key={memo.id}
@@ -162,7 +162,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               </h4>
             )}
             {searchCategoryResults.map(category => {
-              const parentPage = pages.find(p => p.categories?.some(c => c.id === category.id));
+              const parentPage = pages?.find(p => p.categories?.some(c => c.id === category.id));
               return (
                 <div
                   key={category.id}

@@ -57,7 +57,7 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
 
     // 영역 및 메모와 겹치지 않는 위치 찾기
     if (position) {
-      const currentPage = pages.find(p => p.id === currentPageId);
+      const currentPage = pages?.find(p => p.id === currentPageId);
       if (currentPage) {
         // 새 카테고리의 실제 영역 크기 (최소 크기)
         const newCategoryWidth = 400;
@@ -133,7 +133,7 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
     };
 
     // 즉시 UI 업데이트 (낙관적 업데이트)
-    setPages(prev => prev.map(page =>
+    setPages(prev => prev?.map(page =>
       page.id === currentPageId
         ? { ...page, categories: [...(page.categories || []), newCategory] }
         : page
@@ -177,7 +177,7 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
    * 카테고리 업데이트
    */
   const updateCategory = useCallback((category: CategoryBlock) => {
-    setPages(prev => prev.map(page =>
+    setPages(prev => prev?.map(page =>
       page.id === currentPageId
         ? {
             ...page,
@@ -197,7 +197,7 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
    */
   const deleteCategory = useCallback((categoryId: string) => {
     // 삭제된 카테고리의 제목 가져오기
-    const deletedCategory = pages.find(p => p.id === currentPageId)?.categories?.find(c => c.id === categoryId);
+    const deletedCategory = pages?.find(p => p.id === currentPageId)?.categories?.find(c => c.id === categoryId);
     const categoryTitle = deletedCategory?.title || '카테고리';
 
     // 서버에서 카테고리 삭제
@@ -205,7 +205,7 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
       console.error('카테고리 삭제 API 실패:', error);
     });
 
-    setPages(prev => prev.map(page => {
+    setPages(prev => prev?.map(page => {
       if (page.id === currentPageId) {
         const categoryToDelete = (page.categories || []).find(c => c.id === categoryId);
         if (categoryToDelete) {
@@ -259,7 +259,7 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
    * 하위 카테고리도 함께 확장/축소
    */
   const toggleCategoryExpanded = useCallback((categoryId: string) => {
-    setPages(prev => prev.map(page => {
+    setPages(prev => prev?.map(page => {
       if (page.id !== currentPageId) return page;
 
       const targetCategory = page.categories?.find(c => c.id === categoryId);
@@ -306,7 +306,7 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
    * 카테고리 크기 업데이트
    */
   const updateCategorySize = useCallback((categoryId: string, size: { width: number; height: number }) => {
-    setPages(prev => prev.map(page =>
+    setPages(prev => prev?.map(page =>
       page.id === currentPageId
         ? {
             ...page,
@@ -325,7 +325,7 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
    * 메모 또는 카테고리를 다른 카테고리의 자식으로 설정
    */
   const moveToCategory = useCallback((itemId: string, categoryId: string | null) => {
-    setPages(prev => prev.map(page => {
+    setPages(prev => prev?.map(page => {
       if (page.id === currentPageId) {
         // Determine if item is memo or category
         const isMemo = page.memos.some(memo => memo.id === itemId);

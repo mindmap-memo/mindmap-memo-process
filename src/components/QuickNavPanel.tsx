@@ -121,7 +121,7 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
                       .filter(item => item.targetType === 'memo')
                       .map(item => {
                         console.log('[QuickNavPanel] 렌더링:', { id: item.id, name: item.name });
-                        const targetPage = pages.find(p => p.id === item.pageId);
+                        const targetPage = pages?.find(p => p.id === item.pageId);
                         const isCurrentPage = item.pageId === currentPageId;
                         const isEditing = editingItemId === item.id;
 
@@ -216,7 +216,7 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
                     {quickNavItems
                       .filter(item => item.targetType === 'category')
                       .map(item => {
-                        const targetPage = pages.find(p => p.id === item.pageId);
+                        const targetPage = pages?.find(p => p.id === item.pageId);
                         const isCurrentPage = item.pageId === currentPageId;
                         const isEditing = editingItemId === item.id;
 

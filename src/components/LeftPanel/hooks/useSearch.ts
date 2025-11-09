@@ -35,7 +35,7 @@ export const useSearch = ({
 
   // 검색 로직
   const searchMemos = React.useCallback((query: string, category: SearchCategory): MemoBlock[] => {
-    const currentPage = pages.find(p => p.id === currentPageId);
+    const currentPage = pages?.find(p => p.id === currentPageId);
     if (!currentPage) return [];
 
     // 현재 페이지의 모든 메모 (카테고리 children 포함)
@@ -220,7 +220,7 @@ export const useSearch = ({
 
   // 카테고리 검색 로직 (중요도 필터 예외)
   const searchCategories = React.useCallback((query: string): CategoryBlock[] => {
-    const currentPage = pages.find(p => p.id === currentPageId);
+    const currentPage = pages?.find(p => p.id === currentPageId);
     if (!currentPage || !currentPage.categories) return [];
 
     if (!query.trim()) {

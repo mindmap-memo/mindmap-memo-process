@@ -52,7 +52,7 @@ export const useCategoryAreaCollision = (props: UseCategoryAreaCollisionProps) =
     // 충돌 검사 실행 중에는 재귀 방지
     if (isCollisionCheckRunning.current) return;
 
-    const currentPage = pages.find(p => p.id === currentPageId);
+    const currentPage = pages?.find(p => p.id === currentPageId);
     if (!currentPage || !currentPage.categories) return;
 
     // 영역이 변경된 카테고리 찾기
@@ -133,7 +133,7 @@ export const useCategoryAreaCollision = (props: UseCategoryAreaCollisionProps) =
       }
 
       // 페이지 업데이트
-      setPages(prev => prev.map(page =>
+      setPages(prev => prev?.map(page =>
         page.id === currentPageId ? updatedPage : page
       ));
 

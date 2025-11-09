@@ -63,7 +63,7 @@ export const PageList: React.FC<PageListProps> = ({
         </button>
       </div>
       <div>
-        {pages.map(page => (
+        {pages?.map(page => (
         <div
           key={page.id}
           onClick={() => onPageSelect(page.id)}

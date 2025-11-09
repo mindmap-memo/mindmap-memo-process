@@ -62,7 +62,7 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
     if (fromId === toId) return;
 
     // 현재 페이지에서 아이템 타입 확인
-    const currentPageData = pages.find(p => p.id === currentPageId);
+    const currentPageData = pages?.find(p => p.id === currentPageId);
     if (!currentPageData) return;
 
     const fromMemo = currentPageData.memos.find(m => m.id === fromId);
@@ -99,7 +99,7 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
       }
     }
 
-    setPages(prev => prev.map(page =>
+    setPages(prev => prev?.map(page =>
       page.id === currentPageId
         ? {
             ...page,
@@ -163,7 +163,7 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
    * 두 메모/카테고리 간의 연결 제거
    */
   const removeConnection = useCallback((fromId: string, toId: string) => {
-    setPages(prev => prev.map(page =>
+    setPages(prev => prev?.map(page =>
       page.id === currentPageId
         ? {
             ...page,

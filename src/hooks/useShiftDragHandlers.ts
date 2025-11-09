@@ -219,7 +219,7 @@ export const useShiftDragHandlers = ({
       : [draggedCategory.id];
 
     if (parentChanged) {
-      setPages(pages.map(p => {
+      setPages(pages?.map(p => {
         if (p.id === currentPageId) {
           // 원래 위치 정보 가져오기 (드래그 시작 시 저장된 위치)
           const originalMemoPositions = dragStartMemoPositions.current.get(draggedCategory.id);
@@ -373,7 +373,7 @@ export const useShiftDragHandlers = ({
     } else {
       // 같은 카테고리 내에서 위치만 변경 (종속 안 함)
       // 하지만 하위 메모와 카테고리들도 함께 이동해야 함!
-      setPages(pages.map(p => {
+      setPages(pages?.map(p => {
         if (p.id === currentPageId) {
           // 원래 위치 정보 가져오기
           const originalMemoPositions = dragStartMemoPositions.current.get(draggedCategory.id);
@@ -546,7 +546,7 @@ export const useShiftDragHandlers = ({
 
     if (parentChanged) {
       console.log('[Shift Drop Memo] ✅ 부모 변경 실행 - 메모 이동 처리');
-      setPages(pages.map(p => {
+      setPages(pages?.map(p => {
         if (p.id === currentPageId) {
           // 부모 카테고리의 children 업데이트
           let updatedCategories = (p.categories || []).map(category => {
@@ -630,7 +630,7 @@ export const useShiftDragHandlers = ({
     } else {
       console.log('[Shift Drop Memo] ❌ 부모 변경 안 함 - 같은 카테고리 내 이동');
       // 같은 카테고리 내에서 위치만 변경
-      setPages(pages.map(p => {
+      setPages(pages?.map(p => {
         if (p.id === currentPageId) {
           return {
             ...p,

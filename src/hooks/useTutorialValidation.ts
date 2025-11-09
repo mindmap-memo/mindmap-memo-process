@@ -70,7 +70,7 @@ export const useTutorialValidation = ({
   // 메모 생성 감지 (4단계 - add-memo)
   useEffect(() => {
     if (tutorialState.isActive && tutorialState.currentStep === 4) {
-      const currentPage = pages.find(p => p.id === currentPageId);
+      const currentPage = pages?.find(p => p.id === currentPageId);
       if (currentPage && currentPage.memos.length > initialMemoCount.current) {
         setMemoCreated(true);
       }
@@ -80,7 +80,7 @@ export const useTutorialValidation = ({
   // 메모 드래그 감지 (5단계 - memo-drag)
   useEffect(() => {
     if (tutorialState.isActive && tutorialState.currentStep === 5) {
-      const currentPage = pages.find(p => p.id === currentPageId);
+      const currentPage = pages?.find(p => p.id === currentPageId);
       if (!currentPage) return;
 
       // 메모 위치가 변경되었는지 확인

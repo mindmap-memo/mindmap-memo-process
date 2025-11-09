@@ -84,7 +84,7 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
     // ⚠️ Shift 드래그 중에는 영역 계산 스킵 (영역이 freeze된 상태)
     const isShiftDragging = isShiftPressed && (isDraggingMemo || isDraggingCategory);
     if (position && !isShiftDragging) {
-      const currentPage = pages.find(p => p.id === currentPageId);
+      const currentPage = pages?.find(p => p.id === currentPageId);
       if (currentPage) {
         // 새 메모의 실제 크기 (기본 크기)
         const newMemoWidth = 320;
@@ -166,7 +166,7 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
     };
 
     // 즉시 UI 업데이트 (낙관적 업데이트)
-    setPages(prev => prev.map(page =>
+    setPages(prev => prev?.map(page =>
       page.id === currentPageId
         ? { ...page, memos: [...page.memos, newMemo] }
         : page
@@ -216,7 +216,7 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
   const updateMemo = useCallback((memoId: string, updates: Partial<MemoBlock>) => {
     const isBlockUpdate = 'blocks' in updates;
 
-    setPages(prev => prev.map(page =>
+    setPages(prev => prev?.map(page =>
       page.id === currentPageId
         ? {
             ...page,
@@ -237,7 +237,7 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
    * 메모 크기 업데이트
    */
   const updateMemoSize = useCallback((memoId: string, size: { width: number; height: number }) => {
-    setPages(prev => prev.map(page =>
+    setPages(prev => prev?.map(page =>
       page.id === currentPageId
         ? {
             ...page,
@@ -255,7 +255,7 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
    * 메모 디스플레이 크기 업데이트
    */
   const updateMemoDisplaySize = useCallback((memoId: string, displaySize: MemoDisplaySize) => {
-    setPages(prev => prev.map(page =>
+    setPages(prev => prev?.map(page =>
       page.id === currentPageId
         ? {
             ...page,
@@ -280,7 +280,7 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
    * 메모 블록 내용 업데이트
    */
   const updateMemoBlockContent = useCallback((memoId: string, blockId: string, content: string) => {
-    setPages(prev => prev.map(page =>
+    setPages(prev => prev?.map(page =>
       page.id === currentPageId
         ? {
             ...page,
@@ -314,7 +314,7 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
       console.error('메모 삭제 API 실패:', error);
     });
 
-    setPages(prev => prev.map(page => {
+    setPages(prev => prev?.map(page => {
       if (page.id === currentPageId) {
         // 삭제할 메모와 연결된 단축 이동 항목 찾기
         const quickNavItemsToDelete = (page.quickNavItems || []).filter(item => item.targetId === memoIdToDelete);
@@ -346,7 +346,7 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
    * ID로 메모 삭제
    */
   const deleteMemoById = useCallback((memoId: string) => {
-    setPages(prev => prev.map(page => {
+    setPages(prev => prev?.map(page => {
       if (page.id === currentPageId) {
         const updatedMemos = page.memos
           .filter(m => m.id !== memoId)

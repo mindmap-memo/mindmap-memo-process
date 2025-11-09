@@ -64,7 +64,7 @@ export const useCategoryDrop = ({
     // isShiftMode 파라미터 우선, 없으면 ref 체크 (롱프레스 지원)
     const isShiftPressed = isShiftMode !== undefined ? isShiftMode : isShiftPressedRef.current;
 
-    const currentPage = pages.find(p => p.id === currentPageId);
+    const currentPage = pages?.find(p => p.id === currentPageId);
     if (!currentPage || !currentPage.categories) {
       return;
     }
@@ -98,7 +98,7 @@ export const useCategoryDrop = ({
       return;
     }
 
-    const currentPage = pages.find(p => p.id === currentPageId);
+    const currentPage = pages?.find(p => p.id === currentPageId);
     if (!currentPage || !currentPage.categories) {
       return;
     }

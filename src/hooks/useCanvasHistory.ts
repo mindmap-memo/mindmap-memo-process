@@ -23,7 +23,7 @@ export const useCanvasHistory = ({
 }: UseCanvasHistoryProps): UseCanvasHistoryReturn => {
   // Canvas history for undo/redo functionality
   const [canvasHistory, setCanvasHistory] = useState<CanvasHistory>(() => {
-    const currentPage = pages.find(p => p.id === currentPageId);
+    const currentPage = pages?.find(p => p.id === currentPageId);
     return {
       past: [],
       present: currentPage ? {
@@ -42,7 +42,7 @@ export const useCanvasHistory = ({
 
   // Canvas History Management Functions
   const saveCanvasState = useCallback((actionType: CanvasActionType, description: string) => {
-    const currentPage = pages.find(p => p.id === currentPageId);
+    const currentPage = pages?.find(p => p.id === currentPageId);
     if (!currentPage) return;
 
     const newAction: CanvasAction = {
@@ -82,7 +82,7 @@ export const useCanvasHistory = ({
     const previousAction = canvasHistory.past[canvasHistory.past.length - 1];
 
     // Restore the page state from the previous action
-    setPages(prev => prev.map(page =>
+    setPages(prev => prev?.map(page =>
       page.id === currentPageId
         ? {
             ...page,
@@ -109,7 +109,7 @@ export const useCanvasHistory = ({
     const nextAction = canvasHistory.future[0];
 
     // Restore the page state from the next action
-    setPages(prev => prev.map(page =>
+    setPages(prev => prev?.map(page =>
       page.id === currentPageId
         ? {
             ...page,

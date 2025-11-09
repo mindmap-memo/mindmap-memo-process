@@ -136,7 +136,7 @@ export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
       setCanvasZoomed(false);
       initialCanvasScale.current = canvasScale;
       // 메모 개수 저장
-      const currentPage = pages.find(p => p.id === currentPageId);
+      const currentPage = pages?.find(p => p.id === currentPageId);
       if (currentPage) {
         initialMemoCount.current = currentPage.memos.length;
       }
@@ -145,7 +145,7 @@ export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
       // 메모 생성 완료 후
       setMemoCreated(false);
       // 현재 메모 위치를 저장
-      const currentPage = pages.find(p => p.id === currentPageId);
+      const currentPage = pages?.find(p => p.id === currentPageId);
       if (currentPage) {
         initialMemoPositions.current.clear();
         currentPage.memos.forEach(memo => {
@@ -164,15 +164,15 @@ export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
    */
   const handleTutorialSkip = useCallback(() => {
     // 튜토리얼 페이지 삭제 및 다른 페이지로 이동
-    const tutorialPage = pages.find(p => p.name.startsWith('튜토리얼'));
+    const tutorialPage = pages?.find(p => p.name.startsWith('튜토리얼'));
     if (tutorialPage) {
       // 튜토리얼 페이지가 아닌 첫 번째 페이지로 이동
-      const otherPage = pages.find(p => !p.name.startsWith('튜토리얼'));
+      const otherPage = pages?.find(p => !p.name.startsWith('튜토리얼'));
       if (otherPage) {
         setCurrentPageId(otherPage.id);
       }
       // 튜토리얼 페이지 삭제
-      setPages(prev => prev.filter(p => !p.name.startsWith('튜토리얼')));
+      setPages(prev => prev?.filter(p => !p.name.startsWith('튜토리얼')));
     }
 
     setTutorialState({
@@ -195,15 +195,15 @@ export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
    */
   const handleTutorialComplete = useCallback(() => {
     // 튜토리얼 페이지 삭제 및 다른 페이지로 이동
-    const tutorialPage = pages.find(p => p.name.startsWith('튜토리얼'));
+    const tutorialPage = pages?.find(p => p.name.startsWith('튜토리얼'));
     if (tutorialPage) {
       // 튜토리얼 페이지가 아닌 첫 번째 페이지로 이동
-      const otherPage = pages.find(p => !p.name.startsWith('튜토리얼'));
+      const otherPage = pages?.find(p => !p.name.startsWith('튜토리얼'));
       if (otherPage) {
         setCurrentPageId(otherPage.id);
       }
       // 튜토리얼 페이지 삭제
-      setPages(prev => prev.filter(p => !p.name.startsWith('튜토리얼')));
+      setPages(prev => prev?.filter(p => !p.name.startsWith('튜토리얼')));
     }
 
     setTutorialState({
@@ -226,7 +226,7 @@ export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
    */
   const getTutorialPage = useCallback((): Page => {
     // 기존에 튜토리얼 페이지가 있는지 확인 (이름이 "튜토리얼"로 시작하는 페이지)
-    const existingTutorialPage = pages.find(p => p.name.startsWith('튜토리얼'));
+    const existingTutorialPage = pages?.find(p => p.name.startsWith('튜토리얼'));
 
     if (existingTutorialPage) {
       return existingTutorialPage;
@@ -369,7 +369,7 @@ export const useTutorialHandlers = (props: UseTutorialHandlersProps) => {
       size: { width: memoWidth, height: memoHeight }
     };
 
-    setPages(prev => prev.map(p =>
+    setPages(prev => prev?.map(p =>
       p.id === tutorialPage.id
         ? { ...p, memos: [...p.memos, newMemo] }
         : p

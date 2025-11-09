@@ -246,7 +246,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
     if (!pages || pages.length === 0) {
       return [];
     }
-    const currentPage = pages.find(p => p.id === currentPageId);
+    const currentPage = pages?.find(p => p.id === currentPageId);
     return currentPage?.quickNavItems || [];
   }, [pages, currentPageId]);
 
