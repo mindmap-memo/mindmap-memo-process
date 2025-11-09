@@ -174,24 +174,6 @@ const Canvas: React.FC<CanvasProps> = ({
   setIsShiftPressed,  // Shift 상태 업데이트 함수
   isShiftPressedRef  // Shift ref 추가
 }) => {
-  // ===== Early Return Guard: currentPage가 undefined면 빈 Canvas 렌더링 =====
-  if (!currentPage) {
-    return (
-      <div data-canvas="true" className={`${styles.canvas} ${fullscreen ? styles.fullscreen : ''}`}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100%',
-          fontSize: '18px',
-          color: '#9ca3af'
-        }}>
-          페이지를 선택하세요
-        </div>
-      </div>
-    );
-  }
-
   // ===== Canvas 로컬 상태 (useCanvasState 훅 사용) =====
   const canvasState = useCanvasState();
   const {
