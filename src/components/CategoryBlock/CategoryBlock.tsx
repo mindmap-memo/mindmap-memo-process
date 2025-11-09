@@ -33,6 +33,8 @@ interface CategoryBlockProps {
   onStartConnection?: (categoryId: string) => void;
   onConnectItems?: (fromId: string, toId: string) => void;
   onRemoveConnection?: (fromId: string, toId: string) => void;
+  onUpdateDragLine?: (mousePos: { x: number; y: number }) => void;
+  onCancelConnection?: () => void;
   onPositionChange?: (categoryId: string, position: { x: number; y: number }) => void;
   onPositionDragEnd?: (categoryId: string, finalPosition: { x: number; y: number }, isShiftMode?: boolean) => void;
   onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }, isShiftMode?: boolean) => void;
@@ -74,6 +76,8 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   onStartConnection,
   onConnectItems,
   onRemoveConnection,
+  onUpdateDragLine,
+  onCancelConnection,
   onPositionChange,
   onPositionDragEnd,
   onDetectCategoryDropForCategory,
@@ -191,7 +195,11 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     connectingFromId,
     setIsConnectionDragging,
     onStartConnection,
-    onConnectItems
+    onConnectItems,
+    onUpdateDragLine,
+    onCancelConnection,
+    canvasOffset,
+    canvasScale
   });
 
   // 드롭 핸들러
@@ -487,124 +495,144 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
       )}
 
       {!isTagMode && (<>
+      {/* 연결점 - 상단 */}
       <div
+        data-category-id={category.id}
         onMouseDown={handleConnectionPointMouseDown}
         onMouseUp={handleConnectionPointMouseUp}
+        onTouchStart={handleConnectionPointMouseDown}
+        onTouchEnd={handleConnectionPointMouseUp}
         onClick={(e) => {
           e.stopPropagation();
           e.preventDefault();
         }}
         style={{
           position: 'absolute',
-          top: -8,
+          top: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? -75 : -8,
           left: '50%',
           transform: 'translateX(-50%)',
-          width: 16,
-          height: 16,
+          width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
+          height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'crosshair',
-          zIndex: 15
+          zIndex: 15,
+          touchAction: 'none'
         }}
       >
         <div style={{
-          width: 8,
-          height: 8,
+          width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
+          height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
           backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
           borderRadius: '50%',
-          border: '2px solid white',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+          border: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '5px solid white' : '2px solid white',
+          boxShadow: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '0 6px 16px rgba(0, 0, 0, 0.4)' : '0 2px 4px rgba(0,0,0,0.2)'
         }} />
       </div>
+      {/* 연결점 - 하단 */}
       <div
+        data-category-id={category.id}
         onMouseDown={handleConnectionPointMouseDown}
         onMouseUp={handleConnectionPointMouseUp}
+        onTouchStart={handleConnectionPointMouseDown}
+        onTouchEnd={handleConnectionPointMouseUp}
         onClick={(e) => {
           e.stopPropagation();
           e.preventDefault();
         }}
         style={{
           position: 'absolute',
-          bottom: -8,
+          bottom: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? -75 : -8,
           left: '50%',
           transform: 'translateX(-50%)',
-          width: 16,
-          height: 16,
+          width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
+          height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'crosshair',
-          zIndex: 15
+          zIndex: 15,
+          touchAction: 'none'
         }}
       >
         <div style={{
-          width: 8,
-          height: 8,
+          width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
+          height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
           backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
           borderRadius: '50%',
-          border: '2px solid white',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+          border: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '5px solid white' : '2px solid white',
+          boxShadow: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '0 6px 16px rgba(0, 0, 0, 0.4)' : '0 2px 4px rgba(0,0,0,0.2)'
         }} />
       </div>
+      {/* 연결점 - 좌측 */}
       <div
+        data-category-id={category.id}
         onMouseDown={handleConnectionPointMouseDown}
         onMouseUp={handleConnectionPointMouseUp}
+        onTouchStart={handleConnectionPointMouseDown}
+        onTouchEnd={handleConnectionPointMouseUp}
         onClick={(e) => {
           e.stopPropagation();
           e.preventDefault();
         }}
         style={{
           position: 'absolute',
-          left: -8,
+          left: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? -75 : -8,
           top: '50%',
           transform: 'translateY(-50%)',
-          width: 16,
-          height: 16,
+          width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
+          height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'crosshair',
-          zIndex: 15
+          zIndex: 15,
+          touchAction: 'none'
         }}
       >
         <div style={{
-          width: 8,
-          height: 8,
+          width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
+          height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
           backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
           borderRadius: '50%',
-          border: '2px solid white',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+          border: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '5px solid white' : '2px solid white',
+          boxShadow: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '0 6px 16px rgba(0, 0, 0, 0.4)' : '0 2px 4px rgba(0,0,0,0.2)'
         }} />
       </div>
+      {/* 연결점 - 우측 */}
       <div
+        data-category-id={category.id}
         onMouseDown={handleConnectionPointMouseDown}
         onMouseUp={handleConnectionPointMouseUp}
+        onTouchStart={handleConnectionPointMouseDown}
+        onTouchEnd={handleConnectionPointMouseUp}
         onClick={(e) => {
           e.stopPropagation();
           e.preventDefault();
         }}
         style={{
           position: 'absolute',
-          right: -8,
+          right: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? -75 : -8,
           top: '50%',
           transform: 'translateY(-50%)',
-          width: 16,
-          height: 16,
+          width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
+          height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'crosshair',
-          zIndex: 15
+          zIndex: 15,
+          touchAction: 'none'
         }}
       >
         <div style={{
-          width: 8,
-          height: 8,
+          width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
+          height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
           backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
           borderRadius: '50%',
-          border: '2px solid white',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+          border: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '5px solid white' : '2px solid white',
+          boxShadow: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '0 6px 16px rgba(0, 0, 0, 0.4)' : '0 2px 4px rgba(0,0,0,0.2)'
         }} />
       </div>
       </>)}

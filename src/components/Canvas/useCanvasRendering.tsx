@@ -87,6 +87,8 @@ interface UseCanvasRenderingParams {
   onCategorySelect: (categoryId: string, isShiftClick?: boolean) => void;
   onMemoSelect: (memoId: string, isShiftClick?: boolean) => void;
   onStartConnection?: (id: string, direction?: 'top' | 'bottom' | 'left' | 'right') => void;
+  onUpdateDragLine?: (mousePos: { x: number; y: number }) => void;
+  onCancelConnection?: () => void;
   onCategoryPositionChange: (categoryId: string, position: { x: number; y: number }) => void;
   onCategoryLabelPositionChange: (categoryId: string, position: { x: number; y: number }) => void;
   onCategoryToggleExpanded: (categoryId: string) => void;
@@ -172,6 +174,8 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     onCategorySelect,
     onMemoSelect,
     onStartConnection,
+    onUpdateDragLine,
+    onCancelConnection,
     onCategoryPositionChange,
     onCategoryLabelPositionChange,
     onCategoryToggleExpanded,
