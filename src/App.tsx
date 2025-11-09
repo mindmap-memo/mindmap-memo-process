@@ -55,6 +55,19 @@ if (process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_VERCEL_ENV
 }
 
 const App: React.FC = () => {
+  // ===== 에러 추적 =====
+  const [renderError, setRenderError] = React.useState<Error | null>(null);
+
+  // 전역 에러 핸들러
+  React.useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      console.error('[Global Error]', event.error);
+      setRenderError(event.error);
+    };
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
+  }, []);
+
   // ===== 세션 정보 =====
   const { data: session } = useSession();
 
@@ -693,17 +706,83 @@ const App: React.FC = () => {
     );
   }
 
+  // ===== 에러 화면 표시 =====
+  if (renderError) {
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: '#000',
+        color: '#ff0000',
+        padding: '20px',
+        fontSize: '14px',
+        fontFamily: 'monospace',
+        overflow: 'auto',
+        zIndex: 9999999
+      }}>
+        <h1 style={{ color: '#ff0000', marginBottom: '20px' }}>🚨 ERROR DETECTED</h1>
+        <div style={{ marginBottom: '10px' }}><strong>Message:</strong> {renderError.message}</div>
+        <div style={{ marginBottom: '10px' }}><strong>Stack:</strong></div>
+        <pre style={{ whiteSpace: 'pre-wrap', color: '#ffff00' }}>{renderError.stack}</pre>
+        <button
+          onClick={() => {
+            setRenderError(null);
+            window.location.reload();
+          }}
+          style={{
+            marginTop: '20px',
+            padding: '10px 20px',
+            background: '#ff0000',
+            color: '#fff',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '16px'
+          }}
+        >
+          RELOAD PAGE
+        </button>
+      </div>
+    );
+  }
+
   // ===== 모바일 레이아웃 =====
   if (isMobile) {
     return (
-      <AppProviders
-        appState={appStateContextValue}
-        selection={selectionContextValue}
-        panel={panelContextValue}
-        connection={connectionContextValue}
-        quickNav={quickNavContextValue}
-      >
-        <MobileLayout
+      <>
+        {/* 최상위 디버그 UI - AppProviders 외부 */}
+        {process.env.NODE_ENV === 'development' && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            background: 'rgba(255, 0, 0, 0.9)',
+            color: '#fff',
+            padding: '8px',
+            fontSize: '11px',
+            zIndex: 999999,
+            borderBottom: '2px solid yellow',
+            fontFamily: 'monospace'
+          }}>
+            <div><strong>APP.TSX DEBUG:</strong></div>
+            <div>Pages: {pages ? `${pages.length} pages` : 'undefined'}</div>
+            <div>CurrentPageId: {currentPageId || 'undefined'}</div>
+            <div>CurrentPage: {currentPage ? `존재 (${currentPage.name})` : 'undefined'}</div>
+            <div>isInitialLoadDone: {isInitialLoadDone ? 'true' : 'false'}</div>
+            <div>LoadingProgress: {loadingProgress}%</div>
+          </div>
+        )}
+        <AppProviders
+          appState={appStateContextValue}
+          selection={selectionContextValue}
+          panel={panelContextValue}
+          connection={connectionContextValue}
+          quickNav={quickNavContextValue}
+        >
+          <MobileLayout
           tutorialState={tutorialState}
           tutorialMode={tutorialMode}
           handleStartTutorialWrapper={handleStartTutorialWrapper}
@@ -786,6 +865,7 @@ const App: React.FC = () => {
           isShiftPressedRef={appState.isShiftPressedRef}
         />
       </AppProviders>
+      </>
     );
   }
 
