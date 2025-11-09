@@ -472,7 +472,9 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
           display: 'flex',
           gap: '6px',
           alignItems: 'center',
-          marginLeft: '8px'
+          marginLeft: '8px',
+          position: 'relative',
+          zIndex: 100
         }}>
           <button
             style={{
@@ -488,8 +490,12 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
               justifyContent: 'center',
               minWidth: '40px',
               height: '40px',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              position: 'relative',
+              zIndex: 101
             }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
               if (onOpenEditor) {
@@ -525,8 +531,12 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
               justifyContent: 'center',
               minWidth: '40px',
               height: '40px',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              position: 'relative',
+              zIndex: 101
             }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
               if (isQuickNavExists && isQuickNavExists(category.id, 'category')) {
@@ -564,8 +574,12 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
               justifyContent: 'center',
               minWidth: '40px',
               height: '40px',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              position: 'relative',
+              zIndex: 101
             }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
             onClick={handleDelete}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'rgba(255, 77, 77, 0.3)';

@@ -410,6 +410,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
           {/* 제목 옆 버튼들 */}
           <div className={styles.titleButtons}>
             <button
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 if (onOpenEditor) {
@@ -427,6 +429,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
               <Edit2 size={16} />
             </button>
             <button
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 if (isQuickNavExists && isQuickNavExists(memo.id, 'memo')) {
@@ -441,6 +445,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
               <Star size={16} fill={isQuickNavExists && isQuickNavExists(memo.id, 'memo') ? 'currentColor' : 'none'} />
             </button>
             <button
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 if (window.confirm(`"${memo.title || '제목 없는 메모'}"를 삭제하시겠습니까?`)) {

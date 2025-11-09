@@ -85,6 +85,8 @@
   display: flex;
   gap: 4px;
   align-items: center;
+  position: relative;
+  z-index: 100; // 롱프레스보다 높은 우선순위
 }
 
 .titleButton {
@@ -101,6 +103,8 @@
   min-width: 40px;
   height: 40px;
   color: #6b7280;
+  position: relative;
+  z-index: 101; // 부모보다 더 높게
 
   &:hover {
     background-color: #f3f4f6;
