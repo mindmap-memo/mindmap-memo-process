@@ -350,6 +350,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
       <div className={styles.viewContainer}>
         {/* Canvas 뷰 */}
         <div className={styles.view}>
+          {currentPage && (
             <Canvas
               fullscreen
               currentPage={currentPage}
@@ -439,6 +440,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
               setIsShiftPressed={setIsShiftPressed}
               isShiftPressedRef={isShiftPressedRef}
             />
+          )}
         </div>
 
         {/* Editor 뷰 - showEditor가 true일 때만 표시 */}
