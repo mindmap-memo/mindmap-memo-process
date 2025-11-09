@@ -253,16 +253,16 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
       };
 
       const handleTouchMove = (e: TouchEvent) => {
-        if (e.touches.length > 0) {
-          const canvasElement = document.querySelector('[data-canvas-container]') as HTMLElement;
-          if (canvasElement) {
-            const rect = canvasElement.getBoundingClientRect();
-            const offset = canvasOffsetRef.current || { x: 0, y: 0 };
-            const scale = canvasScaleRef.current;
-            const mouseX = (e.touches[0].clientX - rect.left - offset.x) / scale;
-            const mouseY = (e.touches[0].clientY - rect.top - offset.y) / scale;
-            onUpdateDragLine({ x: mouseX, y: mouseY });
-          }
+        if (!e.touches || e.touches.length === 0) return;
+
+        const canvasElement = document.querySelector('[data-canvas-container]') as HTMLElement;
+        if (canvasElement) {
+          const rect = canvasElement.getBoundingClientRect();
+          const offset = canvasOffsetRef.current || { x: 0, y: 0 };
+          const scale = canvasScaleRef.current;
+          const mouseX = (e.touches[0].clientX - rect.left - offset.x) / scale;
+          const mouseY = (e.touches[0].clientY - rect.top - offset.y) / scale;
+          onUpdateDragLine({ x: mouseX, y: mouseY });
         }
       };
 
@@ -677,7 +677,7 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
                 setIsShiftPressed?.(false);
               }
 
-              if (isDragging && upEvent.changedTouches.length > 0) {
+              if (isDragging && upEvent.changedTouches && upEvent.changedTouches.length > 0) {
                 const touch = upEvent.changedTouches[0];
                 const deltaX = (touch.clientX - startX) / canvasScale;
                 const deltaY = (touch.clientY - startY) / canvasScale;

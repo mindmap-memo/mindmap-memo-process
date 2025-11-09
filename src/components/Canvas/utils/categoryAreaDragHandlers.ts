@@ -465,7 +465,7 @@ export const createCategoryAreaTouchHandler = (params: CreateCategoryAreaDragHan
           setIsShiftPressed?.(false);
         }
 
-        if (hasMoved && upEvent?.changedTouches.length) {
+        if (hasMoved && upEvent?.changedTouches && upEvent.changedTouches.length > 0) {
           const touch = upEvent.changedTouches[0];
           const finalPosition = {
             x: originalCategoryPosition.x + (touch.clientX - startX) / canvasScale,

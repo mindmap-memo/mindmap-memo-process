@@ -244,7 +244,7 @@ export const useCategoryLabelDrag = (params: UseCategoryLabelDragParams) => {
         }
 
         // effectiveShiftMode 사용 (롱프레스 또는 Shift 키)
-        if (isDragging && hasMoved && effectiveShiftMode && upEvent?.changedTouches.length) {
+        if (isDragging && hasMoved && effectiveShiftMode && upEvent?.changedTouches && upEvent.changedTouches.length > 0) {
           const touch = upEvent.changedTouches[0];
           const canvasElement = document.getElementById('main-canvas');
           let touchPointerPosition = {
