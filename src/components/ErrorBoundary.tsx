@@ -9,6 +9,8 @@ interface State {
   error: Error | null;
   errorInfo: ErrorInfo | null;
   parsedLocation: string | null;
+  dbLogStatus: 'pending' | 'success' | 'failed' | null;
+  dbLogError: string | null;
 }
 
 class ErrorBoundary extends Component<Props, State> {
@@ -18,7 +20,9 @@ class ErrorBoundary extends Component<Props, State> {
       hasError: false,
       error: null,
       errorInfo: null,
-      parsedLocation: null
+      parsedLocation: null,
+      dbLogStatus: null,
+      dbLogError: null
     };
   }
 
@@ -27,7 +31,9 @@ class ErrorBoundary extends Component<Props, State> {
       hasError: true,
       error,
       errorInfo: null,
-      parsedLocation: null
+      parsedLocation: null,
+      dbLogStatus: 'pending',
+      dbLogError: null
     };
   }
 
@@ -121,17 +127,31 @@ class ErrorBoundary extends Component<Props, State> {
 
       if (!response.ok) {
         const errorText = await response.text();
+        const errorMsg = `상태: ${response.status}, 메시지: ${errorText}`;
         console.error('[ErrorBoundary] Failed to log error - Response not OK:', {
           status: response.status,
           statusText: response.statusText,
           body: errorText
         });
+        this.setState({
+          dbLogStatus: 'failed',
+          dbLogError: errorMsg
+        });
       } else {
         const result = await response.json();
         console.log('[ErrorBoundary] Error logged successfully:', result);
+        this.setState({
+          dbLogStatus: 'success',
+          dbLogError: null
+        });
       }
     } catch (logError) {
+      const errorMsg = logError instanceof Error ? logError.message : String(logError);
       console.error('[ErrorBoundary] Exception while logging error:', logError);
+      this.setState({
+        dbLogStatus: 'failed',
+        dbLogError: `예외 발생: ${errorMsg}`
+      });
     }
   }
 
@@ -154,6 +174,46 @@ class ErrorBoundary extends Component<Props, State> {
             margin: '0 auto'
           }}>
             <h2 style={{ color: '#d32f2f', marginBottom: '20px' }}>⚠️ 에러가 발생했습니다</h2>
+
+            {/* DB 저장 상태 표시 */}
+            <div style={{
+              padding: '15px',
+              backgroundColor: this.state.dbLogStatus === 'success' ? '#d4edda' :
+                              this.state.dbLogStatus === 'failed' ? '#f8d7da' : '#fff3cd',
+              border: `2px solid ${this.state.dbLogStatus === 'success' ? '#28a745' :
+                                   this.state.dbLogStatus === 'failed' ? '#dc3545' : '#ffc107'}`,
+              borderRadius: '8px',
+              marginBottom: '20px'
+            }}>
+              <h3 style={{
+                margin: '0 0 10px 0',
+                color: this.state.dbLogStatus === 'success' ? '#155724' :
+                       this.state.dbLogStatus === 'failed' ? '#721c24' : '#856404'
+              }}>
+                {this.state.dbLogStatus === 'pending' && '⏳ DB 저장 중...'}
+                {this.state.dbLogStatus === 'success' && '✅ DB 저장 성공'}
+                {this.state.dbLogStatus === 'failed' && '❌ DB 저장 실패'}
+              </h3>
+              {this.state.dbLogStatus === 'failed' && this.state.dbLogError && (
+                <div style={{
+                  padding: '10px',
+                  backgroundColor: 'white',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  color: '#721c24',
+                  marginTop: '10px'
+                }}>
+                  <strong>실패 원인:</strong>
+                  <pre style={{
+                    margin: '5px 0 0 0',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all'
+                  }}>
+                    {this.state.dbLogError}
+                  </pre>
+                </div>
+              )}
+            </div>
 
             {this.state.parsedLocation && (
               <div style={{
