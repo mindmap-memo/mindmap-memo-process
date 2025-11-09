@@ -70,12 +70,11 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
     const fromCategory = (currentPageData.categories || []).find(c => c.id === fromId);
     const toCategory = (currentPageData.categories || []).find(c => c.id === toId);
 
-    // 연결 규칙: 메모끼리만, 카테고리끼리만 연결 가능
-    const isValidConnection =
-      (fromMemo && toMemo) || // 메모-메모 연결
-      (fromCategory && toCategory); // 카테고리-카테고리 연결
+    // 연결 규칙: 메모-메모, 메모-카테고리, 카테고리-카테고리 모두 허용
+    const fromExists = fromMemo || fromCategory;
+    const toExists = toMemo || toCategory;
 
-    if (!isValidConnection) {
+    if (!fromExists || !toExists) {
       setIsConnecting(false);
       setConnectingFromId(null);
       setConnectingFromDirection(null);
@@ -105,7 +104,8 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
         ? {
             ...page,
             memos: page.memos.map(memo => {
-              if (memo.id === fromId && fromMemo && toMemo) {
+              // fromId가 메모인 경우 (toId는 메모 또는 카테고리)
+              if (memo.id === fromId && fromMemo) {
                 return {
                   ...memo,
                   connections: memo.connections.includes(toId)
@@ -113,7 +113,8 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
                     : [...memo.connections, toId]
                 };
               }
-              if (memo.id === toId && fromMemo && toMemo) {
+              // toId가 메모인 경우 (fromId는 메모 또는 카테고리)
+              if (memo.id === toId && toMemo) {
                 return {
                   ...memo,
                   connections: memo.connections.includes(fromId)
@@ -124,7 +125,8 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
               return memo;
             }),
             categories: (page.categories || []).map(category => {
-              if (category.id === fromId && fromCategory && toCategory) {
+              // fromId가 카테고리인 경우 (toId는 메모 또는 카테고리)
+              if (category.id === fromId && fromCategory) {
                 return {
                   ...category,
                   connections: category.connections.includes(toId)
@@ -132,7 +134,8 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
                     : [...category.connections, toId]
                 };
               }
-              if (category.id === toId && fromCategory && toCategory) {
+              // toId가 카테고리인 경우 (fromId는 메모 또는 카테고리)
+              if (category.id === toId && toCategory) {
                 return {
                   ...category,
                   connections: category.connections.includes(fromId)

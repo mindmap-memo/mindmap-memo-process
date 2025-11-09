@@ -209,13 +209,17 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
 
   /**
    * 연결점 마우스/터치 다운 핸들러
+   * PC: 항상 작동 (연결 모드 불필요)
+   * 모바일: 연결 모드일 때만 작동
    */
   const handleConnectionPointMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
     console.log('🔵 [연결점 클릭]', { memoId: memo.id, isConnecting, connectingFromId });
 
-    // 연결 모드일 때 드래그 시작
-    if (isConnecting) {
+    const isMobile = window.innerWidth <= 768;
+
+    // PC는 항상, 모바일은 연결 모드일 때만 드래그 시작
+    if (!isMobile || isConnecting) {
       setIsConnectionDragging(true);
       console.log('🔵 [연결 드래그 시작]', { memoId: memo.id });
       // 아직 시작 메모가 설정되지 않았으면 설정
@@ -228,11 +232,16 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
 
   /**
    * 연결점 마우스/터치 업 핸들러
+   * PC: 항상 작동
+   * 모바일: 연결 모드일 때만 작동
    */
   const handleConnectionPointMouseUp = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
 
-    if (isConnecting && connectingFromId && connectingFromId !== memo.id) {
+    const isMobile = window.innerWidth <= 768;
+
+    // PC이거나 모바일 연결 모드일 때 연결 완성
+    if ((!isMobile || isConnecting) && connectingFromId && connectingFromId !== memo.id) {
       onConnectMemos?.(connectingFromId, memo.id);
     }
     setIsConnectionDragging(false);
@@ -553,24 +562,30 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     if (isConnectionDragging && onUpdateDragLine) {
       console.log('🔷 [useEffect] 이벤트 리스너 등록 시작');
       const handleMouseMove = (e: MouseEvent) => {
-        // ref에서 최신 값 가져오기
-        const offset = canvasOffsetRef.current;
-        const scale = canvasScaleRef.current;
-        // 클라이언트 좌표를 캔버스 좌표로 변환
-        const canvasX = (e.clientX - offset.x) / scale;
-        const canvasY = (e.clientY - offset.y) / scale;
-        onUpdateDragLine({ x: canvasX, y: canvasY });
+        // Canvas 요소를 찾아서 rect 기준으로 변환
+        const canvasElement = document.querySelector('[data-canvas-container]') as HTMLElement;
+        if (canvasElement) {
+          const rect = canvasElement.getBoundingClientRect();
+          const offset = canvasOffsetRef.current;
+          const scale = canvasScaleRef.current;
+          const mouseX = (e.clientX - rect.left - offset.x) / scale;
+          const mouseY = (e.clientY - rect.top - offset.y) / scale;
+          onUpdateDragLine({ x: mouseX, y: mouseY });
+        }
       };
 
       const handleTouchMove = (e: TouchEvent) => {
         if (e.touches.length > 0) {
-          // ref에서 최신 값 가져오기
-          const offset = canvasOffsetRef.current;
-          const scale = canvasScaleRef.current;
-          // 클라이언트 좌표를 캔버스 좌표로 변환
-          const canvasX = (e.touches[0].clientX - offset.x) / scale;
-          const canvasY = (e.touches[0].clientY - offset.y) / scale;
-          onUpdateDragLine({ x: canvasX, y: canvasY });
+          // Canvas 요소를 찾아서 rect 기준으로 변환
+          const canvasElement = document.querySelector('[data-canvas-container]') as HTMLElement;
+          if (canvasElement) {
+            const rect = canvasElement.getBoundingClientRect();
+            const offset = canvasOffsetRef.current;
+            const scale = canvasScaleRef.current;
+            const mouseX = (e.touches[0].clientX - rect.left - offset.x) / scale;
+            const mouseY = (e.touches[0].clientY - rect.top - offset.y) / scale;
+            onUpdateDragLine({ x: mouseX, y: mouseY });
+          }
         }
       };
 

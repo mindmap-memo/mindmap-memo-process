@@ -136,21 +136,21 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
                 }}
               />
             )}
-            {/* 실제 보이는 연결선 */}
+            {/* 실제 보이는 연결선 - 모든 연결선 보라색 통일 */}
             <line
               x1={fromPoint.x}
               y1={fromPoint.y}
               x2={toPoint.x}
               y2={toPoint.y}
-              stroke={isDisconnectMode ? "#ef4444" : (isConnecting ? "#9ca3af" : "#9ca3af")}
+              stroke={isDisconnectMode ? "#ef4444" : "#a855f7"}
               strokeWidth={isDisconnectMode ? "4" : "2"}
               style={{
-                strokeDasharray: isDisconnectMode ? '5,5' : '4,4',
+                strokeDasharray: isDisconnectMode ? '5,5' : '8,4',
                 pointerEvents: 'none'
               }}
             />
-            {/* 연결 모드일 때 중간에 삭제 버튼 표시 (드래그 중이 아닐 때만) */}
-            {isConnecting && !connectingFromId && (
+            {/* Disconnect 모드일 때만 삭제 버튼 표시 */}
+            {isDisconnectMode && (
               <g transform={`translate(${midX}, ${midY})`}>
                 {/* 배경 원 */}
                 <circle
@@ -267,21 +267,21 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
                 }}
               />
             )}
-            {/* 실제 보이는 연결선 (카테고리는 보라색, 메모-카테고리는 초록색) */}
+            {/* 실제 보이는 연결선 - 모든 연결선 보라색 통일 */}
             <line
               x1={fromPoint.x}
               y1={fromPoint.y}
               x2={toPoint.x}
               y2={toPoint.y}
-              stroke={isDisconnectMode ? "#ef4444" : (connectedMemo ? "#10b981" : "#a855f7")}
+              stroke={isDisconnectMode ? "#ef4444" : "#a855f7"}
               strokeWidth={isDisconnectMode ? "4" : "2"}
               style={{
-                strokeDasharray: isDisconnectMode ? '5,5' : (connectedMemo ? '6,3' : '8,4'),
+                strokeDasharray: isDisconnectMode ? '5,5' : '8,4',
                 pointerEvents: 'none'
               }}
             />
-            {/* 연결 모드일 때 중간에 삭제 버튼 표시 (드래그 중이 아닐 때만) */}
-            {isConnecting && !connectingFromId && (
+            {/* Disconnect 모드일 때만 삭제 버튼 표시 */}
+            {isDisconnectMode && (
               <g transform={`translate(${midX}, ${midY})`}>
                 {/* 배경 원 */}
                 <circle

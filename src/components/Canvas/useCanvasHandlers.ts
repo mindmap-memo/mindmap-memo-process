@@ -290,8 +290,8 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
    */
   const handleMouseMove = React.useCallback((e: React.MouseEvent) => {
     if (isConnecting) {
+      // Canvas 영역에서의 마우스 이동 - rect 기준으로 변환
       const rect = e.currentTarget.getBoundingClientRect();
-      // 화면 좌표를 원본 좌표로 변환 (SVG가 동일한 transform을 사용하므로)
       const mouseX = (e.clientX - rect.left - canvasOffset.x) / canvasScale;
       const mouseY = (e.clientY - rect.top - canvasOffset.y) / canvasScale;
       onUpdateDragLine({ x: mouseX, y: mouseY });

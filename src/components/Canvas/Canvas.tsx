@@ -469,6 +469,7 @@ const Canvas: React.FC<CanvasProps> = ({
     <div
       id="main-canvas"
       data-canvas="true"
+      data-canvas-container
       data-tutorial="canvas"
       className={`${styles.canvas} ${fullscreen ? styles.fullscreen : ''}`}
       style={{
