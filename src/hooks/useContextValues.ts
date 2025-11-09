@@ -23,6 +23,8 @@ interface UseContextValuesProps {
   currentPageId: string;
   setCurrentPageId: React.Dispatch<React.SetStateAction<string>>;
   currentPage: Page | undefined;
+  isInitialLoadDone: boolean;
+  loadingProgress: number;
   canvasOffset: { x: number; y: number };
   setCanvasOffset: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
   canvasScale: number;
@@ -110,6 +112,8 @@ export const useContextValues = (props: UseContextValuesProps) => {
     currentPageId: props.currentPageId,
     setCurrentPageId: props.setCurrentPageId,
     currentPage: props.currentPage,
+    isInitialLoadDone: props.isInitialLoadDone,
+    loadingProgress: props.loadingProgress,
     canvasOffset: props.canvasOffset,
     setCanvasOffset: props.setCanvasOffset,
     canvasScale: props.canvasScale,
@@ -126,7 +130,8 @@ export const useContextValues = (props: UseContextValuesProps) => {
     setDraggingCategoryId: props.setDraggingCategoryId
   }), [
     props.pages, props.setPages, props.currentPageId, props.setCurrentPageId,
-    props.currentPage, props.canvasOffset, props.setCanvasOffset,
+    props.currentPage, props.isInitialLoadDone, props.loadingProgress,
+    props.canvasOffset, props.setCanvasOffset,
     props.canvasScale, props.setCanvasScale,
     props.isShiftPressed, props.setIsShiftPressed,
     props.isDraggingMemo, props.setIsDraggingMemo,

@@ -9,6 +9,8 @@ export interface AppStateContextType {
   currentPageId: string;
   setCurrentPageId: (id: string) => void;
   currentPage: Page | undefined;
+  isInitialLoadDone: boolean;
+  loadingProgress: number;
 
   // 캔버스 상태
   canvasOffset: { x: number; y: number };

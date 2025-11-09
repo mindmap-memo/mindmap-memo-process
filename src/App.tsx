@@ -591,6 +591,8 @@ const App: React.FC = () => {
     currentPageId,
     setCurrentPageId,
     currentPage,
+    isInitialLoadDone,
+    loadingProgress,
     canvasOffset,
     setCanvasOffset,
     canvasScale,
