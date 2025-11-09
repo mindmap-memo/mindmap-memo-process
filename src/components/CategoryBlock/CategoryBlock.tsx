@@ -2,6 +2,7 @@ import React from 'react';
 import { CategoryBlock } from '../../types';
 import ContextMenu from '../ContextMenu';
 import QuickNavModal from '../QuickNavModal';
+import { Edit2, Star, Trash2 } from 'lucide-react';
 import { detectDoubleTap } from '../../utils/doubleTapUtils';
 import { useCategoryBlockState } from './hooks/useCategoryBlockState';
 import { useCategoryTitleHandlers } from './hooks/useCategoryTitleHandlers';
@@ -344,7 +345,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
 
   const titleStyle: React.CSSProperties = {
     flex: 1,
-    fontSize: isTagMode ? '13px' : '16px',
+    fontSize: isTagMode ? '13px' : '18px', // 16px → 18px로 증가
     fontWeight: isTagMode ? 500 : 600,
     color: 'white',
     backgroundColor: 'transparent',
@@ -467,13 +468,114 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
           </div>
         )}
 
-        <div style={controlsStyle}>
+        <div style={{
+          display: 'flex',
+          gap: '6px',
+          alignItems: 'center',
+          marginLeft: '8px'
+        }}>
           <button
-            style={deleteButtonStyle}
+            style={{
+              background: 'rgba(255, 255, 255, 0.2)',
+              border: '1px solid rgba(255, 255, 255, 0.4)',
+              borderRadius: '6px',
+              padding: '8px 10px',
+              fontSize: '16px',
+              cursor: 'pointer',
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: '40px',
+              height: '40px',
+              transition: 'all 0.2s ease'
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onOpenEditor) {
+                // 모바일: 에디터 열기
+                onOpenEditor();
+              } else {
+                // PC: 제목 편집 모드
+                setIsEditing(true);
+                setTimeout(() => titleRef.current?.focus(), 0);
+              }
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+            }}
+            title="편집"
+          >
+            <Edit2 size={18} />
+          </button>
+          <button
+            style={{
+              background: isQuickNavExists && isQuickNavExists(category.id, 'category') ? 'rgba(251, 191, 36, 0.3)' : 'rgba(255, 255, 255, 0.2)',
+              border: isQuickNavExists && isQuickNavExists(category.id, 'category') ? '1px solid rgba(251, 191, 36, 0.6)' : '1px solid rgba(255, 255, 255, 0.4)',
+              borderRadius: '6px',
+              padding: '8px 10px',
+              fontSize: '16px',
+              cursor: 'pointer',
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: '40px',
+              height: '40px',
+              transition: 'all 0.2s ease'
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isQuickNavExists && isQuickNavExists(category.id, 'category')) {
+                alert('이미 즐겨찾기가 설정되어 있습니다.');
+              } else {
+                onAddQuickNav?.(category.title || '제목 없는 카테고리', category.id, 'category');
+              }
+            }}
+            onMouseEnter={(e) => {
+              const isFav = isQuickNavExists && isQuickNavExists(category.id, 'category');
+              e.currentTarget.style.background = isFav ? 'rgba(251, 191, 36, 0.4)' : 'rgba(255, 255, 255, 0.3)';
+            }}
+            onMouseLeave={(e) => {
+              const isFav = isQuickNavExists && isQuickNavExists(category.id, 'category');
+              e.currentTarget.style.background = isFav ? 'rgba(251, 191, 36, 0.3)' : 'rgba(255, 255, 255, 0.2)';
+            }}
+            title="즐겨찾기"
+          >
+            <Star
+              size={18}
+              fill={isQuickNavExists && isQuickNavExists(category.id, 'category') ? 'currentColor' : 'none'}
+            />
+          </button>
+          <button
+            style={{
+              background: 'rgba(255, 77, 77, 0.2)',
+              border: '1px solid rgba(255, 77, 77, 0.4)',
+              borderRadius: '6px',
+              padding: '8px 10px',
+              fontSize: '16px',
+              cursor: 'pointer',
+              color: '#ff6b6b',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: '40px',
+              height: '40px',
+              transition: 'all 0.2s ease'
+            }}
             onClick={handleDelete}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 77, 77, 0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 77, 77, 0.2)';
+            }}
             title="카테고리 삭제"
           >
-            ✕
+            <Trash2 size={18} />
           </button>
         </div>
       </div>

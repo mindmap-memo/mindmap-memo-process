@@ -36,28 +36,22 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
   onDeleteQuickNavItem,
   hideButton = false
 }) => {
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState<string>('');
-
   // quickNavItems가 undefined일 경우를 대비한 안전 장치
   const safeQuickNavItems = quickNavItems || [];
 
-  const handleStartEdit = (item: QuickNavItem) => {
-    setEditingItemId(item.id);
-    setEditingName(item.name);
-  };
+  // 즐겨찾기 아이템의 실시간 제목을 가져오는 함수
+  const getItemTitle = (item: QuickNavItem): string => {
+    const targetPage = pages?.find(p => p.id === item.pageId);
+    if (!targetPage) return item.name; // 페이지를 찾을 수 없으면 저장된 이름 반환
 
-  const handleSaveEdit = (itemId: string) => {
-    if (editingName.trim()) {
-      onUpdateQuickNavItem(itemId, editingName.trim());
+    if (item.targetType === 'memo') {
+      const memo = targetPage.memos.find(m => m.id === item.targetId);
+      return memo?.title || '제목 없는 메모';
+    } else if (item.targetType === 'category') {
+      const category = targetPage.categories?.find(c => c.id === item.targetId);
+      return category?.title || '제목 없는 카테고리';
     }
-    setEditingItemId(null);
-    setEditingName('');
-  };
-
-  const handleCancelEdit = () => {
-    setEditingItemId(null);
-    setEditingName('');
+    return item.name;
   };
 
   return (
@@ -124,87 +118,39 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
                       .map(item => {
                         const targetPage = pages?.find(p => p.id === item.pageId);
                         const isCurrentPage = item.pageId === currentPageId;
-                        const isEditing = editingItemId === item.id;
+                        const itemTitle = getItemTitle(item); // 실시간 제목 가져오기
 
                         return (
                           <div
                             key={item.id}
-                            className={`${styles['quick-nav-item']} ${styles.memo} ${isEditing ? styles.editing : ''}`}
+                            className={`${styles['quick-nav-item']} ${styles.memo}`}
                           >
-                            {isEditing ? (
-                              <>
-                                <input
-                                  type="text"
-                                  value={editingName}
-                                  onChange={(e) => setEditingName(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      handleSaveEdit(item.id);
-                                    } else if (e.key === 'Escape') {
-                                      handleCancelEdit();
-                                    }
-                                  }}
-                                  className={styles['quick-nav-edit-input']}
-                                  autoFocus
-                                />
-                                <button
-                                  onClick={() => handleSaveEdit(item.id)}
-                                  className={`${styles['quick-nav-edit-button']} ${styles.memo}`}
-                                  title="저장"
-                                >
-                                  ✓
-                                </button>
-                                <button
-                                  onClick={handleCancelEdit}
-                                  className={`${styles['quick-nav-delete-button']} ${styles.memo}`}
-                                  title="취소"
-                                >
-                                  ✕
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <div
-                                  onClick={() => {
-                                    onExecuteQuickNav(item);
-                                    onTogglePanel();
-                                  }}
-                                  className={styles['quick-nav-item-name']}
-                                  title={item.name}
-                                >
-                                  {item.name}
-                                  {!isCurrentPage && targetPage && (
-                                    <span className={styles['quick-nav-item-page']}>
-                                      {targetPage.name}
-                                    </span>
-                                  )}
-                                </div>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleStartEdit(item);
-                                  }}
-                                  className={`${styles['quick-nav-edit-button']} ${styles.memo}`}
-                                  title="이름 변경"
-                                >
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                  </svg>
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (window.confirm(`"${item.name}" 즐겨찾기를 삭제하시겠습니까?`)) {
-                                      onDeleteQuickNavItem(item.id);
-                                    }
-                                  }}
-                                  className={`${styles['quick-nav-delete-button']} ${styles.memo}`}
-                                >
-                                  ×
-                                </button>
-                              </>
-                            )}
+                            <div
+                              onClick={() => {
+                                onExecuteQuickNav(item);
+                                onTogglePanel();
+                              }}
+                              className={styles['quick-nav-item-name']}
+                              title={itemTitle}
+                            >
+                              {itemTitle}
+                              {!isCurrentPage && targetPage && (
+                                <span className={styles['quick-nav-item-page']}>
+                                  {targetPage.name}
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`"${itemTitle}" 즐겨찾기를 삭제하시겠습니까?`)) {
+                                  onDeleteQuickNavItem(item.id);
+                                }
+                              }}
+                              className={`${styles['quick-nav-delete-button']} ${styles.memo}`}
+                            >
+                              ×
+                            </button>
                           </div>
                         );
                       })}
@@ -219,87 +165,39 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
                       .map(item => {
                         const targetPage = pages?.find(p => p.id === item.pageId);
                         const isCurrentPage = item.pageId === currentPageId;
-                        const isEditing = editingItemId === item.id;
+                        const itemTitle = getItemTitle(item); // 실시간 제목 가져오기
 
                         return (
                           <div
                             key={item.id}
-                            className={`${styles['quick-nav-item']} ${styles.category} ${isEditing ? styles.editing : ''}`}
+                            className={`${styles['quick-nav-item']} ${styles.category}`}
                           >
-                            {isEditing ? (
-                              <>
-                                <input
-                                  type="text"
-                                  value={editingName}
-                                  onChange={(e) => setEditingName(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      handleSaveEdit(item.id);
-                                    } else if (e.key === 'Escape') {
-                                      handleCancelEdit();
-                                    }
-                                  }}
-                                  className={styles['quick-nav-edit-input']}
-                                  autoFocus
-                                />
-                                <button
-                                  onClick={() => handleSaveEdit(item.id)}
-                                  className={`${styles['quick-nav-edit-button']} ${styles.category}`}
-                                  title="저장"
-                                >
-                                  ✓
-                                </button>
-                                <button
-                                  onClick={handleCancelEdit}
-                                  className={`${styles['quick-nav-delete-button']} ${styles.category}`}
-                                  title="취소"
-                                >
-                                  ✕
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <div
-                                  onClick={() => {
-                                    onExecuteQuickNav(item);
-                                    onTogglePanel();
-                                  }}
-                                  className={styles['quick-nav-item-name']}
-                                  title={item.name}
-                                >
-                                  {item.name}
-                                  {!isCurrentPage && targetPage && (
-                                    <span className={styles['quick-nav-item-page']}>
-                                      {targetPage.name}
-                                    </span>
-                                  )}
-                                </div>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleStartEdit(item);
-                                  }}
-                                  className={`${styles['quick-nav-edit-button']} ${styles.category}`}
-                                  title="이름 변경"
-                                >
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                  </svg>
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (window.confirm(`"${item.name}" 즐겨찾기를 삭제하시겠습니까?`)) {
-                                      onDeleteQuickNavItem(item.id);
-                                    }
-                                  }}
-                                  className={`${styles['quick-nav-delete-button']} ${styles.category}`}
-                                >
-                                  ×
-                                </button>
-                              </>
-                            )}
+                            <div
+                              onClick={() => {
+                                onExecuteQuickNav(item);
+                                onTogglePanel();
+                              }}
+                              className={styles['quick-nav-item-name']}
+                              title={itemTitle}
+                            >
+                              {itemTitle}
+                              {!isCurrentPage && targetPage && (
+                                <span className={styles['quick-nav-item-page']}>
+                                  {targetPage.name}
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`"${itemTitle}" 즐겨찾기를 삭제하시겠습니까?`)) {
+                                  onDeleteQuickNavItem(item.id);
+                                }
+                              }}
+                              className={`${styles['quick-nav-delete-button']} ${styles.category}`}
+                            >
+                              ×
+                            </button>
                           </div>
                         );
                       })}

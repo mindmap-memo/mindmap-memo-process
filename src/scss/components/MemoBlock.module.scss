@@ -51,15 +51,18 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .title {
   font-weight: 600;
-  font-size: 16px;
+  font-size: 18px; // 16px → 18px로 증가
   display: flex;
   align-items: center;
   gap: 8px;
   flex: 1;
+  min-width: 0; // flex 아이템이 축소될 수 있게
 
   &.withTitle {
     color: #1f2937;
@@ -75,6 +78,44 @@
 
   &.notEditable {
     cursor: default;
+  }
+}
+
+.titleButtons {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.titleButton {
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+  color: #6b7280;
+
+  &:hover {
+    background-color: #f3f4f6;
+    border-color: #d1d5db;
+    color: #374151;
+  }
+
+  &:active {
+    background-color: #e5e7eb;
+  }
+
+  &.bookmarked {
+    background-color: #fef3c7;
+    border-color: #fbbf24;
+    color: #f59e0b;
   }
 }
 

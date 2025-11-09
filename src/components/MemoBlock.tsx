@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { MemoBlock as MemoBlockType, MemoDisplaySize, ImportanceLevel, ImportanceRange, Page } from '../types';
 import ContextMenu from './ContextMenu';
 import QuickNavModal from './QuickNavModal';
+import { Edit2, Star, Trash2 } from 'lucide-react';
 import styles from '../scss/components/MemoBlock.module.scss';
 import {
   getImportanceStyle,
@@ -405,7 +406,56 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
               />
             )}
           </div>
-          {isSelected && (
+
+          {/* 제목 옆 버튼들 */}
+          <div className={styles.titleButtons}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onOpenEditor) {
+                  // 모바일: 에디터 열기
+                  onOpenEditor();
+                } else {
+                  // PC: 제목 편집 모드
+                  setIsEditingTitle(true);
+                  setTimeout(() => titleInputRef.current?.focus(), 0);
+                }
+              }}
+              className={styles.titleButton}
+              title="편집"
+            >
+              <Edit2 size={16} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isQuickNavExists && isQuickNavExists(memo.id, 'memo')) {
+                  alert('이미 즐겨찾기가 설정되어 있습니다.');
+                } else {
+                  onAddQuickNav?.(memo.title || '제목 없는 메모', memo.id, 'memo');
+                }
+              }}
+              className={`${styles.titleButton} ${isQuickNavExists && isQuickNavExists(memo.id, 'memo') ? styles.bookmarked : ''}`}
+              title="즐겨찾기"
+            >
+              <Star size={16} fill={isQuickNavExists && isQuickNavExists(memo.id, 'memo') ? 'currentColor' : 'none'} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm(`"${memo.title || '제목 없는 메모'}"를 삭제하시겠습니까?`)) {
+                  onDelete?.(memo.id);
+                }
+              }}
+              className={styles.titleButton}
+              title="삭제"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+
+          {/* 모바일이 아닐 때만 S/M/L 버튼 표시 */}
+          {isSelected && !onOpenEditor && (
             <div className={styles.sizeButtons}>
               {(['small', 'medium', 'large'] as MemoDisplaySize[]).map((size) => (
                 <button
