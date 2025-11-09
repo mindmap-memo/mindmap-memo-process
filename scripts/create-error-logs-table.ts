@@ -23,10 +23,24 @@ async function createErrorLogsTable() {
 
     // 컬럼 추가 (이미 테이블이 있는 경우)
     try {
+      await sql`ALTER TABLE error_logs ADD COLUMN IF NOT EXISTS stack TEXT`;
+      console.log('✅ stack 컬럼 추가 완료');
+    } catch (e) {
+      console.log('ℹ️ stack 컬럼이 이미 존재하거나 추가할 수 없습니다');
+    }
+
+    try {
       await sql`ALTER TABLE error_logs ADD COLUMN IF NOT EXISTS component_stack TEXT`;
       console.log('✅ component_stack 컬럼 추가 완료');
     } catch (e) {
       console.log('ℹ️ component_stack 컬럼이 이미 존재하거나 추가할 수 없습니다');
+    }
+
+    try {
+      await sql`ALTER TABLE error_logs ADD COLUMN IF NOT EXISTS chunk_file TEXT`;
+      console.log('✅ chunk_file 컬럼 추가 완료');
+    } catch (e) {
+      console.log('ℹ️ chunk_file 컬럼이 이미 존재하거나 추가할 수 없습니다');
     }
 
     try {
