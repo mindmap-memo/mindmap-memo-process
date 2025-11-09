@@ -45,7 +45,9 @@ async function checkAndFixErrorLogs() {
     for (const [colName, colType] of Object.entries(requiredColumns)) {
       if (!columnNames.includes(colName)) {
         console.log(`➕ "${colName}" 컬럼 추가 중...`);
-        await sql`ALTER TABLE error_logs ADD COLUMN ${sql(colName)} ${sql.unsafe(colType)}`;
+        // 동적 SQL 실행을 위해 문자열 템플릿 사용
+        const alterQuery = `ALTER TABLE error_logs ADD COLUMN ${colName} ${colType}`;
+        await sql.unsafe(alterQuery);
         console.log(`✅ "${colName}" 컬럼 추가 완료`);
       }
     }
