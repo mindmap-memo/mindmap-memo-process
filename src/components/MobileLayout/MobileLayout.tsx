@@ -442,19 +442,23 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
             />
           ) : (
             <div className={styles.noPageContainer}>
-              <LeftPanel
-                fullscreen={true}
-                pages={appState.pages}
-                currentPageId={appState.currentPageId}
-                onPageSelect={(pageId) => {
-                  appState.setCurrentPageId(pageId);
-                }}
-                onAddPage={onAddPage}
-                onPageNameChange={onPageNameChange}
-                onDeletePage={onDeletePage}
-                width={0}
-                onResize={() => {}}
-              />
+              {appState.pages && appState.pages.length > 0 ? (
+                <LeftPanel
+                  fullscreen={true}
+                  pages={appState.pages}
+                  currentPageId={appState.currentPageId}
+                  onPageSelect={(pageId) => {
+                    appState.setCurrentPageId(pageId);
+                  }}
+                  onAddPage={onAddPage}
+                  onPageNameChange={onPageNameChange}
+                  onDeletePage={onDeletePage}
+                  width={0}
+                  onResize={() => {}}
+                />
+              ) : (
+                <div className={styles.loadingMessage}>페이지 로딩 중...</div>
+              )}
             </div>
           )}
         </div>
