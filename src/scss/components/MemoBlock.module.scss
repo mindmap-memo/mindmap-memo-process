@@ -270,6 +270,7 @@
   justify-content: center;
   cursor: crosshair;
   z-index: 15;
+  transition: all 0.2s ease;
 
   &.top {
     top: -8px;
@@ -295,12 +296,44 @@
     transform: translateY(-50%);
   }
 
+  // 모바일에서 연결 모드일 때 연결점 크기 확대
+  @media (max-width: 768px) {
+    &.enlarged {
+      width: 56px;
+      height: 56px;
+
+      &.top {
+        top: -28px;
+      }
+
+      &.bottom {
+        bottom: -28px;
+      }
+
+      &.left {
+        left: -28px;
+      }
+
+      &.right {
+        right: -28px;
+      }
+
+      .connectionDot {
+        width: 36px;
+        height: 36px;
+        border: 4px solid white;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+    }
+  }
+
   .connectionDot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
     border: 2px solid white;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
 
     &.default {
       background-color: #8b5cf6;

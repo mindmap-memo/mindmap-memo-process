@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { MemoBlock as MemoBlockType, Page } from '../../../types';
 import { calculateCategoryArea } from '../../../utils/categoryAreaUtils';
 import { DRAG_THRESHOLD, LONG_PRESS_DURATION } from '../../../utils/constants';
@@ -29,6 +29,7 @@ interface UseMemoBlockDragParams {
   onDetectCategoryOnDrop?: (memoId: string, position: { x: number; y: number }, isShiftMode?: boolean) => void;
   onStartConnection?: (memoId: string) => void;
   onConnectMemos?: (fromId: string, toId: string) => void;
+  onUpdateDragLine?: (mousePos: { x: number; y: number }) => void;
   onDragStart?: (memoId: string) => void;
   onDragEnd?: () => void;
   connectingFromId?: string | null;
@@ -52,6 +53,7 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     onDetectCategoryOnDrop,
     onStartConnection,
     onConnectMemos,
+    onUpdateDragLine,
     onDragStart,
     onDragEnd,
     connectingFromId,
@@ -75,6 +77,12 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
   // 빠른 드래그 최적화를 위한 상태
   const lastUpdateTime = React.useRef<number>(0);
   const pendingPosition = React.useRef<{ x: number; y: number } | null>(null);
+
+  // canvasOffset과 canvasScale을 ref로 관리 (매 렌더링마다 업데이트)
+  const canvasOffsetRef = useRef(canvasOffset);
+  const canvasScaleRef = useRef(canvasScale);
+  canvasOffsetRef.current = canvasOffset;
+  canvasScaleRef.current = canvasScale;
 
   // 이벤트 핸들러 ref (useEffect 의존성 문제 해결)
   const handleMouseMoveRef = React.useRef<((e: MouseEvent) => void) | null>(null);
@@ -200,21 +208,22 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
   };
 
   /**
-   * 연결점 마우스 다운 핸들러
+   * 연결점 마우스/터치 다운 핸들러
    */
-  const handleConnectionPointMouseDown = (e: React.MouseEvent) => {
+  const handleConnectionPointMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
 
-    if (!isConnecting) {
+    // 연결 모드가 아니거나, 연결 모드이지만 아직 시작 메모가 설정되지 않았을 때
+    if (!isConnecting || !connectingFromId) {
       setIsConnectionDragging(true);
       onStartConnection?.(memo.id);
     }
   };
 
   /**
-   * 연결점 마우스 업 핸들러
+   * 연결점 마우스/터치 업 핸들러
    */
-  const handleConnectionPointMouseUp = (e: React.MouseEvent) => {
+  const handleConnectionPointMouseUp = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
 
     if (isConnecting && connectingFromId && connectingFromId !== memo.id) {
@@ -551,6 +560,41 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
       };
     }
   }, [mouseDownPos, isDragging]);
+
+  // 연결점 드래그 시 dragLine 업데이트
+  React.useEffect(() => {
+    if (isConnectionDragging && onUpdateDragLine) {
+      const handleMouseMove = (e: MouseEvent) => {
+        // ref에서 최신 값 가져오기
+        const offset = canvasOffsetRef.current;
+        const scale = canvasScaleRef.current;
+        // 클라이언트 좌표를 캔버스 좌표로 변환
+        const canvasX = (e.clientX - offset.x) / scale;
+        const canvasY = (e.clientY - offset.y) / scale;
+        onUpdateDragLine({ x: canvasX, y: canvasY });
+      };
+
+      const handleTouchMove = (e: TouchEvent) => {
+        if (e.touches.length > 0) {
+          // ref에서 최신 값 가져오기
+          const offset = canvasOffsetRef.current;
+          const scale = canvasScaleRef.current;
+          // 클라이언트 좌표를 캔버스 좌표로 변환
+          const canvasX = (e.touches[0].clientX - offset.x) / scale;
+          const canvasY = (e.touches[0].clientY - offset.y) / scale;
+          onUpdateDragLine({ x: canvasX, y: canvasY });
+        }
+      };
+
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('touchmove', handleTouchMove);
+
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('touchmove', handleTouchMove);
+      };
+    }
+  }, [isConnectionDragging, onUpdateDragLine]);
 
   return {
     isDragging,

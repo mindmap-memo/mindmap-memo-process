@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Plus, Folder } from 'lucide-react';
+import { Plus, Folder, GitBranch } from 'lucide-react';
 import { MobileHeader } from './MobileHeader';
 import { MobileSearchResults } from './MobileSearchResults';
 import { useMobileLayout } from './hooks/useMobileLayout';
@@ -546,6 +546,24 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
             <span className={styles.fabMenuText}>카테고리 추가</span>
           </div>
         </div>
+      )}
+
+      {/* 연결선 생성 버튼 - FAB 버튼 위 */}
+      {!showEditor && (
+        <button
+          className={`${styles.connectionButton} ${connection.isConnecting ? styles.active : ''}`}
+          onClick={() => {
+            if (connection.isConnecting) {
+              onCancelConnection();
+            } else {
+              // 연결 모드 활성화 (메모 선택 없이도 가능)
+              connection.setIsConnecting(true);
+            }
+          }}
+          aria-label={connection.isConnecting ? "연결 취소" : "연결선 생성"}
+        >
+          <GitBranch size={24} />
+        </button>
       )}
 
       {/* FAB 버튼 - 우측 하단 */}

@@ -27,6 +27,7 @@ interface MemoBlockProps {
   connectingFromId?: string | null;
   onStartConnection?: (memoId: string) => void;
   onConnectMemos?: (fromId: string, toId: string) => void;
+  onUpdateDragLine?: (mousePos: { x: number; y: number }) => void;
   canvasScale?: number;
   canvasOffset?: { x: number; y: number };
   activeImportanceFilters?: Set<ImportanceLevel>;
@@ -61,6 +62,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   connectingFromId,
   onStartConnection,
   onConnectMemos,
+  onUpdateDragLine,
   canvasScale = 1,
   canvasOffset = { x: 0, y: 0 },
   activeImportanceFilters,
@@ -131,6 +133,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
     onDetectCategoryOnDrop,
     onStartConnection,
     onConnectMemos,
+    onUpdateDragLine,
     onDragStart,
     onDragEnd,
     connectingFromId,
@@ -655,30 +658,42 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
 
       {/* 연결점들 - 메모 블록 외부에 배치 */}
       <div
-        className={`${styles.connectionPoint} ${styles.top}`}
+        className={`${styles.connectionPoint} ${styles.top} ${isConnecting && onOpenEditor ? styles.enlarged : ''}`}
         onMouseDown={handleConnectionPointMouseDown}
         onMouseUp={handleConnectionPointMouseUp}
+        onTouchStart={handleConnectionPointMouseDown}
+        onTouchEnd={handleConnectionPointMouseUp}
+        style={{ touchAction: 'none' }}
       >
         <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} />
       </div>
       <div
-        className={`${styles.connectionPoint} ${styles.bottom}`}
+        className={`${styles.connectionPoint} ${styles.bottom} ${isConnecting && onOpenEditor ? styles.enlarged : ''}`}
         onMouseDown={handleConnectionPointMouseDown}
         onMouseUp={handleConnectionPointMouseUp}
+        onTouchStart={handleConnectionPointMouseDown}
+        onTouchEnd={handleConnectionPointMouseUp}
+        style={{ touchAction: 'none' }}
       >
         <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} />
       </div>
       <div
-        className={`${styles.connectionPoint} ${styles.left}`}
+        className={`${styles.connectionPoint} ${styles.left} ${isConnecting && onOpenEditor ? styles.enlarged : ''}`}
         onMouseDown={handleConnectionPointMouseDown}
         onMouseUp={handleConnectionPointMouseUp}
+        onTouchStart={handleConnectionPointMouseDown}
+        onTouchEnd={handleConnectionPointMouseUp}
+        style={{ touchAction: 'none' }}
       >
         <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} />
       </div>
       <div
-        className={`${styles.connectionPoint} ${styles.right}`}
+        className={`${styles.connectionPoint} ${styles.right} ${isConnecting && onOpenEditor ? styles.enlarged : ''}`}
         onMouseDown={handleConnectionPointMouseDown}
         onMouseUp={handleConnectionPointMouseUp}
+        onTouchStart={handleConnectionPointMouseDown}
+        onTouchEnd={handleConnectionPointMouseUp}
+        style={{ touchAction: 'none' }}
       >
         <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} />
       </div>
