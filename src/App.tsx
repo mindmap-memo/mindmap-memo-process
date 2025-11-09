@@ -753,7 +753,7 @@ const App: React.FC = () => {
     return (
       <>
         {/* 최상위 디버그 UI - AppProviders 외부 */}
-        {process.env.NODE_ENV === 'development' && (
+        {(process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview') && (
           <div style={{
             position: 'fixed',
             top: 0,

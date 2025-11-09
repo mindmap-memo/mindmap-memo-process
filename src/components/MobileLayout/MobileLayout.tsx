@@ -261,8 +261,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
 
   return (
     <div className={styles.mobileLayout}>
-      {/* 시각적 디버깅 UI - 개발 중에만 표시 */}
-      {process.env.NODE_ENV === 'development' && (
+      {/* 시각적 디버깅 UI - 개발 및 Preview에서 표시 */}
+      {(process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview') && (
         <div style={{
           position: 'fixed',
           top: 0,
