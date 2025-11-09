@@ -239,6 +239,13 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   // 현재 페이지 찾기
   const currentPage = appState.pages?.find(p => p.id === appState.currentPageId);
 
+  // 디버깅: currentPage 상태 확인
+  React.useEffect(() => {
+    console.log('[MobileLayout] currentPage:', currentPage);
+    console.log('[MobileLayout] pages:', appState.pages);
+    console.log('[MobileLayout] currentPageId:', appState.currentPageId);
+  }, [currentPage, appState.pages, appState.currentPageId]);
+
   // 선택된 메모 및 카테고리 찾기
   const selectedMemo = currentPage?.memos?.find(m => m.id === selection.selectedMemoId);
   const selectedMemos = currentPage?.memos?.filter(m => selection.selectedMemoIds.includes(m.id)) || [];
