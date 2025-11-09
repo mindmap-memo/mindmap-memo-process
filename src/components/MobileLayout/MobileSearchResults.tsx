@@ -122,15 +122,17 @@ export const MobileSearchResults: React.FC<MobileSearchResultsProps> = ({
 
               // 중요도 배경색이 있는 텍스트 렌더링
               const renderTextWithImportance = (text: string, ranges: typeof importanceRanges) => {
-                if (ranges.length === 0) {
+                if (!ranges || !Array.isArray(ranges) || ranges.length === 0) {
                   return <span>{text}</span>;
                 }
 
                 const elements: React.ReactNode[] = [];
                 let lastIndex = 0;
 
-                // 범위를 정렬
-                const sortedRanges = [...ranges].sort((a, b) => a.start - b.start);
+                // 범위를 정렬 (유효한 범위만 필터링)
+                const sortedRanges = ranges
+                  .filter(r => r && typeof r.start === 'number' && typeof r.end === 'number')
+                  .sort((a, b) => a.start - b.start);
 
                 sortedRanges.forEach((range, idx) => {
                   // 이전 일반 텍스트
