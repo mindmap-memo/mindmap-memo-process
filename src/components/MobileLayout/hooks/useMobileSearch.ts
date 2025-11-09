@@ -32,10 +32,10 @@ export const useMobileSearch = ({
 }: UseMobileSearchProps) => {
 
   // Set을 정렬된 문자열로 변환하여 안정적인 의존성 생성
-  const importanceFiltersKey = useMemo(() =>
-    Array.from(searchImportanceFilters).sort().join(','),
-    [searchImportanceFilters]
-  );
+  const importanceFiltersKey = useMemo(() => {
+    if (!searchImportanceFilters) return '';
+    return Array.from(searchImportanceFilters).sort().join(',');
+  }, [searchImportanceFilters]);
 
   // 메모 검색 로직 (LeftPanel의 useSearch와 동일)
   const searchMemos = useCallback((query: string, category: SearchCategory): MemoBlock[] => {
