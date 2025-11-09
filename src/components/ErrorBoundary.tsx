@@ -97,7 +97,13 @@ class ErrorBoundary extends Component<Props, State> {
       const chunkMatch = stack.match(/\/_next\/static\/chunks\/([a-f0-9]+\.js)/);
       const chunkFile = chunkMatch ? chunkMatch[1] : null;
 
-      await fetch('/api/error-logs', {
+      console.log('[ErrorBoundary] Logging error to database...', {
+        message: error.message,
+        parsedLocation,
+        chunkFile
+      });
+
+      const response = await fetch('/api/error-logs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -112,8 +118,20 @@ class ErrorBoundary extends Component<Props, State> {
           timestamp: new Date().toISOString()
         }),
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[ErrorBoundary] Failed to log error - Response not OK:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
+      } else {
+        const result = await response.json();
+        console.log('[ErrorBoundary] Error logged successfully:', result);
+      }
     } catch (logError) {
-      console.error('Failed to log error to database:', logError);
+      console.error('[ErrorBoundary] Exception while logging error:', logError);
     }
   }
 
