@@ -52,9 +52,11 @@ export const useMobileSearch = ({
     });
 
     const allMemoIds = new Set([...directMemos.map(m => m.id), ...categoryMemos.map(m => m.id)]);
-    const currentPageMemos: MemoBlock[] = Array.from(allMemoIds).map(id => {
-      return directMemos.find(m => m.id === id) || categoryMemos.find(m => m.id === id)!;
-    });
+    const currentPageMemos: MemoBlock[] = Array.from(allMemoIds)
+      .map(id => {
+        return directMemos.find(m => m.id === id) || categoryMemos.find(m => m.id === id);
+      })
+      .filter((memo): memo is MemoBlock => memo !== undefined);
 
     if (!query.trim()) {
       const filteredMemos = currentPageMemos.filter(memo => {

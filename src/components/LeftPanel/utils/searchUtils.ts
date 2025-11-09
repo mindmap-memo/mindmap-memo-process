@@ -94,11 +94,11 @@ export const getAllMemosFromCategory = (categoryId: string, page: Page): MemoBlo
   const result: MemoBlock[] = [];
 
   // 해당 카테고리를 부모로 가진 메모 찾기
-  const childMemos = page.memos.filter(memo => memo.parentId === categoryId);
+  const childMemos = (page.memos || []).filter(memo => memo.parentId === categoryId);
   result.push(...childMemos);
 
   // 해당 카테고리를 부모로 가진 하위 카테고리들의 메모도 재귀적으로 찾기
-  const childCategories = page.categories?.filter(cat => cat.parentId === categoryId) || [];
+  const childCategories = (page.categories || []).filter(cat => cat.parentId === categoryId);
   childCategories.forEach(childCat => {
     result.push(...getAllMemosFromCategory(childCat.id, page));
   });
