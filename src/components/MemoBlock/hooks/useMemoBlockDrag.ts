@@ -561,7 +561,7 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     }
   }, [mouseDownPos, isDragging]);
 
-  // 연결점 드래그 시 dragLine 업데이트
+  // 연결점 드래그 시 dragLine 업데이트 및 드롭 처리
   React.useEffect(() => {
     if (isConnectionDragging && onUpdateDragLine) {
       const handleMouseMove = (e: MouseEvent) => {
@@ -586,15 +586,52 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
         }
       };
 
+      const handleMouseUp = (e: MouseEvent) => {
+        // 마우스 위치에서 메모 찾기 (data-memo-id 속성 사용)
+        const element = document.elementFromPoint(e.clientX, e.clientY);
+        const memoElement = element?.closest('[data-memo-id]');
+
+        if (memoElement && isConnecting && connectingFromId) {
+          const targetMemoId = memoElement.getAttribute('data-memo-id');
+          if (targetMemoId && targetMemoId !== connectingFromId) {
+            onConnectMemos?.(connectingFromId, targetMemoId);
+          }
+        }
+
+        setIsConnectionDragging(false);
+      };
+
+      const handleTouchEnd = (e: TouchEvent) => {
+        if (e.changedTouches.length > 0) {
+          const touch = e.changedTouches[0];
+          // 터치 위치에서 메모 찾기
+          const element = document.elementFromPoint(touch.clientX, touch.clientY);
+          const memoElement = element?.closest('[data-memo-id]');
+
+          if (memoElement && isConnecting && connectingFromId) {
+            const targetMemoId = memoElement.getAttribute('data-memo-id');
+            if (targetMemoId && targetMemoId !== connectingFromId) {
+              onConnectMemos?.(connectingFromId, targetMemoId);
+            }
+          }
+        }
+
+        setIsConnectionDragging(false);
+      };
+
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('touchmove', handleTouchMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('touchend', handleTouchEnd);
 
       return () => {
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('touchend', handleTouchEnd);
       };
     }
-  }, [isConnectionDragging, onUpdateDragLine]);
+  }, [isConnectionDragging, onUpdateDragLine, isConnecting, connectingFromId, onConnectMemos]);
 
   return {
     isDragging,
