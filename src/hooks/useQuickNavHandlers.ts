@@ -89,7 +89,7 @@ export const useQuickNavHandlers = ({
       if (!memo) {
         console.error('[handleNavigateToMemo] Memo not found in target page! Removing from quick nav.');
         // 메모가 삭제되었으면 즐겨찾기 목록에서도 제거
-        const itemToDelete = quickNavItems.find(item => item.targetType === 'memo' && item.targetId === memoId);
+        const itemToDelete = (quickNavItems || []).find(item => item.targetType === 'memo' && item.targetId === memoId);
         if (itemToDelete) {
           deleteQuickNavItem(itemToDelete.id);
         }
@@ -154,7 +154,7 @@ export const useQuickNavHandlers = ({
       if (!category) {
         console.error('[handleNavigateToCategory] Category not found in target page! Removing from quick nav.');
         // 카테고리가 삭제되었으면 즐겨찾기 목록에서도 제거
-        const itemToDelete = quickNavItems.find(item => item.targetType === 'category' && item.targetId === categoryId);
+        const itemToDelete = (quickNavItems || []).find(item => item.targetType === 'category' && item.targetId === categoryId);
         if (itemToDelete) {
           deleteQuickNavItem(itemToDelete.id);
         }
@@ -219,7 +219,7 @@ export const useQuickNavHandlers = ({
   const addQuickNavItem = useCallback(
     async (name: string, targetId: string, targetType: 'memo' | 'category') => {
       // 중복 체크: 같은 페이지의 같은 타겟에 대한 즐겨찾기가 이미 있는지 확인
-      const isDuplicate = quickNavItems.some(
+      const isDuplicate = (quickNavItems || []).some(
         (item) => item.targetId === targetId && item.targetType === targetType && item.pageId === currentPageId
       );
 
@@ -302,7 +302,7 @@ export const useQuickNavHandlers = ({
    */
   const isQuickNavExists = useCallback(
     (targetId: string, targetType: 'memo' | 'category'): boolean => {
-      return quickNavItems.some(
+      return (quickNavItems || []).some(
         (item) => item.targetId === targetId && item.targetType === targetType && item.pageId === currentPageId
       );
     },

@@ -39,6 +39,9 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState<string>('');
 
+  // quickNavItems가 undefined일 경우를 대비한 안전 장치
+  const safeQuickNavItems = quickNavItems || [];
+
   const handleStartEdit = (item: QuickNavItem) => {
     console.log('[QuickNavPanel] 편집 시작:', { id: item.id, name: item.name, item });
     setEditingItemId(item.id);
@@ -74,9 +77,9 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
             <path d="M8 2L9.5 5.5L13 6L10.5 8.5L11 12L8 10L5 12L5.5 8.5L3 6L6.5 5.5L8 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           <span>즐겨찾기</span>
-          {quickNavItems.length > 0 && (
+          {safeQuickNavItems.length > 0 && (
             <span className={styles['quick-nav-badge']}>
-              {quickNavItems.length}
+              {safeQuickNavItems.length}
             </span>
           )}
         </button>
@@ -108,16 +111,16 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
               <X size={24} />
             </button>
 
-            {quickNavItems.length === 0 ? (
+            {safeQuickNavItems.length === 0 ? (
               <div className={styles['quick-nav-empty']}>
                 등록된 즐겨찾기가 없습니다
               </div>
             ) : (
               <>
                 {/* 메모 즐겨찾기 */}
-                {quickNavItems.filter(item => item.targetType === 'memo').length > 0 && (
+                {safeQuickNavItems.filter(item => item.targetType === 'memo').length > 0 && (
                   <div className={styles['quick-nav-section']}>
-                    {quickNavItems
+                    {safeQuickNavItems
                       .filter(item => item.targetType === 'memo')
                       .map(item => {
                         console.log('[QuickNavPanel] 렌더링:', { id: item.id, name: item.name });
@@ -211,9 +214,9 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
                 )}
 
                 {/* 카테고리 즐겨찾기 */}
-                {quickNavItems.filter(item => item.targetType === 'category').length > 0 && (
+                {safeQuickNavItems.filter(item => item.targetType === 'category').length > 0 && (
                   <div className={styles['quick-nav-section']}>
-                    {quickNavItems
+                    {safeQuickNavItems
                       .filter(item => item.targetType === 'category')
                       .map(item => {
                         const targetPage = pages?.find(p => p.id === item.pageId);

@@ -130,7 +130,7 @@ export const MobileSearchResults: React.FC<MobileSearchResultsProps> = ({
                 let lastIndex = 0;
 
                 // 범위를 정렬 (유효한 범위만 필터링)
-                const sortedRanges = ranges
+                const sortedRanges = (ranges || [])
                   .filter(r => r && typeof r.start === 'number' && typeof r.end === 'number')
                   .sort((a, b) => a.start - b.start);
 
