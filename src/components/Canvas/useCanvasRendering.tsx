@@ -282,6 +282,8 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     onCategorySelect,
     onMemoSelect,
     onStartConnection,
+    onUpdateDragLine,
+    onCancelConnection,
     onCategoryPositionChange,
     onCategoryLabelPositionChange,
     onCategoryToggleExpanded,
