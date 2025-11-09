@@ -44,7 +44,7 @@ export const useTextBlockRendering = (params: UseTextBlockRenderingParams) => {
 
   // 필터링이 적용된 편집모드 배경 렌더링
   const renderFilteredStyledText = (text: string, ranges?: ImportanceRange[], activeFilters?: Set<ImportanceLevel>, showGeneral?: boolean) => {
-    if (!ranges || ranges.length === 0) {
+    if (!ranges || !Array.isArray(ranges) || ranges.length === 0) {
       // 배경 레이어에서는 중요도가 없으면 아무것도 렌더링하지 않음
       return null;
     }
@@ -134,7 +134,7 @@ export const useTextBlockRendering = (params: UseTextBlockRenderingParams) => {
 
   // 텍스트에 중요도 스타일 적용
   const renderStyledText = (text: string, ranges: ImportanceRange[] = importanceRanges || []) => {
-    if (!ranges || ranges.length === 0) {
+    if (!ranges || !Array.isArray(ranges) || ranges.length === 0) {
       return null; // 중요도가 없으면 배경 레이어에 아무것도 렌더링하지 않음
     }
 
@@ -207,7 +207,7 @@ export const useTextBlockRendering = (params: UseTextBlockRenderingParams) => {
 
   // 필터링이 적용된 하이라이트 텍스트 렌더링 (MemoBlock과 동일한 로직)
   const renderFilteredHighlightedText = (text: string, ranges?: ImportanceRange[], activeFilters?: Set<ImportanceLevel>, showGeneral?: boolean) => {
-    if (!ranges || ranges.length === 0) {
+    if (!ranges || !Array.isArray(ranges) || ranges.length === 0) {
       // 하이라이팅이 없는 일반 텍스트는 일반 텍스트 필터에 따라 표시/숨김
       return showGeneral === false ? '' : text;
     }
@@ -267,7 +267,7 @@ export const useTextBlockRendering = (params: UseTextBlockRenderingParams) => {
 
   // 읽기 모드에서만 제대로 된 색상으로 중요도 표시
   const renderStyledTextForReadMode = (text: string, ranges: ImportanceRange[] = block.importanceRanges || []) => {
-    if (!ranges || ranges.length === 0) {
+    if (!ranges || !Array.isArray(ranges) || ranges.length === 0) {
       return text;
     }
 

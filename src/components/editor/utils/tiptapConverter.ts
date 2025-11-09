@@ -35,8 +35,8 @@ function textBlockToHTML(block: TextBlock): string {
     return '<p></p>';
   }
 
-  // importanceRanges가 없으면 일반 paragraph
-  if (!block.importanceRanges || block.importanceRanges.length === 0) {
+  // importanceRanges가 없거나 배열이 아니면 일반 paragraph
+  if (!block.importanceRanges || !Array.isArray(block.importanceRanges) || block.importanceRanges.length === 0) {
     return `<p>${escapeHTML(block.content)}</p>`;
   }
 

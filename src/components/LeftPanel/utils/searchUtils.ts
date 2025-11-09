@@ -34,7 +34,7 @@ export const getFilteredTextFromBlock = (
 
   const { content, importanceRanges } = block;
 
-  if (!importanceRanges || importanceRanges.length === 0) {
+  if (!importanceRanges || !Array.isArray(importanceRanges) || importanceRanges.length === 0) {
     // 중요도 없는 일반 텍스트
     return searchShowGeneralContent ? content : '';
   }

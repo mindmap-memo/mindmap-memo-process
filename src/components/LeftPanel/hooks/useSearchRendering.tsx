@@ -155,7 +155,7 @@ export const useSearchRendering = ({
 
   // 하이라이팅된 텍스트 렌더링 (모든 중요도 표시)
   const renderHighlightedText = (text: string, importanceRanges?: any[], blockIndex: number = 0) => {
-    if (!importanceRanges || importanceRanges.length === 0) {
+    if (!importanceRanges || !Array.isArray(importanceRanges) || importanceRanges.length === 0) {
       const displayText = text.length > 200 ? text.substring(0, 200) + '...' : text;
       return (
         <span key={blockIndex}>
@@ -234,7 +234,7 @@ export const useSearchRendering = ({
 
   // 필터링된 하이라이팅 텍스트 렌더링 (선택된 중요도만 표시, 검색어 매칭 고려)
   const renderFilteredHighlightedText = (text: string, importanceRanges?: any[], blockIndex: number = 0) => {
-    if (!importanceRanges || importanceRanges.length === 0) {
+    if (!importanceRanges || !Array.isArray(importanceRanges) || importanceRanges.length === 0) {
       if (searchShowGeneralContent && (!searchQuery || flexibleMatch(text, searchQuery))) {
         // 일반 내용: 검색어가 포함된 경우 전체 블록 표시 (길이 제한 있음)
         const displayText = text.length > 200 ? text.substring(0, 200) + '...' : text;
