@@ -10,7 +10,7 @@ import Canvas from '../Canvas/Canvas';
 import RightPanel from '../RightPanel/RightPanel';
 import LeftPanel from '../LeftPanel/LeftPanel';
 import ImportanceFilter from '../ImportanceFilter';
-import { useAppStateContext, useSelection, useConnection, usePanel } from '../../contexts';
+import { useAppStateContext, useSelection, useConnection, usePanel, useQuickNav } from '../../contexts';
 import { MemoDisplaySize, CategoryBlock, MemoBlock } from '../../types';
 import { centerOnMemo, centerOnCategory } from '../../utils/categoryAreaUtils';
 import styles from '../../scss/components/MobileLayout/MobileLayout.module.scss';
@@ -223,11 +223,49 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   const selection = useSelection();
   const connection = useConnection();
   const panel = usePanel();
+  const quickNav = useQuickNav();
 
-  // 검색 기능
+  // Context 데이터 유효성 검증 (초기 로딩 상태 처리)
+  const [isContextReady, setIsContextReady] = React.useState(false);
+
+  React.useEffect(() => {
+    // Context가 모두 준비되었는지 확인
+    if (appState && selection && connection && panel && quickNav &&
+        appState.pages && Array.isArray(appState.pages)) {
+      setIsContextReady(true);
+    }
+  }, [appState, selection, connection, panel, quickNav]);
+
+  // Context가 준비되지 않았으면 로딩 화면 표시
+  if (!isContextReady || !appState?.pages || !Array.isArray(appState.pages)) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        fontSize: '16px',
+        color: '#666',
+        gap: '16px'
+      }}>
+        <div style={{ fontSize: '20px', fontWeight: 'bold' }}>Mindmap Memo</div>
+        <div>앱을 초기화하는 중...</div>
+        {(process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview') && (
+          <div style={{ fontSize: '12px', color: '#999', marginTop: '20px', textAlign: 'center' }}>
+            <div>DEBUG: Context Ready = {isContextReady ? 'true' : 'false'}</div>
+            <div>appState = {appState ? 'exists' : 'undefined'}</div>
+            <div>pages = {appState?.pages ? `array(${appState.pages.length})` : 'undefined'}</div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // 검색 기능 (안전한 접근)
   useMobileSearch({
-    pages: appState.pages,
-    currentPageId: appState.currentPageId,
+    pages: appState?.pages || [],
+    currentPageId: appState?.currentPageId || '',
     searchQuery,
     searchCategory,
     searchImportanceFilters,
@@ -236,21 +274,44 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
     setSearchCategoryResults
   });
 
-  // 현재 페이지 찾기
-  const currentPage = appState.pages?.find(p => p.id === appState.currentPageId);
+  // 현재 페이지 찾기 (안전한 접근)
+  const currentPage = React.useMemo(() => {
+    if (!appState || !appState.pages || !Array.isArray(appState.pages)) {
+      console.error('[MobileLayout] appState.pages is not available:', appState);
+      return undefined;
+    }
+    return appState.pages.find(p => p.id === appState.currentPageId);
+  }, [appState, appState?.pages, appState?.currentPageId]);
 
   // 디버깅: currentPage 상태 확인
   React.useEffect(() => {
     console.log('[MobileLayout] currentPage:', currentPage);
-    console.log('[MobileLayout] pages:', appState.pages);
-    console.log('[MobileLayout] currentPageId:', appState.currentPageId);
-  }, [currentPage, appState.pages, appState.currentPageId]);
+    console.log('[MobileLayout] pages:', appState?.pages);
+    console.log('[MobileLayout] currentPageId:', appState?.currentPageId);
+  }, [currentPage, appState?.pages, appState?.currentPageId]);
 
-  // 선택된 메모 및 카테고리 찾기
-  const selectedMemo = currentPage?.memos?.find(m => m.id === selection.selectedMemoId);
-  const selectedMemos = currentPage?.memos?.filter(m => selection.selectedMemoIds.includes(m.id)) || [];
-  const selectedCategory = currentPage?.categories?.find(c => c.id === selection.selectedCategoryId);
-  const selectedCategories = currentPage?.categories?.filter(c => selection.selectedCategoryIds.includes(c.id)) || [];
+  // 선택된 메모 및 카테고리 찾기 (안전한 접근)
+  const selectedMemo = React.useMemo(() => {
+    if (!currentPage?.memos || !Array.isArray(currentPage.memos)) return undefined;
+    return currentPage.memos.find(m => m.id === selection?.selectedMemoId);
+  }, [currentPage, selection?.selectedMemoId]);
+
+  const selectedMemos = React.useMemo(() => {
+    if (!currentPage?.memos || !Array.isArray(currentPage.memos)) return [];
+    if (!selection?.selectedMemoIds || !Array.isArray(selection.selectedMemoIds)) return [];
+    return currentPage.memos.filter(m => selection.selectedMemoIds.includes(m.id));
+  }, [currentPage, selection?.selectedMemoIds]);
+
+  const selectedCategory = React.useMemo(() => {
+    if (!currentPage?.categories || !Array.isArray(currentPage.categories)) return undefined;
+    return currentPage.categories.find(c => c.id === selection?.selectedCategoryId);
+  }, [currentPage, selection?.selectedCategoryId]);
+
+  const selectedCategories = React.useMemo(() => {
+    if (!currentPage?.categories || !Array.isArray(currentPage.categories)) return [];
+    if (!selection?.selectedCategoryIds || !Array.isArray(selection.selectedCategoryIds)) return [];
+    return currentPage.categories.filter(c => selection.selectedCategoryIds.includes(c.id));
+  }, [currentPage, selection?.selectedCategoryIds]);
 
   // Editor 표시 조건: 더블탭으로만 열리도록 변경 (자동 열림 제거)
   // React.useEffect(() => {
@@ -329,8 +390,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
               searchQuery={searchQuery}
               showFilters={showFilters}
               onNavigateToMemo={(memoId) => {
-                const currentPage = appState.pages?.find(p => p.id === appState.currentPageId);
-                if (currentPage) {
+                const currentPage = appState?.pages?.find(p => p.id === appState.currentPageId);
+                if (currentPage && selection && appState) {
                   // 메모 선택
                   selection.handleMemoSelect(memoId);
                   // 화면 중앙으로 이동
@@ -340,8 +401,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
                 setSearchQuery('');
               }}
               onNavigateToCategory={(categoryId) => {
-                const currentPage = appState.pages?.find(p => p.id === appState.currentPageId);
-                if (currentPage) {
+                const currentPage = appState?.pages?.find(p => p.id === appState.currentPageId);
+                if (currentPage && selection && appState) {
                   // 카테고리 선택
                   selection.selectCategory(categoryId);
                   // 카테고리 영역 전체를 화면 중앙으로 이동
@@ -356,16 +417,18 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
       )}
 
       {/* 페이지 선택 뷰 */}
-      {showPages && (
+      {showPages && appState?.pages && (
         <div className={styles.pagesOverlay}>
           <div className={styles.pagesContainer}>
             <LeftPanel
               fullscreen={true}
               pages={appState.pages}
-              currentPageId={appState.currentPageId}
+              currentPageId={appState.currentPageId || ''}
               onPageSelect={(pageId) => {
-                appState.setCurrentPageId(pageId);
-                setShowPages(false);
+                if (appState?.setCurrentPageId) {
+                  appState.setCurrentPageId(pageId);
+                  setShowPages(false);
+                }
               }}
               onAddPage={onAddPage}
               onPageNameChange={onPageNameChange}
@@ -385,23 +448,23 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
             <Canvas
               fullscreen
               currentPage={currentPage}
-              selectedMemoId={selection.selectedMemoId}
-              selectedMemoIds={selection.selectedMemoIds}
-              selectedCategoryId={selection.selectedCategoryId}
-              selectedCategoryIds={selection.selectedCategoryIds}
-              onMemoSelect={selection.handleMemoSelect}
-              onCategorySelect={selection.selectCategory}
+              selectedMemoId={selection?.selectedMemoId}
+              selectedMemoIds={selection?.selectedMemoIds || []}
+              selectedCategoryId={selection?.selectedCategoryId}
+              selectedCategoryIds={selection?.selectedCategoryIds || []}
+              onMemoSelect={selection?.handleMemoSelect || (() => {})}
+              onCategorySelect={selection?.selectCategory || (() => {})}
               onAddMemo={onAddMemo}
               onAddCategory={onAddCategory}
               onDeleteMemo={() => {
-                if (selection.selectedMemoId) {
+                if (selection?.selectedMemoId) {
                   onDeleteMemo(selection.selectedMemoId);
                 }
               }}
               onDeleteCategory={onDeleteCategory}
               onDeleteSelected={onDeleteSelected}
               onDisconnectMemo={() => {
-                if (selection.selectedMemoId) {
+                if (selection?.selectedMemoId) {
                   onDisconnectMemo(selection.selectedMemoId);
                 }
               }}
@@ -418,49 +481,49 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
               onMoveToCategory={onMoveToCategory}
               onDetectCategoryOnDrop={onDetectCategoryOnDrop}
               onDetectCategoryDropForCategory={onDetectCategoryDropForCategory}
-              isConnecting={connection.isConnecting}
-              isDisconnectMode={connection.isDisconnectMode}
-              connectingFromId={connection.connectingFromId}
-              connectingFromDirection={connection.connectingFromDirection}
-              dragLineEnd={connection.dragLineEnd}
+              isConnecting={connection?.isConnecting || false}
+              isDisconnectMode={connection?.isDisconnectMode || false}
+              connectingFromId={connection?.connectingFromId}
+              connectingFromDirection={connection?.connectingFromDirection}
+              dragLineEnd={connection?.dragLineEnd}
               onStartConnection={onStartConnection}
               onConnectMemos={onConnectMemos}
               onCancelConnection={onCancelConnection}
               onRemoveConnection={onRemoveConnection}
               onUpdateDragLine={onUpdateDragLine}
-              isDragSelecting={selection.isDragSelecting}
-              dragSelectStart={selection.dragSelectStart}
-              dragSelectEnd={selection.dragSelectEnd}
-              dragHoveredMemoIds={selection.dragHoveredMemoIds}
-              dragHoveredCategoryIds={selection.dragHoveredCategoryIds}
+              isDragSelecting={selection?.isDragSelecting || false}
+              dragSelectStart={selection?.dragSelectStart}
+              dragSelectEnd={selection?.dragSelectEnd}
+              dragHoveredMemoIds={selection?.dragHoveredMemoIds || []}
+              dragHoveredCategoryIds={selection?.dragHoveredCategoryIds || []}
               onDragSelectStart={onDragSelectStart}
               onDragSelectMove={onDragSelectMove}
               onDragSelectEnd={onDragSelectEnd}
-              activeImportanceFilters={selection.activeImportanceFilters}
-              onToggleImportanceFilter={selection.toggleImportanceFilter}
-              showGeneralContent={selection.showGeneralContent}
-              onToggleGeneralContent={selection.toggleGeneralContent}
+              activeImportanceFilters={selection?.activeImportanceFilters || []}
+              onToggleImportanceFilter={selection?.toggleImportanceFilter || (() => {})}
+              showGeneralContent={selection?.showGeneralContent || false}
+              onToggleGeneralContent={selection?.toggleGeneralContent || (() => {})}
               canUndo={canUndo}
               canRedo={canRedo}
               onUndo={onUndo}
               onRedo={onRedo}
-              isDraggingMemo={appState.isDraggingMemo}
-              draggingMemoId={appState.draggingMemoId}
+              isDraggingMemo={appState?.isDraggingMemo || false}
+              draggingMemoId={appState?.draggingMemoId}
               onMemoDragStart={onMemoDragStart}
               onMemoDragEnd={onMemoDragEnd}
-              isShiftPressed={appState.isShiftPressed}
+              isShiftPressed={appState?.isShiftPressed || false}
               shiftDragAreaCacheRef={shiftDragAreaCacheRef}
               onShiftDropCategory={onShiftDropCategory}
-              isDraggingCategory={appState.isDraggingCategory}
-              draggingCategoryId={appState.draggingCategoryId}
+              isDraggingCategory={appState?.isDraggingCategory || false}
+              draggingCategoryId={appState?.draggingCategoryId}
               onCategoryDragStart={onCategoryDragStart}
               onCategoryDragEnd={onCategoryDragEnd}
               onCategoryPositionDragEnd={onCategoryPositionDragEnd}
               onClearCategoryCache={onClearCategoryCache}
-              canvasOffset={appState.canvasOffset}
-              setCanvasOffset={appState.setCanvasOffset}
-              canvasScale={appState.canvasScale}
-              setCanvasScale={appState.setCanvasScale}
+              canvasOffset={appState?.canvasOffset || { x: 0, y: 0 }}
+              setCanvasOffset={appState?.setCanvasOffset || (() => {})}
+              canvasScale={appState?.canvasScale || 1}
+              setCanvasScale={appState?.setCanvasScale || (() => {})}
               onDeleteMemoById={onDeleteMemoById}
               onAddQuickNav={onAddQuickNav}
               isQuickNavExists={isQuickNavExists}
@@ -514,15 +577,15 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
                 currentPage={currentPage}
                 onMemoUpdate={onMemoUpdate}
                 onCategoryUpdate={onCategoryUpdate}
-                onMemoSelect={selection.handleMemoSelect}
-                onCategorySelect={selection.selectCategory}
+                onMemoSelect={selection?.handleMemoSelect || (() => {})}
+                onCategorySelect={selection?.selectCategory || (() => {})}
                 onFocusMemo={onFocusMemo}
-                width={panel.rightPanelWidth}
-                onResize={(panel as any).handleRightPanelResize || (() => {})}
+                width={panel?.rightPanelWidth || 400}
+                onResize={(panel as any)?.handleRightPanelResize || (() => {})}
                 isFullscreen={true}
                 onToggleFullscreen={() => {}}
-                activeImportanceFilters={selection.activeImportanceFilters}
-                showGeneralContent={selection.showGeneralContent}
+                activeImportanceFilters={selection?.activeImportanceFilters || []}
+                showGeneralContent={selection?.showGeneralContent || false}
                 onResetFilters={onResetFilters}
                 onClose={() => setShowEditor(false)}
               />
@@ -547,11 +610,11 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
       )}
 
       {/* Quick Navigation Panel */}
-      {showQuickNavPanel && (
+      {showQuickNavPanel && quickNav?.quickNavItems && (
         <QuickNavPanelComponent
-          quickNavItems={appState.currentPage?.quickNavItems || []}
-          pages={appState.pages}
-          currentPageId={appState.currentPageId}
+          quickNavItems={quickNav.quickNavItems}
+          pages={appState?.pages || []}
+          currentPageId={appState?.currentPageId || ''}
           rightPanelOpen={false}
           rightPanelWidth={0}
           showQuickNavPanel={showQuickNavPanel}
@@ -602,18 +665,18 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
       )}
 
       {/* 연결선 생성 버튼 - FAB 버튼 위 */}
-      {!showEditor && (
+      {!showEditor && connection && (
         <button
           className={`${styles.connectionButton} ${connection.isConnecting ? styles.active : ''}`}
           onClick={() => {
             if (connection.isConnecting) {
               // 연결 모드 완전히 종료
-              connection.setIsConnecting(false);
-              connection.setConnectingFromId(null);
+              connection.setIsConnecting?.(false);
+              connection.setConnectingFromId?.(null);
               onCancelConnection();
             } else {
               // 연결 모드 활성화 (메모 선택 없이도 가능)
-              connection.setIsConnecting(true);
+              connection.setIsConnecting?.(true);
             }
           }}
           aria-label={connection.isConnecting ? "연결 취소" : "연결선 생성"}
@@ -634,12 +697,12 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
       )}
 
       {/* ImportanceFilter - 모바일에서는 하단에 가로로 배치 */}
-      {!showEditor && (
+      {!showEditor && selection && (
         <ImportanceFilter
-          activeFilters={selection.activeImportanceFilters}
-          onToggleFilter={selection.toggleImportanceFilter}
-          showGeneralContent={selection.showGeneralContent}
-          onToggleGeneralContent={selection.toggleGeneralContent}
+          activeFilters={selection.activeImportanceFilters || []}
+          onToggleFilter={selection.toggleImportanceFilter || (() => {})}
+          showGeneralContent={selection.showGeneralContent || false}
+          onToggleGeneralContent={selection.toggleGeneralContent || (() => {})}
           isMobile={true}
         />
       )}
