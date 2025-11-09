@@ -254,10 +254,20 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         <div style={{ fontSize: '20px', fontWeight: 'bold' }}>Mindmap Memo</div>
         <div>앱을 초기화하는 중...</div>
         {(process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview') && (
-          <div style={{ fontSize: '12px', color: '#999', marginTop: '20px', textAlign: 'center' }}>
+          <div style={{ fontSize: '12px', color: '#999', marginTop: '20px', textAlign: 'center', maxWidth: '90%' }}>
             <div>DEBUG: Context Ready = {isContextReady ? 'true' : 'false'}</div>
             <div>appState = {appState ? 'exists' : 'undefined'}</div>
-            <div>pages = {appState?.pages ? `array(${appState.pages.length})` : 'undefined'}</div>
+            <div>selection = {selection ? 'exists' : 'undefined'}</div>
+            <div>connection = {connection ? 'exists' : 'undefined'}</div>
+            <div>panel = {panel ? 'exists' : 'undefined'}</div>
+            <div>quickNav = {quickNav ? 'exists' : 'undefined'}</div>
+            <div style={{ marginTop: '10px', borderTop: '1px solid #ddd', paddingTop: '10px' }}>
+              <div>pages = {appState?.pages ? `array(${appState.pages.length})` : 'undefined'}</div>
+              <div>currentPageId = {appState?.currentPageId || 'undefined'}</div>
+              <div>quickNav.quickNavItems = {quickNav?.quickNavItems ? (
+                Array.isArray(quickNav.quickNavItems) ? `array(${quickNav.quickNavItems.length})` : `NOT ARRAY: ${typeof quickNav.quickNavItems}`
+              ) : 'undefined'}</div>
+            </div>
           </div>
         )}
       </div>
