@@ -158,9 +158,9 @@ export const getHighestImportanceLevel = (memo: MemoBlockType): ImportanceLevel 
   memo.blocks.forEach(block => {
     if (block.type === 'text') {
       const textBlock = block as any; // TextBlock으로 캐스팅
-      if (textBlock.importanceRanges && textBlock.importanceRanges.length > 0) {
+      if (textBlock.importanceRanges && Array.isArray(textBlock.importanceRanges) && textBlock.importanceRanges.length > 0) {
         textBlock.importanceRanges.forEach((range: ImportanceRange) => {
-          if (!highestLevel || importancePriority.indexOf(range.level) < importancePriority.indexOf(highestLevel)) {
+          if (range && range.level && (!highestLevel || importancePriority.indexOf(range.level) < importancePriority.indexOf(highestLevel))) {
             highestLevel = range.level;
           }
         });

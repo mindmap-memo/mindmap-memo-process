@@ -122,11 +122,13 @@ export const calculateImportanceCount = (
     // 텍스트 블록의 중요도 범위 계산
     if (block.type === 'text') {
       const textBlock = block as any;
-      if (textBlock.importanceRanges && textBlock.importanceRanges.length > 0) {
+      if (textBlock.importanceRanges && Array.isArray(textBlock.importanceRanges) && textBlock.importanceRanges.length > 0) {
         textBlock.importanceRanges.forEach((range: any) => {
-          totalCount++;
-          if (searchImportanceFilters && searchImportanceFilters.has(range.level)) {
-            filteredCount++;
+          if (range && range.level) {
+            totalCount++;
+            if (searchImportanceFilters && searchImportanceFilters.has(range.level)) {
+              filteredCount++;
+            }
           }
         });
       }
