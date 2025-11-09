@@ -45,14 +45,14 @@ if (process.env.NODE_ENV === 'development') {
   import('./features/migration/utils/debugUtils');
 }
 
-// 모바일 개발자 도구 (Eruda) - 개발 환경 + Preview 환경에서 활성화
-if (process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview') {
-  if (typeof window !== 'undefined') {
-    import('eruda').then((eruda) => {
-      eruda.default.init();
-    });
-  }
-}
+// 모바일 개발자 도구 (Eruda) - 필요시 주석 해제하여 사용
+// if (process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview') {
+//   if (typeof window !== 'undefined') {
+//     import('eruda').then((eruda) => {
+//       eruda.default.init();
+//     });
+//   }
+// }
 
 const App: React.FC = () => {
   // ===== 에러 추적 =====

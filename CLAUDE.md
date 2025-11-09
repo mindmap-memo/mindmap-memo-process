@@ -456,6 +456,25 @@ The application implements Shift+drag functionality for adding/removing memos an
 - **Collision Detection**: Use unified collision resolution function (`resolveAreaCollisions`) to prevent duplicate logic and infinite loops
 - **Shift+Drag Operations**: When implementing Shift+drag features, remember to: (1) disable collision detection, (2) freeze area bounds using cache, (3) exclude dragged item from area calculations, (4) use frozen cached bounds for overlap detection
 - **Logging**: NEVER add console.log statements in render functions, useEffect callbacks, or frequently-called functions (e.g., calculateCategoryArea, renderSingleCategoryArea) as they cause infinite log spam and make debugging impossible. Only log in event handlers (onClick, onMouseDown, etc.) or one-time initialization code
+- **Debugging and Error Tracking**:
+  - **Root Cause Analysis**: When encountering `Cannot read properties of undefined (reading 'X')` errors, don't assume the cause based on the error message alone. Use detailed logging and unminified stack traces to identify the actual source
+    - Example from recent debugging: Error message suggested `importanceRanges[0]` issue, but actual cause was `steps[currentStep]` in Tutorial component
+    - Always check the full stack trace in development/preview environments to see exact file and line number
+  - **Optional Chaining**: Always use optional chaining (`?.`) when accessing arrays or object properties that might be undefined, especially in components that receive data asynchronously
+    - **Good**: `const step = steps?.[currentStep];` or `const item = array?.find(...)`
+    - **Bad**: `const step = steps[currentStep];` (crashes if steps is undefined)
+    - Apply to all array access and nested property access where data might not be loaded yet
+  - **Debug UI Management**: Keep debug UI code commented out rather than deleted, wrapped in environment checks (`process.env.NODE_ENV === 'development'`). This allows quick re-enabling when needed without polluting production
+    - Debug tools like Eruda should be commented out by default but kept in codebase for future use
+    - Visual debug panels should only show in development, never in production or preview deployments
+    - Use comments like `// 필요시 주석 해제하여 사용` to indicate temporarily disabled debug code
+  - **Mobile-Specific Debugging**: Errors that only appear on actual mobile devices (not in desktop dev tools' mobile emulation) often indicate:
+    - Missing null/undefined checks for asynchronously loaded data
+    - Array access without optional chaining
+    - Race conditions in async data loading (data not ready when component renders)
+    - Context values not yet initialized when component mounts
+    - Always test fixes on real devices or Vercel Preview deployments before concluding they work
+    - Use environment-specific debug panels (shown only in preview) to verify data state on actual devices
 
 ## Responsive Design Guidelines (Desktop-Down Approach)
 
