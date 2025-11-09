@@ -554,6 +554,9 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
           className={`${styles.connectionButton} ${connection.isConnecting ? styles.active : ''}`}
           onClick={() => {
             if (connection.isConnecting) {
+              // 연결 모드 완전히 종료
+              connection.setIsConnecting(false);
+              connection.setConnectingFromId(null);
               onCancelConnection();
             } else {
               // 연결 모드 활성화 (메모 선택 없이도 가능)

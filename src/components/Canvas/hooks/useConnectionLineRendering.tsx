@@ -1,4 +1,5 @@
 import React from 'react';
+import { Trash2 } from 'lucide-react';
 import { Page } from '../../../types';
 import { isInsideCollapsedCategory } from '../../../utils/categoryHierarchyUtils';
 
@@ -109,6 +110,10 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
           }
         }
 
+        // 연결선 중간 지점 계산
+        const midX = (fromPoint.x + toPoint.x) / 2;
+        const midY = (fromPoint.y + toPoint.y) / 2;
+
         lines.push(
           <g key={`${memo.id}-${connId}`}>
             {/* 투명한 넓은 클릭 영역 */}
@@ -137,13 +142,45 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
               y1={fromPoint.y}
               x2={toPoint.x}
               y2={toPoint.y}
-              stroke={isDisconnectMode ? "#ef4444" : "#9ca3af"}
+              stroke={isDisconnectMode ? "#ef4444" : (isConnecting ? "#9ca3af" : "#9ca3af")}
               strokeWidth={isDisconnectMode ? "4" : "2"}
               style={{
                 strokeDasharray: isDisconnectMode ? '5,5' : '4,4',
                 pointerEvents: 'none'
               }}
             />
+            {/* 연결 모드일 때 중간에 삭제 버튼 표시 (드래그 중이 아닐 때만) */}
+            {isConnecting && !connectingFromId && (
+              <g transform={`translate(${midX}, ${midY})`}>
+                {/* 배경 원 */}
+                <circle
+                  r="20"
+                  fill="#ef4444"
+                  stroke="white"
+                  strokeWidth="3"
+                  style={{
+                    cursor: 'pointer',
+                    pointerEvents: 'auto',
+                    filter: 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3))'
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onRemoveConnection(memo.id, connId);
+                  }}
+                />
+                {/* 쓰레기통 아이콘 */}
+                <foreignObject
+                  x="-12"
+                  y="-12"
+                  width="24"
+                  height="24"
+                  style={{ pointerEvents: 'none' }}
+                >
+                  <Trash2 size={24} color="white" />
+                </foreignObject>
+              </g>
+            )}
           </g>
         );
       });
@@ -204,6 +241,10 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
           }
         }
 
+        // 연결선 중간 지점 계산
+        const midX = (fromPoint.x + toPoint.x) / 2;
+        const midY = (fromPoint.y + toPoint.y) / 2;
+
         lines.push(
           <g key={`category-${category.id}-${connId}`}>
             {/* 투명한 넓은 클릭 영역 */}
@@ -239,6 +280,38 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
                 pointerEvents: 'none'
               }}
             />
+            {/* 연결 모드일 때 중간에 삭제 버튼 표시 (드래그 중이 아닐 때만) */}
+            {isConnecting && !connectingFromId && (
+              <g transform={`translate(${midX}, ${midY})`}>
+                {/* 배경 원 */}
+                <circle
+                  r="20"
+                  fill="#ef4444"
+                  stroke="white"
+                  strokeWidth="3"
+                  style={{
+                    cursor: 'pointer',
+                    pointerEvents: 'auto',
+                    filter: 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3))'
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onRemoveConnection(category.id, connId);
+                  }}
+                />
+                {/* 쓰레기통 아이콘 */}
+                <foreignObject
+                  x="-12"
+                  y="-12"
+                  width="24"
+                  height="24"
+                  style={{ pointerEvents: 'none' }}
+                >
+                  <Trash2 size={24} color="white" />
+                </foreignObject>
+              </g>
+            )}
           </g>
         );
       });

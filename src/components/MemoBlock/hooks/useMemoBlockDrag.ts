@@ -157,8 +157,9 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
       return;
     }
 
-    // 연결 모드가 아닐 때만 드래그 준비 (왼쪽 클릭만)
-    if (e.button === 0 && !isConnecting) {
+    // 메모 블록 드래그 준비 (왼쪽 클릭만)
+    // 연결 모드여도 메모 이동은 가능 (연결점은 별도 핸들러로 처리)
+    if (e.button === 0) {
       // 마우스 다운 위치 저장 (임계값 판단용)
       setMouseDownPos({ x: e.clientX, y: e.clientY });
       setDragMoved(false);
@@ -186,8 +187,9 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
       return;
     }
 
-    // 연결 모드가 아닐 때만 드래그 준비
-    if (!isConnecting && e.touches.length === 1) {
+    // 메모 블록 터치 드래그 준비
+    // 연결 모드여도 메모 이동은 가능 (연결점은 별도 핸들러로 처리)
+    if (e.touches.length === 1) {
       const touch = e.touches[0];
 
       // 터치 다운 위치 저장 (임계값 판단용)
@@ -489,8 +491,9 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
         return;
       }
 
-      // 연결 모드가 아닐 때만 드래그 준비
-      if (!isConnecting && e.touches.length === 1) {
+      // 메모 블록 네이티브 터치 드래그 준비
+      // 연결 모드여도 메모 이동은 가능 (연결점은 별도 핸들러로 처리)
+      if (e.touches.length === 1) {
         const touch = e.touches[0];
 
         setMouseDownPos({ x: touch.clientX, y: touch.clientY });
@@ -629,7 +632,9 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
 
           console.log('🟡 [터치 엔드] 상태 확인', {
             찾은요소: element?.tagName,
+            찾은요소클래스: (element as HTMLElement)?.className,
             메모요소: !!memoElement,
+            메모ID: memoElement?.getAttribute('data-memo-id'),
             연결모드: currentIsConnecting,
             시작메모: currentConnectingFromId,
             onCancelConnection함수있음: !!currentOnCancelConnection

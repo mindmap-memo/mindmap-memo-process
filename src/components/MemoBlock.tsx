@@ -663,6 +663,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       {/* 연결점들 - 메모 블록 외부에 배치 */}
       <div
         className={`${styles.connectionPoint} ${styles.top} ${isConnecting && onOpenEditor ? styles.enlarged : ''}`}
+        data-memo-id={memo.id}
         onMouseDown={handleConnectionPointMouseDown}
         onTouchStart={handleConnectionPointMouseDown}
         style={{ touchAction: 'none' }}
@@ -671,6 +672,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       </div>
       <div
         className={`${styles.connectionPoint} ${styles.bottom} ${isConnecting && onOpenEditor ? styles.enlarged : ''}`}
+        data-memo-id={memo.id}
         onMouseDown={handleConnectionPointMouseDown}
         onTouchStart={handleConnectionPointMouseDown}
         style={{ touchAction: 'none' }}
@@ -679,6 +681,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       </div>
       <div
         className={`${styles.connectionPoint} ${styles.left} ${isConnecting && onOpenEditor ? styles.enlarged : ''}`}
+        data-memo-id={memo.id}
         onMouseDown={handleConnectionPointMouseDown}
         onTouchStart={handleConnectionPointMouseDown}
         style={{ touchAction: 'none' }}
@@ -687,6 +690,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       </div>
       <div
         className={`${styles.connectionPoint} ${styles.right} ${isConnecting && onOpenEditor ? styles.enlarged : ''}`}
+        data-memo-id={memo.id}
         onMouseDown={handleConnectionPointMouseDown}
         onTouchStart={handleConnectionPointMouseDown}
         style={{ touchAction: 'none' }}

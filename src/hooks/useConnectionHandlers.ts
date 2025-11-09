@@ -146,8 +146,9 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
         : page
     ));
 
-    setIsConnecting(false);
+    // 연결 모드는 유지하고, 시작점만 초기화 (다음 연결을 위해)
     setConnectingFromId(null);
+    setConnectingFromDirection(null);
 
     // Save canvas state for undo/redo
     if (saveCanvasState) {

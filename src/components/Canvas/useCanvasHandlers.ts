@@ -188,7 +188,8 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
     }
 
     // 스페이스바가 눌린 상태에서는 항상 팬 모드 (메모 블록 위에서도)
-    if (isSpacePressed && !isConnecting) {
+    // 연결 모드에서도 패닝 허용
+    if (isSpacePressed) {
       setIsPanning(true);
       setPanStart({
         x: e.clientX,
@@ -210,7 +211,8 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
                                !target.closest('[data-category-block="true"]') &&
                                !target.closest('button'));
 
-    if (isCanvasBackground && !isConnecting) {
+    if (isCanvasBackground) {
+      // 팬 모드는 연결 모드에서도 허용
       if (currentTool === 'pan') {
         setIsPanning(true);
         setPanStart({
@@ -224,8 +226,8 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
         return;
       }
 
-      // 선택 도구일 때 빈 공간 클릭 시 선택 해제
-      if (currentTool === 'select' && onDeselectAll) {
+      // 선택 도구일 때 빈 공간 클릭 시 선택 해제 (연결 모드가 아닐 때만)
+      if (currentTool === 'select' && !isConnecting && onDeselectAll) {
         onDeselectAll();
       }
     }
@@ -325,8 +327,8 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
       return;
     }
 
-    // 연결 모드가 아닐 때만 패닝 시작
-    if (!isConnecting && e.touches.length === 1) {
+    // 캔버스 배경 터치 시 패닝 시작 (연결 모드에서도 허용)
+    if (e.touches.length === 1) {
       const touch = e.touches[0];
       setIsPanning(true);
       setPanStart({
