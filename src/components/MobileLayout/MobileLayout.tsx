@@ -468,7 +468,9 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         {/* Canvas 뷰 */}
         <div className={styles.view}>
           {currentPage ? (
-            <Canvas
+            <>
+              {console.log('[MobileLayout] 🎨 Canvas 렌더링 시작, activeImportanceFilters:', selection?.activeImportanceFilters)}
+              <Canvas
               fullscreen
               currentPage={currentPage}
               selectedMemoId={selection?.selectedMemoId}
@@ -557,6 +559,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
               setIsShiftPressed={setIsShiftPressed}
               isShiftPressedRef={isShiftPressedRef}
             />
+            </>
           ) : (
             <div className={styles.noPageContainer}>
               {appState.pages && appState.pages.length > 0 ? (
