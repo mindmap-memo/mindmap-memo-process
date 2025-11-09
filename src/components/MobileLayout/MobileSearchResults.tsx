@@ -41,14 +41,16 @@ const extractBlockContent = (memo: MemoBlock): { text: string; importanceRanges:
         const startOffset = fullText.length;
 
         // 중요도 범위가 있으면 오프셋 조정하여 추가
-        if (block.importanceRanges && block.importanceRanges.length > 0) {
+        if (block.importanceRanges && Array.isArray(block.importanceRanges) && block.importanceRanges.length > 0) {
           block.importanceRanges.forEach((range: any) => {
-            allImportanceRanges.push({
-              start: startOffset + range.start,
-              end: startOffset + range.end,
-              level: range.level,
-              color: importanceColors[range.level] || '#e5e7eb'
-            });
+            if (range && typeof range.start === 'number' && typeof range.end === 'number' && range.level) {
+              allImportanceRanges.push({
+                start: startOffset + range.start,
+                end: startOffset + range.end,
+                level: range.level,
+                color: importanceColors[range.level] || '#e5e7eb'
+              });
+            }
           });
         }
 
