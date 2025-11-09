@@ -9,6 +9,7 @@ import { useCanvasState } from './useCanvasState';
 import { useCanvasEffects } from './useCanvasEffects';
 import { useCanvasHandlers } from './useCanvasHandlers';
 import { useCanvasRendering } from './useCanvasRendering';
+import { usePinchZoom } from './hooks/usePinchZoom';
 import styles from '../../scss/components/Canvas.module.scss';
 
 interface CanvasProps {
@@ -174,6 +175,9 @@ const Canvas: React.FC<CanvasProps> = ({
   setIsShiftPressed,  // Shift 상태 업데이트 함수
   isShiftPressedRef  // Shift ref 추가
 }) => {
+  // ===== Canvas Ref =====
+  const canvasRef = React.useRef<HTMLDivElement>(null);
+
   // ===== Canvas 로컬 상태 (useCanvasState 훅 사용) =====
   const canvasState = useCanvasState();
   const {
@@ -244,6 +248,16 @@ const Canvas: React.FC<CanvasProps> = ({
 
   // Shift 드래그 중 영역 캐시 (App.tsx에서 전달된 ref 사용하거나 로컬 ref 사용)
   const shiftDragAreaCache = shiftDragAreaCacheRef || localShiftDragAreaCache;
+
+  // ===== 핀치 줌 (모바일 전용) =====
+  usePinchZoom({
+    canvasRef,
+    canvasScale,
+    setCanvasScale,
+    canvasOffset,
+    setCanvasOffset,
+    isMobile: fullscreen  // fullscreen prop을 모바일 여부로 사용
+  });
 
   // 최근 드래그 종료된 카테고리 ID (영역 계산 로그용)
   const recentlyDraggedCategoryRef = React.useRef<string | null>(null);
@@ -469,6 +483,7 @@ const Canvas: React.FC<CanvasProps> = ({
 
   return (
     <div
+      ref={canvasRef}
       id="main-canvas"
       data-canvas="true"
       data-canvas-container
