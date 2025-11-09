@@ -57,15 +57,24 @@ export async function GET() {
           // blocks 배열 안전하게 처리: importanceRanges가 배열인지 확인
           const safeBlocks = Array.isArray(memo.blocks)
             ? memo.blocks.map((block: any) => {
-                if (block.type === 'text' && block.importanceRanges !== undefined && block.importanceRanges !== null) {
-                  // importanceRanges가 배열이 아니면 빈 배열로 대체
-                  if (!Array.isArray(block.importanceRanges)) {
+                // text 블록인 경우 importanceRanges 필드 보장
+                if (block.type === 'text') {
+                  // importanceRanges가 없거나 배열이 아니면 빈 배열로 대체
+                  if (!block.importanceRanges || !Array.isArray(block.importanceRanges)) {
                     return {
                       ...block,
                       importanceRanges: []
                     };
                   }
-                  return block;
+                  // importanceRanges가 배열이지만 유효하지 않은 항목이 있으면 필터링
+                  return {
+                    ...block,
+                    importanceRanges: block.importanceRanges.filter(
+                      (range: any) => range && typeof range === 'object' &&
+                                      typeof range.start === 'number' &&
+                                      typeof range.end === 'number'
+                    )
+                  };
                 }
                 return block;
               })
