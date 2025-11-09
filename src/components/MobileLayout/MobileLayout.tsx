@@ -350,7 +350,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
       <div className={styles.viewContainer}>
         {/* Canvas 뷰 */}
         <div className={styles.view}>
-          {currentPage && (
+          {currentPage ? (
             <Canvas
               fullscreen
               currentPage={currentPage}
@@ -440,6 +440,22 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
               setIsShiftPressed={setIsShiftPressed}
               isShiftPressedRef={isShiftPressedRef}
             />
+          ) : (
+            <div className={styles.noPageContainer}>
+              <LeftPanel
+                fullscreen={true}
+                pages={appState.pages}
+                currentPageId={appState.currentPageId}
+                onPageSelect={(pageId) => {
+                  appState.setCurrentPageId(pageId);
+                }}
+                onAddPage={onAddPage}
+                onPageNameChange={onPageNameChange}
+                onDeletePage={onDeletePage}
+                width={0}
+                onResize={() => {}}
+              />
+            </div>
           )}
         </div>
 
