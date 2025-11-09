@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import App from '../App';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -34,5 +35,9 @@ export default function Home() {
     return null;
   }
 
-  return <App />;
+  return (
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  );
 }
