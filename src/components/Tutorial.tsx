@@ -29,7 +29,7 @@ export const Tutorial: React.FC<TutorialProps> = ({
 }) => {
   const [highlightPosition, setHighlightPosition] = useState<DOMRect | null>(null);
   const [subStepTargetPosition, setSubStepTargetPosition] = useState<DOMRect | null>(null);
-  const step = steps[currentStep];
+  const step = steps?.[currentStep];
   const activeSubStep = step?.subSteps?.[currentSubStep];
 
   useEffect(() => {
