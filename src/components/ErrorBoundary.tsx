@@ -127,7 +127,16 @@ class ErrorBoundary extends Component<Props, State> {
 
       if (!response.ok) {
         const errorText = await response.text();
-        const errorMsg = `상태: ${response.status}, 메시지: ${errorText}`;
+        let errorDetails = errorText;
+
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorDetails = errorJson.details || errorJson.error || errorText;
+        } catch (e) {
+          // JSON 파싱 실패 시 원본 텍스트 사용
+        }
+
+        const errorMsg = `상태: ${response.status}\n상세: ${errorDetails}`;
         console.error('[ErrorBoundary] Failed to log error - Response not OK:', {
           status: response.status,
           statusText: response.statusText,
