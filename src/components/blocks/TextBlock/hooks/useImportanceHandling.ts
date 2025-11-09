@@ -48,6 +48,11 @@ export const useImportanceHandling = (params: UseImportanceHandlingParams) => {
       return;
     }
 
+    // 모바일에서는 드래그 선택 시 중요도 메뉴를 표시하지 않음 (네이티브 텍스트 선택 사용)
+    if (isMobile) {
+      return;
+    }
+
     const textarea = textareaRef.current;
     if (!textarea) {
       return;
@@ -104,6 +109,69 @@ export const useImportanceHandling = (params: UseImportanceHandlingParams) => {
     } else {
       setShowImportanceMenu(false);
       setSelectedRange(null);
+    }
+  };
+
+  // 더블클릭으로 중요도 메뉴 표시 (모바일/PC 모두)
+  const handleDoubleClick = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isEditing || !canEdit) {
+      return;
+    }
+
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+
+    if (start !== end && end > start) {
+      // 텍스트가 선택된 경우
+      setSelectedRange({ start, end });
+
+      // 메뉴 크기
+      const menuWidth = 150;
+      const menuHeight = 280;
+
+      // 화면 크기
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      // 이벤트 위치 계산 (마우스 또는 터치)
+      let clientX: number, clientY: number;
+      if ('clientX' in e) {
+        // MouseEvent
+        clientX = e.clientX;
+        clientY = e.clientY;
+      } else {
+        // TouchEvent
+        const touch = e.changedTouches?.[0] || e.touches?.[0];
+        if (!touch) return;
+        clientX = touch.clientX;
+        clientY = touch.clientY;
+      }
+
+      // 기본 위치: 이벤트 위치 오른쪽에 표시
+      let x = clientX + 10;
+      let y = clientY - 10;
+
+      // 경계 체크
+      if (x + menuWidth > viewportWidth) {
+        x = clientX - menuWidth - 10;
+      }
+      if (x < 10) {
+        x = 10;
+      }
+      if (y + menuHeight > viewportHeight) {
+        y = viewportHeight - menuHeight - 10;
+      }
+      if (y < 10) {
+        y = 10;
+      }
+
+      setImportanceMenuPosition({ x, y });
+      setShowImportanceMenu(true);
     }
   };
 
@@ -326,6 +394,7 @@ export const useImportanceHandling = (params: UseImportanceHandlingParams) => {
 
   return {
     handleTextSelection,
+    handleDoubleClick,
     applyImportance,
     handleMobileCopy: handleCopy,
     handleMobilePaste: handlePaste,

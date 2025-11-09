@@ -94,6 +94,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   // 중요도 처리 훅
   const {
     handleTextSelection,
+    handleDoubleClick,
     applyImportance,
     handleMobileCopy,
     handleMobilePaste,
@@ -220,6 +221,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             onClick={handleClick}
+            onDoubleClick={(e) => handleDoubleClick(e)}
             onMouseDown={(e) => {
               // 새로운 드래그 시작 시 기존 메뉴 닫기
               if (showImportanceMenu) {
