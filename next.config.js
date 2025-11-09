@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  productionBrowserSourceMaps: true, // 소스맵 활성화
   sassOptions: {
     includePaths: ['./src/scss'],
   },
