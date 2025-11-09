@@ -43,6 +43,13 @@ import styles from './scss/App.module.scss';
 // 개발 환경에서만 디버깅 도구 로드
 if (process.env.NODE_ENV === 'development') {
   import('./features/migration/utils/debugUtils');
+
+  // 모바일 개발자 도구 (Eruda)
+  if (typeof window !== 'undefined') {
+    import('eruda').then((eruda) => {
+      eruda.default.init();
+    });
+  }
 }
 
 const App: React.FC = () => {
