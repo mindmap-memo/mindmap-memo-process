@@ -233,7 +233,13 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
 
   // 연결점 드래그 중일 때 document-level 이벤트 리스너 등록
   React.useEffect(() => {
+    console.log('🔷 [카테고리 연결점 useEffect] 실행', {
+      isConnectionDragging,
+      hasOnUpdateDragLine: !!onUpdateDragLine
+    });
+
     if (isConnectionDragging && onUpdateDragLine) {
+      console.log('🔷 [카테고리 연결점] 이벤트 리스너 등록 시작', { categoryId: isConnectionDragging });
       const handleMouseMove = (e: MouseEvent) => {
         const canvasElement = document.querySelector('[data-canvas-container]') as HTMLElement;
         if (canvasElement) {
@@ -285,26 +291,54 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
       };
 
       const handleTouchEnd = (e: TouchEvent) => {
+        console.log('🟣 [카테고리 Document-level handleTouchEnd 시작]', {
+          changedTouchesLength: e.changedTouches.length
+        });
+
         if (e.changedTouches.length > 0) {
           const touch = e.changedTouches[0];
           const element = document.elementFromPoint(touch.clientX, touch.clientY);
           const categoryElement = element?.closest('[data-category-id]');
           const memoElement = element?.closest('[data-memo-id]');
 
+          console.log('🟣 [카테고리 터치엔드 대상 확인]', {
+            elementTag: element?.tagName,
+            hasCategoryElement: !!categoryElement,
+            hasMemoElement: !!memoElement,
+            categoryId: categoryElement?.getAttribute('data-category-id'),
+            memoId: memoElement?.getAttribute('data-memo-id')
+          });
+
           const currentIsConnecting = isConnectingRef.current;
           const currentConnectingFromId = connectingFromIdRef.current;
           const currentOnConnectMemos = onConnectMemosRef.current;
           const currentOnCancelConnection = onCancelConnectionRef.current;
 
+          console.log('🟣 [카테고리 Ref 값 확인]', {
+            currentIsConnecting,
+            currentConnectingFromId,
+            hasOnConnectMemos: !!currentOnConnectMemos,
+            hasOnCancelConnection: !!currentOnCancelConnection
+          });
+
           if ((categoryElement || memoElement) && currentIsConnecting && currentConnectingFromId) {
             const targetId = categoryElement?.getAttribute('data-category-id') || memoElement?.getAttribute('data-memo-id');
 
+            console.log('🟣 [카테고리 대상 요소 발견]', { targetId, fromId: currentConnectingFromId });
+
             if (targetId && targetId !== currentConnectingFromId) {
+              console.log('✅ [카테고리 연결 생성]', { fromId: currentConnectingFromId, toId: targetId });
               currentOnConnectMemos?.(currentConnectingFromId, targetId);
             } else {
+              console.log('❌ [카테고리 연결 취소] 같은 요소이거나 유효하지 않음');
               currentOnCancelConnection?.();
             }
           } else {
+            console.log('❌ [카테고리 연결 취소] 대상 요소 없음 또는 연결 상태 아님', {
+              hasElement: !!(categoryElement || memoElement),
+              isConnecting: currentIsConnecting,
+              connectingFromId: currentConnectingFromId
+            });
             currentOnCancelConnection?.();
           }
         }
@@ -780,12 +814,15 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             data-category-id={category.id}
             onMouseDown={(e) => {
               e.stopPropagation();
+              console.log('🟣 [카테고리 연결점 클릭]', { categoryId: category.id, isConnecting, connectingFromId });
               const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
 
               if (!isMobile || isConnecting) {
+                console.log('🟣 [카테고리 연결 드래그 시작]', { categoryId: category.id });
                 setIsConnectionDragging(category.id);
                 if (!connectingFromId) {
                   onStartConnection?.(category.id, 'top');
+                  console.log('🟣 [카테고리 연결 시작점 설정]', { fromCategoryId: category.id });
                 }
               }
             }}
@@ -800,23 +837,22 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             }}
             onTouchStart={(e) => {
               e.stopPropagation();
+              console.log('🟣 [카테고리 연결점 터치 시작]', { categoryId: category.id, isConnecting, connectingFromId });
               const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
 
               if (!isMobile || isConnecting) {
+                console.log('🟣 [카테고리 연결 드래그 시작 (터치)]', { categoryId: category.id });
                 setIsConnectionDragging(category.id);
                 if (!connectingFromId) {
                   onStartConnection?.(category.id, 'top');
+                  console.log('🟣 [카테고리 연결 시작점 설정 (터치)]', { fromCategoryId: category.id });
                 }
               }
             }}
             onTouchEnd={(e) => {
-              e.stopPropagation();
-              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
-
-              if ((!isMobile || isConnecting) && connectingFromId && connectingFromId !== category.id) {
-                onConnectMemos(connectingFromId, category.id);
-              }
-              setIsConnectionDragging(null);
+              // stopPropagation 제거 - document-level handleTouchEnd가 실행되도록
+              console.log('🟣 [카테고리 연결점 터치 종료]', { categoryId: category.id, connectingFromId });
+              // 연결점 자체에서는 아무것도 하지 않음 - document-level handleTouchEnd에서 처리
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -872,23 +908,22 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             }}
             onTouchStart={(e) => {
               e.stopPropagation();
+              console.log('🟣 [카테고리 연결점 터치 시작 (하단)]', { categoryId: category.id, isConnecting, connectingFromId });
               const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
 
               if (!isMobile || isConnecting) {
+                console.log('🟣 [카테고리 연결 드래그 시작 (터치-하단)]', { categoryId: category.id });
                 setIsConnectionDragging(category.id);
                 if (!connectingFromId) {
                   onStartConnection?.(category.id, 'bottom');
+                  console.log('🟣 [카테고리 연결 시작점 설정 (터치-하단)]', { fromCategoryId: category.id });
                 }
               }
             }}
             onTouchEnd={(e) => {
-              e.stopPropagation();
-              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
-
-              if ((!isMobile || isConnecting) && connectingFromId && connectingFromId !== category.id) {
-                onConnectMemos(connectingFromId, category.id);
-              }
-              setIsConnectionDragging(null);
+              // stopPropagation 제거 - document-level handleTouchEnd가 실행되도록
+              console.log('🟣 [카테고리 연결점 터치 종료 (하단)]', { categoryId: category.id, connectingFromId });
+              // 연결점 자체에서는 아무것도 하지 않음 - document-level handleTouchEnd에서 처리
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -944,23 +979,22 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             }}
             onTouchStart={(e) => {
               e.stopPropagation();
+              console.log('🟣 [카테고리 연결점 터치 시작 (좌측)]', { categoryId: category.id, isConnecting, connectingFromId });
               const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
 
               if (!isMobile || isConnecting) {
+                console.log('🟣 [카테고리 연결 드래그 시작 (터치-좌측)]', { categoryId: category.id });
                 setIsConnectionDragging(category.id);
                 if (!connectingFromId) {
                   onStartConnection?.(category.id, 'left');
+                  console.log('🟣 [카테고리 연결 시작점 설정 (터치-좌측)]', { fromCategoryId: category.id });
                 }
               }
             }}
             onTouchEnd={(e) => {
-              e.stopPropagation();
-              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
-
-              if ((!isMobile || isConnecting) && connectingFromId && connectingFromId !== category.id) {
-                onConnectMemos(connectingFromId, category.id);
-              }
-              setIsConnectionDragging(null);
+              // stopPropagation 제거 - document-level handleTouchEnd가 실행되도록
+              console.log('🟣 [카테고리 연결점 터치 종료 (좌측)]', { categoryId: category.id, connectingFromId });
+              // 연결점 자체에서는 아무것도 하지 않음 - document-level handleTouchEnd에서 처리
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -1016,23 +1050,22 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             }}
             onTouchStart={(e) => {
               e.stopPropagation();
+              console.log('🟣 [카테고리 연결점 터치 시작 (우측)]', { categoryId: category.id, isConnecting, connectingFromId });
               const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
 
               if (!isMobile || isConnecting) {
+                console.log('🟣 [카테고리 연결 드래그 시작 (터치-우측)]', { categoryId: category.id });
                 setIsConnectionDragging(category.id);
                 if (!connectingFromId) {
                   onStartConnection?.(category.id, 'right');
+                  console.log('🟣 [카테고리 연결 시작점 설정 (터치-우측)]', { fromCategoryId: category.id });
                 }
               }
             }}
             onTouchEnd={(e) => {
-              e.stopPropagation();
-              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
-
-              if ((!isMobile || isConnecting) && connectingFromId && connectingFromId !== category.id) {
-                onConnectMemos(connectingFromId, category.id);
-              }
-              setIsConnectionDragging(null);
+              // stopPropagation 제거 - document-level handleTouchEnd가 실행되도록
+              console.log('🟣 [카테고리 연결점 터치 종료 (우측)]', { categoryId: category.id, connectingFromId });
+              // 연결점 자체에서는 아무것도 하지 않음 - document-level handleTouchEnd에서 처리
             }}
             onClick={(e) => {
               e.stopPropagation();

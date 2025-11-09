@@ -71,7 +71,9 @@ export const createCategoryAreaDragHandler = (params: CreateCategoryAreaDragHand
   } = params;
 
   return (e: React.MouseEvent) => {
-    if (e.button === 0 && !isConnecting) {
+    // PC 버전에서는 연결 모드와 관계없이 카테고리 영역 드래그 가능
+    // (연결점은 별도 핸들러로 처리)
+    if (e.button === 0) {
       // 영역 드래그 시작 - 카테고리 전체를 이동
       e.preventDefault();
       e.stopPropagation();
@@ -291,7 +293,9 @@ export const createCategoryAreaTouchHandler = (params: CreateCategoryAreaDragHan
   } = params;
 
   return (e: React.TouchEvent) => {
-    if (!isConnecting && e.touches.length === 1) {
+    // 모바일 버전에서도 연결 모드와 관계없이 카테고리 영역 드래그 가능
+    // (연결점은 별도 핸들러로 처리)
+    if (e.touches.length === 1) {
       // 영역 터치 드래그 시작 - 카테고리 전체를 이동
       e.stopPropagation();
 

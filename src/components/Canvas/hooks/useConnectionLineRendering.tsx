@@ -114,10 +114,14 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
         const midX = (fromPoint.x + toPoint.x) / 2;
         const midY = (fromPoint.y + toPoint.y) / 2;
 
+        // 모바일 연결 모드 또는 PC 연결 해제 모드에서 삭제 UI 표시
+        const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+        const showDeleteUI = isDisconnectMode || (isMobile && isConnecting);
+
         lines.push(
           <g key={`${memo.id}-${connId}`}>
             {/* 투명한 넓은 클릭 영역 */}
-            {isDisconnectMode && (
+            {showDeleteUI && (
               <line
                 x1={fromPoint.x}
                 y1={fromPoint.y}
@@ -142,15 +146,15 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
               y1={fromPoint.y}
               x2={toPoint.x}
               y2={toPoint.y}
-              stroke={isDisconnectMode ? "#ef4444" : "#a855f7"}
-              strokeWidth={isDisconnectMode ? "4" : "2"}
+              stroke={showDeleteUI ? "#ef4444" : "#a855f7"}
+              strokeWidth={showDeleteUI ? "4" : "2"}
               style={{
-                strokeDasharray: isDisconnectMode ? '5,5' : '8,4',
+                strokeDasharray: showDeleteUI ? '5,5' : '8,4',
                 pointerEvents: 'none'
               }}
             />
-            {/* Disconnect 모드일 때만 삭제 버튼 표시 */}
-            {isDisconnectMode && (
+            {/* Disconnect 모드 또는 모바일 연결 모드일 때 삭제 버튼 표시 */}
+            {showDeleteUI && (
               <g transform={`translate(${midX}, ${midY})`}>
                 {/* 배경 원 */}
                 <circle
@@ -245,10 +249,14 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
         const midX = (fromPoint.x + toPoint.x) / 2;
         const midY = (fromPoint.y + toPoint.y) / 2;
 
+        // 모바일 연결 모드 또는 PC 연결 해제 모드에서 삭제 UI 표시
+        const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+        const showDeleteUI = isDisconnectMode || (isMobile && isConnecting);
+
         lines.push(
           <g key={`category-${category.id}-${connId}`}>
             {/* 투명한 넓은 클릭 영역 */}
-            {isDisconnectMode && (
+            {showDeleteUI && (
               <line
                 x1={fromPoint.x}
                 y1={fromPoint.y}
@@ -273,15 +281,15 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
               y1={fromPoint.y}
               x2={toPoint.x}
               y2={toPoint.y}
-              stroke={isDisconnectMode ? "#ef4444" : "#a855f7"}
-              strokeWidth={isDisconnectMode ? "4" : "2"}
+              stroke={showDeleteUI ? "#ef4444" : "#a855f7"}
+              strokeWidth={showDeleteUI ? "4" : "2"}
               style={{
-                strokeDasharray: isDisconnectMode ? '5,5' : '8,4',
+                strokeDasharray: showDeleteUI ? '5,5' : '8,4',
                 pointerEvents: 'none'
               }}
             />
-            {/* Disconnect 모드일 때만 삭제 버튼 표시 */}
-            {isDisconnectMode && (
+            {/* Disconnect 모드 또는 모바일 연결 모드일 때 삭제 버튼 표시 */}
+            {showDeleteUI && (
               <g transform={`translate(${midX}, ${midY})`}>
                 {/* 배경 원 */}
                 <circle

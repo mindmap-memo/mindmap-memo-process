@@ -592,9 +592,10 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
       const handleMouseUp = (e: MouseEvent) => {
         console.log('🟢 [마우스 업] 드롭 이벤트 발생', { x: e.clientX, y: e.clientY });
 
-        // 마우스 위치에서 메모 찾기 (data-memo-id 속성 사용)
+        // 마우스 위치에서 메모 또는 카테고리 찾기 (data-memo-id 또는 data-category-id 속성 사용)
         const element = document.elementFromPoint(e.clientX, e.clientY);
         const memoElement = element?.closest('[data-memo-id]');
+        const categoryElement = element?.closest('[data-category-id]');
 
         // ref에서 최신 값 가져오기
         const currentIsConnecting = isConnectingRef.current;
@@ -605,23 +606,24 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
         console.log('🟢 [마우스 업] 상태 확인', {
           찾은요소: element?.tagName,
           메모요소: !!memoElement,
+          카테고리요소: !!categoryElement,
           연결모드: currentIsConnecting,
           시작메모: currentConnectingFromId
         });
 
-        if (memoElement && currentIsConnecting && currentConnectingFromId) {
-          const targetMemoId = memoElement.getAttribute('data-memo-id');
-          console.log('🟢 [마우스 업] 대상 메모 발견', { targetMemoId, fromId: currentConnectingFromId });
+        if ((memoElement || categoryElement) && currentIsConnecting && currentConnectingFromId) {
+          const targetId = memoElement?.getAttribute('data-memo-id') || categoryElement?.getAttribute('data-category-id');
+          console.log('🟢 [마우스 업] 대상 요소 발견', { targetId, fromId: currentConnectingFromId });
 
-          if (targetMemoId && targetMemoId !== currentConnectingFromId) {
-            console.log('✅ [연결 생성!]', { from: currentConnectingFromId, to: targetMemoId });
-            currentOnConnectMemos?.(currentConnectingFromId, targetMemoId);
+          if (targetId && targetId !== currentConnectingFromId) {
+            console.log('✅ [연결 생성!]', { from: currentConnectingFromId, to: targetId });
+            currentOnConnectMemos?.(currentConnectingFromId, targetId);
           } else {
-            console.log('❌ [연결 취소] 같은 메모이거나 유효하지 않음');
+            console.log('❌ [연결 취소] 같은 요소이거나 유효하지 않음');
             currentOnCancelConnection?.();
           }
         } else {
-          console.log('❌ [연결 취소] 대상 메모 없음');
+          console.log('❌ [연결 취소] 대상 요소 없음');
           currentOnCancelConnection?.();
         }
 
@@ -635,9 +637,10 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
           const touch = e.changedTouches[0];
           console.log('🟡 [터치 엔드] 터치 위치', { x: touch.clientX, y: touch.clientY });
 
-          // 터치 위치에서 메모 찾기
+          // 터치 위치에서 메모 또는 카테고리 찾기
           const element = document.elementFromPoint(touch.clientX, touch.clientY);
           const memoElement = element?.closest('[data-memo-id]');
+          const categoryElement = element?.closest('[data-category-id]');
 
           // ref에서 최신 값 가져오기
           const currentIsConnecting = isConnectingRef.current;
@@ -650,25 +653,27 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
             찾은요소클래스: (element as HTMLElement)?.className,
             메모요소: !!memoElement,
             메모ID: memoElement?.getAttribute('data-memo-id'),
+            카테고리요소: !!categoryElement,
+            카테고리ID: categoryElement?.getAttribute('data-category-id'),
             연결모드: currentIsConnecting,
             시작메모: currentConnectingFromId,
             onCancelConnection함수있음: !!currentOnCancelConnection
           });
 
-          if (memoElement && currentIsConnecting && currentConnectingFromId) {
-            const targetMemoId = memoElement.getAttribute('data-memo-id');
-            console.log('🟡 [터치 엔드] 대상 메모 발견', { targetMemoId, fromId: currentConnectingFromId });
+          if ((memoElement || categoryElement) && currentIsConnecting && currentConnectingFromId) {
+            const targetId = memoElement?.getAttribute('data-memo-id') || categoryElement?.getAttribute('data-category-id');
+            console.log('🟡 [터치 엔드] 대상 요소 발견', { targetId, fromId: currentConnectingFromId });
 
-            if (targetMemoId && targetMemoId !== currentConnectingFromId) {
-              console.log('✅ [연결 생성!]', { from: currentConnectingFromId, to: targetMemoId });
-              currentOnConnectMemos?.(currentConnectingFromId, targetMemoId);
+            if (targetId && targetId !== currentConnectingFromId) {
+              console.log('✅ [연결 생성!]', { from: currentConnectingFromId, to: targetId });
+              currentOnConnectMemos?.(currentConnectingFromId, targetId);
             } else {
-              console.log('❌ [연결 취소] 같은 메모이거나 유효하지 않음');
+              console.log('❌ [연결 취소] 같은 요소이거나 유효하지 않음');
               console.log('❌ [연결 취소] currentOnCancelConnection 호출 시도', { 함수존재: !!currentOnCancelConnection });
               currentOnCancelConnection?.();
             }
           } else {
-            console.log('❌ [연결 취소] 대상 메모 없음');
+            console.log('❌ [연결 취소] 대상 요소 없음');
             console.log('❌ [연결 취소] currentOnCancelConnection 호출 시도', { 함수존재: !!currentOnCancelConnection });
             currentOnCancelConnection?.();
           }

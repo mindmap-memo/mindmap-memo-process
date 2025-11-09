@@ -342,6 +342,8 @@ const Canvas: React.FC<CanvasProps> = ({
     onCategorySelect,
     onMemoSelect,
     onStartConnection,
+    onUpdateDragLine,  // 🔥 추가: 카테고리 연결점 드래그 시 연결선이 커서를 따라가도록
+    onCancelConnection,  // 🔥 추가: 카테고리 연결 취소 시 연결선 제거
     onCategoryPositionChange,
     onCategoryLabelPositionChange,
     onCategoryToggleExpanded,
