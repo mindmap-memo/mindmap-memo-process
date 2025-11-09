@@ -68,7 +68,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
         if (loadedPages.length > 0) {
           // 페이지가 있지만 메모/카테고리가 비어있는지 확인
           const needsInitialData = loadedPages.every(
-            p => p.memos.length === 0 && p.categories.length === 0
+            p => (!p.memos || p.memos.length === 0) && (!p.categories || p.categories.length === 0)
           );
 
           if (needsInitialData) {
@@ -78,12 +78,14 @@ export const useAppState = (isAuthenticated: boolean = false) => {
             const updatedPages: Page[] = [];
             for (let i = 0; i < loadedPages.length; i++) {
               const existingPage = loadedPages[i];
+              if (!existingPage) continue; // 안전성 체크
+
               const defaultPage = DEFAULT_PAGES[i] || DEFAULT_PAGES[0]; // 기본값 사용
 
               try {
                 // 메모 생성
                 const createdMemos = [];
-                for (const memo of defaultPage.memos) {
+                for (const memo of (defaultPage.memos || [])) {
                   try {
                     console.log(`📝 메모 생성 시도: ${memo.title}`, {
                       tags: memo.tags,
@@ -103,7 +105,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
 
                 // 카테고리 생성
                 const createdCategories = [];
-                for (const category of defaultPage.categories) {
+                for (const category of (defaultPage.categories || [])) {
                   try {
                     const createdCategory = await createCategory({
                       ...category,
@@ -120,19 +122,41 @@ export const useAppState = (isAuthenticated: boolean = false) => {
                   ...existingPage,
                   memos: createdMemos,
                   categories: createdCategories,
+                  quickNavItems: existingPage.quickNavItems || []
                 });
               } catch (error) {
                 console.error(`❌ 페이지 데이터 추가 실패: ${existingPage.name}`, error);
-                updatedPages.push(existingPage);
+                updatedPages.push({
+                  ...existingPage,
+                  memos: existingPage.memos || [],
+                  categories: existingPage.categories || [],
+                  quickNavItems: existingPage.quickNavItems || []
+                });
               }
             }
 
-            setPages(updatedPages);
-            setCurrentPageId(updatedPages[0].id);
+            // 안전성 체크: updatedPages가 비어있지 않은지 확인
+            if (updatedPages.length > 0 && updatedPages[0]) {
+              setPages(updatedPages);
+              setCurrentPageId(updatedPages[0].id);
+            } else {
+              // 페이지 생성 실패 시 DEFAULT_PAGES 사용
+              console.warn('페이지 업데이트 실패. 기본 페이지로 폴백합니다.');
+              setPages(DEFAULT_PAGES);
+              setCurrentPageId(DEFAULT_PAGES[0]?.id || '1');
+            }
           } else {
             // 이미 데이터가 있으면 그대로 사용
-            setPages(loadedPages);
-            setCurrentPageId(loadedPages[0].id);
+            // 안전성 체크: memos와 categories가 배열인지 확인
+            const safePages = loadedPages.map(page => ({
+              ...page,
+              memos: Array.isArray(page.memos) ? page.memos : [],
+              categories: Array.isArray(page.categories) ? page.categories : [],
+              quickNavItems: Array.isArray(page.quickNavItems) ? page.quickNavItems : []
+            }));
+
+            setPages(safePages);
+            setCurrentPageId(safePages[0]?.id || '1');
           }
         } else {
           // 첫 로그인: 기본 페이지를 DB에 생성
@@ -141,6 +165,8 @@ export const useAppState = (isAuthenticated: boolean = false) => {
           // DEFAULT_PAGES를 DB에 생성
           const createdPages: Page[] = [];
           for (const page of DEFAULT_PAGES) {
+            if (!page) continue; // 안전성 체크
+
             try {
               // 1. 페이지 생성
               const newPage = await createPage(page.id, page.name);
@@ -148,7 +174,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
 
               // 2. 메모 생성
               const createdMemos = [];
-              for (const memo of page.memos) {
+              for (const memo of (page.memos || [])) {
                 try {
                   console.log(`📝 메모 생성 시도: ${memo.title}`, {
                     tags: memo.tags,
@@ -168,7 +194,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
 
               // 3. 카테고리 생성
               const createdCategories = [];
-              for (const category of page.categories) {
+              for (const category of (page.categories || [])) {
                 try {
                   const createdCategory = await createCategory({
                     ...category,
@@ -186,20 +212,21 @@ export const useAppState = (isAuthenticated: boolean = false) => {
                 ...newPage,
                 memos: createdMemos,
                 categories: createdCategories,
+                quickNavItems: newPage.quickNavItems || []
               });
             } catch (pageError) {
               console.error(`❌ 페이지 생성 실패: ${page.name}`, pageError);
             }
           }
 
-          if (createdPages.length > 0) {
+          if (createdPages.length > 0 && createdPages[0]) {
             setPages(createdPages);
             setCurrentPageId(createdPages[0].id);
           } else {
             // 페이지 생성 실패 시 로컬 DEFAULT_PAGES 사용
             console.warn('페이지 생성 실패. 로컬 페이지를 사용합니다.');
             setPages(DEFAULT_PAGES);
-            setCurrentPageId('1');
+            setCurrentPageId(DEFAULT_PAGES[0]?.id || '1');
           }
         }
 
