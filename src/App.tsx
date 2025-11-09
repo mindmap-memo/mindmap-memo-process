@@ -752,29 +752,6 @@ const App: React.FC = () => {
   if (isMobile) {
     return (
       <>
-        {/* 최상위 디버그 UI - AppProviders 외부 */}
-        {(process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview') && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            background: 'rgba(255, 0, 0, 0.9)',
-            color: '#fff',
-            padding: '8px',
-            fontSize: '11px',
-            zIndex: 999999,
-            borderBottom: '2px solid yellow',
-            fontFamily: 'monospace'
-          }}>
-            <div><strong>APP.TSX DEBUG:</strong></div>
-            <div>Pages: {pages ? `${pages.length} pages` : 'undefined'}</div>
-            <div>CurrentPageId: {currentPageId || 'undefined'}</div>
-            <div>CurrentPage: {currentPage ? `존재 (${currentPage.name})` : 'undefined'}</div>
-            <div>isInitialLoadDone: {isInitialLoadDone ? 'true' : 'false'}</div>
-            <div>LoadingProgress: {loadingProgress}%</div>
-          </div>
-        )}
         <AppProviders
           appState={appStateContextValue}
           selection={selectionContextValue}
