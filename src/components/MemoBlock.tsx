@@ -27,6 +27,7 @@ interface MemoBlockProps {
   connectingFromId?: string | null;
   onStartConnection?: (memoId: string) => void;
   onConnectMemos?: (fromId: string, toId: string) => void;
+  onCancelConnection?: () => void;
   onUpdateDragLine?: (mousePos: { x: number; y: number }) => void;
   canvasScale?: number;
   canvasOffset?: { x: number; y: number };
@@ -62,6 +63,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   connectingFromId,
   onStartConnection,
   onConnectMemos,
+  onCancelConnection,
   onUpdateDragLine,
   canvasScale = 1,
   canvasOffset = { x: 0, y: 0 },
@@ -133,6 +135,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
     onDetectCategoryOnDrop,
     onStartConnection,
     onConnectMemos,
+    onCancelConnection,
     onUpdateDragLine,
     onDragStart,
     onDragEnd,
@@ -358,6 +361,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
           styles.notSelected
         } ${isDragging ? styles.dragging : styles.notDragging}`}
         data-memo-block="true"
+        data-memo-id={memo.id}
         onContextMenu={handleContextMenu}
         onMouseDown={handleMouseDown}
         onMouseUp={(e) => {
@@ -660,9 +664,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       <div
         className={`${styles.connectionPoint} ${styles.top} ${isConnecting && onOpenEditor ? styles.enlarged : ''}`}
         onMouseDown={handleConnectionPointMouseDown}
-        onMouseUp={handleConnectionPointMouseUp}
         onTouchStart={handleConnectionPointMouseDown}
-        onTouchEnd={handleConnectionPointMouseUp}
         style={{ touchAction: 'none' }}
       >
         <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} />
@@ -670,9 +672,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       <div
         className={`${styles.connectionPoint} ${styles.bottom} ${isConnecting && onOpenEditor ? styles.enlarged : ''}`}
         onMouseDown={handleConnectionPointMouseDown}
-        onMouseUp={handleConnectionPointMouseUp}
         onTouchStart={handleConnectionPointMouseDown}
-        onTouchEnd={handleConnectionPointMouseUp}
         style={{ touchAction: 'none' }}
       >
         <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} />
@@ -680,9 +680,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       <div
         className={`${styles.connectionPoint} ${styles.left} ${isConnecting && onOpenEditor ? styles.enlarged : ''}`}
         onMouseDown={handleConnectionPointMouseDown}
-        onMouseUp={handleConnectionPointMouseUp}
         onTouchStart={handleConnectionPointMouseDown}
-        onTouchEnd={handleConnectionPointMouseUp}
         style={{ touchAction: 'none' }}
       >
         <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} />
@@ -690,9 +688,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       <div
         className={`${styles.connectionPoint} ${styles.right} ${isConnecting && onOpenEditor ? styles.enlarged : ''}`}
         onMouseDown={handleConnectionPointMouseDown}
-        onMouseUp={handleConnectionPointMouseUp}
         onTouchStart={handleConnectionPointMouseDown}
-        onTouchEnd={handleConnectionPointMouseUp}
         style={{ touchAction: 'none' }}
       >
         <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} />

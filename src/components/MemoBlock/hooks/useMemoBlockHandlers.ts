@@ -62,7 +62,6 @@ export const useMemoBlockHandlers = (params: UseMemoBlockHandlersParams) => {
     // 모바일(터치) 환경에서는 컨텍스트 메뉴 비활성화
     // @ts-ignore - nativeEvent의 sourceCapabilities 체크
     if (e.nativeEvent && e.nativeEvent.sourceCapabilities && e.nativeEvent.sourceCapabilities.firesTouchEvents) {
-      console.log('[MemoBlock] 모바일 환경이므로 컨텍스트 메뉴 표시 안 함');
       return false;
     }
 
@@ -86,10 +85,7 @@ export const useMemoBlockHandlers = (params: UseMemoBlockHandlersParams) => {
 
   // 더블탭/더블클릭 처리 공통 로직
   const handleOpenEditor = React.useCallback(() => {
-    console.log('[MemoBlock] handleOpenEditor 호출됨', { onOpenEditor: !!onOpenEditor });
-
     if (onOpenEditor) {
-      console.log('[MemoBlock] onOpenEditor 호출 - 에디터 열기');
       onOpenEditor();
     }
   }, [onOpenEditor]);
@@ -99,14 +95,8 @@ export const useMemoBlockHandlers = (params: UseMemoBlockHandlersParams) => {
     const currentTime = Date.now();
     const timeSinceLastTap = currentTime - lastTapTimeRef.current;
 
-    console.log('[MemoBlock] touchEnd', {
-      timeSinceLastTap,
-      onOpenEditor: !!onOpenEditor
-    });
-
     // 300ms 이내에 두 번째 탭이 발생하면 더블탭으로 인식
     if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
-      console.log('[MemoBlock] 더블탭 감지!');
       e.preventDefault(); // 기본 더블탭 줌 방지
 
       if (tapTimeoutRef.current) {
@@ -132,7 +122,6 @@ export const useMemoBlockHandlers = (params: UseMemoBlockHandlersParams) => {
 
   // 제목 더블클릭 핸들러 (PC용)
   const handleTitleDoubleClick = React.useCallback((e: React.MouseEvent) => {
-    console.log('[MemoBlock] handleTitleDoubleClick 호출됨 (PC)', { onOpenEditor: !!onOpenEditor });
     e.stopPropagation();
     handleOpenEditor();
   }, [handleOpenEditor]);
@@ -161,7 +150,6 @@ export const useMemoBlockHandlers = (params: UseMemoBlockHandlersParams) => {
 
   // 통합 편집 핸들러 - 모든 텍스트 블록을 하나로 합쳐서 편집 (PC용)
   const handleAllBlocksDoubleClick = React.useCallback((e: React.MouseEvent) => {
-    console.log('[MemoBlock] handleAllBlocksDoubleClick 호출됨 (PC)', { onOpenEditor: !!onOpenEditor });
     e.stopPropagation();
     handleOpenEditor();
   }, [handleOpenEditor]);

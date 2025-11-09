@@ -561,6 +561,7 @@ const Canvas: React.FC<CanvasProps> = ({
                 connectingFromId={connectingFromId}
                 onStartConnection={onStartConnection}
                 onConnectMemos={onConnectMemos}
+                onCancelConnection={onCancelConnection}
                 onUpdateDragLine={onUpdateDragLine}
                 canvasScale={canvasScale}
                 canvasOffset={canvasOffset}

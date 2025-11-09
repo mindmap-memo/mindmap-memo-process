@@ -52,8 +52,6 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
   // 검색창이 있으면 검색 모드
   const isSearchMode = isSearchFocused || searchQuery.length > 0;
 
-  console.log('🟡 MobileHeader 렌더링:', { isSearchFocused, searchQuery, isSearchMode });
-
   return (
     <>
       <div className={styles.mobileHeaderContainer}>

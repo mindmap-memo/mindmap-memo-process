@@ -204,14 +204,16 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
   }, [setDragLineEnd]);
 
   /**
-   * 연결 취소
+   * 연결 취소 (연결선만 제거, 연결 모드는 유지)
    */
   const cancelConnection = useCallback(() => {
-    setIsConnecting(false);
+    console.log('🔴 [연결 취소] cancelConnection 호출됨');
+    // 연결 모드는 유지하고, 연결선만 제거
     setConnectingFromId(null);
     setConnectingFromDirection(null);
     setDragLineEnd(null);
-  }, [setIsConnecting, setConnectingFromId, setConnectingFromDirection, setDragLineEnd]);
+    console.log('🔴 [연결 취소] 연결선 제거 완료 (연결 모드는 유지)');
+  }, [setConnectingFromId, setConnectingFromDirection, setDragLineEnd]);
 
   return {
     disconnectMemo,
