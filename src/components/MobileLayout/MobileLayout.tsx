@@ -298,7 +298,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
               searchQuery={searchQuery}
               showFilters={showFilters}
               onNavigateToMemo={(memoId) => {
-                const currentPage = appState.pages.find(p => p.id === appState.currentPageId);
+                const currentPage = appState.pages?.find(p => p.id === appState.currentPageId);
                 if (currentPage) {
                   // 메모 선택
                   selection.handleMemoSelect(memoId);
@@ -309,7 +309,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
                 setSearchQuery('');
               }}
               onNavigateToCategory={(categoryId) => {
-                const currentPage = appState.pages.find(p => p.id === appState.currentPageId);
+                const currentPage = appState.pages?.find(p => p.id === appState.currentPageId);
                 if (currentPage) {
                   // 카테고리 선택
                   selection.selectCategory(categoryId);
