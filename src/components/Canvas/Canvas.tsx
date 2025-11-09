@@ -174,14 +174,6 @@ const Canvas: React.FC<CanvasProps> = ({
   setIsShiftPressed,  // Shift 상태 업데이트 함수
   isShiftPressedRef  // Shift ref 추가
 }) => {
-  // 디버깅: Canvas 렌더링 시작
-  console.log('[Canvas] 🎨 렌더링 시작', {
-    activeImportanceFilters,
-    isSet: activeImportanceFilters instanceof Set,
-    type: typeof activeImportanceFilters,
-    hasMethod: activeImportanceFilters && typeof activeImportanceFilters.has === 'function'
-  });
-
   // ===== Canvas 로컬 상태 (useCanvasState 훅 사용) =====
   const canvasState = useCanvasState();
   const {

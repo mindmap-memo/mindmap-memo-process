@@ -219,22 +219,11 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   const [showFilters, setShowFilters] = React.useState(false);
 
   // Context에서 필요한 상태와 핸들러 가져오기
-  console.log('[MobileLayout] 🎬 렌더링 시작');
   const appState = useAppStateContext();
-  console.log('[MobileLayout] appState 로드:', { exists: !!appState, pages: appState?.pages?.length });
   const selection = useSelection();
-  console.log('[MobileLayout] selection 로드:', { exists: !!selection });
   const connection = useConnection();
-  console.log('[MobileLayout] connection 로드:', { exists: !!connection });
   const panel = usePanel();
-  console.log('[MobileLayout] panel 로드:', { exists: !!panel });
   const quickNav = useQuickNav();
-  console.log('[MobileLayout] quickNav 로드:', {
-    exists: !!quickNav,
-    quickNavItems: quickNav?.quickNavItems,
-    isArray: Array.isArray(quickNav?.quickNavItems),
-    length: quickNav?.quickNavItems?.length
-  });
 
   // Context 데이터 유효성 검증 (초기 로딩 상태 처리)
   // useEffect 대신 직접 체크하여 더 빠르게 응답
@@ -306,12 +295,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
     return appState.pages.find(p => p.id === appState.currentPageId);
   }, [appState.pages, appState.currentPageId]);
 
-  // 디버깅: currentPage 상태 확인
-  React.useEffect(() => {
-    console.log('[MobileLayout] currentPage:', currentPage);
-    console.log('[MobileLayout] pages:', appState.pages);
-    console.log('[MobileLayout] currentPageId:', appState.currentPageId);
-  }, [currentPage, appState.pages, appState.currentPageId]);
 
   // 선택된 메모 및 카테고리 찾기 (안전한 접근)
   const selectedMemo = React.useMemo(() => {
@@ -469,7 +452,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         <div className={styles.view}>
           {currentPage ? (
             <>
-              {console.log('[MobileLayout] 🎨 Canvas 렌더링 시작, activeImportanceFilters:', selection?.activeImportanceFilters)}
               <Canvas
               fullscreen
               currentPage={currentPage}

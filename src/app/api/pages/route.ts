@@ -54,12 +54,25 @@ export async function GET() {
       const pageMemos = memos
         .filter((memo: any) => memo.page_id === page.id)
         .map((memo: any) => {
-          console.log(`[서버] 메모 로딩, id: ${memo.id}, blocks:`, JSON.stringify(memo.blocks, null, 2));
+          // blocks 배열 안전하게 처리: importanceRanges가 배열인지 확인
+          const safeBlocks = Array.isArray(memo.blocks)
+            ? memo.blocks.map((block: any) => {
+                if (block.type === 'text' && block.importanceRanges !== undefined && block.importanceRanges !== null) {
+                  // importanceRanges가 배열이 아니면 빈 배열로 대체
+                  return {
+                    ...block,
+                    importanceRanges: Array.isArray(block.importanceRanges) ? block.importanceRanges : []
+                  };
+                }
+                return block;
+              })
+            : [];
+
           return {
             id: memo.id,
             title: memo.title || '',
             content: '', // 기존 호환성을 위해 빈 문자열로 초기화
-            blocks: memo.blocks || [],
+            blocks: safeBlocks,
             tags: memo.tags || [],
             connections: memo.connections || [],
             position: { x: Number(memo.position_x), y: Number(memo.position_y) },

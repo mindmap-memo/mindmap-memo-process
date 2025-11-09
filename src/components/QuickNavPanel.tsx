@@ -43,7 +43,6 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
   const safeQuickNavItems = quickNavItems || [];
 
   const handleStartEdit = (item: QuickNavItem) => {
-    console.log('[QuickNavPanel] 편집 시작:', { id: item.id, name: item.name, item });
     setEditingItemId(item.id);
     setEditingName(item.name);
   };
@@ -123,7 +122,6 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
                     {safeQuickNavItems
                       .filter(item => item.targetType === 'memo')
                       .map(item => {
-                        console.log('[QuickNavPanel] 렌더링:', { id: item.id, name: item.name });
                         const targetPage = pages?.find(p => p.id === item.pageId);
                         const isCurrentPage = item.pageId === currentPageId;
                         const isEditing = editingItemId === item.id;
