@@ -69,7 +69,7 @@ export const useSelectionHandlers = (props: UseSelectionHandlersProps) => {
     setCanvasScale
   } = props;
 
-  const currentPage = pages.find(p => p.id === currentPageId);
+  const currentPage = pages?.find(p => p.id === currentPageId);
 
   // 통합 메모 선택 핸들러 (멀티 선택 지원)
   const handleMemoSelect = useCallback((memoId: string, isShiftClick: boolean = false) => {

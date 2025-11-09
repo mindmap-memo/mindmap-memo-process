@@ -40,7 +40,7 @@ export const useMobileSearch = ({
   // 메모 검색 로직 (LeftPanel의 useSearch와 동일)
   const searchMemos = useCallback((query: string, category: SearchCategory): MemoBlock[] => {
     if (!pages || pages.length === 0) return [];
-    const currentPage = pages.find(p => p.id === currentPageId);
+    const currentPage = pages?.find(p => p.id === currentPageId);
     if (!currentPage) return [];
 
     const directMemos = currentPage.memos || [];
@@ -209,7 +209,7 @@ export const useMobileSearch = ({
   // 카테고리 검색 로직
   const searchCategories = useCallback((query: string): CategoryBlock[] => {
     if (!pages || pages.length === 0) return [];
-    const currentPage = pages.find(p => p.id === currentPageId);
+    const currentPage = pages?.find(p => p.id === currentPageId);
     if (!currentPage || !currentPage.categories) return [];
 
     if (!query.trim()) {
