@@ -54,31 +54,47 @@ export async function GET() {
       const pageMemos = memos
         .filter((memo: any) => memo.page_id === page.id)
         .map((memo: any) => {
+          console.log(`[API] 메모 처리 시작: ${memo.id}`);
+
           // blocks 배열 안전하게 처리: importanceRanges가 배열인지 확인
           const safeBlocks = Array.isArray(memo.blocks)
-            ? memo.blocks.map((block: any) => {
+            ? memo.blocks.map((block: any, blockIndex: number) => {
+                console.log(`[API] 메모 ${memo.id} - 블록 ${blockIndex} 처리:`, {
+                  type: block.type,
+                  hasImportanceRanges: 'importanceRanges' in block,
+                  importanceRangesType: typeof block.importanceRanges,
+                  isArray: Array.isArray(block.importanceRanges)
+                });
+
                 // text 블록인 경우 importanceRanges 필드 보장
                 if (block.type === 'text') {
                   // importanceRanges가 없거나 배열이 아니면 빈 배열로 대체
                   if (!block.importanceRanges || !Array.isArray(block.importanceRanges)) {
+                    console.log(`[API] 메모 ${memo.id} - 블록 ${blockIndex}: importanceRanges 수정됨 (${typeof block.importanceRanges} → [])`);
                     return {
                       ...block,
                       importanceRanges: []
                     };
                   }
                   // importanceRanges가 배열이지만 유효하지 않은 항목이 있으면 필터링
+                  const validRanges = block.importanceRanges.filter(
+                    (range: any) => range && typeof range === 'object' &&
+                                    typeof range.start === 'number' &&
+                                    typeof range.end === 'number'
+                  );
+                  if (validRanges.length !== block.importanceRanges.length) {
+                    console.log(`[API] 메모 ${memo.id} - 블록 ${blockIndex}: 유효하지 않은 범위 필터링됨 (${block.importanceRanges.length} → ${validRanges.length})`);
+                  }
                   return {
                     ...block,
-                    importanceRanges: block.importanceRanges.filter(
-                      (range: any) => range && typeof range === 'object' &&
-                                      typeof range.start === 'number' &&
-                                      typeof range.end === 'number'
-                    )
+                    importanceRanges: validRanges
                   };
                 }
                 return block;
               })
             : [];
+
+          console.log(`[API] 메모 ${memo.id} 처리 완료: ${safeBlocks.length}개 블록`);
 
           return {
             id: memo.id,
