@@ -85,6 +85,16 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   setIsShiftPressed,  // Shift 상태 업데이트 함수
   isShiftPressedRef  // Shift ref 추가
 }) => {
+  // 디버깅: MemoBlock 렌더링 시작
+  console.log('[MemoBlock] 📝 렌더링 시작', {
+    memoId: memo.id,
+    memoTitle: memo.title,
+    activeImportanceFilters,
+    isSet: activeImportanceFilters instanceof Set,
+    blocks: memo.blocks,
+    blocksLength: memo.blocks?.length
+  });
+
   // 상태 관리 훅 사용
   const state = useMemoBlockState(memo);
   const {
