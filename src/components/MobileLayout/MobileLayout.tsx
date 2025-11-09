@@ -328,30 +328,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
 
   return (
     <div className={styles.mobileLayout}>
-      {/* 시각적 디버깅 UI - 개발 및 Preview에서 표시 */}
-      {(process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview') && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          background: 'rgba(255, 255, 0, 0.9)',
-          color: '#000',
-          padding: '8px',
-          fontSize: '11px',
-          zIndex: 99999,
-          borderBottom: '2px solid red',
-          fontFamily: 'monospace'
-        }}>
-          <div><strong>DEBUG INFO:</strong></div>
-          <div>Pages: {appState.pages ? `${appState.pages.length} pages` : 'undefined'}</div>
-          <div>CurrentPageId: {appState.currentPageId || 'undefined'}</div>
-          <div>CurrentPage: {currentPage ? `존재 (${currentPage.name})` : 'undefined'}</div>
-          <div>isInitialLoadDone: {appState.isInitialLoadDone ? 'true' : 'false'}</div>
-          <div>LoadingProgress: {appState.loadingProgress}%</div>
-        </div>
-      )}
-
       {/* 마이그레이션 프롬프트 */}
       {needsMigration && (
         <MigrationPromptComponent
