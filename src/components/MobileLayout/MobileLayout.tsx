@@ -522,9 +522,9 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
               onDragSelectStart={onDragSelectStart}
               onDragSelectMove={onDragSelectMove}
               onDragSelectEnd={onDragSelectEnd}
-              activeImportanceFilters={selection?.activeImportanceFilters || []}
+              activeImportanceFilters={selection?.activeImportanceFilters || new Set()}
               onToggleImportanceFilter={selection?.toggleImportanceFilter || (() => {})}
-              showGeneralContent={selection?.showGeneralContent || false}
+              showGeneralContent={selection?.showGeneralContent ?? true}
               onToggleGeneralContent={selection?.toggleGeneralContent || (() => {})}
               canUndo={canUndo}
               canRedo={canRedo}
