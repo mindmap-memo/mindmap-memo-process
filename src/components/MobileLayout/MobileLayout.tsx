@@ -226,18 +226,20 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   const quickNav = useQuickNav();
 
   // Context 데이터 유효성 검증 (초기 로딩 상태 처리)
-  const [isContextReady, setIsContextReady] = React.useState(false);
-
-  React.useEffect(() => {
-    // Context가 모두 준비되었는지 확인
-    if (appState && selection && connection && panel && quickNav &&
-        appState.pages && Array.isArray(appState.pages)) {
-      setIsContextReady(true);
-    }
-  }, [appState, selection, connection, panel, quickNav]);
+  // useEffect 대신 직접 체크하여 더 빠르게 응답
+  const isContextReady = !!(
+    appState &&
+    selection &&
+    connection &&
+    panel &&
+    quickNav &&
+    appState.pages &&
+    Array.isArray(appState.pages) &&
+    appState.pages.length > 0
+  );
 
   // Context가 준비되지 않았으면 로딩 화면 표시
-  if (!isContextReady || !appState?.pages || !Array.isArray(appState.pages)) {
+  if (!isContextReady) {
     return (
       <div style={{
         display: 'flex',
@@ -262,10 +264,10 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
     );
   }
 
-  // 검색 기능 (안전한 접근)
+  // 검색 기능
   useMobileSearch({
-    pages: appState?.pages || [],
-    currentPageId: appState?.currentPageId || '',
+    pages: appState.pages,
+    currentPageId: appState.currentPageId,
     searchQuery,
     searchCategory,
     searchImportanceFilters,
@@ -281,37 +283,37 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
       return undefined;
     }
     return appState.pages.find(p => p.id === appState.currentPageId);
-  }, [appState, appState?.pages, appState?.currentPageId]);
+  }, [appState.pages, appState.currentPageId]);
 
   // 디버깅: currentPage 상태 확인
   React.useEffect(() => {
     console.log('[MobileLayout] currentPage:', currentPage);
-    console.log('[MobileLayout] pages:', appState?.pages);
-    console.log('[MobileLayout] currentPageId:', appState?.currentPageId);
-  }, [currentPage, appState?.pages, appState?.currentPageId]);
+    console.log('[MobileLayout] pages:', appState.pages);
+    console.log('[MobileLayout] currentPageId:', appState.currentPageId);
+  }, [currentPage, appState.pages, appState.currentPageId]);
 
   // 선택된 메모 및 카테고리 찾기 (안전한 접근)
   const selectedMemo = React.useMemo(() => {
     if (!currentPage?.memos || !Array.isArray(currentPage.memos)) return undefined;
-    return currentPage.memos.find(m => m.id === selection?.selectedMemoId);
-  }, [currentPage, selection?.selectedMemoId]);
+    return currentPage.memos.find(m => m.id === selection.selectedMemoId);
+  }, [currentPage, selection.selectedMemoId]);
 
   const selectedMemos = React.useMemo(() => {
     if (!currentPage?.memos || !Array.isArray(currentPage.memos)) return [];
-    if (!selection?.selectedMemoIds || !Array.isArray(selection.selectedMemoIds)) return [];
+    if (!selection.selectedMemoIds || !Array.isArray(selection.selectedMemoIds)) return [];
     return currentPage.memos.filter(m => selection.selectedMemoIds.includes(m.id));
-  }, [currentPage, selection?.selectedMemoIds]);
+  }, [currentPage, selection.selectedMemoIds]);
 
   const selectedCategory = React.useMemo(() => {
     if (!currentPage?.categories || !Array.isArray(currentPage.categories)) return undefined;
-    return currentPage.categories.find(c => c.id === selection?.selectedCategoryId);
-  }, [currentPage, selection?.selectedCategoryId]);
+    return currentPage.categories.find(c => c.id === selection.selectedCategoryId);
+  }, [currentPage, selection.selectedCategoryId]);
 
   const selectedCategories = React.useMemo(() => {
     if (!currentPage?.categories || !Array.isArray(currentPage.categories)) return [];
-    if (!selection?.selectedCategoryIds || !Array.isArray(selection.selectedCategoryIds)) return [];
+    if (!selection.selectedCategoryIds || !Array.isArray(selection.selectedCategoryIds)) return [];
     return currentPage.categories.filter(c => selection.selectedCategoryIds.includes(c.id));
-  }, [currentPage, selection?.selectedCategoryIds]);
+  }, [currentPage, selection.selectedCategoryIds]);
 
   // Editor 표시 조건: 더블탭으로만 열리도록 변경 (자동 열림 제거)
   // React.useEffect(() => {
