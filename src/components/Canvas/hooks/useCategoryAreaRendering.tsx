@@ -141,6 +141,9 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
   // 롱프레스 활성화 상태 추적
   const [longPressActiveCategoryId, setLongPressActiveCategoryId] = React.useState<string | null>(null);
 
+  // 연결점 드래그 상태 추적
+  const [isConnectionDragging, setIsConnectionDragging] = React.useState<string | null>(null);
+
   const {
     currentPage,
     areaUpdateTrigger,
@@ -210,6 +213,117 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
     handleCategoryAreaDragOver,
     calculateArea
   } = params;
+
+  // Refs for stable callbacks
+  const isConnectingRef = React.useRef(isConnecting);
+  const connectingFromIdRef = React.useRef(connectingFromId);
+  const onConnectMemosRef = React.useRef(onConnectMemos);
+  const onCancelConnectionRef = React.useRef(onCancelConnection);
+  const canvasOffsetRef = React.useRef(canvasOffset);
+  const canvasScaleRef = React.useRef(canvasScale);
+
+  React.useEffect(() => {
+    isConnectingRef.current = isConnecting;
+    connectingFromIdRef.current = connectingFromId;
+    onConnectMemosRef.current = onConnectMemos;
+    onCancelConnectionRef.current = onCancelConnection;
+    canvasOffsetRef.current = canvasOffset;
+    canvasScaleRef.current = canvasScale;
+  }, [isConnecting, connectingFromId, onConnectMemos, onCancelConnection, canvasOffset, canvasScale]);
+
+  // 연결점 드래그 중일 때 document-level 이벤트 리스너 등록
+  React.useEffect(() => {
+    if (isConnectionDragging && onUpdateDragLine) {
+      const handleMouseMove = (e: MouseEvent) => {
+        const canvasElement = document.querySelector('[data-canvas-container]') as HTMLElement;
+        if (canvasElement) {
+          const rect = canvasElement.getBoundingClientRect();
+          const offset = canvasOffsetRef.current || { x: 0, y: 0 };
+          const scale = canvasScaleRef.current;
+          const mouseX = (e.clientX - rect.left - offset.x) / scale;
+          const mouseY = (e.clientY - rect.top - offset.y) / scale;
+          onUpdateDragLine({ x: mouseX, y: mouseY });
+        }
+      };
+
+      const handleTouchMove = (e: TouchEvent) => {
+        if (e.touches.length > 0) {
+          const canvasElement = document.querySelector('[data-canvas-container]') as HTMLElement;
+          if (canvasElement) {
+            const rect = canvasElement.getBoundingClientRect();
+            const offset = canvasOffsetRef.current || { x: 0, y: 0 };
+            const scale = canvasScaleRef.current;
+            const mouseX = (e.touches[0].clientX - rect.left - offset.x) / scale;
+            const mouseY = (e.touches[0].clientY - rect.top - offset.y) / scale;
+            onUpdateDragLine({ x: mouseX, y: mouseY });
+          }
+        }
+      };
+
+      const handleMouseUp = (e: MouseEvent) => {
+        const element = document.elementFromPoint(e.clientX, e.clientY);
+        const categoryElement = element?.closest('[data-category-id]');
+        const memoElement = element?.closest('[data-memo-id]');
+
+        const currentIsConnecting = isConnectingRef.current;
+        const currentConnectingFromId = connectingFromIdRef.current;
+        const currentOnConnectMemos = onConnectMemosRef.current;
+        const currentOnCancelConnection = onCancelConnectionRef.current;
+
+        if ((categoryElement || memoElement) && currentIsConnecting && currentConnectingFromId) {
+          const targetId = categoryElement?.getAttribute('data-category-id') || memoElement?.getAttribute('data-memo-id');
+
+          if (targetId && targetId !== currentConnectingFromId) {
+            currentOnConnectMemos?.(currentConnectingFromId, targetId);
+          } else {
+            currentOnCancelConnection?.();
+          }
+        } else {
+          currentOnCancelConnection?.();
+        }
+        setIsConnectionDragging(null);
+      };
+
+      const handleTouchEnd = (e: TouchEvent) => {
+        if (e.changedTouches.length > 0) {
+          const touch = e.changedTouches[0];
+          const element = document.elementFromPoint(touch.clientX, touch.clientY);
+          const categoryElement = element?.closest('[data-category-id]');
+          const memoElement = element?.closest('[data-memo-id]');
+
+          const currentIsConnecting = isConnectingRef.current;
+          const currentConnectingFromId = connectingFromIdRef.current;
+          const currentOnConnectMemos = onConnectMemosRef.current;
+          const currentOnCancelConnection = onCancelConnectionRef.current;
+
+          if ((categoryElement || memoElement) && currentIsConnecting && currentConnectingFromId) {
+            const targetId = categoryElement?.getAttribute('data-category-id') || memoElement?.getAttribute('data-memo-id');
+
+            if (targetId && targetId !== currentConnectingFromId) {
+              currentOnConnectMemos?.(currentConnectingFromId, targetId);
+            } else {
+              currentOnCancelConnection?.();
+            }
+          } else {
+            currentOnCancelConnection?.();
+          }
+        }
+        setIsConnectionDragging(null);
+      };
+
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('touchmove', handleTouchMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('touchend', handleTouchEnd);
+
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('touchend', handleTouchEnd);
+      };
+    }
+  }, [isConnectionDragging, onUpdateDragLine]);
 
   // 카테고리 영역 색상 훅 사용
   const { calculateCategoryAreaWithColor } = useCategoryAreaColors({
@@ -663,158 +777,290 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
           {/* 영역 연결점들 - 4방향 */}
           {/* Top */}
           <div
+            data-category-id={category.id}
             onMouseDown={(e) => {
               e.stopPropagation();
-              if (!isConnecting) {
-                onCategorySelect(category.id);
-                onStartConnection?.(category.id, 'top');
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if (!isMobile || isConnecting) {
+                setIsConnectionDragging(category.id);
+                if (!connectingFromId) {
+                  onStartConnection?.(category.id, 'top');
+                }
               }
             }}
             onMouseUp={(e) => {
               e.stopPropagation();
-              if (isConnecting && connectingFromId && connectingFromId !== category.id) {
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if ((!isMobile || isConnecting) && connectingFromId && connectingFromId !== category.id) {
                 onConnectMemos(connectingFromId, category.id);
               }
+              setIsConnectionDragging(null);
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if (!isMobile || isConnecting) {
+                setIsConnectionDragging(category.id);
+                if (!connectingFromId) {
+                  onStartConnection?.(category.id, 'top');
+                }
+              }
+            }}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if ((!isMobile || isConnecting) && connectingFromId && connectingFromId !== category.id) {
+                onConnectMemos(connectingFromId, category.id);
+              }
+              setIsConnectionDragging(null);
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
             }}
             style={{
               position: 'absolute',
-              top: -8,
+              top: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? -75 : -8,
               left: '50%',
               transform: 'translateX(-50%)',
-              width: 16,
-              height: 16,
+              width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
+              height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'crosshair',
               zIndex: 15,
-              pointerEvents: 'auto'
+              pointerEvents: 'auto',
+              touchAction: 'none'
             }}
           >
             <div style={{
-              width: 8,
-              height: 8,
+              width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
+              height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
               backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
               borderRadius: '50%',
-              border: '2px solid white',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+              border: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '5px solid white' : '2px solid white',
+              boxShadow: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '0 6px 16px rgba(0, 0, 0, 0.4)' : '0 2px 4px rgba(0,0,0,0.2)'
             }} />
           </div>
           {/* Bottom */}
           <div
+            data-category-id={category.id}
             onMouseDown={(e) => {
               e.stopPropagation();
-              if (!isConnecting) {
-                onCategorySelect(category.id);
-                onStartConnection?.(category.id, 'bottom');
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if (!isMobile || isConnecting) {
+                setIsConnectionDragging(category.id);
+                if (!connectingFromId) {
+                  onStartConnection?.(category.id, 'bottom');
+                }
               }
             }}
             onMouseUp={(e) => {
               e.stopPropagation();
-              if (isConnecting && connectingFromId && connectingFromId !== category.id) {
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if ((!isMobile || isConnecting) && connectingFromId && connectingFromId !== category.id) {
                 onConnectMemos(connectingFromId, category.id);
               }
+              setIsConnectionDragging(null);
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if (!isMobile || isConnecting) {
+                setIsConnectionDragging(category.id);
+                if (!connectingFromId) {
+                  onStartConnection?.(category.id, 'bottom');
+                }
+              }
+            }}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if ((!isMobile || isConnecting) && connectingFromId && connectingFromId !== category.id) {
+                onConnectMemos(connectingFromId, category.id);
+              }
+              setIsConnectionDragging(null);
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
             }}
             style={{
               position: 'absolute',
-              bottom: -8,
+              bottom: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? -75 : -8,
               left: '50%',
               transform: 'translateX(-50%)',
-              width: 16,
-              height: 16,
+              width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
+              height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'crosshair',
               zIndex: 15,
-              pointerEvents: 'auto'
+              pointerEvents: 'auto',
+              touchAction: 'none'
             }}
           >
             <div style={{
-              width: 8,
-              height: 8,
+              width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
+              height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
               backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
               borderRadius: '50%',
-              border: '2px solid white',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+              border: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '5px solid white' : '2px solid white',
+              boxShadow: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '0 6px 16px rgba(0, 0, 0, 0.4)' : '0 2px 4px rgba(0,0,0,0.2)'
             }} />
           </div>
           {/* Left */}
           <div
+            data-category-id={category.id}
             onMouseDown={(e) => {
               e.stopPropagation();
-              if (!isConnecting) {
-                onCategorySelect(category.id);
-                onStartConnection?.(category.id, 'left');
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if (!isMobile || isConnecting) {
+                setIsConnectionDragging(category.id);
+                if (!connectingFromId) {
+                  onStartConnection?.(category.id, 'left');
+                }
               }
             }}
             onMouseUp={(e) => {
               e.stopPropagation();
-              if (isConnecting && connectingFromId && connectingFromId !== category.id) {
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if ((!isMobile || isConnecting) && connectingFromId && connectingFromId !== category.id) {
                 onConnectMemos(connectingFromId, category.id);
               }
+              setIsConnectionDragging(null);
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if (!isMobile || isConnecting) {
+                setIsConnectionDragging(category.id);
+                if (!connectingFromId) {
+                  onStartConnection?.(category.id, 'left');
+                }
+              }
+            }}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if ((!isMobile || isConnecting) && connectingFromId && connectingFromId !== category.id) {
+                onConnectMemos(connectingFromId, category.id);
+              }
+              setIsConnectionDragging(null);
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
             }}
             style={{
               position: 'absolute',
-              left: -8,
+              left: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? -75 : -8,
               top: '50%',
               transform: 'translateY(-50%)',
-              width: 16,
-              height: 16,
+              width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
+              height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'crosshair',
               zIndex: 15,
-              pointerEvents: 'auto'
+              pointerEvents: 'auto',
+              touchAction: 'none'
             }}
           >
             <div style={{
-              width: 8,
-              height: 8,
+              width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
+              height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
               backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
               borderRadius: '50%',
-              border: '2px solid white',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+              border: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '5px solid white' : '2px solid white',
+              boxShadow: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '0 6px 16px rgba(0, 0, 0, 0.4)' : '0 2px 4px rgba(0,0,0,0.2)'
             }} />
           </div>
           {/* Right */}
           <div
+            data-category-id={category.id}
             onMouseDown={(e) => {
               e.stopPropagation();
-              if (!isConnecting) {
-                onCategorySelect(category.id);
-                onStartConnection?.(category.id, 'right');
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if (!isMobile || isConnecting) {
+                setIsConnectionDragging(category.id);
+                if (!connectingFromId) {
+                  onStartConnection?.(category.id, 'right');
+                }
               }
             }}
             onMouseUp={(e) => {
               e.stopPropagation();
-              if (isConnecting && connectingFromId && connectingFromId !== category.id) {
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if ((!isMobile || isConnecting) && connectingFromId && connectingFromId !== category.id) {
                 onConnectMemos(connectingFromId, category.id);
               }
+              setIsConnectionDragging(null);
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if (!isMobile || isConnecting) {
+                setIsConnectionDragging(category.id);
+                if (!connectingFromId) {
+                  onStartConnection?.(category.id, 'right');
+                }
+              }
+            }}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if ((!isMobile || isConnecting) && connectingFromId && connectingFromId !== category.id) {
+                onConnectMemos(connectingFromId, category.id);
+              }
+              setIsConnectionDragging(null);
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
             }}
             style={{
               position: 'absolute',
-              right: -8,
+              right: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? -75 : -8,
               top: '50%',
               transform: 'translateY(-50%)',
-              width: 16,
-              height: 16,
+              width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
+              height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'crosshair',
               zIndex: 15,
-              pointerEvents: 'auto'
+              pointerEvents: 'auto',
+              touchAction: 'none'
             }}
           >
             <div style={{
-              width: 8,
-              height: 8,
+              width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
+              height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
               backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
               borderRadius: '50%',
-              border: '2px solid white',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+              border: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '5px solid white' : '2px solid white',
+              boxShadow: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '0 6px 16px rgba(0, 0, 0, 0.4)' : '0 2px 4px rgba(0,0,0,0.2)'
             }} />
           </div>
         </div>
