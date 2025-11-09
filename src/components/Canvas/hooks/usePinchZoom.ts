@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 interface UsePinchZoomProps {
-  canvasRef: React.RefObject<HTMLDivElement>;
+  canvasRef: React.RefObject<HTMLDivElement | null>;
   canvasScale: number;
   setCanvasScale: (scale: number) => void;
   canvasOffset: { x: number; y: number };
