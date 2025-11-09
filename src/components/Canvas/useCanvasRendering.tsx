@@ -105,6 +105,7 @@ interface UseCanvasRenderingParams {
   onMemoDragEnd?: () => void;
   onDeleteMemoById?: (id: string) => void;
   onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
+  onDeleteQuickNav?: (targetId: string, targetType: 'memo' | 'category') => void;
   isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
   onCategoryUpdate: (category: CategoryBlock) => void;
   onOpenEditor?: () => void;
@@ -192,6 +193,7 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     onMemoDragEnd,
     onDeleteMemoById,
     onAddQuickNav,
+    onDeleteQuickNav,
     isQuickNavExists,
     onCategoryUpdate,
     onOpenEditor,

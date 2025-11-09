@@ -100,6 +100,7 @@ interface UseCategoryAreaRenderingParams {
   onMemoDragEnd?: () => void;
   onDeleteMemoById?: (id: string) => void;
   onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
+  onDeleteQuickNav?: (targetId: string, targetType: 'memo' | 'category') => void;
   isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
   onCategoryUpdate: (category: CategoryBlock) => void;
   onOpenEditor?: () => void;
@@ -192,6 +193,7 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
     onMemoDragEnd,
     onDeleteMemoById,
     onAddQuickNav,
+    onDeleteQuickNav,
     isQuickNavExists,
     onCategoryUpdate,
     onOpenEditor,
@@ -1363,6 +1365,7 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             isShiftPressed={isShiftPressed}
             onDelete={onDeleteMemoById}
             onAddQuickNav={onAddQuickNav}
+            onDeleteQuickNav={onDeleteQuickNav}
             isQuickNavExists={isQuickNavExists}
             onOpenEditor={onOpenEditor}
             setIsLongPressActive={setIsLongPressActive}

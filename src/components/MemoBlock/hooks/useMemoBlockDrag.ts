@@ -103,6 +103,7 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
    * 롱프레스 타이머 시작
    */
   const startLongPressTimer = () => {
+    console.log('⏱️ [롱프레스 타이머] 시작', { memoId: memo.id });
     // 기존 타이머가 있으면 취소
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
@@ -110,6 +111,7 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
 
     // 1초 후 롱프레스 활성화
     longPressTimerRef.current = setTimeout(() => {
+      console.log('✅ [롱프레스] 활성화!', { memoId: memo.id });
       setIsLongPressActive(true);
       // 전역 상태 업데이트
       externalSetIsLongPressActive?.(true, memo.id);
@@ -144,11 +146,30 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
    * 마우스 다운 핸들러 - 드래그 준비
    */
   const handleMouseDown = (e: React.MouseEvent) => {
+    console.log('🟡 [MemoBlock handleMouseDown] 호출됨', { memoId: memo.id, button: e.button });
+
     // 우클릭은 컨텍스트 메뉴용으로 무시
     if (e.button === 2) {
+      console.log('⚪ [MemoBlock] 우클릭 무시');
       return;
     }
 
+    // 액션 버튼(편집, 즐겨찾기, 삭제)을 클릭한 경우 드래그 로직 건너뛰기
+    const target = e.target as HTMLElement;
+    const isActionButton = target.closest('[data-action-button]') || target.closest('.titleButton');
+    console.log('🔍 [MemoBlock] 버튼 체크', {
+      isActionButton: !!isActionButton,
+      targetTagName: target.tagName,
+      targetClassName: target.className,
+      hasDataAttribute: target.hasAttribute('data-action-button')
+    });
+
+    if (isActionButton) {
+      console.log('✋ [MemoBlock] 액션 버튼 클릭 감지 - 드래그 로직 건너뜀');
+      return;
+    }
+
+    console.log('➡️ [MemoBlock] 드래그 로직 진행');
     // 캔버스의 드래그 선택이 시작되지 않도록 이벤트 전파 중단
     e.stopPropagation();
 
@@ -179,6 +200,23 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
    * 터치 시작 핸들러 - 모바일 드래그 준비
    */
   const handleTouchStart = (e: React.TouchEvent) => {
+    console.log('👆 [MemoBlock handleTouchStart] 호출됨', { memoId: memo.id });
+
+    // 액션 버튼(편집, 즐겨찾기, 삭제)을 터치한 경우 드래그 로직 건너뛰기
+    const target = e.target as HTMLElement;
+    const isActionButton = target.closest('[data-action-button]') || target.closest('.titleButton');
+    console.log('🔍 [MemoBlock TouchStart] 버튼 체크', {
+      isActionButton: !!isActionButton,
+      targetTagName: target.tagName,
+      targetClassName: target.className
+    });
+
+    if (isActionButton) {
+      console.log('✋ [MemoBlock TouchStart] 액션 버튼 터치 감지 - 드래그 로직 건너뜀');
+      return;
+    }
+
+    console.log('➡️ [MemoBlock TouchStart] 드래그 로직 진행');
     // 캔버스의 드래그 선택이 시작되지 않도록 이벤트 전파 중단
     e.stopPropagation();
 

@@ -477,6 +477,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
           zIndex: 100
         }}>
           <button
+            data-action-button
             style={{
               background: 'rgba(255, 255, 255, 0.2)',
               border: '1px solid rgba(255, 255, 255, 0.4)',
@@ -494,8 +495,6 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
               position: 'relative',
               zIndex: 101
             }}
-            onMouseDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
               if (onOpenEditor) {
@@ -518,6 +517,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
             <Edit2 size={18} />
           </button>
           <button
+            data-action-button
             style={{
               background: isQuickNavExists && isQuickNavExists(category.id, 'category') ? 'rgba(251, 191, 36, 0.3)' : 'rgba(255, 255, 255, 0.2)',
               border: isQuickNavExists && isQuickNavExists(category.id, 'category') ? '1px solid rgba(251, 191, 36, 0.6)' : '1px solid rgba(255, 255, 255, 0.4)',
@@ -535,8 +535,6 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
               position: 'relative',
               zIndex: 101
             }}
-            onMouseDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
               if (isQuickNavExists && isQuickNavExists(category.id, 'category')) {
@@ -561,6 +559,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
             />
           </button>
           <button
+            data-action-button
             style={{
               background: 'rgba(255, 77, 77, 0.2)',
               border: '1px solid rgba(255, 77, 77, 0.4)',
@@ -578,8 +577,6 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
               position: 'relative',
               zIndex: 101
             }}
-            onMouseDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
             onClick={handleDelete}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'rgba(255, 77, 77, 0.3)';

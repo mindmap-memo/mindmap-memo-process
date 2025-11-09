@@ -286,6 +286,17 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
     setSearchCategoryResults
   });
 
+  // onDeleteQuickNav 래퍼 함수 (targetId, targetType → itemId 변환)
+  const handleDeleteQuickNav = React.useCallback((targetId: string, targetType: 'memo' | 'category') => {
+    // quickNavItems에서 해당 target을 가진 item의 id를 찾아서 삭제
+    const item = quickNav.quickNavItems.find(
+      (item: any) => item.targetId === targetId && item.targetType === targetType
+    );
+    if (item) {
+      onDeleteQuickNavItem(item.id);
+    }
+  }, [quickNav.quickNavItems, onDeleteQuickNavItem]);
+
   // 현재 페이지 찾기 (안전한 접근)
   const currentPage = React.useMemo(() => {
     if (!appState || !appState.pages || !Array.isArray(appState.pages)) {
@@ -509,6 +520,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
               setCanvasScale={appState?.setCanvasScale || (() => {})}
               onDeleteMemoById={onDeleteMemoById}
               onAddQuickNav={onAddQuickNav}
+              onDeleteQuickNav={handleDeleteQuickNav}
               isQuickNavExists={isQuickNavExists}
               onOpenEditor={() => setShowEditor(true)}
               isLongPressActive={isLongPressActive}

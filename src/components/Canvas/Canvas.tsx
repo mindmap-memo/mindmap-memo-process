@@ -84,6 +84,7 @@ interface CanvasProps {
   setCanvasScale?: (scale: number) => void;
   onDeleteMemoById?: (id: string) => void;
   onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
+  onDeleteQuickNav?: (targetId: string, targetType: 'memo' | 'category') => void;
   isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
   fullscreen?: boolean;  // Mobile fullscreen mode
   onOpenEditor?: () => void;  // Mobile: Open editor on double-tap
@@ -166,6 +167,7 @@ const Canvas: React.FC<CanvasProps> = ({
   setCanvasScale: externalSetCanvasScale,
   onDeleteMemoById,
   onAddQuickNav,
+  onDeleteQuickNav,
   isQuickNavExists,
   fullscreen = false,
   onOpenEditor,
@@ -374,6 +376,7 @@ const Canvas: React.FC<CanvasProps> = ({
     onMemoDragEnd,
     onDeleteMemoById,
     onAddQuickNav,
+    onDeleteQuickNav,
     isQuickNavExists,
     onCategoryUpdate,
     setIsDraggingCategoryArea,
@@ -593,6 +596,7 @@ const Canvas: React.FC<CanvasProps> = ({
                 isShiftPressed={isShiftPressed}
                 onDelete={onDeleteMemoById}
                 onAddQuickNav={onAddQuickNav}
+                onDeleteQuickNav={onDeleteQuickNav}
                 isQuickNavExists={isQuickNavExists}
                 onOpenEditor={onOpenEditor}
                 setIsLongPressActive={setIsLongPressActive}

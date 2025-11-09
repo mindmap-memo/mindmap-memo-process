@@ -42,6 +42,7 @@ interface MemoBlockProps {
   isShiftPressed?: boolean;
   onDelete?: (id: string) => void;
   onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
+  onDeleteQuickNav?: (targetId: string, targetType: 'memo' | 'category') => void;
   isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
   onTitleUpdate?: (id: string, title: string) => void;
   onBlockUpdate?: (memoId: string, blockId: string, content: string) => void;
@@ -78,6 +79,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   isShiftPressed = false,
   onDelete,
   onAddQuickNav,
+  onDeleteQuickNav,
   isQuickNavExists,
   onTitleUpdate,
   onBlockUpdate,
@@ -403,6 +405,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
                 onKeyDown={handleTitleKeyDown}
                 onMouseDown={(e) => e.stopPropagation()}
                 className={styles.titleInput}
+                style={{ pointerEvents: 'auto' }}
               />
             )}
           </div>
@@ -410,9 +413,18 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
           {/* 제목 옆 버튼들 */}
           <div className={styles.titleButtons}>
             <button
-              onMouseDown={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
+              data-action-button
+              onTouchStart={(e) => {
+                console.log('👆 [편집 버튼] TouchStart', { memoId: memo.id });
+                e.stopPropagation();
+              }}
+              onMouseDown={(e) => {
+                console.log('🔵 [편집 버튼] MouseDown', { memoId: memo.id });
+                e.stopPropagation();
+                e.preventDefault();
+              }}
               onClick={(e) => {
+                console.log('✅ [편집 버튼] Click', { memoId: memo.id });
                 e.stopPropagation();
                 if (onOpenEditor) {
                   // 모바일: 에디터 열기
@@ -429,25 +441,46 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
               <Edit2 size={16} />
             </button>
             <button
-              onMouseDown={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
-              onClick={(e) => {
+              data-action-button
+              onTouchStart={(e) => {
+                console.log('👆 [즐겨찾기 버튼] TouchStart', { memoId: memo.id });
                 e.stopPropagation();
-                if (isQuickNavExists && isQuickNavExists(memo.id, 'memo')) {
-                  alert('이미 즐겨찾기가 설정되어 있습니다.');
+              }}
+              onMouseDown={(e) => {
+                console.log('🔵 [즐겨찾기 버튼] MouseDown', { memoId: memo.id });
+                e.stopPropagation();
+                e.preventDefault();
+              }}
+              onClick={(e) => {
+                console.log('✅ [즐겨찾기 버튼] Click', { memoId: memo.id });
+                e.stopPropagation();
+                const isBookmarked = isQuickNavExists && isQuickNavExists(memo.id, 'memo');
+                if (isBookmarked) {
+                  // 이미 즐겨찾기에 있으면 삭제
+                  onDeleteQuickNav?.(memo.id, 'memo');
                 } else {
+                  // 즐겨찾기 추가
                   onAddQuickNav?.(memo.title || '제목 없는 메모', memo.id, 'memo');
                 }
               }}
               className={`${styles.titleButton} ${isQuickNavExists && isQuickNavExists(memo.id, 'memo') ? styles.bookmarked : ''}`}
-              title="즐겨찾기"
+              title={isQuickNavExists && isQuickNavExists(memo.id, 'memo') ? '즐겨찾기 해제' : '즐겨찾기'}
             >
               <Star size={16} fill={isQuickNavExists && isQuickNavExists(memo.id, 'memo') ? 'currentColor' : 'none'} />
             </button>
             <button
-              onMouseDown={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
+              data-action-button
+              onTouchStart={(e) => {
+                console.log('👆 [삭제 버튼] TouchStart', { memoId: memo.id });
+                e.stopPropagation();
+              }}
+              onMouseDown={(e) => {
+                console.log('🔵 [삭제 버튼] MouseDown', { memoId: memo.id });
+                e.stopPropagation();
+                e.preventDefault();
+              }}
               onClick={(e) => {
+                console.log('✅ [삭제 버튼] Click', { memoId: memo.id });
                 e.stopPropagation();
                 if (window.confirm(`"${memo.title || '제목 없는 메모'}"를 삭제하시겠습니까?`)) {
                   onDelete?.(memo.id);

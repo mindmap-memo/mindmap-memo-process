@@ -823,6 +823,7 @@ const App: React.FC = () => {
           onClearCategoryCache={clearCategoryCache}
           onDeleteMemoById={deleteMemoById}
           onAddQuickNav={addQuickNavItem}
+          onDeleteQuickNav={deleteQuickNavItem}
           isQuickNavExists={isQuickNavExists}
           onMemoUpdate={updateMemo}
           onFocusMemo={focusOnMemo}
@@ -968,6 +969,7 @@ const App: React.FC = () => {
         setCanvasScale={setCanvasScale}
         onDeleteMemoById={deleteMemoById}
         onAddQuickNav={addQuickNavItem}
+        onDeleteQuickNav={deleteQuickNavItem}
         isQuickNavExists={isQuickNavExists}
         isLongPressActive={isLongPressActive}
         longPressTargetId={longPressTargetId}

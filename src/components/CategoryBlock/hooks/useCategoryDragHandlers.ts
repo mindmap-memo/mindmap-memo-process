@@ -117,6 +117,12 @@ export const useCategoryDragHandlers = ({
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    // 액션 버튼(편집, 즐겨찾기, 삭제)을 클릭한 경우 드래그 로직 건너뛰기
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-action-button]')) {
+      return;
+    }
+
     // 캔버스의 드래그 선택이 시작되지 않도록 이벤트 전파 중단
     e.stopPropagation();
 
