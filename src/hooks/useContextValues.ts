@@ -105,30 +105,42 @@ interface UseContextValuesProps {
 }
 
 export const useContextValues = (props: UseContextValuesProps) => {
-  // ===== AppState Context =====
-  const appStateContextValue = useMemo(() => ({
-    pages: props.pages,
-    setPages: props.setPages,
+  console.log('[useContextValues] 🔧 Context 값 생성 중:', {
+    hasPages: !!props.pages,
+    pageCount: props.pages?.length || 0,
     currentPageId: props.currentPageId,
-    setCurrentPageId: props.setCurrentPageId,
-    currentPage: props.currentPage,
-    isInitialLoadDone: props.isInitialLoadDone,
-    loadingProgress: props.loadingProgress,
-    canvasOffset: props.canvasOffset,
-    setCanvasOffset: props.setCanvasOffset,
-    canvasScale: props.canvasScale,
-    setCanvasScale: props.setCanvasScale,
-    isShiftPressed: props.isShiftPressed,
-    setIsShiftPressed: props.setIsShiftPressed,
-    isDraggingMemo: props.isDraggingMemo,
-    setIsDraggingMemo: props.setIsDraggingMemo,
-    draggingMemoId: props.draggingMemoId,
-    setDraggingMemoId: props.setDraggingMemoId,
-    isDraggingCategory: props.isDraggingCategory,
-    setIsDraggingCategory: props.setIsDraggingCategory,
-    draggingCategoryId: props.draggingCategoryId,
-    setDraggingCategoryId: props.setDraggingCategoryId
-  }), [
+    hasQuickNavItems: !!props.quickNavItems,
+    quickNavItemsCount: props.quickNavItems?.length || 0,
+    quickNavItemsType: Array.isArray(props.quickNavItems) ? 'array' : typeof props.quickNavItems
+  });
+
+  // ===== AppState Context =====
+  const appStateContextValue = useMemo(() => {
+    console.log('[useContextValues] 📊 AppState Context 생성');
+    return {
+      pages: props.pages,
+      setPages: props.setPages,
+      currentPageId: props.currentPageId,
+      setCurrentPageId: props.setCurrentPageId,
+      currentPage: props.currentPage,
+      isInitialLoadDone: props.isInitialLoadDone,
+      loadingProgress: props.loadingProgress,
+      canvasOffset: props.canvasOffset,
+      setCanvasOffset: props.setCanvasOffset,
+      canvasScale: props.canvasScale,
+      setCanvasScale: props.setCanvasScale,
+      isShiftPressed: props.isShiftPressed,
+      setIsShiftPressed: props.setIsShiftPressed,
+      isDraggingMemo: props.isDraggingMemo,
+      setIsDraggingMemo: props.setIsDraggingMemo,
+      draggingMemoId: props.draggingMemoId,
+      setDraggingMemoId: props.setDraggingMemoId,
+      isDraggingCategory: props.isDraggingCategory,
+      setIsDraggingCategory: props.setIsDraggingCategory,
+      draggingCategoryId: props.draggingCategoryId,
+      setDraggingCategoryId: props.setDraggingCategoryId
+    };
+  }, [
     props.pages, props.setPages, props.currentPageId, props.setCurrentPageId,
     props.currentPage, props.isInitialLoadDone, props.loadingProgress,
     props.canvasOffset, props.setCanvasOffset,
@@ -223,13 +235,22 @@ export const useContextValues = (props: UseContextValuesProps) => {
   ]);
 
   // ===== QuickNav Context =====
-  const quickNavContextValue = useMemo(() => ({
-    quickNavItems: props.quickNavItems,
-    showQuickNavPanel: props.showQuickNavPanel,
-    setShowQuickNavPanel: props.setShowQuickNavPanel
-  }), [
+  const quickNavContextValue = useMemo(() => {
+    console.log('[useContextValues] 🔖 QuickNav Context 생성:', {
+      quickNavItems: props.quickNavItems,
+      isArray: Array.isArray(props.quickNavItems),
+      length: props.quickNavItems?.length
+    });
+    return {
+      quickNavItems: props.quickNavItems,
+      showQuickNavPanel: props.showQuickNavPanel,
+      setShowQuickNavPanel: props.setShowQuickNavPanel
+    };
+  }, [
     props.quickNavItems, props.showQuickNavPanel, props.setShowQuickNavPanel
   ]);
+
+  console.log('[useContextValues] ✅ 모든 Context 생성 완료');
 
   return {
     appStateContextValue,

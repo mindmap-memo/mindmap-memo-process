@@ -48,6 +48,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
   useEffect(() => {
     // 인증되지 않았으면 로딩 완료 처리
     if (!isAuthenticated) {
+      console.log('[useAppState] 🔓 인증되지 않음 - 기본 데이터 사용');
       setPages(DEFAULT_PAGES);
       setCurrentPageId('1');
       setIsInitialLoadDone(true);
@@ -57,11 +58,17 @@ export const useAppState = (isAuthenticated: boolean = false) => {
 
     const loadInitialData = async () => {
       try {
+        console.log('[useAppState] 🚀 데이터 로딩 시작');
         setLoadingProgress(10);
 
         // 데이터 페칭 시작
+        console.log('[useAppState] 📡 서버에서 페이지 데이터 가져오는 중...');
         setLoadingProgress(30);
         const loadedPages = await fetchPages();
+        console.log('[useAppState] ✅ 페이지 데이터 로드 완료:', {
+          pageCount: loadedPages.length,
+          pages: loadedPages.map(p => ({ id: p.id, name: p.name, memoCount: p.memos?.length || 0, categoryCount: p.categories?.length || 0 }))
+        });
 
         setLoadingProgress(60);
 
@@ -147,6 +154,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
             }
           } else {
             // 이미 데이터가 있으면 그대로 사용
+            console.log('[useAppState] 📦 기존 데이터 사용');
             // 안전성 체크: memos와 categories가 배열인지 확인
             const safePages = loadedPages.map(page => ({
               ...page,
@@ -154,6 +162,12 @@ export const useAppState = (isAuthenticated: boolean = false) => {
               categories: Array.isArray(page.categories) ? page.categories : [],
               quickNavItems: Array.isArray(page.quickNavItems) ? page.quickNavItems : []
             }));
+
+            console.log('[useAppState] ✅ 페이지 데이터 설정 완료:', {
+              pageCount: safePages.length,
+              firstPageId: safePages[0]?.id,
+              firstPageQuickNavItems: safePages[0]?.quickNavItems
+            });
 
             setPages(safePages);
             setCurrentPageId(safePages[0]?.id || '1');
@@ -236,15 +250,17 @@ export const useAppState = (isAuthenticated: boolean = false) => {
         await new Promise(resolve => setTimeout(resolve, 100));
 
       } catch (error) {
-        console.error('데이터베이스 연결 실패. 기본 페이지로 시작합니다:', error);
-        console.log('데이터베이스를 사용하려면 create-tables.sql을 실행하세요.');
+        console.error('[useAppState] ❌ 데이터베이스 연결 실패. 기본 페이지로 시작합니다:', error);
+        console.log('[useAppState] 💡 데이터베이스를 사용하려면 create-tables.sql을 실행하세요.');
         setPages(DEFAULT_PAGES);
         setCurrentPageId('1');
         setLoadingProgress(90);
       } finally {
+        console.log('[useAppState] 🏁 데이터 로딩 완료 - 진행률 100%');
         setLoadingProgress(100);
         // 100% 애니메이션을 보여주기 위한 짧은 대기
         setTimeout(() => {
+          console.log('[useAppState] ✨ 초기 로딩 완료 플래그 설정');
           setIsInitialLoadDone(true);
         }, 200);
       }
