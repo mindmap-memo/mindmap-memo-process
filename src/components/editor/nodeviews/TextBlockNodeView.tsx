@@ -17,12 +17,17 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
+  // 더블탭 감지를 위한 ref
+  const lastTapTimeRef = useRef<number>(0);
+  const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const { importance } = node.attrs;
 
-  // 네이티브 dragover 이벤트 리스너 등록
+  // 네이티브 이벤트 리스너 등록
   React.useEffect(() => {
     const wrapper = wrapperRef.current;
-    if (!wrapper) return;
+    const content = contentRef.current;
+    if (!wrapper || !content) return;
 
     const handleNativeDragOver = (e: DragEvent) => {
       const hasNodeData = e.dataTransfer?.types.includes('application/x-tiptap-node-pos');
@@ -34,15 +39,65 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
       }
     };
 
+    // 더블탭 이벤트 (passive: false로 preventDefault 허용)
+    const handleNativeTouchStart = (e: TouchEvent) => {
+      const currentTime = Date.now();
+      const timeSinceLastTap = currentTime - lastTapTimeRef.current;
+
+      // 300ms 이내에 두 번째 탭이 발생하면 더블탭으로 인식
+      if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
+        // 더블탭 감지 시 즉시 기본 동작 방지
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (tapTimeoutRef.current) {
+          clearTimeout(tapTimeoutRef.current);
+          tapTimeoutRef.current = null;
+        }
+
+        // 에디터 포커스 해제 (Enter 키 처리 방지)
+        if (editor) {
+          editor.commands.blur();
+        }
+
+        // 블록 중요도 컨텍스트 메뉴 표시
+        const touch = e.touches[0] || e.changedTouches[0];
+        setContextMenu({ show: true, x: touch.clientX, y: touch.clientY });
+
+        lastTapTimeRef.current = 0; // 리셋
+      } else {
+        // 첫 번째 탭 기록
+        lastTapTimeRef.current = currentTime;
+
+        // 300ms 후 리셋
+        if (tapTimeoutRef.current) {
+          clearTimeout(tapTimeoutRef.current);
+        }
+        tapTimeoutRef.current = setTimeout(() => {
+          lastTapTimeRef.current = 0;
+        }, 300);
+      }
+    };
+
     // 캡처 단계에서 이벤트 가로채기
     wrapper.addEventListener('dragover', handleNativeDragOver, true);
+    // passive: false로 preventDefault 허용
+    content.addEventListener('touchstart', handleNativeTouchStart, { passive: false, capture: true });
 
     return () => {
       wrapper.removeEventListener('dragover', handleNativeDragOver, true);
+      content.removeEventListener('touchstart', handleNativeTouchStart, true);
     };
-  }, []);
+  }, [editor]);
 
   const handleContextMenu = (e: React.MouseEvent) => {
+    // 모바일(터치) 환경에서는 네이티브 텍스트 선택 허용
+    // @ts-ignore - nativeEvent의 sourceCapabilities 체크
+    if (e.nativeEvent && e.nativeEvent.sourceCapabilities && e.nativeEvent.sourceCapabilities.firesTouchEvents) {
+      return; // 모바일: 네이티브 동작 허용, ImportanceToolbar는 텍스트 선택 시 자동 표시
+    }
+
+    // PC에서만 커스텀 컨텍스트 메뉴 표시
     e.preventDefault();
     e.stopPropagation();
     setContextMenu({ show: true, x: e.clientX, y: e.clientY });
@@ -271,7 +326,7 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
           style={{
             cursor: 'grab',
             padding: '2px 4px',
-            opacity: isHovered ? 1 : 0,
+            opacity: isHovered ? 1 : 0.3,
             transition: 'opacity 0.1s ease',
             fontSize: '14px',
             color: '#9ca3af',

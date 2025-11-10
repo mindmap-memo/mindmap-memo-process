@@ -52,9 +52,13 @@ export default function ImportanceToolbar({ editor }: ImportanceToolbarProps) {
       const start = editor.view.coordsAtPos(from);
       const end = editor.view.coordsAtPos(to);
 
-      // 툴바를 선택 영역 위에 배치
+      // 모바일 환경 감지
+      const isMobile = window.innerWidth <= 768;
+
+      // 모바일: 선택 영역 아래에 배치 (네이티브 메뉴와 겹치지 않도록)
+      // PC: 선택 영역 위에 배치 (기존 동작 유지)
       setPosition({
-        top: start.top - 10,
+        top: isMobile ? end.bottom + 10 : start.top - 10,
         left: (start.left + end.right) / 2,
       });
       setShow(true);
@@ -87,6 +91,9 @@ export default function ImportanceToolbar({ editor }: ImportanceToolbarProps) {
 
   if (!show) return null;
 
+  // 모바일 환경 감지
+  const isMobile = window.innerWidth <= 768;
+
   const importanceLevels: ImportanceLevel[] = [
     'critical',
     'important',
@@ -118,7 +125,7 @@ export default function ImportanceToolbar({ editor }: ImportanceToolbarProps) {
         position: 'fixed',
         top: `${position.top}px`,
         left: `${position.left}px`,
-        transform: 'translate(-50%, -100%)',
+        transform: isMobile ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
         backgroundColor: 'white',
         border: '1px solid #e1e5e9',
         borderRadius: '8px',

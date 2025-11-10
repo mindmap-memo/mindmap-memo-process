@@ -53,13 +53,42 @@ export default function BlockContextMenu({
     'none'
   ];
 
+  // 메뉴가 화면 밖으로 나가지 않도록 위치 조정
+  const menuWidth = 180;
+  const menuHeight = 400; // 대략적인 메뉴 높이
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+
+  let adjustedX = position.x;
+  let adjustedY = position.y;
+
+  // 오른쪽 경계 체크
+  if (adjustedX + menuWidth > viewportWidth) {
+    adjustedX = viewportWidth - menuWidth - 10;
+  }
+
+  // 왼쪽 경계 체크
+  if (adjustedX < 10) {
+    adjustedX = 10;
+  }
+
+  // 아래쪽 경계 체크
+  if (adjustedY + menuHeight > viewportHeight) {
+    adjustedY = viewportHeight - menuHeight - 10;
+  }
+
+  // 위쪽 경계 체크
+  if (adjustedY < 10) {
+    adjustedY = 10;
+  }
+
   return (
     <div
       ref={menuRef}
       style={{
         position: 'fixed',
-        top: `${position.y}px`,
-        left: `${position.x}px`,
+        top: `${adjustedY}px`,
+        left: `${adjustedX}px`,
         backgroundColor: 'white',
         border: '1px solid #e1e5e9',
         borderRadius: '8px',
