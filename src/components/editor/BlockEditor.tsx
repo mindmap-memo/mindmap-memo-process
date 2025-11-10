@@ -372,6 +372,19 @@ export default function BlockEditor({
           }
           return false; // ProseMirror가 계속 처리하도록 함
         },
+        // 네이티브 복사/붙여넣기 허용
+        copy: () => {
+          console.log('[BlockEditor] copy event');
+          return false; // ProseMirror/브라우저 기본 동작 허용
+        },
+        cut: () => {
+          console.log('[BlockEditor] cut event');
+          return false; // ProseMirror/브라우저 기본 동작 허용
+        },
+        paste: () => {
+          console.log('[BlockEditor] paste event');
+          return false; // ProseMirror/브라우저 기본 동작 허용
+        },
       },
     },
     onUpdate: ({ editor }) => {
