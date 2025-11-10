@@ -809,7 +809,11 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
               padding: '20px',
               userSelect: 'none'
             }}>
-              SHIFT + 드래그로 메모나 카테고리를<br/>다른 카테고리 영역에 종속, 제거하세요
+{typeof window !== 'undefined' && window.innerWidth <= 768 ? (
+                <>메모나 카테고리를 꾹 누른 후 드래그해<br/>카테고리 영역에 종속, 제거하세요</>
+              ) : (
+                <>SHIFT + 드래그로 메모나 카테고리를<br/>다른 카테고리 영역에 종속, 제거하세요</>
+              )}
             </div>
           )}
 
