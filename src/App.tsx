@@ -7,8 +7,8 @@ import { useDragState } from './hooks/useDragState';
 import { useSelectionHandlers } from './hooks/useSelectionHandlers';
 import { useMemoHandlers } from './hooks/useMemoHandlers';
 import { useConnectionHandlers } from './hooks/useConnectionHandlers';
-import { useTutorialHandlers } from './hooks/useTutorialHandlers';
-import { useTutorialState } from './hooks/useTutorialState';
+// import { useTutorialHandlers } from './hooks/useTutorialHandlers';
+// import { useTutorialState } from './hooks/useTutorialState';
 import { useCanvasHandlers } from './hooks/useCanvasHandlers';
 import { useQuickNavHandlers } from './hooks/useQuickNavHandlers';
 import { usePanelHandlers } from './hooks/usePanelHandlers';
@@ -19,7 +19,7 @@ import { useShiftDragHandlers } from './hooks/useShiftDragHandlers';
 import { useCategoryPositionHandlers } from './hooks/useCategoryPositionHandlers';
 import { useGlobalEventHandlers } from './hooks/useGlobalEventHandlers';
 import { useAutoSave } from './hooks/useAutoSave';
-import { useTutorialValidation } from './hooks/useTutorialValidation';
+// import { useTutorialValidation } from './hooks/useTutorialValidation';
 import { useCategoryDrop } from './hooks/useCategoryDrop';
 import { usePositionHandlers } from './hooks/usePositionHandlers';
 import { useDeleteHandlers } from './hooks/useDeleteHandlers';
@@ -30,7 +30,7 @@ import { AppProviders } from './contexts';
 import LeftPanel from './components/LeftPanel/LeftPanel';
 import RightPanel from './components/RightPanel/RightPanel';
 import Canvas from './components/Canvas/Canvas';
-import { Tutorial } from './components/Tutorial';
+// import { Tutorial } from './components/Tutorial';
 import { QuickNavPanel } from './components/QuickNavPanel';
 import { useMigration } from './features/migration/hooks/useMigration';
 import { MigrationPrompt } from './features/migration/components/MigrationPrompt';
@@ -297,6 +297,7 @@ const App: React.FC = () => {
 
   // ===== 튜토리얼 상태 임시 (순환 의존성 해결을 위해) =====
   // 먼저 tutorialState만 초기화
+  /*
   const tutorialValidationTemp = useTutorialValidation({
     tutorialState: { isActive: false, currentStep: 0, completed: true, currentSubStep: 0 },
     canvasOffset,
@@ -350,6 +351,17 @@ const App: React.FC = () => {
     handleTutorialComplete: tutorialHandlersTemp.handleTutorialComplete,
     canProceedTutorial: tutorialHandlersTemp.canProceedTutorial
   });
+  */
+
+  // Tutorial disabled
+  const tutorialState = { isActive: false, currentStep: 0, completed: true, currentSubStep: 0 };
+  const tutorialMode = 'basic' as const;
+  const currentTutorialSteps = [];
+  const handleStartTutorialWrapper = () => {};
+  const handleTutorialSkip = () => {};
+  const handleSwitchToBasic = () => {};
+  const handleTutorialPrev = () => {};
+  const handleSubStepEvent = () => {};
 
   // ===== 카테고리 핸들러 =====
   const categoryHandlers = useCategoryHandlers({
@@ -764,14 +776,14 @@ const App: React.FC = () => {
           tutorialMode={tutorialMode}
           handleStartTutorialWrapper={handleStartTutorialWrapper}
           handleCloseTutorial={handleTutorialSkip}
-          handleNextStep={tutorialHandlersTemp.handleTutorialNext}
+          handleNextStep={() => {}}
           handlePreviousStep={handleTutorialPrev}
           handleStepClick={(stepIndex) => {
             // setTutorialState 직접 호출은 불가능하므로 제거 (또는 useTutorialState에 추가 필요)
           }}
           handleNextSubStep={() => {}}
           handlePreviousSubStep={() => {}}
-          TutorialComponent={Tutorial}
+          TutorialComponent={() => null}
           migrationStatus={migrationStatus}
           needsMigration={needsMigration}
           migrationError={migrationError}
@@ -823,7 +835,6 @@ const App: React.FC = () => {
           onClearCategoryCache={clearCategoryCache}
           onDeleteMemoById={deleteMemoById}
           onAddQuickNav={addQuickNavItem}
-          onDeleteQuickNav={deleteQuickNavItem}
           isQuickNavExists={isQuickNavExists}
           onMemoUpdate={updateMemo}
           onFocusMemo={focusOnMemo}

@@ -350,7 +350,6 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       className={styles.memoBlockWrapper}
       style={{
         transform: `translate3d(${memo.position.x}px, ${memo.position.y}px, 0)`,
-        width: `${sizeConfig.width}px`,
         willChange: isDragging ? 'transform' : 'auto'
       }}
     >
@@ -380,7 +379,6 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         draggable={false}
         style={{
           backgroundColor,
-          width: `${sizeConfig.width}px`,
           maxHeight: `${sizeConfig.maxHeight}px`
         }}
       >
@@ -389,12 +387,15 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
             onDoubleClick={handleTitleDoubleClick}
             onTouchEnd={handleTouchEnd}
             className={`${styles.title} ${memo.title ? styles.withTitle : styles.withoutTitle} ${isSelected ? styles.editable : styles.notEditable}`}
+            style={{
+              fontSize: `${Math.max(36, 45 * (canvasScale || 1))}px`
+            }}
           >
             {isDragging && (isShiftPressed || isLongPressActive) && (
               <span className={styles.shiftDragIcon}>+</span>
             )}
             {!isEditingTitle ? (
-              <>📝 {memo.title || '제목을 입력해주세요'}</>
+              <>{memo.title || '제목을 입력해주세요'}</>
             ) : (
               <input
                 ref={titleInputRef}
@@ -405,122 +406,22 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
                 onKeyDown={handleTitleKeyDown}
                 onMouseDown={(e) => e.stopPropagation()}
                 className={styles.titleInput}
-                style={{ pointerEvents: 'auto' }}
+                style={{
+                  pointerEvents: 'auto',
+                  fontSize: `${Math.max(36, 45 * (canvasScale || 1))}px`
+                }}
               />
             )}
           </div>
 
-          {/* 제목 옆 버튼들 */}
-          <div className={styles.titleButtons}>
-            <button
-              data-action-button
-              onTouchStart={(e) => {
-                console.log('👆 [편집 버튼] TouchStart', { memoId: memo.id });
-                e.stopPropagation();
-              }}
-              onMouseDown={(e) => {
-                console.log('🔵 [편집 버튼] MouseDown', { memoId: memo.id });
-                e.stopPropagation();
-                e.preventDefault();
-              }}
-              onClick={(e) => {
-                console.log('✅ [편집 버튼] Click', { memoId: memo.id });
-                e.stopPropagation();
-                if (onOpenEditor) {
-                  // 모바일: 에디터 열기
-                  onOpenEditor();
-                } else {
-                  // PC: 제목 편집 모드
-                  setIsEditingTitle(true);
-                  setTimeout(() => titleInputRef.current?.focus(), 0);
-                }
-              }}
-              className={styles.titleButton}
-              title="편집"
-            >
-              <Edit2 size={16} />
-            </button>
-            <button
-              data-action-button
-              onTouchStart={(e) => {
-                console.log('👆 [즐겨찾기 버튼] TouchStart', { memoId: memo.id });
-                e.stopPropagation();
-              }}
-              onMouseDown={(e) => {
-                console.log('🔵 [즐겨찾기 버튼] MouseDown', { memoId: memo.id });
-                e.stopPropagation();
-                e.preventDefault();
-              }}
-              onClick={(e) => {
-                console.log('✅ [즐겨찾기 버튼] Click', { memoId: memo.id });
-                e.stopPropagation();
-                const isBookmarked = isQuickNavExists && isQuickNavExists(memo.id, 'memo');
-                if (isBookmarked) {
-                  // 이미 즐겨찾기에 있으면 삭제
-                  onDeleteQuickNav?.(memo.id, 'memo');
-                } else {
-                  // 즐겨찾기 추가
-                  onAddQuickNav?.(memo.title || '제목 없는 메모', memo.id, 'memo');
-                }
-              }}
-              className={`${styles.titleButton} ${isQuickNavExists && isQuickNavExists(memo.id, 'memo') ? styles.bookmarked : ''}`}
-              title={isQuickNavExists && isQuickNavExists(memo.id, 'memo') ? '즐겨찾기 해제' : '즐겨찾기'}
-            >
-              <Star size={16} fill={isQuickNavExists && isQuickNavExists(memo.id, 'memo') ? 'currentColor' : 'none'} />
-            </button>
-            <button
-              data-action-button
-              onTouchStart={(e) => {
-                console.log('👆 [삭제 버튼] TouchStart', { memoId: memo.id });
-                e.stopPropagation();
-              }}
-              onMouseDown={(e) => {
-                console.log('🔵 [삭제 버튼] MouseDown', { memoId: memo.id });
-                e.stopPropagation();
-                e.preventDefault();
-              }}
-              onClick={(e) => {
-                console.log('✅ [삭제 버튼] Click', { memoId: memo.id });
-                e.stopPropagation();
-                if (window.confirm(`"${memo.title || '제목 없는 메모'}"를 삭제하시겠습니까?`)) {
-                  onDelete?.(memo.id);
-                }
-              }}
-              className={styles.titleButton}
-              title="삭제"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
+          {/* 제목 옆 버튼들 제거 - PC 버튼으로 통합 */}
 
-          {/* 모바일이 아닐 때만 S/M/L 버튼 표시 */}
-          {isSelected && !onOpenEditor && (
-            <div className={styles.sizeButtons}>
-              {(['small', 'medium', 'large'] as MemoDisplaySize[]).map((size) => (
-                <button
-                  key={size}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDisplaySizeChange?.(memo.id, size);
-                  }}
-                  className={`${styles.sizeButton} ${memo.displaySize === size ? styles.active : styles.inactive}`}
-                >
-                  {size === 'small' ? 'S' : size === 'medium' ? 'M' : 'L'}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* S/M/L 사이즈 버튼 제거됨 */}
         </div>
-        {sizeConfig.showTags && memo.tags.length > 0 && (
-          <div className={styles.tagsContainer}>
-            {memo.tags.map(tag => (
-              <span key={tag} className={styles.tag}>
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-        {sizeConfig.showContent && (
+        {/* Tags removed - 항상 숨김 */}
+
+        {/* 내용은 hover 또는 selected일 때만 표시 */}
+        {(isHovering || isSelected) && (
           <div
             onDoubleClick={handleAllBlocksDoubleClick}
             onTouchEnd={handleTouchEnd}
@@ -801,6 +702,76 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
             ? '메모를 카테고리에 추가/제거하려면 드롭하세요'
             : '0.5초 이상 꾹 누르면 메모를 카테고리에 종속/제거할 수 있습니다'
           }
+        </div>
+      )}
+
+      {/* 액션 버튼들 - 선택 시 메모 블록 위쪽에 표시 */}
+      {isSelected && (
+        <div
+          className={styles.actionButtons}
+          style={{
+            top: '-80px'
+          }}
+        >
+          <button
+            data-action-button
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onOpenEditor) {
+                // 모바일: 에디터 열기
+                onOpenEditor();
+              } else {
+                // PC: 제목 편집 모드
+                setIsEditingTitle(true);
+                setTimeout(() => titleInputRef.current?.focus(), 0);
+              }
+            }}
+            className={styles.actionButton}
+            title="편집"
+          >
+            <Edit2 size={26} />
+          </button>
+          <button
+            data-action-button
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              const isBookmarked = isQuickNavExists && isQuickNavExists(memo.id, 'memo');
+              if (isBookmarked) {
+                onDeleteQuickNav?.(memo.id, 'memo');
+              } else {
+                onAddQuickNav?.(memo.title || '제목 없는 메모', memo.id, 'memo');
+              }
+            }}
+            className={`${styles.actionButton} ${isQuickNavExists && isQuickNavExists(memo.id, 'memo') ? styles.bookmarked : ''}`}
+            title={isQuickNavExists && isQuickNavExists(memo.id, 'memo') ? '즐겨찾기 해제' : '즐겨찾기'}
+          >
+            <Star size={26} fill={isQuickNavExists && isQuickNavExists(memo.id, 'memo') ? 'currentColor' : 'none'} />
+          </button>
+          <button
+            data-action-button
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (window.confirm(`"${memo.title || '제목 없는 메모'}"를 삭제하시겠습니까?`)) {
+                onDelete?.(memo.id);
+              }
+            }}
+            className={styles.actionButton}
+            title="삭제"
+          >
+            <Trash2 size={26} />
+          </button>
         </div>
       )}
 

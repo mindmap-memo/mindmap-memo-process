@@ -2,7 +2,7 @@ import { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import { neon } from '@neondatabase/serverless';
 
-const sql = neon(process.env.DATABASE_URL!);
+const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -51,6 +51,12 @@ export const authOptions: NextAuthOptions = {
         return false;
       }
 
+      // If no database connection, allow sign in without storing user data
+      if (!sql) {
+        console.warn('[NextAuth] No database connection, skipping user storage');
+        return true;
+      }
+
       try {
         // Check if user exists
         const existingUser = await sql`
@@ -81,16 +87,18 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user && token.sub) {
         // Get user_id from database based on email
-        try {
-          const result = await sql`
-            SELECT id FROM users WHERE email = ${session.user.email}
-          `;
+        if (sql) {
+          try {
+            const result = await sql`
+              SELECT id FROM users WHERE email = ${session.user.email}
+            `;
 
-          if (result.length > 0) {
-            session.user.id = result[0].id;
+            if (result.length > 0) {
+              session.user.id = result[0].id;
+            }
+          } catch (error) {
+            console.error('[NextAuth] Session callback error:', error);
           }
-        } catch (error) {
-          console.error('[NextAuth] Session callback error:', error);
         }
       }
       return session;
