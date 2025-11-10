@@ -5,6 +5,7 @@ import { createCategoryAreaDragHandler } from '../utils/categoryAreaDragHandlers
 import { useCategoryAreaColors } from './useCategoryAreaColors';
 import { useCategoryLabelDrag } from './useCategoryLabelDrag';
 import { detectDoubleTap } from '../../../utils/doubleTapUtils';
+import { Edit2, Star, Trash2 } from 'lucide-react';
 
 /**
  * useCategoryAreaRendering
@@ -103,6 +104,7 @@ interface UseCategoryAreaRenderingParams {
   onDeleteQuickNav?: (targetId: string, targetType: 'memo' | 'category') => void;
   isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
   onCategoryUpdate: (category: CategoryBlock) => void;
+  onDeleteCategory: (categoryId: string) => void;
   onOpenEditor?: () => void;
 
   // 상태 Setters
@@ -196,6 +198,7 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
     onDeleteQuickNav,
     isQuickNavExists,
     onCategoryUpdate,
+    onDeleteCategory,
     onOpenEditor,
     isLongPressActive,  // 롱프레스 활성화 상태
     longPressTargetId,  // 롱프레스 대상 ID
@@ -1128,7 +1131,7 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             color: 'white',
             padding: '12px 24px',
             borderRadius: '12px',
-            fontSize: '26px',
+            fontSize: `${14 / (canvasScale || 1)}px`,
             fontWeight: '600',
             pointerEvents: 'auto',
             boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
@@ -1219,7 +1222,7 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
                 border: '2px solid rgba(255,255,255,0.5)',
                 borderRadius: '6px',
                 color: 'white',
-                fontSize: '26px',
+                fontSize: `${14 / (canvasScale || 1)}px`,
                 fontWeight: '600',
                 padding: '4px 8px',
                 outline: 'none',
@@ -1252,6 +1255,180 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
           </button>
         </div>
       );
+
+      // 선택된 카테고리일 때 액션 버튼 표시
+      const isCategorySelected = selectedCategoryId === category.id || selectedCategoryIds.includes(category.id);
+      if (isCategorySelected) {
+        const buttonScale = 0.5 / (canvasScale || 1);
+        const buttonHeight = 60 * buttonScale; // 버튼의 실제 높이 (scale 적용 후)
+        areas.push(
+          <div
+            key={`action-buttons-${category.id}`}
+            style={{
+              position: 'absolute',
+              top: `${labelY - buttonHeight - 10}px`,
+              left: `${labelX}px`,
+              display: 'flex',
+              flexDirection: 'row',
+              gap: '14px',
+              zIndex: 100,
+              pointerEvents: 'auto',
+              transform: `scale(${buttonScale})`,
+              transformOrigin: 'bottom left'
+            }}
+          >
+            <button
+              data-action-button
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onOpenEditor) {
+                  // 모바일: 에디터 열기
+                  onOpenEditor();
+                } else {
+                  // PC: 제목 편집 모드
+                  setEditingCategoryId(category.id);
+                  setEditingCategoryTitle(category.title);
+                }
+              }}
+              style={{
+                background: 'white',
+                border: '2px solid #e5e7eb',
+                borderRadius: '14px',
+                padding: '20px 24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                color: '#6b7280',
+                minWidth: '60px',
+                minHeight: '60px'
+              }}
+              title="편집"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f9fafb';
+                e.currentTarget.style.borderColor = '#8b5cf6';
+                e.currentTarget.style.color = '#8b5cf6';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'white';
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.color = '#6b7280';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+              }}
+            >
+              <Edit2 size={26} />
+            </button>
+            <button
+              data-action-button
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                const isBookmarked = isQuickNavExists && isQuickNavExists(category.id, 'category');
+                if (isBookmarked) {
+                  onDeleteQuickNav?.(category.id, 'category');
+                } else {
+                  onAddQuickNav?.(category.title || '제목 없는 카테고리', category.id, 'category');
+                }
+              }}
+              style={{
+                background: (isQuickNavExists && isQuickNavExists(category.id, 'category')) ? '#fef3c7' : 'white',
+                border: (isQuickNavExists && isQuickNavExists(category.id, 'category')) ? '2px solid #fbbf24' : '2px solid #e5e7eb',
+                borderRadius: '14px',
+                padding: '20px 24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                color: (isQuickNavExists && isQuickNavExists(category.id, 'category')) ? '#f59e0b' : '#6b7280',
+                minWidth: '60px',
+                minHeight: '60px'
+              }}
+              title={isQuickNavExists && isQuickNavExists(category.id, 'category') ? '즐겨찾기 해제' : '즐겨찾기'}
+              onMouseEnter={(e) => {
+                const isBookmarked = isQuickNavExists && isQuickNavExists(category.id, 'category');
+                if (isBookmarked) {
+                  e.currentTarget.style.backgroundColor = '#fde68a';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(251, 191, 36, 0.3)';
+                } else {
+                  e.currentTarget.style.backgroundColor = '#f9fafb';
+                  e.currentTarget.style.borderColor = '#8b5cf6';
+                  e.currentTarget.style.color = '#8b5cf6';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.2)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                const isBookmarked = isQuickNavExists && isQuickNavExists(category.id, 'category');
+                if (isBookmarked) {
+                  e.currentTarget.style.backgroundColor = '#fef3c7';
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+                } else {
+                  e.currentTarget.style.backgroundColor = 'white';
+                  e.currentTarget.style.borderColor = '#e5e7eb';
+                  e.currentTarget.style.color = '#6b7280';
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+                }
+              }}
+            >
+              <Star size={26} fill={(isQuickNavExists && isQuickNavExists(category.id, 'category')) ? 'currentColor' : 'none'} />
+            </button>
+            <button
+              data-action-button
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm(`"${category.title || '제목 없는 카테고리'}"를 삭제하시겠습니까?`)) {
+                  onDeleteCategory(category.id);
+                }
+              }}
+              style={{
+                background: 'white',
+                border: '2px solid #e5e7eb',
+                borderRadius: '14px',
+                padding: '20px 24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                color: '#6b7280',
+                minWidth: '60px',
+                minHeight: '60px'
+              }}
+              title="삭제"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#fef2f2';
+                e.currentTarget.style.borderColor = '#ef4444';
+                e.currentTarget.style.color = '#ef4444';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'white';
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.color = '#6b7280';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+              }}
+            >
+              <Trash2 size={26} />
+            </button>
+          </div>
+        );
+      }
 
     }
 

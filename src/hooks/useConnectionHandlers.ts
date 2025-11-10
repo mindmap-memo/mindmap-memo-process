@@ -56,7 +56,7 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
   /**
    * 두 메모/카테고리를 연결
    * - 메모끼리만, 카테고리끼리만 연결 가능
-   * - 카테고리의 경우 부모-자식 관계가 있으면 연결 금지
+   * - 부모-자식 관계가 있으면 연결 금지 (메모-메모, 메모-카테고리, 카테고리-카테고리 모두 해당)
    */
   const connectMemos = useCallback((fromId: string, toId: string) => {
     if (fromId === toId) return;
@@ -81,10 +81,45 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
       return;
     }
 
-    // 카테고리-카테고리 연결 시 부모-자식 관계 체크
-    if (fromCategory && toCategory) {
-      const categories = currentPageData.categories || [];
+    const categories = currentPageData.categories || [];
 
+    // 부모-자식 관계 체크
+    // 1. 메모-메모: 연결 허용 (제한 없음)
+
+    // 2. 메모-카테고리: 메모가 카테고리의 자식이거나, 메모의 부모가 카테고리의 자식/조상인지 확인
+    if ((fromMemo && toCategory) || (fromCategory && toMemo)) {
+      const memo = fromMemo || toMemo;
+      const category = fromCategory || toCategory;
+
+      if (memo && category) {
+        // 메모가 카테고리의 직접 자식인지 확인
+        if (memo.parentId === category.id) {
+          setIsConnecting(false);
+          setConnectingFromId(null);
+          setConnectingFromDirection(null);
+          return;
+        }
+
+        // 메모의 부모가 카테고리의 자손인지 확인
+        if (memo.parentId && isAncestor(category.id, memo.parentId, categories)) {
+          setIsConnecting(false);
+          setConnectingFromId(null);
+          setConnectingFromDirection(null);
+          return;
+        }
+
+        // 카테고리가 메모의 부모의 조상인지 확인
+        if (memo.parentId && isAncestor(memo.parentId, category.id, categories)) {
+          setIsConnecting(false);
+          setConnectingFromId(null);
+          setConnectingFromDirection(null);
+          return;
+        }
+      }
+    }
+
+    // 3. 카테고리-카테고리: 기존 로직 유지
+    if (fromCategory && toCategory) {
       // fromCategory가 toCategory의 조상인지 확인 (from이 to의 부모/조부모/...)
       const fromIsAncestorOfTo = isAncestor(fromId, toId, categories);
       // toCategory가 fromCategory의 조상인지 확인 (to가 from의 부모/조부모/...)

@@ -108,6 +108,7 @@ interface UseCanvasRenderingParams {
   onDeleteQuickNav?: (targetId: string, targetType: 'memo' | 'category') => void;
   isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
   onCategoryUpdate: (category: CategoryBlock) => void;
+  onDeleteCategory: (categoryId: string) => void;
   onOpenEditor?: () => void;
 
   // 상태 Setters
@@ -196,6 +197,7 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     onDeleteQuickNav,
     isQuickNavExists,
     onCategoryUpdate,
+    onDeleteCategory,
     onOpenEditor,
     setIsDraggingCategoryArea,
     setShiftDragInfo,
@@ -307,6 +309,7 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     isQuickNavExists,
     onOpenEditor,
     onCategoryUpdate,
+    onDeleteCategory,
     setIsDraggingCategoryArea,
     setShiftDragInfo,
     setDraggedCategoryAreas,

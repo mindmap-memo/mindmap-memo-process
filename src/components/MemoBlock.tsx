@@ -362,7 +362,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       className={styles.memoBlockWrapper}
       style={{
         transform: `translate3d(${memo.position.x}px, ${memo.position.y}px, 0)`,
-        willChange: isDragging ? 'transform' : 'auto'
+        willChange: isDragging ? 'transform' : 'auto',
+        zIndex: isSelected ? 1000 : 10
       }}
     >
       {/* 메모 블록 콘텐츠 */}
@@ -400,7 +401,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
             onTouchEnd={handleTouchEnd}
             className={`${styles.title} ${memo.title ? styles.withTitle : styles.withoutTitle} ${isSelected ? styles.editable : styles.notEditable}`}
             style={{
-              fontSize: `${30 / (canvasScale || 1)}px`
+              fontSize: `${24 / (canvasScale || 1)}px`
             }}
           >
             {isDragging && (isShiftPressed || isLongPressActive) && (
@@ -420,7 +421,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
                 className={styles.titleInput}
                 style={{
                   pointerEvents: 'auto',
-                  fontSize: `${30 / (canvasScale || 1)}px`
+                  fontSize: `${24 / (canvasScale || 1)}px`
                 }}
               />
             )}
@@ -440,9 +441,11 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
             className={`${styles.contentContainer} ${isSelected ? styles.editable : styles.notEditable}`}
             style={{
               fontSize: `${14 / (canvasScale || 1)}px`,
-              minWidth: `${300 / Math.sqrt(canvasScale || 1)}px`,
-              maxWidth: `${300 / Math.sqrt(canvasScale || 1)}px`,
-              maxHeight: `${500 / Math.sqrt(canvasScale || 1)}px`
+              width: `${180 / (canvasScale || 1)}px`,
+              minWidth: `${180 / (canvasScale || 1)}px`,
+              maxWidth: `${180 / (canvasScale || 1)}px`,
+              maxHeight: `${500 / Math.sqrt(canvasScale || 1)}px`,
+              zIndex: isSelected ? 1000 : 50
             }}
           >
             {isEditingAllBlocks ? (
@@ -730,7 +733,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
           style={{
             top: '-80px',
             transform: `scale(${0.5 / (canvasScale || 1)})`,
-            transformOrigin: 'bottom left'
+            transformOrigin: 'bottom left',
+            zIndex: 1000
           }}
         >
           <button

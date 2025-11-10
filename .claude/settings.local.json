@@ -55,7 +55,8 @@
       "Bash(git restore:*)",
       "Bash(if exist nul del nul 2)",
       "Bash(ngrok http:*)",
-      "Bash(.gitignore)"
+      "Bash(.gitignore)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []

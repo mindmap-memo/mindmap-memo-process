@@ -60,7 +60,7 @@
 
 .title {
   font-weight: 600;
-  // font-size는 인라인 스타일로 동적 설정 (최소 36px)
+  font-size: 24px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -145,7 +145,7 @@
   border: 1px solid #8b5cf6;
   border-radius: 4px;
   padding: 4px 8px;
-  // font-size는 인라인 스타일로 동적 설정 (최소 36px)
+  font-size: 24px;
   font-weight: 600;
   outline: none;
   background-color: white;
@@ -245,7 +245,7 @@
   border-radius: 12px;
   padding: 16px 20px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  font-size: 26px;
+  font-size: 14px;
   color: #6b7280;
   line-height: 1.6;
   z-index: 50;
@@ -266,7 +266,7 @@
   border: 1px solid #8b5cf6;
   border-radius: 4px;
   padding: 8px;
-  font-size: 26px;
+  font-size: 14px;
   outline: none;
   resize: none;
   font-family: inherit;

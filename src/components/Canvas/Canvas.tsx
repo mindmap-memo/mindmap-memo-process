@@ -379,6 +379,7 @@ const Canvas: React.FC<CanvasProps> = ({
     onDeleteQuickNav,
     isQuickNavExists,
     onCategoryUpdate,
+    onDeleteCategory,
     setIsDraggingCategoryArea,
     setShiftDragInfo,
     setDraggedCategoryAreas,
@@ -520,9 +521,9 @@ const Canvas: React.FC<CanvasProps> = ({
           left: 0,
           width: '100%',
           height: '100%',
-          pointerEvents: isDisconnectMode ? 'auto' : 'none',
+          pointerEvents: (isDisconnectMode || isConnecting) ? 'auto' : 'none',
           overflow: 'visible',
-          zIndex: isDisconnectMode ? 100 : 0
+          zIndex: (isDisconnectMode || isConnecting) ? 100 : 0
         }}
       >
         <defs>
