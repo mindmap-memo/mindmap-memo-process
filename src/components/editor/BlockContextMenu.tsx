@@ -62,24 +62,24 @@ export default function BlockContextMenu({
   let adjustedX = position.x;
   let adjustedY = position.y;
 
-  // 오른쪽 경계 체크
-  if (adjustedX + menuWidth > viewportWidth) {
-    adjustedX = viewportWidth - menuWidth - 10;
+  // 오른쪽 경계 체크 (중앙 정렬이므로 menuWidth / 2 고려)
+  if (adjustedX + menuWidth / 2 > viewportWidth) {
+    adjustedX = viewportWidth - menuWidth / 2 - 10;
   }
 
-  // 왼쪽 경계 체크
-  if (adjustedX < 10) {
-    adjustedX = 10;
+  // 왼쪽 경계 체크 (중앙 정렬이므로 menuWidth / 2 고려)
+  if (adjustedX - menuWidth / 2 < 10) {
+    adjustedX = menuWidth / 2 + 10;
+  }
+
+  // 위쪽 경계 체크 (메뉴가 위로 표시되므로)
+  if (adjustedY < 10) {
+    adjustedY = 10;
   }
 
   // 아래쪽 경계 체크
   if (adjustedY + menuHeight > viewportHeight) {
     adjustedY = viewportHeight - menuHeight - 10;
-  }
-
-  // 위쪽 경계 체크
-  if (adjustedY < 10) {
-    adjustedY = 10;
   }
 
   return (
@@ -89,6 +89,7 @@ export default function BlockContextMenu({
         position: 'fixed',
         top: `${adjustedY}px`,
         left: `${adjustedX}px`,
+        transform: 'translateX(-50%)', // 중앙 정렬
         backgroundColor: 'white',
         border: '1px solid #e1e5e9',
         borderRadius: '8px',

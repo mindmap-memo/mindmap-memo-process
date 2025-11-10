@@ -39,14 +39,14 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
       }
     };
 
-    // 더블탭 이벤트 (passive: false로 preventDefault 허용)
-    const handleNativeTouchStart = (e: TouchEvent) => {
+    // 더블탭 이벤트 (touchend에서 감지)
+    const handleNativeTouchEnd = (e: TouchEvent) => {
       const currentTime = Date.now();
       const timeSinceLastTap = currentTime - lastTapTimeRef.current;
 
       // 300ms 이내에 두 번째 탭이 발생하면 더블탭으로 인식
       if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
-        // 더블탭 감지 시 즉시 기본 동작 방지
+        // 더블탭 감지 시 기본 동작 방지
         e.preventDefault();
         e.stopPropagation();
 
@@ -65,6 +65,8 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
         let menuX: number;
         let menuY: number;
 
+        const menuHeight = 400; // BlockContextMenu의 대략적인 높이
+
         if (editor && typeof getPos === 'function') {
           const { state } = editor;
           const { from, to } = state.selection;
@@ -74,25 +76,27 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
             const start = editor.view.coordsAtPos(from);
             const end = editor.view.coordsAtPos(to);
             menuX = (start.left + end.right) / 2;
-            menuY = Math.max(10, start.top - 50); // 선택 영역 위쪽 50px
+            // 선택 영역 위쪽에 메뉴 표시 (메뉴 높이만큼 위로)
+            menuY = Math.max(10, start.top - menuHeight - 10);
           } else {
             // 선택 영역이 없는 경우 터치 위치 기준
-            const touch = e.touches[0] || e.changedTouches[0];
+            const touch = e.changedTouches[0];
             menuX = touch.clientX;
-            menuY = Math.max(10, touch.clientY - 400 - 20);
+            // 터치 위치 위쪽에 메뉴 표시
+            menuY = Math.max(10, touch.clientY - menuHeight - 10);
           }
         } else {
           // 에디터가 없는 경우 터치 위치 기준
-          const touch = e.touches[0] || e.changedTouches[0];
+          const touch = e.changedTouches[0];
           menuX = touch.clientX;
-          menuY = Math.max(10, touch.clientY - 400 - 20);
+          menuY = Math.max(10, touch.clientY - menuHeight - 10);
         }
 
         setContextMenu({ show: true, x: menuX, y: menuY });
 
         lastTapTimeRef.current = 0; // 리셋
       } else {
-        // 첫 번째 탭 기록 (preventDefault 하지 않음 - 네이티브 동작 허용)
+        // 첫 번째 탭 기록
         lastTapTimeRef.current = currentTime;
 
         // 300ms 후 리셋
@@ -102,20 +106,17 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
         tapTimeoutRef.current = setTimeout(() => {
           lastTapTimeRef.current = 0;
         }, 300);
-
-        // 첫 번째 탭은 기본 동작 허용 (복사/붙여넣기 등을 위해)
-        // preventDefault 하지 않음
       }
     };
 
     // 캡처 단계에서 이벤트 가로채기
     wrapper.addEventListener('dragover', handleNativeDragOver, true);
-    // passive: false로 preventDefault 허용
-    content.addEventListener('touchstart', handleNativeTouchStart, { passive: false, capture: true });
+    // touchend에서 더블탭 감지 (touchstart는 네이티브 동작 허용)
+    content.addEventListener('touchend', handleNativeTouchEnd, { passive: false, capture: false });
 
     return () => {
       wrapper.removeEventListener('dragover', handleNativeDragOver, true);
-      content.removeEventListener('touchstart', handleNativeTouchStart, true);
+      content.removeEventListener('touchend', handleNativeTouchEnd);
     };
   }, [editor]);
 
