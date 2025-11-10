@@ -1231,7 +1231,9 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
               }}
             />
           ) : (
-            <span>{category.title}</span>
+            <span style={{ color: category.title ? 'white' : 'rgba(255,255,255,0.6)' }}>
+              {category.title || '제목을 입력해주세요'}
+            </span>
           )}
           <button
             style={{
