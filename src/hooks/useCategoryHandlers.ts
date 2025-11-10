@@ -123,7 +123,7 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
 
     const newCategory: CategoryBlock = {
       id: `category-${Date.now()}`,
-      title: 'New Category',
+      title: '',
       tags: [],
       connections: [],
       position: newPosition,

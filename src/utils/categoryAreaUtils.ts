@@ -326,13 +326,20 @@ export function centerCanvasOnPosition(
   canvasHeight: number,
   canvasScale: number
 ): { x: number; y: number } {
+  // 모바일 체크 (768px 이하)
+  const isMobile = window.innerWidth <= 768;
+
+  // 모바일에서는 실제 화면 크기 사용, PC에서는 전달된 값 사용
+  const actualCanvasWidth = isMobile ? window.innerWidth : canvasWidth;
+  const actualCanvasHeight = isMobile ? window.innerHeight : canvasHeight;
+
   // 타겟 위치를 스케일 적용한 좌표로 변환
   const scaledTargetX = targetPosition.x * canvasScale;
   const scaledTargetY = targetPosition.y * canvasScale;
 
   // 캔버스 중앙 좌표
-  const centerX = canvasWidth / 2;
-  const centerY = canvasHeight / 2;
+  const centerX = actualCanvasWidth / 2;
+  const centerY = actualCanvasHeight / 2;
 
   // 타겟이 중앙에 오도록 오프셋 계산
   const newOffsetX = centerX - scaledTargetX;

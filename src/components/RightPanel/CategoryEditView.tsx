@@ -48,11 +48,11 @@ const CategoryEditView: React.FC<CategoryEditViewProps> = ({
             fontWeight: '700',
             backgroundColor: 'transparent',
             outline: 'none',
-            color: '#ff9800',
+            color: '#1f2937',
             transition: 'border-bottom-color 0.2s ease'
           }}
           onFocus={(e) => {
-            e.target.style.borderBottomColor = '#ff9800';
+            e.target.style.borderBottomColor = '#8b5cf6';
           }}
           onBlur={(e) => {
             e.target.style.borderBottomColor = 'transparent';

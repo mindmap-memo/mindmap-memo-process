@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Page } from '../types';
-import { updateMemo, updateCategory, updatePage } from '../utils/api';
+import { updateMemo, updateCategory, updatePage, createCategory } from '../utils/api';
 import { AUTO_SAVE_DEBOUNCE } from '../utils/constants';
 
 /**
@@ -85,7 +85,27 @@ export const useAutoSave = (
         for (const category of page.categories || []) {
           const prevCategory = prevPage.categories?.find(c => c.id === category.id);
 
-          if (!prevCategory) continue;
+          if (!prevCategory) {
+            // 새로 생성된 카테고리 - POST 요청
+            try {
+              await createCategory({
+                id: category.id,
+                pageId: page.id,
+                title: category.title || '',
+                position: category.position || { x: 0, y: 0 },
+                originalPosition: category.originalPosition || category.position || { x: 0, y: 0 },
+                size: category.size,
+                connections: category.connections || [],
+                tags: category.tags || [],
+                children: category.children || [],
+                parentId: category.parentId || undefined,
+                isExpanded: category.isExpanded !== undefined ? category.isExpanded : true,
+              });
+            } catch (error) {
+              console.error('카테고리 생성 실패:', error);
+            }
+            continue;
+          }
 
           // 카테고리 데이터 비교
           if (JSON.stringify(prevCategory) !== JSON.stringify(category)) {
@@ -101,7 +121,12 @@ export const useAutoSave = (
                 isExpanded: category.isExpanded,
               });
             } catch (error) {
-              console.error('카테고리 저장 실패:', error);
+              // 404 에러는 조용히 무시 (이미 삭제된 카테고리)
+              if (error instanceof Error && error.message.includes('not found')) {
+                console.log(`카테고리 ${category.id}는 이미 삭제되었습니다.`);
+              } else {
+                console.error('카테고리 저장 실패:', error);
+              }
             }
           }
         }
