@@ -85,6 +85,9 @@ export const useCanvasState = () => {
   const renderedCategoryAreas = useRef<{
     [categoryId: string]: { x: number; y: number; width: number; height: number };
   }>({});
+  const renderedMemoSizes = useRef<{
+    [memoId: string]: { width: number; height: number };
+  }>({});
 
   return {
     // 패닝
@@ -159,6 +162,7 @@ export const useCanvasState = () => {
 
     // Refs
     shiftDragAreaCache,
-    renderedCategoryAreas
+    renderedCategoryAreas,
+    renderedMemoSizes
   };
 };

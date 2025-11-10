@@ -217,7 +217,8 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
 
   // 연결점 계산 훅 사용
   const { getBlockConnectionPoints, getConnectionPoints } = useConnectionPoints({
-    renderedCategoryAreas
+    renderedCategoryAreas,
+    canvasScale
   });
 
   // 카테고리 영역 색상 훅 사용

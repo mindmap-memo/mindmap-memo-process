@@ -4,8 +4,12 @@
 export const getBlockConnectionPoints = (item: any) => {
   const x = item.position.x;
   const y = item.position.y;
-  const width = item.size?.width || 200;
-  const height = item.size?.height || 100;
+
+  // 역스케일링으로 인한 과도한 크기 증가 방지 (최대 800x300으로 제한)
+  const MAX_WIDTH = 800;
+  const MAX_HEIGHT = 300;
+  const width = Math.min(item.size?.width || 200, MAX_WIDTH);
+  const height = Math.min(item.size?.height || 100, MAX_HEIGHT);
 
   return {
     top: { x: x + width / 2, y: y },

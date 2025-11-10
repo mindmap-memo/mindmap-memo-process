@@ -68,23 +68,18 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
           return;
         }
 
-        // 최신 크기 정보로 연결점 계산
+        // 최신 크기 정보로 연결점 계산 (DOM 기반)
         const fromPoints = getConnectionPoints(memo);
         const toPoints = getConnectionPoints(connectedMemo);
 
-        const fromWidth = memo.size?.width || 200;
-        const fromHeight = memo.size?.height || 95;
-        const toWidth = connectedMemo.size?.width || 200;
-        const toHeight = connectedMemo.size?.height || 95;
-
-        // 원본 메모 좌표로 중심점 계산
+        // 중심점 계산 (연결점으로부터 계산)
         const centerFrom = {
-          x: memo.position.x + fromWidth / 2,
-          y: memo.position.y + fromHeight / 2
+          x: (fromPoints.left.x + fromPoints.right.x) / 2,
+          y: (fromPoints.top.y + fromPoints.bottom.y) / 2
         };
         const centerTo = {
-          x: connectedMemo.position.x + toWidth / 2,
-          y: connectedMemo.position.y + toHeight / 2
+          x: (toPoints.left.x + toPoints.right.x) / 2,
+          y: (toPoints.top.y + toPoints.bottom.y) / 2
         };
 
         const dx = centerTo.x - centerFrom.x;
@@ -339,15 +334,12 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
         if (connectingFromDirection) {
           fromPoint = fromPoints[connectingFromDirection];
         } else {
-          const connectingWidth = connectingMemo.size?.width || 200;
-          const connectingHeight = connectingMemo.size?.height || 95;
-
-          // 원본 메모 좌표로 중심점 계산
+          // 중심점 계산 (연결점으로부터 계산)
           const centerFrom = {
-            x: connectingMemo.position.x + connectingWidth / 2,
-            y: connectingMemo.position.y + connectingHeight / 2
+            x: (fromPoints.left.x + fromPoints.right.x) / 2,
+            y: (fromPoints.top.y + fromPoints.bottom.y) / 2
           };
-          // dragLineEnd를 원본 좌표로 변환
+
           const dx = dragLineEnd.x - centerFrom.x;
           const dy = dragLineEnd.y - centerFrom.y;
 
