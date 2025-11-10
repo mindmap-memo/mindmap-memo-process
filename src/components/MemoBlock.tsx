@@ -343,7 +343,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         resizeObserver.disconnect();
       };
     }
-  }, [memo.title, memo.content, memo.tags, memo.blocks, memo.id, onSizeChange, canvasScale, isDragging]);
+  }, [memo.title, memo.content, memo.tags, memo.blocks?.length, memo.id, onSizeChange, canvasScale, isDragging]);
 
   return (
     <div
@@ -388,7 +388,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
             onTouchEnd={handleTouchEnd}
             className={`${styles.title} ${memo.title ? styles.withTitle : styles.withoutTitle} ${isSelected ? styles.editable : styles.notEditable}`}
             style={{
-              fontSize: `${Math.max(36, 45 * (canvasScale || 1))}px`
+              fontSize: `${30 / (canvasScale || 1)}px`
             }}
           >
             {isDragging && (isShiftPressed || isLongPressActive) && (
@@ -408,7 +408,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
                 className={styles.titleInput}
                 style={{
                   pointerEvents: 'auto',
-                  fontSize: `${Math.max(36, 45 * (canvasScale || 1))}px`
+                  fontSize: `${30 / (canvasScale || 1)}px`
                 }}
               />
             )}
@@ -426,6 +426,10 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
             onDoubleClick={handleAllBlocksDoubleClick}
             onTouchEnd={handleTouchEnd}
             className={`${styles.contentContainer} ${isSelected ? styles.editable : styles.notEditable}`}
+            style={{
+              fontSize: `${14 / (canvasScale || 1)}px`,
+              minWidth: `${300 / (canvasScale || 1)}px`
+            }}
           >
             {isEditingAllBlocks ? (
               <textarea
@@ -710,7 +714,9 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         <div
           className={styles.actionButtons}
           style={{
-            top: '-80px'
+            top: '-80px',
+            transform: `scale(${0.5 / (canvasScale || 1)})`,
+            transformOrigin: 'bottom left'
           }}
         >
           <button

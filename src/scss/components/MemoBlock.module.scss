@@ -16,12 +16,11 @@
   border-radius: 12px;
   padding: 16px;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: visible;
   user-select: none;
   z-index: 10;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   width: fit-content;
-  max-width: 500px;
 
   &.selected {
     background-color: #f3f4f6;
@@ -65,11 +64,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1;
-  min-width: 0; // flex 아이템이 축소될 수 있게
   pointer-events: none; // title div는 클릭을 받지 않고 버튼으로 전달
-  word-break: break-word;
-  white-space: pre-wrap;
+  white-space: nowrap;
 
   &.withTitle {
     color: #1f2937;

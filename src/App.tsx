@@ -356,7 +356,7 @@ const App: React.FC = () => {
   // Tutorial disabled
   const tutorialState = { isActive: false, currentStep: 0, completed: true, currentSubStep: 0 };
   const tutorialMode = 'basic' as const;
-  const currentTutorialSteps = [];
+  const currentTutorialSteps: any[] = [];
   const handleStartTutorialWrapper = () => {};
   const handleTutorialSkip = () => {};
   const handleSwitchToBasic = () => {};
@@ -1037,20 +1037,7 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* 튜토리얼 오버레이 - 마이그레이션이 필요하지 않을 때만 표시 */}
-      {tutorialState.isActive && !needsMigration && (
-        <Tutorial
-          steps={currentTutorialSteps}
-          currentStep={tutorialState.currentStep}
-          currentSubStep={tutorialState.currentSubStep || 0}
-          onNext={tutorialHandlersTemp.handleTutorialNext}
-          onPrev={handleTutorialPrev}
-          onSkip={handleTutorialSkip}
-          onComplete={tutorialHandlersTemp.handleTutorialComplete}
-          onSwitchToCore={handleSwitchToBasic}
-          canProceed={tutorialMode === 'core' ? true : tutorialHandlersTemp.canProceedTutorial()}
-        />
-      )}
+      {/* 튜토리얼 오버레이 - 비활성화됨 */}
 
       {/* 마이그레이션 프롬프트 */}
       {needsMigration && session && (
