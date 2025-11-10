@@ -61,38 +61,30 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
         }
 
         // 블록 중요도 컨텍스트 메뉴 표시
-        // 현재 선택 영역이 있으면 선택 영역 위에, 없으면 터치 위치 위에 표시
+        // 메뉴의 하단(중요도 제거 버튼)이 블록 위쪽에 오도록 배치
         let menuX: number;
-        let menuY: number;
+        let menuBottomY: number; // 메뉴 하단이 와야 할 Y 위치
 
-        const menuHeight = 400; // BlockContextMenu의 대략적인 높이
+        // 블록의 DOM 요소 위치 가져오기
+        const blockElement = wrapperRef.current;
+        if (blockElement) {
+          const blockRect = blockElement.getBoundingClientRect();
+          const touch = e.changedTouches[0];
 
-        if (editor && typeof getPos === 'function') {
-          const { state } = editor;
-          const { from, to } = state.selection;
+          // 메뉴 X는 터치 위치 (또는 블록 중앙)
+          menuX = touch ? touch.clientX : blockRect.left + blockRect.width / 2;
 
-          // 선택 영역이 있는 경우
-          if (from !== to) {
-            const start = editor.view.coordsAtPos(from);
-            const end = editor.view.coordsAtPos(to);
-            menuX = (start.left + end.right) / 2;
-            // 선택 영역 위쪽에 메뉴 표시 (메뉴 높이만큼 위로)
-            menuY = Math.max(10, start.top - menuHeight - 10);
-          } else {
-            // 선택 영역이 없는 경우 터치 위치 기준
-            const touch = e.changedTouches[0];
-            menuX = touch.clientX;
-            // 터치 위치 위쪽에 메뉴 표시
-            menuY = Math.max(10, touch.clientY - menuHeight - 10);
-          }
+          // 메뉴 하단이 블록 상단 위쪽 10px에 오도록
+          menuBottomY = blockRect.top - 10;
         } else {
-          // 에디터가 없는 경우 터치 위치 기준
+          // 폴백: 터치 위치 기준
           const touch = e.changedTouches[0];
           menuX = touch.clientX;
-          menuY = Math.max(10, touch.clientY - menuHeight - 10);
+          menuBottomY = touch.clientY - 10;
         }
 
-        setContextMenu({ show: true, x: menuX, y: menuY });
+        // menuBottomY를 전달 (BlockContextMenu에서 transform으로 메뉴를 위로 올림)
+        setContextMenu({ show: true, x: menuX, y: menuBottomY });
 
         lastTapTimeRef.current = 0; // 리셋
       } else {
@@ -130,7 +122,10 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
     // PC에서만 커스텀 컨텍스트 메뉴 표시
     e.preventDefault();
     e.stopPropagation();
-    setContextMenu({ show: true, x: e.clientX, y: e.clientY });
+
+    // 메뉴의 하단이 우클릭 위치 위쪽 10px에 오도록
+    const menuBottomY = e.clientY - 10;
+    setContextMenu({ show: true, x: e.clientX, y: menuBottomY });
   };
 
   // 수동 드래그 구현

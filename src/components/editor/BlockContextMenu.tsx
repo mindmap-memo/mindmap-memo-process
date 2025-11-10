@@ -55,7 +55,6 @@ export default function BlockContextMenu({
 
   // 메뉴가 화면 밖으로 나가지 않도록 위치 조정
   const menuWidth = 180;
-  const menuHeight = 400; // 대략적인 메뉴 높이
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
 
@@ -72,14 +71,15 @@ export default function BlockContextMenu({
     adjustedX = menuWidth / 2 + 10;
   }
 
-  // 위쪽 경계 체크 (메뉴가 위로 표시되므로)
+  // Y 위치 경계 체크
+  // position.y는 메뉴 하단이 와야 할 위치
+  // 화면 위쪽으로 나가는 경우 화면 상단에서 10px 아래로
   if (adjustedY < 10) {
     adjustedY = 10;
   }
-
-  // 아래쪽 경계 체크
-  if (adjustedY + menuHeight > viewportHeight) {
-    adjustedY = viewportHeight - menuHeight - 10;
+  // 화면 아래쪽으로 나가는 경우
+  if (adjustedY > viewportHeight - 10) {
+    adjustedY = viewportHeight - 10;
   }
 
   return (
@@ -89,7 +89,7 @@ export default function BlockContextMenu({
         position: 'fixed',
         top: `${adjustedY}px`,
         left: `${adjustedX}px`,
-        transform: 'translateX(-50%)', // 중앙 정렬
+        transform: 'translate(-50%, -100%)', // 중앙 정렬 + 메뉴를 위로 올림
         backgroundColor: 'white',
         border: '1px solid #e1e5e9',
         borderRadius: '8px',
