@@ -1260,13 +1260,12 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
       const isCategorySelected = selectedCategoryId === category.id || selectedCategoryIds.includes(category.id);
       if (isCategorySelected) {
         const buttonScale = 0.5 / (canvasScale || 1);
-        const buttonHeight = 60 * buttonScale; // 버튼의 실제 높이 (scale 적용 후)
         areas.push(
           <div
             key={`action-buttons-${category.id}`}
             style={{
               position: 'absolute',
-              top: `${labelY - buttonHeight - 10}px`,
+              top: `${labelY - 80}px`,
               left: `${labelX}px`,
               display: 'flex',
               flexDirection: 'row',
