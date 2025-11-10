@@ -61,12 +61,38 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
         }
 
         // 블록 중요도 컨텍스트 메뉴 표시
-        const touch = e.touches[0] || e.changedTouches[0];
-        setContextMenu({ show: true, x: touch.clientX, y: touch.clientY });
+        // 현재 선택 영역이 있으면 선택 영역 위에, 없으면 터치 위치 위에 표시
+        let menuX: number;
+        let menuY: number;
+
+        if (editor && typeof getPos === 'function') {
+          const { state } = editor;
+          const { from, to } = state.selection;
+
+          // 선택 영역이 있는 경우
+          if (from !== to) {
+            const start = editor.view.coordsAtPos(from);
+            const end = editor.view.coordsAtPos(to);
+            menuX = (start.left + end.right) / 2;
+            menuY = Math.max(10, start.top - 50); // 선택 영역 위쪽 50px
+          } else {
+            // 선택 영역이 없는 경우 터치 위치 기준
+            const touch = e.touches[0] || e.changedTouches[0];
+            menuX = touch.clientX;
+            menuY = Math.max(10, touch.clientY - 400 - 20);
+          }
+        } else {
+          // 에디터가 없는 경우 터치 위치 기준
+          const touch = e.touches[0] || e.changedTouches[0];
+          menuX = touch.clientX;
+          menuY = Math.max(10, touch.clientY - 400 - 20);
+        }
+
+        setContextMenu({ show: true, x: menuX, y: menuY });
 
         lastTapTimeRef.current = 0; // 리셋
       } else {
-        // 첫 번째 탭 기록
+        // 첫 번째 탭 기록 (preventDefault 하지 않음 - 네이티브 동작 허용)
         lastTapTimeRef.current = currentTime;
 
         // 300ms 후 리셋
@@ -76,6 +102,9 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
         tapTimeoutRef.current = setTimeout(() => {
           lastTapTimeRef.current = 0;
         }, 300);
+
+        // 첫 번째 탭은 기본 동작 허용 (복사/붙여넣기 등을 위해)
+        // preventDefault 하지 않음
       }
     };
 
