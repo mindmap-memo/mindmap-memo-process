@@ -55,31 +55,35 @@ export default function BlockContextMenu({
 
   // 메뉴가 화면 밖으로 나가지 않도록 위치 조정
   const menuWidth = 180;
+  const menuHeight = 400; // 대략적인 메뉴 높이
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
+  const padding = 10; // 화면 가장자리 여백
 
   let adjustedX = position.x;
   let adjustedY = position.y;
 
-  // 오른쪽 경계 체크 (중앙 정렬이므로 menuWidth / 2 고려)
-  if (adjustedX + menuWidth / 2 > viewportWidth) {
-    adjustedX = viewportWidth - menuWidth / 2 - 10;
+  // X 위치 경계 체크
+  // transform: translateX(-50%)를 고려하여 메뉴가 중앙 정렬됨
+  // 왼쪽 경계: adjustedX - menuWidth/2 >= padding
+  if (adjustedX - menuWidth / 2 < padding) {
+    adjustedX = menuWidth / 2 + padding;
   }
-
-  // 왼쪽 경계 체크 (중앙 정렬이므로 menuWidth / 2 고려)
-  if (adjustedX - menuWidth / 2 < 10) {
-    adjustedX = menuWidth / 2 + 10;
+  // 오른쪽 경계: adjustedX + menuWidth/2 <= viewportWidth - padding
+  if (adjustedX + menuWidth / 2 > viewportWidth - padding) {
+    adjustedX = viewportWidth - menuWidth / 2 - padding;
   }
 
   // Y 위치 경계 체크
-  // position.y는 메뉴 하단이 와야 할 위치
-  // 화면 위쪽으로 나가는 경우 화면 상단에서 10px 아래로
-  if (adjustedY < 10) {
-    adjustedY = 10;
+  // transform: translateY(-100%)를 고려하여 메뉴가 위로 올라감
+  // position.y는 메뉴 하단 위치이므로, 실제 메뉴 상단은 adjustedY - menuHeight
+  // 위쪽 경계: adjustedY - menuHeight >= padding
+  if (adjustedY - menuHeight < padding) {
+    adjustedY = menuHeight + padding;
   }
-  // 화면 아래쪽으로 나가는 경우
-  if (adjustedY > viewportHeight - 10) {
-    adjustedY = viewportHeight - 10;
+  // 아래쪽 경계: adjustedY <= viewportHeight - padding
+  if (adjustedY > viewportHeight - padding) {
+    adjustedY = viewportHeight - padding;
   }
 
   return (

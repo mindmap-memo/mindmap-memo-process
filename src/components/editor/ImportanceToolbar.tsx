@@ -55,10 +55,10 @@ export default function ImportanceToolbar({ editor }: ImportanceToolbarProps) {
       // 모바일 환경 감지
       const isMobile = window.innerWidth <= 768;
 
-      // 모바일: 선택 영역 아래에 배치 (네이티브 메뉴와 겹치지 않도록)
-      // PC: 선택 영역 위에 배치 (기존 동작 유지)
+      // PC와 모바일 모두 선택 영역 위에 배치
+      // 메뉴 하단이 선택 영역 상단 위쪽 10px에 오도록
       setPosition({
-        top: isMobile ? end.bottom + 10 : start.top - 10,
+        top: start.top - 10,
         left: (start.left + end.right) / 2,
       });
       setShow(true);
@@ -91,9 +91,6 @@ export default function ImportanceToolbar({ editor }: ImportanceToolbarProps) {
 
   if (!show) return null;
 
-  // 모바일 환경 감지
-  const isMobile = window.innerWidth <= 768;
-
   const importanceLevels: ImportanceLevel[] = [
     'critical',
     'important',
@@ -118,14 +115,40 @@ export default function ImportanceToolbar({ editor }: ImportanceToolbarProps) {
     return hoverColors[level];
   };
 
+  // 화면 밖으로 나가지 않도록 위치 조정
+  const menuWidth = 160;
+  const menuHeight = 280; // 대략적인 메뉴 높이
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const padding = 10;
+
+  let adjustedTop = position.top;
+  let adjustedLeft = position.left;
+
+  // X 위치 경계 체크 (transform: translateX(-50%))
+  if (adjustedLeft - menuWidth / 2 < padding) {
+    adjustedLeft = menuWidth / 2 + padding;
+  }
+  if (adjustedLeft + menuWidth / 2 > viewportWidth - padding) {
+    adjustedLeft = viewportWidth - menuWidth / 2 - padding;
+  }
+
+  // Y 위치 경계 체크 (transform: translateY(-100%))
+  if (adjustedTop - menuHeight < padding) {
+    adjustedTop = menuHeight + padding;
+  }
+  if (adjustedTop > viewportHeight - padding) {
+    adjustedTop = viewportHeight - padding;
+  }
+
   return (
     <div
       data-context-menu="true"
       style={{
         position: 'fixed',
-        top: `${position.top}px`,
-        left: `${position.left}px`,
-        transform: isMobile ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
+        top: `${adjustedTop}px`,
+        left: `${adjustedLeft}px`,
+        transform: 'translate(-50%, -100%)', // PC/모바일 모두 위쪽에 표시
         backgroundColor: 'white',
         border: '1px solid #e1e5e9',
         borderRadius: '8px',
