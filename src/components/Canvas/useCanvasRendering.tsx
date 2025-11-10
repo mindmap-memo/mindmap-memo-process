@@ -251,7 +251,8 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     dragLineEnd,
     onRemoveConnection,
     onConnectMemos,
-    getConnectionPoints
+    getConnectionPoints,
+    canvasScale
   });
 
   // 카테고리 영역 렌더링 훅 사용

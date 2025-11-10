@@ -28,6 +28,7 @@ interface UseConnectionLineRenderingParams {
   onRemoveConnection: (fromId: string, toId: string) => void;
   onConnectMemos: (fromId: string, toId: string) => void;
   getConnectionPoints: (block: any) => any;
+  canvasScale: number;
 }
 
 export const useConnectionLineRendering = (params: UseConnectionLineRenderingParams) => {
@@ -40,7 +41,8 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
     dragLineEnd,
     onRemoveConnection,
     onConnectMemos,
-    getConnectionPoints
+    getConnectionPoints,
+    canvasScale
   } = params;
 
   /**
@@ -153,10 +155,10 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
               <g transform={`translate(${midX}, ${midY})`}>
                 {/* 배경 원 */}
                 <circle
-                  r="20"
+                  r={20 / Math.sqrt(canvasScale)}
                   fill="#ef4444"
                   stroke="white"
-                  strokeWidth="3"
+                  strokeWidth={3 / Math.sqrt(canvasScale)}
                   style={{
                     cursor: 'pointer',
                     pointerEvents: 'auto',
@@ -170,13 +172,13 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
                 />
                 {/* 쓰레기통 아이콘 */}
                 <foreignObject
-                  x="-12"
-                  y="-12"
-                  width="24"
-                  height="24"
+                  x={-12 / Math.sqrt(canvasScale)}
+                  y={-12 / Math.sqrt(canvasScale)}
+                  width={24 / Math.sqrt(canvasScale)}
+                  height={24 / Math.sqrt(canvasScale)}
                   style={{ pointerEvents: 'none' }}
                 >
-                  <Trash2 size={24} color="white" />
+                  <Trash2 size={24 / Math.sqrt(canvasScale)} color="white" />
                 </foreignObject>
               </g>
             )}
@@ -288,10 +290,10 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
               <g transform={`translate(${midX}, ${midY})`}>
                 {/* 배경 원 */}
                 <circle
-                  r="20"
+                  r={20 / Math.sqrt(canvasScale)}
                   fill="#ef4444"
                   stroke="white"
-                  strokeWidth="3"
+                  strokeWidth={3 / Math.sqrt(canvasScale)}
                   style={{
                     cursor: 'pointer',
                     pointerEvents: 'auto',
@@ -305,13 +307,13 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
                 />
                 {/* 쓰레기통 아이콘 */}
                 <foreignObject
-                  x="-12"
-                  y="-12"
-                  width="24"
-                  height="24"
+                  x={-12 / Math.sqrt(canvasScale)}
+                  y={-12 / Math.sqrt(canvasScale)}
+                  width={24 / Math.sqrt(canvasScale)}
+                  height={24 / Math.sqrt(canvasScale)}
                   style={{ pointerEvents: 'none' }}
                 >
-                  <Trash2 size={24} color="white" />
+                  <Trash2 size={24 / Math.sqrt(canvasScale)} color="white" />
                 </foreignObject>
               </g>
             )}
@@ -405,7 +407,8 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
     dragLineEnd,
     getConnectionPoints,
     onRemoveConnection,
-    onConnectMemos
+    onConnectMemos,
+    canvasScale
   ]);
 
   return {

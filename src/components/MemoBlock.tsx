@@ -440,7 +440,9 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
             className={`${styles.contentContainer} ${isSelected ? styles.editable : styles.notEditable}`}
             style={{
               fontSize: `${14 / (canvasScale || 1)}px`,
-              minWidth: `${300 / (canvasScale || 1)}px`
+              minWidth: `${300 / Math.sqrt(canvasScale || 1)}px`,
+              maxWidth: `${300 / Math.sqrt(canvasScale || 1)}px`,
+              maxHeight: `${500 / Math.sqrt(canvasScale || 1)}px`
             }}
           >
             {isEditingAllBlocks ? (
