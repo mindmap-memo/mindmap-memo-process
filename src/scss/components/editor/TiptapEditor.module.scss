@@ -1,9 +1,15 @@
 .container {
   width: 100%;
   min-height: 200px;
-  padding: 20px;
+  padding: 0;
   background-color: #f9fafb;
   border-radius: 8px;
+
+  // 모바일에서는 배경색과 border-radius 제거
+  @media (max-width: 768px) {
+    background-color: transparent;
+    border-radius: 0;
+  }
 }
 
 .editor {

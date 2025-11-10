@@ -312,11 +312,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
             height: Math.round(rect.height / canvasScale)
           };
 
-          console.log(`[MemoBlock Size Debug] memo:${memo.id.slice(0,8)} scale:${canvasScale.toFixed(2)} rect:${rect.width.toFixed(0)}x${rect.height.toFixed(0)} → logical:${newSize.width}x${newSize.height}`);
-
           // scale < 1.0일 때는 크기 업데이트 하지 않음 (역스케일링으로 인한 영역 확장 방지)
           if (canvasScale < 1.0) {
-            console.log(`[MemoBlock] Skip update due to scale ${canvasScale.toFixed(2)} < 1.0`);
             return;
           }
 

@@ -49,8 +49,6 @@ export function calculateCategoryArea(
     const memoWidth = Math.min(memo.size?.width || DEFAULT_MEMO_WIDTH, MAX_WIDTH);
     const memoHeight = Math.min(memo.size?.height || DEFAULT_MEMO_HEIGHT, MAX_HEIGHT);
 
-    console.log(`[Area Calc] memo:${memo.id.slice(0,8)} raw:${memo.size?.width}x${memo.size?.height} → used:${memoWidth}x${memoHeight}`);
-
     minX = Math.min(minX, memo.position.x);
     minY = Math.min(minY, memo.position.y);
     maxX = Math.max(maxX, memo.position.x + memoWidth);

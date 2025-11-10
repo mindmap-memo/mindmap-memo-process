@@ -549,7 +549,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                 marginBottom: '16px',
                 position: 'relative',
                 minHeight: '200px',
-                padding: '20px'
+                padding: '0'
               }}
             >
               {/* 드래그 선택 박스 오버레이 */}
