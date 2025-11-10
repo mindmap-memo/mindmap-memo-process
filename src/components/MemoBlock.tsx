@@ -306,11 +306,18 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
             return;
           }
 
+          // scale < 1.0일 때는 크기 업데이트 하지 않음 (역스케일링으로 인한 영역 확장 방지)
+          if (canvasScale < 1.0) {
+            return;
+          }
+
           // scale을 나누어서 실제 논리적 크기 계산
           const newSize = {
             width: Math.round(rect.width / canvasScale),
             height: Math.round(rect.height / canvasScale)
           };
+
+          console.log(`[MemoBlock Size Debug] memo:${memo.id.slice(0,8)} scale:${canvasScale.toFixed(2)} rect:${rect.width.toFixed(0)}x${rect.height.toFixed(0)} → logical:${newSize.width}x${newSize.height}`);
 
           // 크기 변화가 충분히 클 때만 업데이트 (5px 이상 차이)
           if (!memo.size ||
@@ -319,6 +326,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
             // 디바운싱: 100ms 후에 업데이트
             clearTimeout(timeoutId);
             timeoutId = setTimeout(() => {
+              console.log(`[MemoBlock Size Update] memo:${memo.id.slice(0,8)} newSize:${newSize.width}x${newSize.height}`);
               onSizeChange(memo.id, newSize);
             }, 100);
           }
