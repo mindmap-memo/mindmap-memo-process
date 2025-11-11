@@ -706,9 +706,10 @@ const App: React.FC = () => {
   // ===== 반응형 분기 =====
   // 모바일/태블릿 감지: 터치 기기는 모두 모바일 레이아웃 사용
   const isMobilePortrait = useMediaQuery('(max-width: 768px)'); // 모바일 세로
-  const isTablet = useMediaQuery('(min-width: 769px) and (max-width: 1024px) and (pointer: coarse)'); // 태블릿 (터치 기기)
+  const isTabletPortrait = useMediaQuery('(min-width: 769px) and (max-width: 1024px) and (orientation: portrait) and (pointer: coarse)'); // 태블릿 세로
+  const isTabletLandscape = useMediaQuery('(min-width: 769px) and (max-width: 1366px) and (orientation: landscape) and (pointer: coarse)'); // 태블릿 가로
   const isMobileLandscape = useMediaQuery('(max-height: 600px) and (orientation: landscape) and (pointer: coarse)'); // 모바일 가로
-  const isMobile = isMobilePortrait || isTablet || isMobileLandscape;
+  const isMobile = isMobilePortrait || isTabletPortrait || isTabletLandscape || isMobileLandscape;
 
   // 초기 로딩이 완료될 때까지 로딩 인디케이터 표시
   if (!isInitialLoadDone) {

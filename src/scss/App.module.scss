@@ -81,6 +81,11 @@
   display: flex;
   gap: 12px;
 
+  // 태블릿: 버튼에 가려지지 않도록 top 위치 조정
+  @media (min-width: 769px) and (max-width: 1366px) and (pointer: coarse) {
+    top: 130px;
+  }
+
   // 모바일 버전: 풀스크린 패널
   @media (max-width: 768px) {
     top: 0;
