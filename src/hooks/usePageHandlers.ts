@@ -49,7 +49,7 @@ export const usePageHandlers = ({
    */
   const addPage = useCallback(async () => {
     try {
-      const newId = `page-${Date.now()}`;
+      const newId = `page-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
       const newName = `페이지 ${pages.length + 1}`;
 
       // Create page in database

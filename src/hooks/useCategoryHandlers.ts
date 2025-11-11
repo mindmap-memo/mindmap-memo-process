@@ -122,7 +122,7 @@ export const useCategoryHandlers = (props: UseCategoryHandlersProps) => {
     }
 
     const newCategory: CategoryBlock = {
-      id: `category-${Date.now()}`,
+      id: `category-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       title: '',
       tags: [],
       connections: [],

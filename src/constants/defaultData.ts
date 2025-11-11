@@ -11,8 +11,8 @@ export const STORAGE_KEYS = {
 // 기본 데이터
 export const DEFAULT_PAGES: Page[] = (() => {
   // 고유한 페이지 ID 생성 (절대 '1'을 사용하지 않음)
-  // 형식: page-[타임스탬프]
-  const pageId = `page-${Date.now()}`;
+  // 형식: page-[타임스탬프]-[랜덤4자리]
+  const pageId = `page-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
 
   // 튜토리얼 메모들
   const tutorialMemos: MemoBlock[] = [

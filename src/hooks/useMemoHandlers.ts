@@ -148,8 +148,9 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
       }
     }
 
+    const timestamp = Date.now();
     const newMemo: MemoBlock = {
-      id: `memo-${Date.now()}`,
+      id: `memo-${timestamp}-${Math.random().toString(36).substr(2, 4)}`,
       title: '',
       content: '',
       tags: [],
@@ -158,7 +159,7 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
       displaySize: 'medium',
       blocks: [
         {
-          id: `block-${Date.now()}`,
+          id: `block-${timestamp}-${Math.random().toString(36).substr(2, 4)}`,
           type: 'text',
           content: ''
         }

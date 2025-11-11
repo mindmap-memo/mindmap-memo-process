@@ -182,9 +182,9 @@ export const useAppState = (isAuthenticated: boolean = false) => {
             if (!page) continue; // 안전성 체크
 
             try {
-              // 1. 고유한 페이지 ID 생성 (타임스탬프 기반)
-              // 형식: page-[타임스탬프]
-              const uniquePageId = `page-${Date.now()}`;
+              // 1. 고유한 페이지 ID 생성 (타임스탬프 + 랜덤 기반)
+              // 형식: page-[타임스탬프]-[랜덤4자리]
+              const uniquePageId = `page-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
               const newPage = await createPage(uniquePageId, page.name);
               console.log(`✅ 페이지 생성 완료: ${page.name}`);
 
