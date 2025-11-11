@@ -6,6 +6,7 @@ import { MobileHeader } from './MobileHeader';
 import { MobileSearchResults } from './MobileSearchResults';
 import { useMobileLayout } from './hooks/useMobileLayout';
 import { useMobileSearch } from './hooks/useMobileSearch';
+import { useMobileBackButton } from '../../hooks/useMobileBackButton';
 import Canvas from '../Canvas/Canvas';
 import RightPanel from '../RightPanel/RightPanel';
 import LeftPanel from '../LeftPanel/LeftPanel';
@@ -217,6 +218,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   } = useMobileLayout();
   const [showFabMenu, setShowFabMenu] = React.useState(false);
   const [showFilters, setShowFilters] = React.useState(false);
+  const [showExitToast, setShowExitToast] = React.useState(false);
 
   // Context에서 필요한 상태와 핸들러 가져오기
   const appState = useAppStateContext();
@@ -224,6 +226,18 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   const connection = useConnection();
   const panel = usePanel();
   const quickNav = useQuickNav();
+
+  // 모바일 뒤로가기 버튼 처리
+  useMobileBackButton({
+    isEditorOpen: showEditor,
+    onClose: () => {
+      setShowEditor(false);
+      selection?.setSelectedMemoId(null);
+      selection?.setSelectedCategoryId(null);
+    },
+    showExitToast,
+    onShowExitToast: setShowExitToast
+  });
 
   // Context 데이터 유효성 검증 (초기 로딩 상태 처리)
   // useEffect 대신 직접 체크하여 더 빠르게 응답
@@ -701,6 +715,27 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
           onToggleGeneralContent={selection.toggleGeneralContent || (() => {})}
           isMobile={true}
         />
+      )}
+
+      {/* 뒤로가기 종료 안내 토스트 */}
+      {showExitToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '80px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          color: 'white',
+          padding: '12px 24px',
+          borderRadius: '8px',
+          fontSize: '14px',
+          fontWeight: 500,
+          zIndex: 10000,
+          whiteSpace: 'nowrap',
+          animation: 'fadeIn 0.2s ease-in-out'
+        }}>
+          뒤로가기 버튼을 한번 더 누르면 종료됩니다
+        </div>
       )}
     </div>
   );

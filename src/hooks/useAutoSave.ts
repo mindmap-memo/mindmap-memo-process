@@ -76,7 +76,12 @@ export const useAutoSave = (
                 parentId: memo.parentId,
               });
             } catch (error) {
-              console.error('메모 저장 실패:', error);
+              // 404 에러는 조용히 무시 (이미 삭제된 메모)
+              if (error instanceof Error && (error.message.includes('not found') || error.message.includes('unauthorized'))) {
+                console.log(`메모 ${memo.id}는 이미 삭제되었습니다.`);
+              } else {
+                console.error('메모 저장 실패:', error);
+              }
             }
           }
         }

@@ -438,9 +438,9 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
             className={`${styles.contentContainer} ${isSelected ? styles.editable : styles.notEditable}`}
             style={{
               fontSize: `${14 / (canvasScale || 1)}px`,
-              width: `${180 / (canvasScale || 1)}px`,
-              minWidth: `${180 / (canvasScale || 1)}px`,
-              maxWidth: `${180 / (canvasScale || 1)}px`,
+              width: `${Math.max(180, memo.size?.width || sizeConfig.width) / (canvasScale || 1)}px`,
+              minWidth: `${Math.max(180, memo.size?.width || sizeConfig.width) / (canvasScale || 1)}px`,
+              maxWidth: `${Math.max(180, memo.size?.width || sizeConfig.width) / (canvasScale || 1)}px`,
               maxHeight: `${500 / Math.sqrt(canvasScale || 1)}px`,
               zIndex: isSelected ? 1000 : 50
             }}

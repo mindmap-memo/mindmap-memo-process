@@ -37,7 +37,6 @@ import { MigrationPrompt } from './features/migration/components/MigrationPrompt
 import { useAnalytics } from './features/analytics/hooks/useAnalytics';
 import { useAnalyticsTrackers } from './features/analytics/hooks/useAnalyticsTrackers';
 import { useMediaQuery } from './hooks/useMediaQuery';
-import { useMobileBackButton } from './hooks/useMobileBackButton';
 import { MobileLayout } from './components/MobileLayout/MobileLayout';
 import styles from './scss/App.module.scss';
 
@@ -138,10 +137,7 @@ const App: React.FC = () => {
   } = panelState;
 
   // ===== 모바일 뒤로가기 버튼 처리 =====
-  useMobileBackButton({
-    isEditorOpen: selectedMemoId !== null,
-    onClose: () => setSelectedMemoId(null)
-  });
+  // MobileLayout 컴포넌트 내부에서 처리됨
 
   const dragState = useDragState();
   const {
