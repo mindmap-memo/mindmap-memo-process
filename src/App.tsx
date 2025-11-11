@@ -963,6 +963,8 @@ const App: React.FC = () => {
         onToggleImportanceFilter={toggleImportanceFilter}
         showGeneralContent={appState.showGeneralContent}
         onToggleGeneralContent={() => appState.setShowGeneralContent(!appState.showGeneralContent)}
+        alwaysShowContent={appState.alwaysShowContent}
+        onToggleAlwaysShowContent={() => appState.setAlwaysShowContent(!appState.alwaysShowContent)}
         canUndo={canUndo}
         canRedo={canRedo}
         onUndo={undoCanvasAction}

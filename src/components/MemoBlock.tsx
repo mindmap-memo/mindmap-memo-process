@@ -439,13 +439,13 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
 
         {/* 내용은 hover, selected, 또는 alwaysShowContent일 때 표시 */}
         {(isHovering || isSelected || alwaysShowContent) && (() => {
-          // memoRef.current.offsetWidth는 이미 scale이 적용된 화면 크기
-          // 내용 영역도 메모 블록의 자식이므로 같은 scale을 받음
-          // 따라서 scale 변환 없이 그대로 사용
+          // actualWidth는 scale이 적용된 화면 크기
+          // 최소 너비도 scale을 고려해야 함
           const actualWidth = memoRef.current?.offsetWidth || 0;
+          const minWidth = 150 / (canvasScale || 1); // 최소 너비를 scale로 나눔
           const memoWidth = actualWidth - 24; // padding 제외
-          const contentWidth = memoWidth < 150 ? 150 : memoWidth; // 150px보다 작으면 150px, 크면 메모 블록 너비 사용
-          console.log(`[Content Width] ${memo.title?.slice(0,20) || memo.id.slice(0,8)} | actualWidth: ${actualWidth}px | memoWidth: ${memoWidth}px | contentWidth: ${contentWidth}px | scale: ${canvasScale}`);
+          const contentWidth = memoWidth < minWidth ? minWidth : memoWidth;
+          console.log(`[Content Width] ${memo.title?.slice(0,20) || memo.id.slice(0,8)} | actualWidth: ${actualWidth}px | minWidth: ${minWidth}px | memoWidth: ${memoWidth}px | contentWidth: ${contentWidth}px | scale: ${canvasScale}`);
 
           return (
           <div
