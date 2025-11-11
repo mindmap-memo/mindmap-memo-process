@@ -43,7 +43,7 @@ interface UseCanvasHandlersParams {
   onCategoryDragStart?: () => void;
   onCategoryDragEnd?: () => void;
   onMoveToCategory: (itemId: string, categoryId: string | null) => void;
-  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }) => void;
+  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }, isShiftMode?: boolean) => void;
   onUpdateDragLine: (mousePos: { x: number; y: number }) => void;
   onDeselectAll?: () => void;
 
@@ -178,8 +178,18 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
   const handleCanvasMouseDown = React.useCallback((e: React.MouseEvent) => {
     const target = e.target as Element;
 
+    // 카테고리 영역인지 확인
+    const isCategoryArea = target.hasAttribute('data-category-area');
+
+    // 카테고리 영역을 드래그할 때는 팬을 시작하지 않음
+    if (isCategoryArea) {
+      // 카테고리 영역 자체 드래그 핸들러가 처리하므로 여기서는 아무것도 하지 않음
+      return;
+    }
+
     // 스페이스바가 눌린 상태에서는 항상 팬 모드 (메모 블록 위에서도)
-    if (isSpacePressed && !isConnecting) {
+    // 연결 모드에서도 패닝 허용
+    if (isSpacePressed) {
       setIsPanning(true);
       setPanStart({
         x: e.clientX,
@@ -192,9 +202,6 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
       return;
     }
 
-    // 카테고리 영역인지 확인
-    const isCategoryArea = target.hasAttribute('data-category-area');
-
     // 캔버스 배경 영역에서만 팬 도구 활성화
     const isCanvasBackground = target.hasAttribute('data-canvas') ||
                               target.tagName === 'svg' ||
@@ -202,10 +209,10 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
                               (target.tagName === 'DIV' &&
                                !target.closest('[data-memo-block="true"]') &&
                                !target.closest('[data-category-block="true"]') &&
-                               !target.closest('button') &&
-                               !isCategoryArea);
+                               !target.closest('button'));
 
-    if (isCanvasBackground && !isConnecting) {
+    if (isCanvasBackground) {
+      // 팬 모드는 연결 모드에서도 허용
       if (currentTool === 'pan') {
         setIsPanning(true);
         setPanStart({
@@ -219,14 +226,14 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
         return;
       }
 
-      // 선택 도구일 때 빈 공간 클릭 시 선택 해제
-      if (currentTool === 'select' && onDeselectAll) {
+      // 선택 도구일 때 빈 공간 클릭 시 선택 해제 (연결 모드가 아닐 때만)
+      if (currentTool === 'select' && !isConnecting && onDeselectAll) {
         onDeselectAll();
       }
     }
 
-    // 선택 도구이고 연결 모드가 아닐 때 전역 드래그 선택 시작 준비 (캔버스 배경 또는 카테고리 영역에서)
-    if (currentTool === 'select' && !isConnecting && !isPanning && (isCanvasBackground || isCategoryArea)) {
+    // 선택 도구이고 연결 모드가 아닐 때 전역 드래그 선택 시작 준비 (캔버스 배경에서만)
+    if (currentTool === 'select' && !isConnecting && !isPanning && isCanvasBackground) {
       setGlobalDragSelecting(true);
       setGlobalDragStart({ x: e.clientX, y: e.clientY });
       setGlobalDragWithShift(e.shiftKey);
@@ -283,8 +290,8 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
    */
   const handleMouseMove = React.useCallback((e: React.MouseEvent) => {
     if (isConnecting) {
+      // Canvas 영역에서의 마우스 이동 - rect 기준으로 변환
       const rect = e.currentTarget.getBoundingClientRect();
-      // 화면 좌표를 원본 좌표로 변환 (SVG가 동일한 transform을 사용하므로)
       const mouseX = (e.clientX - rect.left - canvasOffset.x) / canvasScale;
       const mouseY = (e.clientY - rect.top - canvasOffset.y) / canvasScale;
       onUpdateDragLine({ x: mouseX, y: mouseY });
@@ -307,18 +314,58 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
   const handleTouchStart = React.useCallback((e: React.TouchEvent) => {
     const target = e.target as Element;
 
-    // 메모 블록이나 카테고리 블록을 터치한 경우는 패닝하지 않음
-    const isMemoOrCategory = target.closest('[data-memo-block="true"]') ||
-                             target.closest('[data-category-block="true"]') ||
-                             target.closest('button');
+    // 카테고리 영역인지 확인
+    const isCategoryArea = target.hasAttribute('data-category-area');
 
-    if (isMemoOrCategory) {
+    // 연결점을 터치했는지 확인 (가장 먼저 체크해야 함!)
+    // data 속성으로 정확하게 감지
+    const isConnectionPoint = target.hasAttribute('data-connection-point') ||
+                             target.hasAttribute('data-connection-dot') ||
+                             target.closest('[data-connection-point]');
+
+    // 디버깅: 터치한 요소와 모든 data 속성 확인
+    const allDataAttrs: Record<string, string> = {};
+    Array.from(target.attributes).forEach(attr => {
+      if (attr.name.startsWith('data-')) {
+        allDataAttrs[attr.name] = attr.value;
+      }
+    });
+
+    console.log('🟡 [Canvas handleTouchStart]', {
+      isConnecting,
+      isConnectionPoint,
+      hasDataConnectionPoint: target.hasAttribute('data-connection-point'),
+      hasDataConnectionDot: target.hasAttribute('data-connection-dot'),
+      closestConnectionPoint: !!target.closest('[data-connection-point]'),
+      targetTagName: target.tagName,
+      targetClassName: target.className,
+      allDataAttrs,
+      parentElement: target.parentElement?.tagName,
+      parentClassName: target.parentElement?.className
+    });
+
+    // 연결 모드에서 연결점을 터치한 경우: 패닝하지 않고 MemoBlock의 핸들러가 처리하도록 함
+    if (isConnecting && isConnectionPoint) {
+      console.log('✅ [Canvas] 연결점 터치 감지 - MemoBlock 핸들러로 위임');
+      // 여기서 return하면 MemoBlock의 onTouchStart가 실행됨
       return;
     }
 
-    // 연결 모드가 아닐 때만 패닝 시작
-    if (!isConnecting && e.touches.length === 1) {
+    // 연결점이 아닌 메모 블록, 카테고리 블록을 터치한 경우는 패닝하지 않음
+    const isMemoOrCategory = (target.closest('[data-memo-block="true"]') && !isConnectionPoint) ||
+                             target.closest('[data-category-block="true"]') ||
+                             target.closest('button') ||
+                             isCategoryArea;
+
+    if (isMemoOrCategory) {
+      console.log('🔶 [Canvas] 메모/카테고리 터치 - 패닝 차단');
+      return;
+    }
+
+    // 캔버스 배경 터치 시 패닝 시작 (연결 모드에서도 허용, 단 연결점이 아닌 경우만)
+    if (e.touches.length === 1) {
       const touch = e.touches[0];
+      console.log('🟢 [Canvas] 패닝 시작');
       setIsPanning(true);
       setPanStart({
         x: touch.clientX,

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Page, QuickNavItem, ImportanceLevel } from '../types';
 import { DEFAULT_PAGES } from '../constants/defaultData';
 import { fetchPages, createPage, createMemo, createCategory } from '../utils/api';
@@ -48,6 +48,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
   useEffect(() => {
     // 인증되지 않았으면 로딩 완료 처리
     if (!isAuthenticated) {
+      console.log('[useAppState] 🔓 인증되지 않음 - 기본 데이터 사용');
       setPages(DEFAULT_PAGES);
       setCurrentPageId('1');
       setIsInitialLoadDone(true);
@@ -57,18 +58,24 @@ export const useAppState = (isAuthenticated: boolean = false) => {
 
     const loadInitialData = async () => {
       try {
+        console.log('[useAppState] 🚀 데이터 로딩 시작');
         setLoadingProgress(10);
 
         // 데이터 페칭 시작
+        console.log('[useAppState] 📡 서버에서 페이지 데이터 가져오는 중...');
         setLoadingProgress(30);
         const loadedPages = await fetchPages();
+        console.log('[useAppState] ✅ 페이지 데이터 로드 완료:', {
+          pageCount: loadedPages.length,
+          pages: loadedPages.map(p => ({ id: p.id, name: p.name, memoCount: p.memos?.length || 0, categoryCount: p.categories?.length || 0 }))
+        });
 
         setLoadingProgress(60);
 
         if (loadedPages.length > 0) {
           // 페이지가 있지만 메모/카테고리가 비어있는지 확인
           const needsInitialData = loadedPages.every(
-            p => p.memos.length === 0 && p.categories.length === 0
+            p => (!p.memos || p.memos.length === 0) && (!p.categories || p.categories.length === 0)
           );
 
           if (needsInitialData) {
@@ -78,12 +85,14 @@ export const useAppState = (isAuthenticated: boolean = false) => {
             const updatedPages: Page[] = [];
             for (let i = 0; i < loadedPages.length; i++) {
               const existingPage = loadedPages[i];
+              if (!existingPage) continue; // 안전성 체크
+
               const defaultPage = DEFAULT_PAGES[i] || DEFAULT_PAGES[0]; // 기본값 사용
 
               try {
                 // 메모 생성
                 const createdMemos = [];
-                for (const memo of defaultPage.memos) {
+                for (const memo of (defaultPage.memos || [])) {
                   try {
                     console.log(`📝 메모 생성 시도: ${memo.title}`, {
                       tags: memo.tags,
@@ -103,7 +112,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
 
                 // 카테고리 생성
                 const createdCategories = [];
-                for (const category of defaultPage.categories) {
+                for (const category of (defaultPage.categories || [])) {
                   try {
                     const createdCategory = await createCategory({
                       ...category,
@@ -120,19 +129,48 @@ export const useAppState = (isAuthenticated: boolean = false) => {
                   ...existingPage,
                   memos: createdMemos,
                   categories: createdCategories,
+                  quickNavItems: existingPage.quickNavItems || []
                 });
               } catch (error) {
                 console.error(`❌ 페이지 데이터 추가 실패: ${existingPage.name}`, error);
-                updatedPages.push(existingPage);
+                updatedPages.push({
+                  ...existingPage,
+                  memos: existingPage.memos || [],
+                  categories: existingPage.categories || [],
+                  quickNavItems: existingPage.quickNavItems || []
+                });
               }
             }
 
-            setPages(updatedPages);
-            setCurrentPageId(updatedPages[0].id);
+            // 안전성 체크: updatedPages가 비어있지 않은지 확인
+            if (updatedPages.length > 0 && updatedPages[0]) {
+              setPages(updatedPages);
+              setCurrentPageId(updatedPages[0].id);
+            } else {
+              // 페이지 생성 실패 시 DEFAULT_PAGES 사용
+              console.warn('페이지 업데이트 실패. 기본 페이지로 폴백합니다.');
+              setPages(DEFAULT_PAGES);
+              setCurrentPageId(DEFAULT_PAGES[0]?.id || '1');
+            }
           } else {
             // 이미 데이터가 있으면 그대로 사용
-            setPages(loadedPages);
-            setCurrentPageId(loadedPages[0].id);
+            console.log('[useAppState] 📦 기존 데이터 사용');
+            // 안전성 체크: memos와 categories가 배열인지 확인
+            const safePages = loadedPages.map(page => ({
+              ...page,
+              memos: Array.isArray(page.memos) ? page.memos : [],
+              categories: Array.isArray(page.categories) ? page.categories : [],
+              quickNavItems: Array.isArray(page.quickNavItems) ? page.quickNavItems : []
+            }));
+
+            console.log('[useAppState] ✅ 페이지 데이터 설정 완료:', {
+              pageCount: safePages.length,
+              firstPageId: safePages[0]?.id,
+              firstPageQuickNavItems: safePages[0]?.quickNavItems
+            });
+
+            setPages(safePages);
+            setCurrentPageId(safePages[0]?.id || '1');
           }
         } else {
           // 첫 로그인: 기본 페이지를 DB에 생성
@@ -141,6 +179,8 @@ export const useAppState = (isAuthenticated: boolean = false) => {
           // DEFAULT_PAGES를 DB에 생성
           const createdPages: Page[] = [];
           for (const page of DEFAULT_PAGES) {
+            if (!page) continue; // 안전성 체크
+
             try {
               // 1. 페이지 생성
               const newPage = await createPage(page.id, page.name);
@@ -148,7 +188,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
 
               // 2. 메모 생성
               const createdMemos = [];
-              for (const memo of page.memos) {
+              for (const memo of (page.memos || [])) {
                 try {
                   console.log(`📝 메모 생성 시도: ${memo.title}`, {
                     tags: memo.tags,
@@ -168,7 +208,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
 
               // 3. 카테고리 생성
               const createdCategories = [];
-              for (const category of page.categories) {
+              for (const category of (page.categories || [])) {
                 try {
                   const createdCategory = await createCategory({
                     ...category,
@@ -186,20 +226,21 @@ export const useAppState = (isAuthenticated: boolean = false) => {
                 ...newPage,
                 memos: createdMemos,
                 categories: createdCategories,
+                quickNavItems: newPage.quickNavItems || []
               });
             } catch (pageError) {
               console.error(`❌ 페이지 생성 실패: ${page.name}`, pageError);
             }
           }
 
-          if (createdPages.length > 0) {
+          if (createdPages.length > 0 && createdPages[0]) {
             setPages(createdPages);
             setCurrentPageId(createdPages[0].id);
           } else {
             // 페이지 생성 실패 시 로컬 DEFAULT_PAGES 사용
             console.warn('페이지 생성 실패. 로컬 페이지를 사용합니다.');
             setPages(DEFAULT_PAGES);
-            setCurrentPageId('1');
+            setCurrentPageId(DEFAULT_PAGES[0]?.id || '1');
           }
         }
 
@@ -209,12 +250,13 @@ export const useAppState = (isAuthenticated: boolean = false) => {
         await new Promise(resolve => setTimeout(resolve, 100));
 
       } catch (error) {
-        console.error('데이터베이스 연결 실패. 기본 페이지로 시작합니다:', error);
-        console.log('데이터베이스를 사용하려면 create-tables.sql을 실행하세요.');
+        console.error('[useAppState] ❌ 데이터베이스 연결 실패. 기본 페이지로 시작합니다:', error);
+        console.log('[useAppState] 💡 데이터베이스를 사용하려면 create-tables.sql을 실행하세요.');
         setPages(DEFAULT_PAGES);
         setCurrentPageId('1');
         setLoadingProgress(90);
       } finally {
+        console.log('[useAppState] 🏁 데이터 로딩 완료 - 진행률 100%');
         setLoadingProgress(100);
         // 100% 애니메이션을 보여주기 위한 짧은 대기
         setTimeout(() => {
@@ -236,14 +278,17 @@ export const useAppState = (isAuthenticated: boolean = false) => {
 
   // ===== 캔버스 뷰포트 상태 =====
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
-  const [canvasScale, setCanvasScale] = useState(1);
+  const [canvasScale, setCanvasScale] = useState(0.35);
 
   // ===== 단축 이동 (Quick Navigation) =====
   const [showQuickNavPanel, setShowQuickNavPanel] = useState(false);
 
   // 현재 페이지의 quickNavItems를 가져오기 (페이지별 저장)
   const quickNavItems = useMemo(() => {
-    const currentPage = pages.find(p => p.id === currentPageId);
+    if (!pages || pages.length === 0) {
+      return [];
+    }
+    const currentPage = pages?.find(p => p.id === currentPageId);
     return currentPage?.quickNavItems || [];
   }, [pages, currentPageId]);
 
@@ -252,6 +297,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
     new Set(['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'] as ImportanceLevel[])
   );
   const [showGeneralContent, setShowGeneralContent] = useState<boolean>(true);
+  const [alwaysShowContent, setAlwaysShowContent] = useState<boolean>(false);
 
   // ===== 드래그 선택 상태 =====
   const [isDragSelecting, setIsDragSelecting] = useState<boolean>(false);
@@ -269,12 +315,14 @@ export const useAppState = (isAuthenticated: boolean = false) => {
   const [dragLineEnd, setDragLineEnd] = useState<{ x: number; y: number } | null>(null);
 
   // ===== Shift 키 상태 =====
-  const [isShiftPressed, setIsShiftPressed] = useState<boolean>(false);
+  const [isShiftPressed, setIsShiftPressedState] = useState<boolean>(false);
   const isShiftPressedRef = useRef<boolean>(false);
 
-  // Shift 키 상태가 변경될 때마다 ref 업데이트
-  useEffect(() => {
-    isShiftPressedRef.current = isShiftPressed;
+  // Shift 키 상태 업데이트 함수 (state와 ref를 동시에 업데이트)
+  const setIsShiftPressed = useCallback((value: React.SetStateAction<boolean>) => {
+    const newValue = typeof value === 'function' ? value(isShiftPressed) : value;
+    setIsShiftPressedState(newValue);
+    isShiftPressedRef.current = newValue; // 즉시 ref 업데이트
   }, [isShiftPressed]);
 
   // ===== 드래그 상태 =====
@@ -320,6 +368,8 @@ export const useAppState = (isAuthenticated: boolean = false) => {
     setActiveImportanceFilters,
     showGeneralContent,
     setShowGeneralContent,
+    alwaysShowContent,
+    setAlwaysShowContent,
 
     // 드래그 선택
     isDragSelecting,

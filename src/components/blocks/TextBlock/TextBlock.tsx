@@ -7,6 +7,7 @@ import { useImportanceHandling } from './hooks/useImportanceHandling';
 import { useTextBlockInput } from './hooks/useTextBlockInput';
 import { useTextBlockRendering } from './hooks/useTextBlockRendering';
 import { useTextBlockEffects } from './hooks/useTextBlockEffects';
+import { MobileSelectionMenu } from './MobileSelectionMenu';
 
 const IMPORTANCE_LABELS = {
   critical: '🔴 매우중요',
@@ -33,6 +34,7 @@ interface TextBlockProps {
   activeImportanceFilters?: Set<ImportanceLevel>;
   showGeneralContent?: boolean;
   onResetFilters?: () => void;
+  isMobile?: boolean;
 }
 
 const TextBlockComponent: React.FC<TextBlockProps> = ({
@@ -48,8 +50,16 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   onSaveToHistory,
   activeImportanceFilters,
   showGeneralContent,
-  onResetFilters
+  onResetFilters,
+  isMobile = false
 }) => {
+  // 모바일 감지
+  const [isMobileDevice] = React.useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 768;
+    }
+    return false;
+  });
   // 상태 관리 훅
   const {
     content,
@@ -82,7 +92,15 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
   );
 
   // 중요도 처리 훅
-  const { handleTextSelection, applyImportance } = useImportanceHandling({
+  const {
+    handleTextSelection,
+    handleDoubleClick,
+    applyImportance,
+    handleMobileCopy,
+    handleMobilePaste,
+    handleMobileCut,
+    handleMobileDelete
+  } = useImportanceHandling({
     block,
     content,
     importanceRanges,
@@ -96,7 +114,9 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
     setSelectedRange,
     selectedRange,
     onUpdate,
-    onSaveToHistory
+    onSaveToHistory,
+    isMobile: isMobile || isMobileDevice,
+    setContent
   });
 
   // 입력 핸들러 훅
@@ -201,6 +221,7 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             onClick={handleClick}
+            onDoubleClick={(e) => handleDoubleClick(e)}
             onMouseDown={(e) => {
               // 새로운 드래그 시작 시 기존 메뉴 닫기
               if (showImportanceMenu) {
@@ -243,57 +264,75 @@ const TextBlockComponent: React.FC<TextBlockProps> = ({
           />
         </div>
 
-        {/* 중요도 메뉴 - Portal을 사용하여 document.body에 렌더링 */}
-        {showImportanceMenu && ReactDOM.createPortal(
-          <div
-            ref={menuRef}
-            data-importance-menu
-            onMouseDown={(e) => e.preventDefault()} // 선택 해제 방지
-            style={{
-              position: 'fixed',
-              left: `${importanceMenuPosition.x}px`,
-              top: `${importanceMenuPosition.y}px`,
-              backgroundColor: '#ffffff',
-              border: '1px solid #e0e0e0',
-              borderRadius: '8px',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-              zIndex: 10000,
-              padding: '4px',
-              minWidth: '140px',
-              maxWidth: '200px'
-            }}
-          >
-            {Object.entries(IMPORTANCE_LABELS).map(([level, label]) => (
-              <button
-                key={level}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  applyImportance(level as ImportanceLevel);
-                }}
+        {/* Selection 메뉴 - PC/모바일 분기 */}
+        {showImportanceMenu && (
+          (isMobile || isMobileDevice) ? (
+            <MobileSelectionMenu
+              position={importanceMenuPosition}
+              onCopy={handleMobileCopy}
+              onPaste={handleMobilePaste}
+              onCut={handleMobileCut}
+              onDelete={handleMobileDelete}
+              onApplyImportance={applyImportance}
+              onClose={() => {
+                setShowImportanceMenu(false);
+                setSelectedRange(null);
+              }}
+              menuRef={menuRef}
+            />
+          ) : (
+            ReactDOM.createPortal(
+              <div
+                ref={menuRef}
+                data-importance-menu
+                onMouseDown={(e) => e.preventDefault()} // 선택 해제 방지
                 style={{
-                  display: 'block',
-                  width: '100%',
-                  padding: '6px 8px',
-                  border: 'none',
-                  backgroundColor: 'transparent',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  fontFamily: 'inherit'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f5f5f5';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
+                  position: 'fixed',
+                  left: `${importanceMenuPosition.x}px`,
+                  top: `${importanceMenuPosition.y}px`,
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                  zIndex: 10000,
+                  padding: '4px',
+                  minWidth: '140px',
+                  maxWidth: '200px'
                 }}
               >
-                {label}
-              </button>
-            ))}
-          </div>,
-          document.body
+                {Object.entries(IMPORTANCE_LABELS).map(([level, label]) => (
+                  <button
+                    key={level}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      applyImportance(level as ImportanceLevel);
+                    }}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      padding: '6px 8px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      fontFamily: 'inherit'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>,
+              document.body
+            )
+          )
         )}
       </>
     );

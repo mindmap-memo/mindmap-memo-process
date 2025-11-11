@@ -108,7 +108,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
             <path d="M8 2L9.5 5.5L13 6L10.5 8.5L11 12L8 10L5 12L5.5 8.5L3 6L6.5 5.5L8 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          <span>단축 이동 설정</span>
+          <span>즐겨찾기 설정</span>
         </button>
 
         <div style={{ height: '1px', backgroundColor: '#e5e7eb', margin: '0' }} />

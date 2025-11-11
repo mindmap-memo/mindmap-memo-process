@@ -1,8 +1,11 @@
 import React from 'react';
 import { Page, CategoryBlock, MemoBlock as MemoBlockType, MemoDisplaySize } from '../../../types';
 import MemoBlock from '../../MemoBlock';
-import { createCategoryAreaDragHandler, createCategoryAreaTouchHandler } from '../utils/categoryAreaDragHandlers';
+import { createCategoryAreaDragHandler } from '../utils/categoryAreaDragHandlers';
 import { useCategoryAreaColors } from './useCategoryAreaColors';
+import { useCategoryLabelDrag } from './useCategoryLabelDrag';
+import { detectDoubleTap } from '../../../utils/doubleTapUtils';
+import { Edit2, Star, Trash2 } from 'lucide-react';
 
 /**
  * useCategoryAreaRendering
@@ -74,18 +77,21 @@ interface UseCategoryAreaRenderingParams {
   // 필터 관련
   activeImportanceFilters: Set<any>;
   showGeneralContent: boolean;
+  alwaysShowContent?: boolean;
 
   // 핸들러들
   onConnectMemos: (fromId: string, toId: string) => void;
   onCategorySelect: (categoryId: string, isShiftClick?: boolean) => void;
   onMemoSelect: (memoId: string, isShiftClick?: boolean) => void;
   onStartConnection?: (id: string, direction?: 'top' | 'bottom' | 'left' | 'right') => void;
+  onUpdateDragLine?: (mousePos: { x: number; y: number }) => void;
+  onCancelConnection?: () => void;
   onCategoryPositionChange: (categoryId: string, position: { x: number; y: number }) => void;
   onCategoryLabelPositionChange: (categoryId: string, position: { x: number; y: number }) => void;
   onCategoryToggleExpanded: (categoryId: string) => void;
   onCategoryPositionDragEnd?: (categoryId: string, finalPosition: { x: number; y: number }) => void;
   onShiftDropCategory?: (category: CategoryBlock, position: { x: number; y: number }) => void;
-  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }) => void;
+  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }, isShiftMode?: boolean) => void;
   onMemoPositionChange: (memoId: string, position: { x: number; y: number }) => void;
   onMemoSizeChange: (memoId: string, size: { width: number; height: number }) => void;
   onMemoDisplaySizeChange?: (memoId: string, displaySize: MemoDisplaySize) => void;
@@ -96,8 +102,10 @@ interface UseCategoryAreaRenderingParams {
   onMemoDragEnd?: () => void;
   onDeleteMemoById?: (id: string) => void;
   onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
+  onDeleteQuickNav?: (targetId: string, targetType: 'memo' | 'category') => void;
   isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
   onCategoryUpdate: (category: CategoryBlock) => void;
+  onDeleteCategory: (categoryId: string) => void;
   onOpenEditor?: () => void;
 
   // 상태 Setters
@@ -124,9 +132,22 @@ interface UseCategoryAreaRenderingParams {
 
   // 영역 계산 함수
   calculateArea: (category: CategoryBlock) => any;
+
+  // 롱프레스 상태
+  isLongPressActive?: boolean;  // 롱프레스 활성화 상태
+  longPressTargetId?: string | null;  // 롱프레스 대상 ID
+  setIsLongPressActive?: (active: boolean, targetId?: string | null) => void;
+  setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수
+  isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref 추가
 }
 
 export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams) => {
+  // 롱프레스 활성화 상태 추적
+  const [longPressActiveCategoryId, setLongPressActiveCategoryId] = React.useState<string | null>(null);
+
+  // 연결점 드래그 상태 추적
+  const [isConnectionDragging, setIsConnectionDragging] = React.useState<string | null>(null);
+
   const {
     currentPage,
     areaUpdateTrigger,
@@ -153,10 +174,13 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
     dragHoveredMemoIds,
     activeImportanceFilters,
     showGeneralContent,
+    alwaysShowContent,
     onConnectMemos,
     onCategorySelect,
     onMemoSelect,
     onStartConnection,
+    onUpdateDragLine,
+    onCancelConnection,
     onCategoryPositionChange,
     onCategoryLabelPositionChange,
     onCategoryToggleExpanded,
@@ -173,9 +197,16 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
     onMemoDragEnd,
     onDeleteMemoById,
     onAddQuickNav,
+    onDeleteQuickNav,
     isQuickNavExists,
     onCategoryUpdate,
+    onDeleteCategory,
     onOpenEditor,
+    isLongPressActive,  // 롱프레스 활성화 상태
+    longPressTargetId,  // 롱프레스 대상 ID
+    setIsLongPressActive,
+    setIsShiftPressed,  // Shift 상태 업데이트 함수
+    isShiftPressedRef,  // Shift ref 추가
     setIsDraggingCategoryArea,
     setShiftDragInfo,
     setDraggedCategoryAreas,
@@ -190,11 +221,163 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
     calculateArea
   } = params;
 
+  // Refs for stable callbacks
+  const isConnectingRef = React.useRef(isConnecting);
+  const connectingFromIdRef = React.useRef(connectingFromId);
+  const onConnectMemosRef = React.useRef(onConnectMemos);
+  const onCancelConnectionRef = React.useRef(onCancelConnection);
+  const canvasOffsetRef = React.useRef(canvasOffset);
+  const canvasScaleRef = React.useRef(canvasScale);
+
+  React.useEffect(() => {
+    isConnectingRef.current = isConnecting;
+    connectingFromIdRef.current = connectingFromId;
+    onConnectMemosRef.current = onConnectMemos;
+    onCancelConnectionRef.current = onCancelConnection;
+    canvasOffsetRef.current = canvasOffset;
+    canvasScaleRef.current = canvasScale;
+  }, [isConnecting, connectingFromId, onConnectMemos, onCancelConnection, canvasOffset, canvasScale]);
+
+  // 연결점 드래그 중일 때 document-level 이벤트 리스너 등록
+  React.useEffect(() => {
+    if (isConnectionDragging && onUpdateDragLine) {
+      const handleMouseMove = (e: MouseEvent) => {
+        const canvasElement = document.querySelector('[data-canvas-container]') as HTMLElement;
+        if (canvasElement) {
+          const rect = canvasElement.getBoundingClientRect();
+          const offset = canvasOffsetRef.current || { x: 0, y: 0 };
+          const scale = canvasScaleRef.current;
+          const mouseX = (e.clientX - rect.left - offset.x) / scale;
+          const mouseY = (e.clientY - rect.top - offset.y) / scale;
+          onUpdateDragLine({ x: mouseX, y: mouseY });
+        }
+      };
+
+      const handleTouchMove = (e: TouchEvent) => {
+        if (!e.touches || e.touches.length === 0) return;
+
+        const canvasElement = document.querySelector('[data-canvas-container]') as HTMLElement;
+        if (canvasElement) {
+          const rect = canvasElement.getBoundingClientRect();
+          const offset = canvasOffsetRef.current || { x: 0, y: 0 };
+          const scale = canvasScaleRef.current;
+          const mouseX = (e.touches[0].clientX - rect.left - offset.x) / scale;
+          const mouseY = (e.touches[0].clientY - rect.top - offset.y) / scale;
+          onUpdateDragLine({ x: mouseX, y: mouseY });
+        }
+      };
+
+      const handleMouseUp = (e: MouseEvent) => {
+        const element = document.elementFromPoint(e.clientX, e.clientY);
+        const categoryElement = element?.closest('[data-category-id]');
+        const memoElement = element?.closest('[data-memo-id]');
+
+        const currentIsConnecting = isConnectingRef.current;
+        const currentConnectingFromId = connectingFromIdRef.current;
+        const currentOnConnectMemos = onConnectMemosRef.current;
+        const currentOnCancelConnection = onCancelConnectionRef.current;
+
+        if ((categoryElement || memoElement) && currentIsConnecting && currentConnectingFromId) {
+          const targetId = categoryElement?.getAttribute('data-category-id') || memoElement?.getAttribute('data-memo-id');
+
+          if (targetId && targetId !== currentConnectingFromId) {
+            currentOnConnectMemos?.(currentConnectingFromId, targetId);
+          } else {
+            currentOnCancelConnection?.();
+          }
+        } else {
+          currentOnCancelConnection?.();
+        }
+        setIsConnectionDragging(null);
+      };
+
+      const handleTouchEnd = (e: TouchEvent) => {
+        console.log('🟣 [카테고리 Document-level handleTouchEnd 시작]', {
+          changedTouchesLength: e.changedTouches.length
+        });
+
+        if (e.changedTouches.length > 0) {
+          const touch = e.changedTouches[0];
+          const element = document.elementFromPoint(touch.clientX, touch.clientY);
+          const categoryElement = element?.closest('[data-category-id]');
+          const memoElement = element?.closest('[data-memo-id]');
+
+          console.log('🟣 [카테고리 터치엔드 대상 확인]', {
+            elementTag: element?.tagName,
+            hasCategoryElement: !!categoryElement,
+            hasMemoElement: !!memoElement,
+            categoryId: categoryElement?.getAttribute('data-category-id'),
+            memoId: memoElement?.getAttribute('data-memo-id')
+          });
+
+          const currentIsConnecting = isConnectingRef.current;
+          const currentConnectingFromId = connectingFromIdRef.current;
+          const currentOnConnectMemos = onConnectMemosRef.current;
+          const currentOnCancelConnection = onCancelConnectionRef.current;
+
+          console.log('🟣 [카테고리 Ref 값 확인]', {
+            currentIsConnecting,
+            currentConnectingFromId,
+            hasOnConnectMemos: !!currentOnConnectMemos,
+            hasOnCancelConnection: !!currentOnCancelConnection
+          });
+
+          if ((categoryElement || memoElement) && currentIsConnecting && currentConnectingFromId) {
+            const targetId = categoryElement?.getAttribute('data-category-id') || memoElement?.getAttribute('data-memo-id');
+
+            console.log('🟣 [카테고리 대상 요소 발견]', { targetId, fromId: currentConnectingFromId });
+
+            if (targetId && targetId !== currentConnectingFromId) {
+              console.log('✅ [카테고리 연결 생성]', { fromId: currentConnectingFromId, toId: targetId });
+              currentOnConnectMemos?.(currentConnectingFromId, targetId);
+            } else {
+              console.log('❌ [카테고리 연결 취소] 같은 요소이거나 유효하지 않음');
+              currentOnCancelConnection?.();
+            }
+          } else {
+            console.log('❌ [카테고리 연결 취소] 대상 요소 없음 또는 연결 상태 아님', {
+              hasElement: !!(categoryElement || memoElement),
+              isConnecting: currentIsConnecting,
+              connectingFromId: currentConnectingFromId
+            });
+            currentOnCancelConnection?.();
+          }
+        }
+        setIsConnectionDragging(null);
+      };
+
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('touchmove', handleTouchMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('touchend', handleTouchEnd);
+
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('touchend', handleTouchEnd);
+      };
+    }
+  }, [isConnectionDragging, onUpdateDragLine]);
+
   // 카테고리 영역 색상 훅 사용
   const { calculateCategoryAreaWithColor } = useCategoryAreaColors({
     currentPage,
     areaUpdateTrigger,
     recentlyDraggedCategoryRef
+  });
+
+  // 카테고리 라벨 드래그 훅 사용
+  const { createMouseDragHandler, createTouchDragHandler } = useCategoryLabelDrag({
+    canvasScale,
+    canvasOffset,
+    onCategorySelect,
+    onCategoryLabelPositionChange,
+    onDetectCategoryDropForCategory,
+    onLongPressActivate: (categoryId) => setLongPressActiveCategoryId(categoryId),
+    onLongPressDeactivate: () => setLongPressActiveCategoryId(null),
+    setIsShiftPressed,
+    isShiftPressedRef
   });
 
   /**
@@ -253,9 +436,21 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
         }
       }
 
+      // Shift+드래그 중인지 확인
+      // - 영역 드래그: isCurrentCategoryDragging && isShiftPressed
+      // - 블록 드래그: isCurrentCategoryBlockDragging && isShiftPressed
+      // - 롱프레스: 이 카테고리가 롱프레스 대상인지 확인 (드래그 없이도 UI 변경)
+      const isThisCategoryLongPressed = isLongPressActive && longPressTargetId === category.id;
+
       // 타겟 영역 확인 (추가 UI)
-      // 조건: 마우스가 올라간 영역이면서, 현재 부모가 아님
+      // 조건: 드래그 중 + 마우스가 올라간 영역이면서, 현재 부모가 아님
+      // ⚠️ 롱프레스는 여기 포함하지 않음 (롱프레스는 자기 자신이므로 "추가" UI를 보여주면 안 됨)
       const isShiftDragTarget = isShiftPressed && dragTargetCategoryId === category.id && (isDraggingMemo || isDraggingCategory || isDraggingCategoryArea) && !isCurrentParent;
+
+      // 롱프레스 또는 Shift 드래그 타겟 (초록색 테두리용)
+      // - 롱프레스: 자기 자신 (드래그 없이도 초록색 표시)
+      // - Shift 드래그 타겟: 다른 요소를 드래그해서 이 영역 위로 가져온 경우
+      const isShiftModeActive = isShiftDragTarget || isThisCategoryLongPressed;
 
       // 드래그 선택 중 하이라이트
       const isDragHovered = dragHoveredCategoryIds?.includes(category.id) || false;
@@ -263,7 +458,14 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
       // 드래그 중인 카테고리는 transform을 사용하여 GPU 가속 활용
       // 일반 드래그 또는 Shift+드래그 시 GPU 가속 적용
       const isDragging = draggedCategoryAreas[category.id] !== undefined;
-      const isShiftDragging = isShiftPressed && isDraggingCategoryArea === category.id && shiftDragInfo !== null;
+      // 현재 카테고리가 드래그 중인지 확인
+      const isCurrentCategoryDragging = isDraggingCategoryArea === category.id;
+      // 현재 카테고리가 블록으로 드래그 중인지 확인 (CategoryBlock 컴포넌트)
+      const isCurrentCategoryBlockDragging = isDraggingCategory && draggingCategoryId === category.id;
+
+      const isShiftDragging = isThisCategoryLongPressed ||
+                             (isCurrentCategoryDragging && (isShiftPressed || isThisCategoryLongPressed)) ||
+                             (isCurrentCategoryBlockDragging && (isShiftPressed || isThisCategoryLongPressed));
       const isAnyDragging = isDragging || isShiftDragging;
 
       const basePosition = isDragging && draggedCategoryAreas[category.id]
@@ -280,9 +482,13 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
           }
         : { x: 0, y: 0 };
 
+      const calculatedBgColor = isParentBeingLeftBehind
+        ? 'rgba(239, 68, 68, 0.2)'
+        : (isShiftModeActive ? 'rgba(16, 185, 129, 0.2)' : (isDragHovered ? 'rgba(59, 130, 246, 0.3)' : area.color));
+
       areas.push(
         <div
-          key={`area-${category.id}`}
+          key={`area-${category.id}-${isShiftModeActive ? 'shift' : 'normal'}`}
           data-category-area="true"
           data-category-id={category.id}
           draggable={false}
@@ -292,19 +498,19 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             top: `${basePosition.top}px`,
             width: `${area.width}px`,
             height: `${area.height}px`,
-            backgroundColor: isParentBeingLeftBehind
-              ? 'rgba(239, 68, 68, 0.2)'  // 빨간색 (하위 요소 빼기)
-              : (isShiftDragTarget ? 'rgba(16, 185, 129, 0.2)' : (isDragHovered ? 'rgba(59, 130, 246, 0.3)' : area.color)),  // 드래그 선택: 파란색
-            border: isParentBeingLeftBehind
-              ? '3px solid rgba(239, 68, 68, 0.6)'
-              : (isShiftDragTarget ? '3px solid rgba(16, 185, 129, 0.6)' : (isDragHovered ? '3px solid rgba(59, 130, 246, 0.6)' : '2px dashed rgba(139, 92, 246, 0.3)')),
+            backgroundColor: calculatedBgColor,
+            border: longPressActiveCategoryId === category.id
+              ? '3px solid rgba(16, 185, 129, 0.8)'
+              : (isParentBeingLeftBehind
+                ? '3px solid rgba(239, 68, 68, 0.6)'
+                : (isShiftModeActive ? '3px solid rgba(16, 185, 129, 0.6)' : (isDragHovered ? '3px solid rgba(59, 130, 246, 0.6)' : '2px dashed rgba(139, 92, 246, 0.3)'))),
             borderRadius: '12px',
             pointerEvents: 'auto',
             cursor: 'move',
             zIndex: -1,
             transform: isDragging
-              ? `translate(${deltaTransform.x}px, ${deltaTransform.y}px) ${(isShiftDragTarget || isParentBeingLeftBehind || isDragHovered) ? 'scale(1.02)' : 'scale(1)'}`
-              : (isShiftDragTarget || isParentBeingLeftBehind || isDragHovered) ? 'scale(1.02)' : 'scale(1)',
+              ? `translate(${deltaTransform.x}px, ${deltaTransform.y}px) ${(isShiftModeActive || isParentBeingLeftBehind || isDragHovered) ? 'scale(1.02)' : 'scale(1)'}`
+              : (isShiftModeActive || isParentBeingLeftBehind || isDragHovered) ? 'scale(1.02)' : 'scale(1)',
             transition: isAnyDragging ? 'none' : 'background-color 0.2s ease, border 0.2s ease',
             willChange: 'transform',
             display: 'flex',
@@ -336,25 +542,189 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             onCategoryPositionDragEnd,
             onDetectCategoryDropForCategory
           })}
-          onTouchStart={createCategoryAreaTouchHandler({
-            category,
-            isConnecting,
-            isShiftPressed,
-            canvasScale,
-            canvasOffset,
-            currentPage,
-            area,
-            draggedCategoryAreas,
-            shiftDragAreaCache,
-            calculateCategoryAreaWithColor,
-            onCategorySelect,
-            setIsDraggingCategoryArea,
-            setShiftDragInfo,
-            setDraggedCategoryAreas,
-            onCategoryPositionChange,
-            onCategoryPositionDragEnd,
-            onDetectCategoryDropForCategory
-          })}
+          onTouchStart={(e) => {
+            if (isConnecting || e.touches.length !== 1) return;
+
+            e.stopPropagation();
+
+            const touch = e.touches[0];
+            const startX = touch.clientX;
+            const startY = touch.clientY;
+            const originalPosition = { x: category.position.x, y: category.position.y };
+            let hasMoved = false;
+            let isDragging = false;
+            let longPressTimer: NodeJS.Timeout | null = null;
+            let isLongPressActive = false;
+
+            // 롱프레스 타이머 시작 (0.5초)
+            longPressTimer = setTimeout(() => {
+              isLongPressActive = true;
+              // 롱프레스 감지 시 즉시 UI 업데이트
+              setLongPressActiveCategoryId(category.id);
+              console.log('[CategoryArea] 롱프레스 감지! Shift+드래그 모드 활성화', category.id);
+
+              // Shift 상태도 함께 업데이트 (충돌 판정 예외 처리를 위해 필수!)
+              // ⚠️ 중요: ref를 직접 업데이트하여 즉시 반영 (state는 비동기)
+              if (isShiftPressedRef) {
+                isShiftPressedRef.current = true;
+                console.log('[CategoryArea] isShiftPressedRef.current = true 직접 설정');
+              }
+              setIsShiftPressed?.(true);
+              console.log('[CategoryArea] setIsShiftPressed(true) 호출 완료');
+            }, 500);
+
+            const handleTouchMove = (moveEvent: TouchEvent) => {
+              if (moveEvent.touches.length !== 1) return;
+
+              const touch = moveEvent.touches[0];
+              const distance = Math.sqrt(
+                Math.pow(touch.clientX - startX, 2) +
+                Math.pow(touch.clientY - startY, 2)
+              );
+
+              // 타이머 취소 (이동이 시작되면 롱프레스 취소)
+              if (longPressTimer && distance >= 5) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+              }
+
+              // 롱프레스가 활성화되었거나 임계값을 넘으면 드래그 시작
+              if (!isDragging && (isLongPressActive || distance >= 5)) {
+                isDragging = true;
+                onCategorySelect(category.id);
+                setIsDraggingCategoryArea(category.id);
+
+                // Shift 모드일 때만 캐시 설정 (롱프레스 또는 Shift 키)
+                const effectiveShiftMode = isShiftPressed || isLongPressActive;
+                if (effectiveShiftMode) {
+                  if (currentPage && Object.keys(shiftDragAreaCache.current).length === 0) {
+                    currentPage.categories?.forEach(cat => {
+                      if (cat.isExpanded) {
+                        const catArea = calculateCategoryAreaWithColor(cat, new Set(), category.id);
+                        if (catArea) {
+                          shiftDragAreaCache.current[cat.id] = catArea;
+                        }
+                      }
+                    });
+                  }
+                } else {
+                  if (!draggedCategoryAreas[category.id]) {
+                    const currentArea = area || calculateCategoryAreaWithColor(category);
+                    if (currentArea) {
+                      setDraggedCategoryAreas(prev => ({
+                        ...prev,
+                        [category.id]: {
+                          area: currentArea,
+                          originalPosition: { x: category.position.x, y: category.position.y }
+                        }
+                      }));
+                    }
+                  }
+                }
+              }
+
+              if (isDragging) {
+                if (!hasMoved) {
+                  hasMoved = true;
+                }
+
+                const deltaX = (touch.clientX - startX) / canvasScale;
+                const deltaY = (touch.clientY - startY) / canvasScale;
+
+                const newPosition = {
+                  x: originalPosition.x + deltaX,
+                  y: originalPosition.y + deltaY
+                };
+
+                onCategoryPositionChange(category.id, newPosition);
+
+                // Shift 모드 또는 롱프레스 상태 확인
+                const effectiveShiftMode = isShiftPressed || isLongPressActive;
+                if (effectiveShiftMode) {
+                  setShiftDragInfo({
+                    categoryId: category.id,
+                    offset: { x: deltaX, y: deltaY }
+                  });
+                }
+
+                moveEvent.preventDefault();
+              }
+            };
+
+            const handleTouchEnd = (upEvent: TouchEvent) => {
+              // 타이머 취소
+              if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+              }
+
+              // 롱프레스가 활성화되어 있었는지 확인
+              const wasLongPressActive = isLongPressActive;
+
+              // 실제 Shift 키 또는 롱프레스로 인한 가상 Shift 모드
+              const effectiveShiftMode = isShiftPressed || wasLongPressActive;
+
+              // 롱프레스 상태 초기화
+              setLongPressActiveCategoryId(null);
+
+              // 롱프레스가 활성화되어 있었다면 Shift도 리셋
+              if (wasLongPressActive) {
+                console.log('[CategoryArea] 롱프레스 종료 - Shift 리셋');
+                // ref도 직접 리셋
+                if (isShiftPressedRef) {
+                  isShiftPressedRef.current = false;
+                  console.log('[CategoryArea] isShiftPressedRef.current = false 직접 설정');
+                }
+                setIsShiftPressed?.(false);
+              }
+
+              if (isDragging && upEvent.changedTouches && upEvent.changedTouches.length > 0) {
+                const touch = upEvent.changedTouches[0];
+                const deltaX = (touch.clientX - startX) / canvasScale;
+                const deltaY = (touch.clientY - startY) / canvasScale;
+
+                const finalPosition = {
+                  x: originalPosition.x + deltaX,
+                  y: originalPosition.y + deltaY
+                };
+
+                const canvasElement = document.getElementById('main-canvas');
+                if (canvasElement && canvasOffset) {
+                  const rect = canvasElement.getBoundingClientRect();
+                  const mouseX = (touch.clientX - rect.left - canvasOffset.x) / canvasScale;
+                  const mouseY = (touch.clientY - rect.top - canvasOffset.y) / canvasScale;
+
+                  onCategoryPositionDragEnd?.(category.id, finalPosition);
+
+                  // effectiveShiftMode 사용 (롱프레스 또는 Shift 키)
+                  if (effectiveShiftMode) {
+                    onDetectCategoryDropForCategory?.(category.id, { x: mouseX, y: mouseY }, true);
+                  }
+                } else {
+                  onCategoryPositionDragEnd?.(category.id, finalPosition);
+
+                  // effectiveShiftMode 사용 (롱프레스 또는 Shift 키)
+                  if (effectiveShiftMode) {
+                    onDetectCategoryDropForCategory?.(category.id, finalPosition, true);
+                  }
+                }
+              } else if (!hasMoved) {
+                onCategorySelect(category.id);
+              }
+
+              // 상태 초기화
+              setIsDraggingCategoryArea(null);
+              setShiftDragInfo(null);
+
+              document.removeEventListener('touchmove', handleTouchMove);
+              document.removeEventListener('touchend', handleTouchEnd);
+              document.removeEventListener('touchcancel', handleTouchEnd);
+            };
+
+            document.addEventListener('touchmove', handleTouchMove, { passive: false });
+            document.addEventListener('touchend', handleTouchEnd);
+            document.addEventListener('touchcancel', handleTouchEnd);
+          }}
           onMouseUp={(e) => {
             // 연결 모드일 때 영역 어디에나 연결선을 놓으면 연결
             if (isConnecting && connectingFromId && connectingFromId !== category.id) {
@@ -365,53 +735,28 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
           onContextMenu={(e) => {
             e.preventDefault();
             e.stopPropagation();
+
+            // 모바일(터치) 환경에서는 컨텍스트 메뉴 비활성화
+            // @ts-ignore - nativeEvent의 sourceCapabilities 체크
+            if (e.nativeEvent && e.nativeEvent.sourceCapabilities && e.nativeEvent.sourceCapabilities.firesTouchEvents) {
+              return;
+            }
+
             onCategorySelect(category.id);
             setAreaContextMenu({ x: e.clientX, y: e.clientY, categoryId: category.id });
           }}
           onTouchEnd={(e) => {
-            // 카테고리 영역에서도 더블탭 감지 (라벨과 동일한 로직)
-            const currentTime = Date.now();
-            const lastTapTime = (window as any)[`lastTapTime_area_${category.id}`] || 0;
-            const timeSinceLastTap = currentTime - lastTapTime;
+            // 카테고리 영역 더블탭 감지
+            const isDoubleTap = detectDoubleTap(`area_${category.id}`);
 
-            console.log('[CategoryArea Area] touchEnd', {
-              categoryId: category.id,
-              timeSinceLastTap,
-              onOpenEditor: !!onOpenEditor
-            });
-
-            // 300ms 이내에 두 번째 탭이 발생하면 더블탭으로 인식
-            if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
-              console.log('[CategoryArea Area] 더블탭 감지!');
-              e.preventDefault(); // 기본 더블탭 줌 방지
+            if (isDoubleTap) {
+              e.preventDefault();
               e.stopPropagation();
-
-              // 타임아웃 취소
-              const timeoutId = (window as any)[`tapTimeout_area_${category.id}`];
-              if (timeoutId) {
-                clearTimeout(timeoutId);
-                delete (window as any)[`tapTimeout_area_${category.id}`];
-              }
 
               // 모바일에서는 에디터 열기
               if (onOpenEditor) {
                 onOpenEditor();
               }
-
-              // 리셋
-              delete (window as any)[`lastTapTime_area_${category.id}`];
-            } else {
-              // 첫 번째 탭 기록
-              (window as any)[`lastTapTime_area_${category.id}`] = currentTime;
-
-              // 300ms 후 리셋
-              const timeoutId = (window as any)[`tapTimeout_area_${category.id}`];
-              if (timeoutId) {
-                clearTimeout(timeoutId);
-              }
-              (window as any)[`tapTimeout_area_${category.id}`] = setTimeout(() => {
-                delete (window as any)[`lastTapTime_area_${category.id}`];
-              }, 300);
             }
           }}
         >
@@ -460,165 +805,300 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
               padding: '20px',
               userSelect: 'none'
             }}>
-              SHIFT + 드래그로 메모나 카테고리를<br/>다른 카테고리 영역에 종속, 제거하세요
+{typeof window !== 'undefined' && window.innerWidth <= 768 ? (
+                <>메모나 카테고리를 꾹 누른 후 드래그해<br/>카테고리 영역에 종속, 제거하세요</>
+              ) : (
+                <>SHIFT + 드래그로 메모나 카테고리를<br/>다른 카테고리 영역에 종속, 제거하세요</>
+              )}
             </div>
           )}
 
           {/* 영역 연결점들 - 4방향 */}
           {/* Top */}
           <div
+            data-category-id={category.id}
             onMouseDown={(e) => {
               e.stopPropagation();
-              if (!isConnecting) {
-                onCategorySelect(category.id);
-                onStartConnection?.(category.id, 'top');
+              console.log('🟣 [카테고리 연결점 클릭]', { categoryId: category.id, isConnecting, connectingFromId });
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if (!isMobile || isConnecting) {
+                console.log('🟣 [카테고리 연결 드래그 시작]', { categoryId: category.id });
+                setIsConnectionDragging(category.id);
+                if (!connectingFromId) {
+                  onStartConnection?.(category.id, 'top');
+                  console.log('🟣 [카테고리 연결 시작점 설정]', { fromCategoryId: category.id });
+                }
               }
             }}
             onMouseUp={(e) => {
               e.stopPropagation();
-              if (isConnecting && connectingFromId && connectingFromId !== category.id) {
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if ((!isMobile || isConnecting) && connectingFromId && connectingFromId !== category.id) {
                 onConnectMemos(connectingFromId, category.id);
               }
+              setIsConnectionDragging(null);
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              console.log('🟣 [카테고리 연결점 터치 시작]', { categoryId: category.id, isConnecting, connectingFromId });
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if (!isMobile || isConnecting) {
+                console.log('🟣 [카테고리 연결 드래그 시작 (터치)]', { categoryId: category.id });
+                setIsConnectionDragging(category.id);
+                if (!connectingFromId) {
+                  onStartConnection?.(category.id, 'top');
+                  console.log('🟣 [카테고리 연결 시작점 설정 (터치)]', { fromCategoryId: category.id });
+                }
+              }
+            }}
+            onTouchEnd={(e) => {
+              // stopPropagation 제거 - document-level handleTouchEnd가 실행되도록
+              console.log('🟣 [카테고리 연결점 터치 종료]', { categoryId: category.id, connectingFromId });
+              // 연결점 자체에서는 아무것도 하지 않음 - document-level handleTouchEnd에서 처리
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
             }}
             style={{
               position: 'absolute',
-              top: -8,
+              top: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? -75 : -8,
               left: '50%',
               transform: 'translateX(-50%)',
-              width: 16,
-              height: 16,
+              width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
+              height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'crosshair',
               zIndex: 15,
-              pointerEvents: 'auto'
+              pointerEvents: 'auto',
+              touchAction: 'none'
             }}
           >
             <div style={{
-              width: 8,
-              height: 8,
+              width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
+              height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
               backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
               borderRadius: '50%',
-              border: '2px solid white',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+              border: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '5px solid white' : '2px solid white',
+              boxShadow: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '0 6px 16px rgba(0, 0, 0, 0.4)' : '0 2px 4px rgba(0,0,0,0.2)'
             }} />
           </div>
           {/* Bottom */}
           <div
+            data-category-id={category.id}
             onMouseDown={(e) => {
               e.stopPropagation();
-              if (!isConnecting) {
-                onCategorySelect(category.id);
-                onStartConnection?.(category.id, 'bottom');
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if (!isMobile || isConnecting) {
+                setIsConnectionDragging(category.id);
+                if (!connectingFromId) {
+                  onStartConnection?.(category.id, 'bottom');
+                }
               }
             }}
             onMouseUp={(e) => {
               e.stopPropagation();
-              if (isConnecting && connectingFromId && connectingFromId !== category.id) {
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if ((!isMobile || isConnecting) && connectingFromId && connectingFromId !== category.id) {
                 onConnectMemos(connectingFromId, category.id);
               }
+              setIsConnectionDragging(null);
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              console.log('🟣 [카테고리 연결점 터치 시작 (하단)]', { categoryId: category.id, isConnecting, connectingFromId });
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if (!isMobile || isConnecting) {
+                console.log('🟣 [카테고리 연결 드래그 시작 (터치-하단)]', { categoryId: category.id });
+                setIsConnectionDragging(category.id);
+                if (!connectingFromId) {
+                  onStartConnection?.(category.id, 'bottom');
+                  console.log('🟣 [카테고리 연결 시작점 설정 (터치-하단)]', { fromCategoryId: category.id });
+                }
+              }
+            }}
+            onTouchEnd={(e) => {
+              // stopPropagation 제거 - document-level handleTouchEnd가 실행되도록
+              console.log('🟣 [카테고리 연결점 터치 종료 (하단)]', { categoryId: category.id, connectingFromId });
+              // 연결점 자체에서는 아무것도 하지 않음 - document-level handleTouchEnd에서 처리
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
             }}
             style={{
               position: 'absolute',
-              bottom: -8,
+              bottom: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? -75 : -8,
               left: '50%',
               transform: 'translateX(-50%)',
-              width: 16,
-              height: 16,
+              width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
+              height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'crosshair',
               zIndex: 15,
-              pointerEvents: 'auto'
+              pointerEvents: 'auto',
+              touchAction: 'none'
             }}
           >
             <div style={{
-              width: 8,
-              height: 8,
+              width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
+              height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
               backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
               borderRadius: '50%',
-              border: '2px solid white',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+              border: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '5px solid white' : '2px solid white',
+              boxShadow: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '0 6px 16px rgba(0, 0, 0, 0.4)' : '0 2px 4px rgba(0,0,0,0.2)'
             }} />
           </div>
           {/* Left */}
           <div
+            data-category-id={category.id}
             onMouseDown={(e) => {
               e.stopPropagation();
-              if (!isConnecting) {
-                onCategorySelect(category.id);
-                onStartConnection?.(category.id, 'left');
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if (!isMobile || isConnecting) {
+                setIsConnectionDragging(category.id);
+                if (!connectingFromId) {
+                  onStartConnection?.(category.id, 'left');
+                }
               }
             }}
             onMouseUp={(e) => {
               e.stopPropagation();
-              if (isConnecting && connectingFromId && connectingFromId !== category.id) {
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if ((!isMobile || isConnecting) && connectingFromId && connectingFromId !== category.id) {
                 onConnectMemos(connectingFromId, category.id);
               }
+              setIsConnectionDragging(null);
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              console.log('🟣 [카테고리 연결점 터치 시작 (좌측)]', { categoryId: category.id, isConnecting, connectingFromId });
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if (!isMobile || isConnecting) {
+                console.log('🟣 [카테고리 연결 드래그 시작 (터치-좌측)]', { categoryId: category.id });
+                setIsConnectionDragging(category.id);
+                if (!connectingFromId) {
+                  onStartConnection?.(category.id, 'left');
+                  console.log('🟣 [카테고리 연결 시작점 설정 (터치-좌측)]', { fromCategoryId: category.id });
+                }
+              }
+            }}
+            onTouchEnd={(e) => {
+              // stopPropagation 제거 - document-level handleTouchEnd가 실행되도록
+              console.log('🟣 [카테고리 연결점 터치 종료 (좌측)]', { categoryId: category.id, connectingFromId });
+              // 연결점 자체에서는 아무것도 하지 않음 - document-level handleTouchEnd에서 처리
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
             }}
             style={{
               position: 'absolute',
-              left: -8,
+              left: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? -75 : -8,
               top: '50%',
               transform: 'translateY(-50%)',
-              width: 16,
-              height: 16,
+              width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
+              height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'crosshair',
               zIndex: 15,
-              pointerEvents: 'auto'
+              pointerEvents: 'auto',
+              touchAction: 'none'
             }}
           >
             <div style={{
-              width: 8,
-              height: 8,
+              width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
+              height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
               backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
               borderRadius: '50%',
-              border: '2px solid white',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+              border: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '5px solid white' : '2px solid white',
+              boxShadow: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '0 6px 16px rgba(0, 0, 0, 0.4)' : '0 2px 4px rgba(0,0,0,0.2)'
             }} />
           </div>
           {/* Right */}
           <div
+            data-category-id={category.id}
             onMouseDown={(e) => {
               e.stopPropagation();
-              if (!isConnecting) {
-                onCategorySelect(category.id);
-                onStartConnection?.(category.id, 'right');
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if (!isMobile || isConnecting) {
+                setIsConnectionDragging(category.id);
+                if (!connectingFromId) {
+                  onStartConnection?.(category.id, 'right');
+                }
               }
             }}
             onMouseUp={(e) => {
               e.stopPropagation();
-              if (isConnecting && connectingFromId && connectingFromId !== category.id) {
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if ((!isMobile || isConnecting) && connectingFromId && connectingFromId !== category.id) {
                 onConnectMemos(connectingFromId, category.id);
               }
+              setIsConnectionDragging(null);
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              console.log('🟣 [카테고리 연결점 터치 시작 (우측)]', { categoryId: category.id, isConnecting, connectingFromId });
+              const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+              if (!isMobile || isConnecting) {
+                console.log('🟣 [카테고리 연결 드래그 시작 (터치-우측)]', { categoryId: category.id });
+                setIsConnectionDragging(category.id);
+                if (!connectingFromId) {
+                  onStartConnection?.(category.id, 'right');
+                  console.log('🟣 [카테고리 연결 시작점 설정 (터치-우측)]', { fromCategoryId: category.id });
+                }
+              }
+            }}
+            onTouchEnd={(e) => {
+              // stopPropagation 제거 - document-level handleTouchEnd가 실행되도록
+              console.log('🟣 [카테고리 연결점 터치 종료 (우측)]', { categoryId: category.id, connectingFromId });
+              // 연결점 자체에서는 아무것도 하지 않음 - document-level handleTouchEnd에서 처리
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
             }}
             style={{
               position: 'absolute',
-              right: -8,
+              right: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? -75 : -8,
               top: '50%',
               transform: 'translateY(-50%)',
-              width: 16,
-              height: 16,
+              width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
+              height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'crosshair',
               zIndex: 15,
-              pointerEvents: 'auto'
+              pointerEvents: 'auto',
+              touchAction: 'none'
             }}
           >
             <div style={{
-              width: 8,
-              height: 8,
+              width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
+              height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
               backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
               borderRadius: '50%',
-              border: '2px solid white',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+              border: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '5px solid white' : '2px solid white',
+              boxShadow: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '0 6px 16px rgba(0, 0, 0, 0.4)' : '0 2px 4px rgba(0,0,0,0.2)'
             }} />
           </div>
         </div>
@@ -628,9 +1108,9 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
 
     // 카테고리 이름 라벨은 항상 표시
     if (true) {
-      // 라벨 위치는 영역의 좌상단에 고정
+      // 라벨 위치는 영역의 좌상단 위쪽에 고정 (영역과 겹치지 않도록)
       const labelX = area?.x || category.position.x;
-      const labelY = area?.y || category.position.y;
+      const labelY = (area?.y || category.position.y) - 60; // 라벨 높이만큼 위로 이동하여 영역과 겹치지 않도록
 
       // Shift+드래그 중인지 확인 (카테고리 블록 드래그 또는 카테고리 영역 드래그)
       const isCurrentCategoryBeingDragged = (isDraggingCategory && draggingCategoryId === category.id) || (isDraggingCategoryArea === category.id);
@@ -647,11 +1127,11 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             position: 'absolute',
             top: `${labelY}px`,
             left: `${labelX}px`,
-            backgroundColor: isShiftDragging ? '#10b981' : '#8b5cf6',
+            backgroundColor: (longPressActiveCategoryId === category.id || isShiftDragging) ? '#10b981' : '#8b5cf6',
             color: 'white',
             padding: '12px 24px',
             borderRadius: '12px',
-            fontSize: '26px',
+            fontSize: `${14 / (canvasScale || 1)}px`,
             fontWeight: '600',
             pointerEvents: 'auto',
             boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
@@ -660,7 +1140,7 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             alignItems: 'center',
             gap: '12px',
             zIndex: 10,
-            border: isShiftDragging ? '3px solid #059669' : 'none'
+            border: (longPressActiveCategoryId === category.id || isShiftDragging) ? '3px solid #059669' : 'none'
           }}
           onClick={() => !isEditing && onCategorySelect(category.id)}
           onDoubleClick={(e) => {
@@ -679,284 +1159,25 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
           onContextMenu={(e) => {
             e.preventDefault();
             e.stopPropagation();
+
+            // 모바일(터치) 환경에서는 컨텍스트 메뉴 비활성화
+            // @ts-ignore - nativeEvent의 sourceCapabilities 체크
+            if (e.nativeEvent && e.nativeEvent.sourceCapabilities && e.nativeEvent.sourceCapabilities.firesTouchEvents) {
+              return;
+            }
+
             onCategorySelect(category.id);
             setAreaContextMenu({ x: e.clientX, y: e.clientY, categoryId: category.id });
           }}
-          onMouseDown={(e) => {
-            // 편집 모드일 때는 드래그 방지
-            if (isEditing) {
-              return;
-            }
-            if (e.button === 0) {
-              // 라벨 드래그 시작 - 라벨만 이동
-              e.stopPropagation();
-
-              let startX = e.clientX;
-              let startY = e.clientY;
-              const originalLabelPosition = { x: category.position.x, y: category.position.y };
-              let hasMoved = false;
-              let isDragging = false; // 임계값 통과 전까지는 false
-              const DRAG_THRESHOLD = 5; // 드래그 임계값 (픽셀)
-
-              const handleMouseMove = (moveEvent: MouseEvent) => {
-                // 임계값 확인
-                if (!isDragging) {
-                  const distance = Math.sqrt(
-                    Math.pow(moveEvent.clientX - startX, 2) +
-                    Math.pow(moveEvent.clientY - startY, 2)
-                  );
-
-                  // 임계값을 넘으면 드래그 시작
-                  if (distance >= DRAG_THRESHOLD) {
-                    isDragging = true;
-                    hasMoved = true;
-                    onCategorySelect(category.id); // 드래그 시작 시 선택
-                  }
-                }
-
-                if (!isDragging) return; // 드래그 시작 전까지 위치 업데이트 안함
-
-                hasMoved = true;
-
-                const deltaX = (moveEvent.clientX - startX) / canvasScale;
-                const deltaY = (moveEvent.clientY - startY) / canvasScale;
-
-                const newLabelPosition = {
-                  x: originalLabelPosition.x + deltaX,
-                  y: originalLabelPosition.y + deltaY
-                };
-
-                // 라벨만 이동
-                onCategoryLabelPositionChange(category.id, newLabelPosition);
-              };
-
-              const handleMouseUp = (upEvent?: MouseEvent) => {
-                console.log('[Label handleMouseUp] 호출됨', {
-                  categoryId: category.id,
-                  hasMoved,
-                  isDragging,
-                  isShiftPressed,
-                  upEventShiftKey: upEvent?.shiftKey,
-                  upEventExists: !!upEvent
-                });
-
-                // 드래그가 발생하지 않았을 때: 클릭으로 처리 (카테고리 선택)
-                if (!hasMoved && !isDragging) {
-                  onCategorySelect(category.id);
-                  document.removeEventListener('mousemove', handleMouseMove);
-                  document.removeEventListener('mouseup', handleMouseUp);
-                  document.removeEventListener('mouseleave', handleMouseLeave);
-                  return;
-                }
-
-                isDragging = false; // 즉시 드래그 종료 플래그 설정
-
-                // Shift+드래그면 카테고리 드롭 감지 호출
-                // upEvent.shiftKey로 실시간 Shift 키 상태 확인
-                const wasShiftPressed = upEvent?.shiftKey || isShiftPressed;
-
-                console.log('[Label handleMouseUp] Shift 체크', {
-                  wasShiftPressed,
-                  willCallDetect: hasMoved && wasShiftPressed
-                });
-
-                if (hasMoved && wasShiftPressed) {
-                  // 카테고리 라벨의 최종 위치 (라벨 이동용)
-                  const finalLabelPosition = {
-                    x: originalLabelPosition.x + ((upEvent?.clientX || startX) - startX) / canvasScale,
-                    y: originalLabelPosition.y + ((upEvent?.clientY || startY) - startY) / canvasScale
-                  };
-
-                  // 마우스 포인터의 실제 위치 계산 (충돌 검사용)
-                  const canvasElement = document.getElementById('main-canvas');
-                  let mousePointerPosition = finalLabelPosition; // fallback
-
-                  if (canvasElement && canvasOffset && upEvent) {
-                    const rect = canvasElement.getBoundingClientRect();
-                    const clientX = upEvent.clientX;
-                    const clientY = upEvent.clientY;
-
-                    // 캔버스 좌표계로 변환
-                    const mouseX = (clientX - rect.left - canvasOffset.x) / canvasScale;
-                    const mouseY = (clientY - rect.top - canvasOffset.y) / canvasScale;
-
-                    mousePointerPosition = { x: mouseX, y: mouseY };
-                  }
-
-                  console.log('[Label MouseUp] Shift+드래그 종료 - detectCategoryDropForCategory 호출', {
-                    categoryId: category.id,
-                    finalLabelPosition,
-                    mousePointerPosition
-                  });
-
-                  // 마우스 포인터 위치로 전달 (점 충돌 검사용)
-                  onDetectCategoryDropForCategory?.(category.id, mousePointerPosition);
-                }
-
-                document.removeEventListener('mousemove', handleMouseMove);
-                document.removeEventListener('mouseup', handleMouseUp);
-              };
-
-              // mouseup 이벤트가 누락되는 경우를 대비한 안전장치
-              const handleMouseLeave = () => {
-                if (isDragging) {
-                  isDragging = false;
-                  document.removeEventListener('mousemove', handleMouseMove);
-                  document.removeEventListener('mouseup', handleMouseUp);
-                  document.removeEventListener('mouseleave', handleMouseLeave);
-                }
-              };
-
-              document.addEventListener('mousemove', handleMouseMove);
-              document.addEventListener('mouseup', handleMouseUp);
-              document.addEventListener('mouseleave', handleMouseLeave);
-              e.preventDefault();
-            }
-          }}
-          onTouchStart={(e) => {
-            // 편집 모드일 때는 드래그 방지
-            if (isEditing || e.touches.length !== 1) {
-              return;
-            }
-
-            // 라벨 터치 드래그 시작 - 라벨만 이동
-            e.stopPropagation();
-
-            const touch = e.touches[0];
-            let startX = touch.clientX;
-            let startY = touch.clientY;
-            const originalLabelPosition = { x: category.position.x, y: category.position.y };
-            let hasMoved = false;
-            let isDragging = false; // 임계값 통과 전까지는 false
-            const DRAG_THRESHOLD = 5; // 드래그 임계값 (픽셀)
-
-            const handleTouchMove = (moveEvent: TouchEvent) => {
-              if (moveEvent.touches.length !== 1) return;
-
-              const touch = moveEvent.touches[0];
-              const distance = Math.sqrt(
-                Math.pow(touch.clientX - startX, 2) +
-                Math.pow(touch.clientY - startY, 2)
-              );
-
-              // 임계값을 넘으면 드래그 시작
-              if (!isDragging && distance >= DRAG_THRESHOLD) {
-                isDragging = true;
-                hasMoved = true;
-                // 드래그 시작 시 카테고리 선택 (우측 패널 표시)
-                onCategorySelect(category.id);
-              }
-
-              // 드래그 중일 때만 위치 업데이트
-              if (!isDragging) return;
-
-              const deltaX = (touch.clientX - startX) / canvasScale;
-              const deltaY = (touch.clientY - startY) / canvasScale;
-
-              const newLabelPosition = {
-                x: originalLabelPosition.x + deltaX,
-                y: originalLabelPosition.y + deltaY
-              };
-
-              // 라벨만 이동
-              onCategoryLabelPositionChange(category.id, newLabelPosition);
-              moveEvent.preventDefault(); // 스크롤 방지
-            };
-
-            // 더블탭 감지를 위한 타임스탬프
-            let lastTapTime = 0;
-            const DOUBLE_TAP_DELAY = 300;
-
-            const handleTouchEnd = (upEvent?: TouchEvent) => {
-              // 드래그가 없었을 때만 탭/더블탭 감지
-              if (!hasMoved && !isDragging) {
-                const currentTime = new Date().getTime();
-                const tapTimeDiff = currentTime - lastTapTime;
-
-                if (tapTimeDiff < DOUBLE_TAP_DELAY && tapTimeDiff > 0) {
-                  // 더블탭: 에디터 열기
-                  if (onOpenEditor) {
-                    onOpenEditor();
-                  } else {
-                    // 데스크톱: 편집 모드
-                    setEditingCategoryId(category.id);
-                    setEditingCategoryTitle(category.title);
-                  }
-                  lastTapTime = 0; // 리셋
-                } else {
-                  // 싱글탭: 카테고리 선택
-                  onCategorySelect(category.id);
-                  lastTapTime = currentTime;
-                }
-              }
-
-              isDragging = false; // 드래그 종료
-
-              // Shift+드래그는 모바일에서 지원하지 않음 (isShiftPressed는 항상 false)
-              const wasShiftPressed = isShiftPressed;
-
-              if (hasMoved && wasShiftPressed && upEvent?.changedTouches.length) {
-                const touch = upEvent.changedTouches[0];
-                // 카테고리 라벨의 최종 위치 (라벨 이동용)
-                const finalLabelPosition = {
-                  x: originalLabelPosition.x + (touch.clientX - startX) / canvasScale,
-                  y: originalLabelPosition.y + (touch.clientY - startY) / canvasScale
-                };
-
-                // 터치 포인터의 실제 위치 계산 (충돌 검사용)
-                const canvasElement = document.getElementById('main-canvas');
-                let touchPointerPosition = finalLabelPosition; // fallback
-
-                if (canvasElement && canvasOffset) {
-                  const rect = canvasElement.getBoundingClientRect();
-                  const clientX = touch.clientX;
-                  const clientY = touch.clientY;
-
-                  // 캔버스 좌표계로 변환
-                  const touchX = (clientX - rect.left - canvasOffset.x) / canvasScale;
-                  const touchY = (clientY - rect.top - canvasOffset.y) / canvasScale;
-
-                  touchPointerPosition = { x: touchX, y: touchY };
-                }
-
-                // 터치 포인터 위치로 전달 (점 충돌 검사용)
-                onDetectCategoryDropForCategory?.(category.id, touchPointerPosition);
-              }
-
-              document.removeEventListener('touchmove', handleTouchMove);
-              document.removeEventListener('touchend', handleTouchEnd);
-              document.removeEventListener('touchcancel', handleTouchEnd);
-            };
-
-            document.addEventListener('touchmove', handleTouchMove, { passive: false });
-            document.addEventListener('touchend', handleTouchEnd);
-            document.addEventListener('touchcancel', handleTouchEnd);
-          }}
+          onMouseDown={isEditing ? undefined : createMouseDragHandler(category, isShiftPressed || false)}
+          onTouchStart={isEditing ? undefined : createTouchDragHandler(category, isShiftPressed || false)}
           onTouchEnd={(e) => {
-            // MemoBlock과 동일한 더블탭 감지 로직 추가
-            // 드래그와 관계없이 터치 종료 시점에 더블탭 감지
-            const currentTime = Date.now();
-            const lastTapTime = (window as any)[`lastTapTime_${category.id}`] || 0;
-            const timeSinceLastTap = currentTime - lastTapTime;
+            // 라벨 더블탭 감지
+            const isDoubleTap = detectDoubleTap(category.id);
 
-            console.log('[CategoryArea Label] touchEnd', {
-              categoryId: category.id,
-              timeSinceLastTap,
-              onOpenEditor: !!onOpenEditor
-            });
-
-            // 300ms 이내에 두 번째 탭이 발생하면 더블탭으로 인식
-            if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
-              console.log('[CategoryArea Label] 더블탭 감지!');
-              e.preventDefault(); // 기본 더블탭 줌 방지
+            if (isDoubleTap) {
+              e.preventDefault();
               e.stopPropagation();
-
-              // 타임아웃 취소
-              const timeoutId = (window as any)[`tapTimeout_${category.id}`];
-              if (timeoutId) {
-                clearTimeout(timeoutId);
-                delete (window as any)[`tapTimeout_${category.id}`];
-              }
 
               // 모바일에서는 에디터 열기
               if (onOpenEditor) {
@@ -966,21 +1187,6 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
                 setEditingCategoryId(category.id);
                 setEditingCategoryTitle(category.title);
               }
-
-              // 리셋
-              delete (window as any)[`lastTapTime_${category.id}`];
-            } else {
-              // 첫 번째 탭 기록
-              (window as any)[`lastTapTime_${category.id}`] = currentTime;
-
-              // 300ms 후 리셋
-              const timeoutId = (window as any)[`tapTimeout_${category.id}`];
-              if (timeoutId) {
-                clearTimeout(timeoutId);
-              }
-              (window as any)[`tapTimeout_${category.id}`] = setTimeout(() => {
-                delete (window as any)[`lastTapTime_${category.id}`];
-              }, 300);
             }
           }}
         >
@@ -1016,7 +1222,7 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
                 border: '2px solid rgba(255,255,255,0.5)',
                 borderRadius: '6px',
                 color: 'white',
-                fontSize: '26px',
+                fontSize: `${14 / (canvasScale || 1)}px`,
                 fontWeight: '600',
                 padding: '4px 8px',
                 outline: 'none',
@@ -1025,7 +1231,9 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
               }}
             />
           ) : (
-            <span>{category.title}</span>
+            <span style={{ color: category.title ? 'white' : 'rgba(255,255,255,0.6)' }}>
+              {category.title || '제목을 입력해주세요'}
+            </span>
           )}
           <button
             style={{
@@ -1049,6 +1257,179 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
           </button>
         </div>
       );
+
+      // 선택된 카테고리일 때 액션 버튼 표시
+      const isCategorySelected = selectedCategoryId === category.id || selectedCategoryIds.includes(category.id);
+      if (isCategorySelected) {
+        const buttonScale = 0.5 / (canvasScale || 1);
+        areas.push(
+          <div
+            key={`action-buttons-${category.id}`}
+            style={{
+              position: 'absolute',
+              top: `${labelY - 80}px`,
+              left: `${labelX}px`,
+              display: 'flex',
+              flexDirection: 'row',
+              gap: '14px',
+              zIndex: 100,
+              pointerEvents: 'auto',
+              transform: `scale(${buttonScale})`,
+              transformOrigin: 'bottom left'
+            }}
+          >
+            <button
+              data-action-button
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onOpenEditor) {
+                  // 모바일: 에디터 열기
+                  onOpenEditor();
+                } else {
+                  // PC: 제목 편집 모드
+                  setEditingCategoryId(category.id);
+                  setEditingCategoryTitle(category.title);
+                }
+              }}
+              style={{
+                background: 'white',
+                border: '2px solid #e5e7eb',
+                borderRadius: '14px',
+                padding: '20px 24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                color: '#6b7280',
+                minWidth: '60px',
+                minHeight: '60px'
+              }}
+              title="편집"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f9fafb';
+                e.currentTarget.style.borderColor = '#8b5cf6';
+                e.currentTarget.style.color = '#8b5cf6';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'white';
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.color = '#6b7280';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+              }}
+            >
+              <Edit2 size={26} />
+            </button>
+            <button
+              data-action-button
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                const isBookmarked = isQuickNavExists && isQuickNavExists(category.id, 'category');
+                if (isBookmarked) {
+                  onDeleteQuickNav?.(category.id, 'category');
+                } else {
+                  onAddQuickNav?.(category.title || '제목 없는 카테고리', category.id, 'category');
+                }
+              }}
+              style={{
+                background: (isQuickNavExists && isQuickNavExists(category.id, 'category')) ? '#fef3c7' : 'white',
+                border: (isQuickNavExists && isQuickNavExists(category.id, 'category')) ? '2px solid #fbbf24' : '2px solid #e5e7eb',
+                borderRadius: '14px',
+                padding: '20px 24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                color: (isQuickNavExists && isQuickNavExists(category.id, 'category')) ? '#f59e0b' : '#6b7280',
+                minWidth: '60px',
+                minHeight: '60px'
+              }}
+              title={isQuickNavExists && isQuickNavExists(category.id, 'category') ? '즐겨찾기 해제' : '즐겨찾기'}
+              onMouseEnter={(e) => {
+                const isBookmarked = isQuickNavExists && isQuickNavExists(category.id, 'category');
+                if (isBookmarked) {
+                  e.currentTarget.style.backgroundColor = '#fde68a';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(251, 191, 36, 0.3)';
+                } else {
+                  e.currentTarget.style.backgroundColor = '#f9fafb';
+                  e.currentTarget.style.borderColor = '#8b5cf6';
+                  e.currentTarget.style.color = '#8b5cf6';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.2)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                const isBookmarked = isQuickNavExists && isQuickNavExists(category.id, 'category');
+                if (isBookmarked) {
+                  e.currentTarget.style.backgroundColor = '#fef3c7';
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+                } else {
+                  e.currentTarget.style.backgroundColor = 'white';
+                  e.currentTarget.style.borderColor = '#e5e7eb';
+                  e.currentTarget.style.color = '#6b7280';
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+                }
+              }}
+            >
+              <Star size={26} fill={(isQuickNavExists && isQuickNavExists(category.id, 'category')) ? 'currentColor' : 'none'} />
+            </button>
+            <button
+              data-action-button
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm(`"${category.title || '제목 없는 카테고리'}"를 삭제하시겠습니까?`)) {
+                  onDeleteCategory(category.id);
+                }
+              }}
+              style={{
+                background: 'white',
+                border: '2px solid #e5e7eb',
+                borderRadius: '14px',
+                padding: '20px 24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                color: '#6b7280',
+                minWidth: '60px',
+                minHeight: '60px'
+              }}
+              title="삭제"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#fef2f2';
+                e.currentTarget.style.borderColor = '#ef4444';
+                e.currentTarget.style.color = '#ef4444';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'white';
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.color = '#6b7280';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+              }}
+            >
+              <Trash2 size={26} />
+            </button>
+          </div>
+        );
+      }
 
     }
 
@@ -1095,7 +1476,10 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
     isDraggingCategoryArea,
     isShiftPressed,
     isDraggingMemo,
-    isDraggingCategory
+    isDraggingCategory,
+    isLongPressActive,  // 롱프레스 상태 추가
+    longPressTargetId,  // 롱프레스 대상 ID 추가
+    longPressActiveCategoryId  // 카테고리 롱프레스 상태 추가
   ]);
 
   /**
@@ -1151,6 +1535,7 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             canvasOffset={canvasOffset}
             activeImportanceFilters={activeImportanceFilters}
             showGeneralContent={showGeneralContent}
+            alwaysShowContent={alwaysShowContent}
             enableImportanceBackground={true}
             onDragStart={onMemoDragStart}
             onDragEnd={onMemoDragEnd}
@@ -1159,8 +1544,11 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             isShiftPressed={isShiftPressed}
             onDelete={onDeleteMemoById}
             onAddQuickNav={onAddQuickNav}
+            onDeleteQuickNav={onDeleteQuickNav}
             isQuickNavExists={isQuickNavExists}
             onOpenEditor={onOpenEditor}
+            setIsLongPressActive={setIsLongPressActive}
+            setIsShiftPressed={setIsShiftPressed}
           />
         ))}
         {childCategories.map(childCategory => (

@@ -183,7 +183,7 @@ export const DEFAULT_PAGES: Page[] = (() => {
         {
           id: `${pageId}-view-1`,
           type: 'text',
-          content: '단축 이동\n메모나 카테고리를 우클릭하여 단축 이동 목록에 추가하고, 우측 상단의 단축 이동 버튼을 클릭해 빠르게 이동하세요'
+          content: '즐겨찾기\n메모나 카테고리를 우클릭하여 즐겨찾기 목록에 추가하고, 우측 상단의 즐겨찾기 버튼을 클릭해 빠르게 이동하세요'
         },
         {
           id: `${pageId}-view-2`,
@@ -271,7 +271,7 @@ export const DEFAULT_PAGES: Page[] = (() => {
       name: '페이지 1',
       memos: tutorialMemos,
       categories: [tutorialCategory],
-      quickNavItems: [] // 빈 단축 이동 목록으로 초기화
+      quickNavItems: [] // 빈 즐겨찾기 목록으로 초기화
     }
   ];
 })();

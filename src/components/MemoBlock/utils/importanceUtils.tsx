@@ -29,7 +29,8 @@ export const renderHighlightedText = (
   activeFilters?: Set<ImportanceLevel>,
   showGeneral?: boolean
 ) => {
-  if (!importanceRanges || importanceRanges.length === 0) {
+  // 배열이 아니거나, undefined이거나, 빈 배열이면 일반 텍스트 처리
+  if (!importanceRanges || !Array.isArray(importanceRanges) || importanceRanges.length === 0) {
     // 하이라이팅이 없는 일반 텍스트는 일반 텍스트 필터에 따라 표시/숨김
     return showGeneral === false ? '' : text;
   }

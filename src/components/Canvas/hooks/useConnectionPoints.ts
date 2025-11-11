@@ -17,15 +17,32 @@ interface UseConnectionPointsParams {
   renderedCategoryAreas: React.MutableRefObject<{
     [categoryId: string]: { x: number; y: number; width: number; height: number };
   }>;
+  canvasScale: number;
 }
 
-export const useConnectionPoints = ({ renderedCategoryAreas }: UseConnectionPointsParams) => {
+export const useConnectionPoints = ({ renderedCategoryAreas, canvasScale }: UseConnectionPointsParams) => {
   /**
    * 블록의 상하좌우 중심점을 반환합니다.
+   * DOM 요소의 실제 크기를 측정하여 연결점을 계산합니다.
    */
   const getBlockConnectionPoints = React.useCallback((item: any) => {
-    const width = item.size?.width || 200;
-    const height = item.size?.height || 95;
+    // DOM에서 실제 렌더링된 크기를 측정
+    const element = document.querySelector(`[data-memo-id="${item.id}"]`) || document.querySelector(`[data-category-id="${item.id}"]`);
+
+    let width, height;
+
+    if (element) {
+      const rect = element.getBoundingClientRect();
+      // 실제 DOM 크기를 현재 scale로 나누어 논리적 크기 계산
+      width = rect.width / canvasScale;
+      height = rect.height / canvasScale;
+    } else {
+      // DOM 요소를 찾을 수 없으면 기본값 사용 (Math.min으로 캡핑)
+      const MAX_WIDTH = 800;
+      const MAX_HEIGHT = 300;
+      width = Math.min(item.size?.width || 200, MAX_WIDTH);
+      height = Math.min(item.size?.height || 95, MAX_HEIGHT);
+    }
 
     return {
       top: {
@@ -45,7 +62,7 @@ export const useConnectionPoints = ({ renderedCategoryAreas }: UseConnectionPoin
         y: item.position.y + height / 2
       }
     };
-  }, []);
+  }, [canvasScale]);
 
   /**
    * 연결점 계산 (카테고리 영역 정보 고려)

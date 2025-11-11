@@ -53,13 +53,47 @@ export default function BlockContextMenu({
     'none'
   ];
 
+  // 메뉴가 화면 밖으로 나가지 않도록 위치 조정
+  const menuWidth = 180;
+  const menuHeight = 400; // 대략적인 메뉴 높이
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const padding = 10; // 화면 가장자리 여백
+
+  let adjustedX = position.x;
+  let adjustedY = position.y;
+
+  // X 위치 경계 체크
+  // transform: translateX(-50%)를 고려하여 메뉴가 중앙 정렬됨
+  // 왼쪽 경계: adjustedX - menuWidth/2 >= padding
+  if (adjustedX - menuWidth / 2 < padding) {
+    adjustedX = menuWidth / 2 + padding;
+  }
+  // 오른쪽 경계: adjustedX + menuWidth/2 <= viewportWidth - padding
+  if (adjustedX + menuWidth / 2 > viewportWidth - padding) {
+    adjustedX = viewportWidth - menuWidth / 2 - padding;
+  }
+
+  // Y 위치 경계 체크
+  // transform: translateY(-100%)를 고려하여 메뉴가 위로 올라감
+  // position.y는 메뉴 하단 위치이므로, 실제 메뉴 상단은 adjustedY - menuHeight
+  // 위쪽 경계: adjustedY - menuHeight >= padding
+  if (adjustedY - menuHeight < padding) {
+    adjustedY = menuHeight + padding;
+  }
+  // 아래쪽 경계: adjustedY <= viewportHeight - padding
+  if (adjustedY > viewportHeight - padding) {
+    adjustedY = viewportHeight - padding;
+  }
+
   return (
     <div
       ref={menuRef}
       style={{
         position: 'fixed',
-        top: `${position.y}px`,
-        left: `${position.x}px`,
+        top: `${adjustedY}px`,
+        left: `${adjustedX}px`,
+        transform: 'translate(-50%, -100%)', // 중앙 정렬 + 메뉴를 위로 올림
         backgroundColor: 'white',
         border: '1px solid #e1e5e9',
         borderRadius: '8px',

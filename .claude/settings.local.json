@@ -48,7 +48,15 @@
       "Bash(Remove-Item -Force \".next\\dev\\lock\" -ErrorAction SilentlyContinue)",
       "Bash(Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue)",
       "Bash(Remove-Item -Force nul -ErrorAction SilentlyContinue)",
-      "Bash(del nul 2)"
+      "Bash(del nul 2)",
+      "Bash(psql:*)",
+      "Bash(npx tsx:*)",
+      "Bash(collision/unified.ts.tmp)",
+      "Bash(git restore:*)",
+      "Bash(if exist nul del nul 2)",
+      "Bash(ngrok http:*)",
+      "Bash(.gitignore)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []

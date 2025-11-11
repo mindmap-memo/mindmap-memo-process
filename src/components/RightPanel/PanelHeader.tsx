@@ -1,5 +1,5 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { X, Maximize2 } from 'lucide-react';
 import { ImportanceLevel } from '../../types';
 import { isDefaultFilterState } from './utils/blockUtils';
 
@@ -10,6 +10,9 @@ interface PanelHeaderProps {
   showGeneralContent?: boolean;
   onResetFilters?: () => void;
   onClose?: () => void;
+  isTablet?: boolean;
+  isTabletCollapsed?: boolean;
+  onToggleTabletCollapse?: () => void;
 }
 
 /**
@@ -23,7 +26,10 @@ const PanelHeader: React.FC<PanelHeaderProps> = ({
   activeImportanceFilters,
   showGeneralContent,
   onResetFilters,
-  onClose
+  onClose,
+  isTablet = false,
+  isTabletCollapsed = false,
+  onToggleTabletCollapse
 }) => {
   return (
     <div style={{
@@ -101,8 +107,39 @@ const PanelHeader: React.FC<PanelHeaderProps> = ({
         )}
       </div>
 
-      {/* 전체화면 버튼 - 모바일에서는 숨김 (onClose가 있으면 모바일) */}
-      {onToggleFullscreen && !onClose && (
+      {/* 태블릿 모드 전체화면 버튼 */}
+      {isTablet && onToggleFullscreen && (
+        <button
+          onClick={onToggleFullscreen}
+          style={{
+            padding: '8px',
+            border: '1px solid #e1e5e9',
+            borderRadius: '6px',
+            backgroundColor: 'white',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '16px',
+            color: '#6b7280',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#f3f4f6';
+            e.currentTarget.style.color = '#374151';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'white';
+            e.currentTarget.style.color = '#6b7280';
+          }}
+          title="전체화면"
+        >
+          <Maximize2 size={16} />
+        </button>
+      )}
+
+      {/* PC 모드 전체화면 버튼 - 모바일/태블릿에서는 숨김 */}
+      {onToggleFullscreen && !onClose && !isTablet && (
         <button
           onClick={onToggleFullscreen}
           style={{

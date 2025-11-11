@@ -23,6 +23,8 @@ interface UseContextValuesProps {
   currentPageId: string;
   setCurrentPageId: React.Dispatch<React.SetStateAction<string>>;
   currentPage: Page | undefined;
+  isInitialLoadDone: boolean;
+  loadingProgress: number;
   canvasOffset: { x: number; y: number };
   setCanvasOffset: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>;
   canvasScale: number;
@@ -69,8 +71,11 @@ interface UseContextValuesProps {
   setActiveImportanceFilters: React.Dispatch<React.SetStateAction<Set<ImportanceLevel>>>;
   showGeneralContent: boolean;
   setShowGeneralContent: React.Dispatch<React.SetStateAction<boolean>>;
+  alwaysShowContent: boolean;
+  setAlwaysShowContent: React.Dispatch<React.SetStateAction<boolean>>;
   toggleImportanceFilter: (level: ImportanceLevel) => void;
   toggleGeneralContent: () => void;
+  toggleAlwaysShowContent: () => void;
 
   // Panel
   leftPanelOpen: boolean;
@@ -104,29 +109,34 @@ interface UseContextValuesProps {
 
 export const useContextValues = (props: UseContextValuesProps) => {
   // ===== AppState Context =====
-  const appStateContextValue = useMemo(() => ({
-    pages: props.pages,
-    setPages: props.setPages,
-    currentPageId: props.currentPageId,
-    setCurrentPageId: props.setCurrentPageId,
-    currentPage: props.currentPage,
-    canvasOffset: props.canvasOffset,
-    setCanvasOffset: props.setCanvasOffset,
-    canvasScale: props.canvasScale,
-    setCanvasScale: props.setCanvasScale,
-    isShiftPressed: props.isShiftPressed,
-    setIsShiftPressed: props.setIsShiftPressed,
-    isDraggingMemo: props.isDraggingMemo,
-    setIsDraggingMemo: props.setIsDraggingMemo,
-    draggingMemoId: props.draggingMemoId,
-    setDraggingMemoId: props.setDraggingMemoId,
-    isDraggingCategory: props.isDraggingCategory,
-    setIsDraggingCategory: props.setIsDraggingCategory,
-    draggingCategoryId: props.draggingCategoryId,
-    setDraggingCategoryId: props.setDraggingCategoryId
-  }), [
+  const appStateContextValue = useMemo(() => {
+    return {
+      pages: props.pages,
+      setPages: props.setPages,
+      currentPageId: props.currentPageId,
+      setCurrentPageId: props.setCurrentPageId,
+      currentPage: props.currentPage,
+      isInitialLoadDone: props.isInitialLoadDone,
+      loadingProgress: props.loadingProgress,
+      canvasOffset: props.canvasOffset,
+      setCanvasOffset: props.setCanvasOffset,
+      canvasScale: props.canvasScale,
+      setCanvasScale: props.setCanvasScale,
+      isShiftPressed: props.isShiftPressed,
+      setIsShiftPressed: props.setIsShiftPressed,
+      isDraggingMemo: props.isDraggingMemo,
+      setIsDraggingMemo: props.setIsDraggingMemo,
+      draggingMemoId: props.draggingMemoId,
+      setDraggingMemoId: props.setDraggingMemoId,
+      isDraggingCategory: props.isDraggingCategory,
+      setIsDraggingCategory: props.setIsDraggingCategory,
+      draggingCategoryId: props.draggingCategoryId,
+      setDraggingCategoryId: props.setDraggingCategoryId
+    };
+  }, [
     props.pages, props.setPages, props.currentPageId, props.setCurrentPageId,
-    props.currentPage, props.canvasOffset, props.setCanvasOffset,
+    props.currentPage, props.isInitialLoadDone, props.loadingProgress,
+    props.canvasOffset, props.setCanvasOffset,
     props.canvasScale, props.setCanvasScale,
     props.isShiftPressed, props.setIsShiftPressed,
     props.isDraggingMemo, props.setIsDraggingMemo,
@@ -167,8 +177,11 @@ export const useContextValues = (props: UseContextValuesProps) => {
     setActiveImportanceFilters: props.setActiveImportanceFilters,
     showGeneralContent: props.showGeneralContent,
     setShowGeneralContent: props.setShowGeneralContent,
+    alwaysShowContent: props.alwaysShowContent,
+    setAlwaysShowContent: props.setAlwaysShowContent,
     toggleImportanceFilter: props.toggleImportanceFilter,
-    toggleGeneralContent: props.toggleGeneralContent
+    toggleGeneralContent: props.toggleGeneralContent,
+    toggleAlwaysShowContent: props.toggleAlwaysShowContent
   }), [
     props.selectedMemoId, props.setSelectedMemoId, props.selectedMemoIds, props.setSelectedMemoIds,
     props.selectedMemo, props.selectedMemos, props.selectedCategoryId, props.setSelectedCategoryId,
@@ -178,7 +191,8 @@ export const useContextValues = (props: UseContextValuesProps) => {
     props.dragHoveredCategoryIds, props.setDragHoveredCategoryIds, props.isDragSelectingWithShift,
     props.setIsDragSelectingWithShift, props.handleMemoSelect, props.selectCategory,
     props.activeImportanceFilters, props.setActiveImportanceFilters,
-    props.showGeneralContent, props.setShowGeneralContent, props.toggleImportanceFilter, props.toggleGeneralContent
+    props.showGeneralContent, props.setShowGeneralContent, props.alwaysShowContent, props.setAlwaysShowContent,
+    props.toggleImportanceFilter, props.toggleGeneralContent, props.toggleAlwaysShowContent
   ]);
 
   // ===== Panel Context =====
@@ -218,11 +232,13 @@ export const useContextValues = (props: UseContextValuesProps) => {
   ]);
 
   // ===== QuickNav Context =====
-  const quickNavContextValue = useMemo(() => ({
-    quickNavItems: props.quickNavItems,
-    showQuickNavPanel: props.showQuickNavPanel,
-    setShowQuickNavPanel: props.setShowQuickNavPanel
-  }), [
+  const quickNavContextValue = useMemo(() => {
+    return {
+      quickNavItems: props.quickNavItems,
+      showQuickNavPanel: props.showQuickNavPanel,
+      setShowQuickNavPanel: props.setShowQuickNavPanel
+    };
+  }, [
     props.quickNavItems, props.showQuickNavPanel, props.setShowQuickNavPanel
   ]);
 

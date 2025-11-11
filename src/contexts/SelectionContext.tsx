@@ -42,8 +42,11 @@ export interface SelectionContextType {
   setActiveImportanceFilters: React.Dispatch<React.SetStateAction<Set<ImportanceLevel>>>;
   showGeneralContent: boolean;
   setShowGeneralContent: React.Dispatch<React.SetStateAction<boolean>>;
+  alwaysShowContent: boolean;
+  setAlwaysShowContent: React.Dispatch<React.SetStateAction<boolean>>;
   toggleImportanceFilter: (level: ImportanceLevel) => void;
   toggleGeneralContent: () => void;
+  toggleAlwaysShowContent: () => void;
 }
 
 // Context 생성

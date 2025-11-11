@@ -362,6 +362,97 @@ export function isInsideCollapsedCategory(
 }
 
 /**
+ * 모든 하위 카테고리 ID 수집 (재귀적으로) - parentId 기반
+ */
+export const getAllDescendantCategoryIds = (
+  parentId: string,
+  categories: CategoryBlock[]
+): string[] => {
+  const directChildren = categories
+    .filter(cat => cat.parentId === parentId)
+    .map(cat => cat.id);
+
+  const allDescendants = [...directChildren];
+  directChildren.forEach(childId => {
+    allDescendants.push(...getAllDescendantCategoryIds(childId, categories));
+  });
+
+  return allDescendants;
+};
+
+/**
+ * 모든 상위 카테고리 ID 수집 (재귀적으로) - parentId 기반
+ */
+export const getAllParentCategoryIds = (
+  categoryId: string,
+  categories: CategoryBlock[]
+): string[] => {
+  const parentIds: string[] = [categoryId];
+  let currentCat = categories.find(c => c.id === categoryId);
+
+  while (currentCat?.parentId) {
+    parentIds.push(currentCat.parentId);
+    currentCat = categories.find(c => c.id === currentCat!.parentId);
+  }
+
+  return parentIds;
+};
+
+/**
+ * 아이템이 선택된 카테고리의 하위 요소인지 확인
+ */
+export const isDescendantOfSelectedCategory = (
+  itemParentId: string | null | undefined,
+  selectedCategoryIds: string[],
+  categories: CategoryBlock[]
+): boolean => {
+  if (!itemParentId) return false;
+
+  let currentParentId: string | null | undefined = itemParentId;
+  while (currentParentId) {
+    if (selectedCategoryIds.includes(currentParentId)) {
+      return true;
+    }
+    const parentCategory = categories.find(c => c.id === currentParentId);
+    currentParentId = parentCategory?.parentId;
+  }
+
+  return false;
+};
+
+/**
+ * 선택된 카테고리의 모든 하위 요소(메모, 카테고리) 찾기
+ */
+export const getAllChildrenOfCategories = (
+  categoryIds: string[],
+  page: Page
+): { memos: Set<string>, categories: Set<string> } => {
+  const childMemos = new Set<string>();
+  const childCategories = new Set<string>();
+
+  const addDescendants = (catId: string) => {
+    // 이 카테고리의 직계 자식 메모들
+    page.memos.forEach(m => {
+      if (m.parentId === catId) {
+        childMemos.add(m.id);
+      }
+    });
+
+    // 이 카테고리의 직계 자식 카테고리들
+    page.categories?.forEach(c => {
+      if (c.parentId === catId) {
+        childCategories.add(c.id);
+        // 재귀적으로 하위 요소들도 추가
+        addDescendants(c.id);
+      }
+    });
+  };
+
+  categoryIds.forEach(catId => addDescendants(catId));
+  return { memos: childMemos, categories: childCategories };
+};
+
+/**
  * 부모-자식 관계 변경으로 인해 제거해야 할 연결선을 찾아 제거
  *
  * 규칙:

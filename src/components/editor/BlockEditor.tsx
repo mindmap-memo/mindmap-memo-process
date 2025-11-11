@@ -313,6 +313,7 @@ export default function BlockEditor({
     editable: true,
     extensions: [
       DocumentNode,
+      // TextBlockNode를 맨 앞에 등록하여 키바인딩 우선순위를 가장 높게 설정
       TextBlockNode,
       FileNode,
       ImageNode,
@@ -322,7 +323,16 @@ export default function BlockEditor({
       Code,
       Strike,
       History,
-      HardBreak,
+      HardBreak.extend({
+        addKeyboardShortcuts() {
+          return {
+            // 모든 기본 키바인딩 비활성화 (capture phase에서 처리)
+            'Enter': () => false,
+            'Mod-Enter': () => false,
+            'Shift-Enter': () => false,
+          };
+        },
+      }),
       Link.configure({
         openOnClick: true,
         HTMLAttributes: {
@@ -361,6 +371,19 @@ export default function BlockEditor({
             });
           }
           return false; // ProseMirror가 계속 처리하도록 함
+        },
+        // 네이티브 복사/붙여넣기 허용
+        copy: () => {
+          console.log('[BlockEditor] copy event');
+          return false; // ProseMirror/브라우저 기본 동작 허용
+        },
+        cut: () => {
+          console.log('[BlockEditor] cut event');
+          return false; // ProseMirror/브라우저 기본 동작 허용
+        },
+        paste: () => {
+          console.log('[BlockEditor] paste event');
+          return false; // ProseMirror/브라우저 기본 동작 허용
         },
       },
     },
@@ -441,11 +464,50 @@ export default function BlockEditor({
     }
   };
 
+  // Enter 키를 capture phase에서 가로채기
+  const handleKeyDownCapture = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      if (!e.shiftKey) {
+        // Enter: 새 블록 생성
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!editor) return;
+
+        const { state } = editor;
+        const { $from } = state.selection;
+
+        if ($from.parent.type.name === 'textBlock') {
+          try {
+            const tr = state.tr.split($from.pos, 1, [
+              {
+                type: state.schema.nodes.textBlock,
+                attrs: { id: Date.now().toString() }
+              }
+            ]);
+            editor.view.dispatch(tr.scrollIntoView());
+          } catch (error) {
+            console.error('[BlockEditor] Split error:', error);
+          }
+        }
+      } else {
+        // Shift+Enter: 줄바꿈 (HardBreak)
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!editor) return;
+
+        editor.commands.setHardBreak();
+      }
+    }
+  };
+
   return (
     <div
       className={styles.container}
       onDragOverCapture={handleDragOver}
       onClick={handleContainerClick}
+      onKeyDownCapture={handleKeyDownCapture}
     >
       <EditorContent editor={editor} />
       <ImportanceToolbar editor={editor} />

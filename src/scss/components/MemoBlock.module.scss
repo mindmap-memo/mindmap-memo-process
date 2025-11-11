@@ -8,16 +8,23 @@
   // GPU 가속 활성화
   backface-visibility: hidden;
   perspective: 1000px;
+  // 자식 요소의 절대 위치 기준점
+  // position: relative를 추가하지 않음 (transform 때문에 이미 기준점이 됨)
+  // 연결점이 메모 블록 외부에 배치되므로 overflow: visible 필수
+  overflow: visible;
+  pointer-events: none; // wrapper는 이벤트 받지 않음, 자식만 받음
 }
 
 .memoBlockContainer {
   border-radius: 12px;
   padding: 16px;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: visible;
   user-select: none;
   z-index: 10;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  width: fit-content;
+  pointer-events: auto; // wrapper가 pointer-events: none이므로 자식은 auto 필수
 
   &.selected {
     background-color: #f3f4f6;
@@ -51,15 +58,18 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .title {
   font-weight: 600;
-  font-size: 16px;
+  font-size: 24px;
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1;
+  pointer-events: none; // title div는 클릭을 받지 않고 버튼으로 전달
+  white-space: nowrap;
 
   &.withTitle {
     color: #1f2937;
@@ -71,10 +81,60 @@
 
   &.editable {
     cursor: text;
+    pointer-events: auto; // 편집 가능할 때만 클릭 가능
   }
 
   &.notEditable {
     cursor: default;
+  }
+}
+
+.titleButtons {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  position: relative;
+  z-index: 100; // 롱프레스보다 높은 우선순위
+  pointer-events: auto; // 명시적으로 클릭 가능하게
+}
+
+.titleButton {
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+  color: #6b7280;
+  position: relative;
+  z-index: 101; // 부모보다 더 높게
+  pointer-events: auto; // 명시적으로 클릭 가능하게
+
+  // 아이콘은 클릭 이벤트를 무시하고 버튼으로 전달
+  svg {
+    pointer-events: none;
+  }
+
+  &:hover {
+    background-color: #f3f4f6;
+    border-color: #d1d5db;
+    color: #374151;
+  }
+
+  &:active {
+    background-color: #e5e7eb;
+  }
+
+  &.bookmarked {
+    background-color: #fef3c7;
+    border-color: #fbbf24;
+    color: #f59e0b;
   }
 }
 
@@ -89,7 +149,7 @@
   border: 1px solid #8b5cf6;
   border-radius: 4px;
   padding: 4px 8px;
-  font-size: 16px;
+  font-size: 24px;
   font-weight: 600;
   outline: none;
   background-color: white;
@@ -132,10 +192,68 @@
   font-weight: 500;
 }
 
+// PC용 액션 버튼들 - 메모 블록 완전히 밖 오른쪽에 표시
+.actionButtons {
+  position: absolute;
+  // top은 inline style로 설정 (-50px)
+  left: 0;
+  display: flex;
+  flex-direction: row;
+  gap: 14px;
+  z-index: 100;
+  pointer-events: auto;
+}
+
+.actionButton {
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  color: #6b7280;
+  min-width: 60px;
+  min-height: 60px;
+
+  &:hover {
+    background-color: #f9fafb;
+    border-color: #8b5cf6;
+    color: #8b5cf6;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+  }
+
+  &.bookmarked {
+    color: #fbbf24;
+    border-color: #fbbf24;
+
+    &:hover {
+      color: #f59e0b;
+      border-color: #f59e0b;
+    }
+  }
+}
+
 .contentContainer {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 8px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   font-size: 14px;
   color: #6b7280;
-  line-height: 1.5;
+  line-height: 1.6;
+  z-index: 50;
+  max-height: 300px;
+  overflow-y: auto;
 
   &.editable {
     cursor: text;
@@ -156,7 +274,7 @@
   resize: none;
   font-family: inherit;
   background-color: white;
-  line-height: 1.5;
+  line-height: 1.6;
   color: #6b7280;
   overflow: hidden;
 }
@@ -263,44 +381,78 @@
 
 .connectionPoint {
   position: absolute;
-  width: 16px;
-  height: 16px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: crosshair;
   z-index: 15;
+  transition: all 0.2s ease;
+  pointer-events: auto; // wrapper가 pointer-events: none이므로 연결점도 auto 필수
 
   &.top {
-    top: -8px;
+    top: -12px;
     left: 50%;
     transform: translateX(-50%);
   }
 
   &.bottom {
-    bottom: -8px;
+    bottom: -12px;
     left: 50%;
     transform: translateX(-50%);
   }
 
   &.left {
-    left: -8px;
+    left: -12px;
     top: 50%;
     transform: translateY(-50%);
   }
 
   &.right {
-    right: -8px;
+    right: -12px;
     top: 50%;
     transform: translateY(-50%);
   }
 
+  // 모바일/태블릿 가로모드에서 연결 모드일 때 연결점 크기 확대
+  @media (max-width: 768px), (min-width: 769px) and (max-width: 1366px) and (orientation: landscape) {
+    &.enlarged {
+      width: 150px;
+      height: 150px;
+
+      &.top {
+        top: -75px;
+      }
+
+      &.bottom {
+        bottom: -75px;
+      }
+
+      &.left {
+        left: -75px;
+      }
+
+      &.right {
+        right: -75px;
+      }
+
+      .connectionDot {
+        width: 48px;
+        height: 48px;
+        border: 5px solid white;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+      }
+    }
+  }
+
   .connectionDot {
-    width: 8px;
-    height: 8px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
-    border: 2px solid white;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    border: 3px solid white;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
 
     &.default {
       background-color: #8b5cf6;

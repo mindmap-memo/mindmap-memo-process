@@ -332,6 +332,89 @@ The application implements Shift+drag functionality for adding/removing memos an
      - 타입 정의도 함께 이동
      - 의존성 배열 확인
 
+10. **새 로직 추가 시 필수 규칙 (CRITICAL)**
+    - **절대 금지**: 기존 파일에 직접 로직을 작성하는 방식
+    - **필수 원칙**: 모든 새로운 로직은 커스텀 훅 또는 유틸 함수로 만들어서 import하는 형태로 추가
+    - **적용 범위**:
+      - 새로운 기능 추가
+      - 기존 기능 수정 및 확장
+      - 반응형 로직 추가 (모바일, 태블릿 대응)
+      - 이벤트 핸들러 추가
+      - 상태 관리 로직 추가
+    - **올바른 절차**:
+      1. 새로운 기능이 필요하면 먼저 커스텀 훅 또는 유틸 함수 파일을 생성
+      2. 해당 파일에서 로직을 완성
+      3. 필요한 컴포넌트나 훅에서 import하여 사용
+      4. 기존 파일에는 훅/함수 호출 코드만 추가
+    - **예시 (반응형 로직 추가)**:
+      ```typescript
+      // ❌ 잘못된 방법 - App.tsx에 직접 작성
+      const App = () => {
+        const [isMobile, setIsMobile] = useState(false);
+
+        useEffect(() => {
+          const checkMobile = () => {
+            setIsMobile(window.innerWidth <= 768);
+          };
+          window.addEventListener('resize', checkMobile);
+          checkMobile();
+          return () => window.removeEventListener('resize', checkMobile);
+        }, []);
+        // ... 나머지 코드
+      };
+
+      // ✅ 올바른 방법 - 커스텀 훅으로 분리
+      // src/hooks/useMediaQuery.ts
+      export const useMediaQuery = (query: string) => {
+        const [matches, setMatches] = useState(false);
+        useEffect(() => {
+          const media = window.matchMedia(query);
+          setMatches(media.matches);
+          const listener = () => setMatches(media.matches);
+          media.addEventListener('change', listener);
+          return () => media.removeEventListener('change', listener);
+        }, [query]);
+        return matches;
+      };
+
+      // App.tsx
+      const App = () => {
+        const isMobile = useMediaQuery('(max-width: 768px)');
+        // ... 나머지 코드
+      };
+      ```
+    - **예시 (유틸 함수)**:
+      ```typescript
+      // ❌ 잘못된 방법 - 컴포넌트 내부에 함수 정의
+      const Component = () => {
+        const getAllDescendantIds = (parentId: string): string[] => {
+          // ... 로직
+        };
+        const result = getAllDescendantIds(id);
+      };
+
+      // ✅ 올바른 방법 - 유틸 함수로 분리
+      // src/utils/categoryHierarchyUtils.ts
+      export const getAllDescendantCategoryIds = (
+        parentId: string,
+        categories: CategoryBlock[]
+      ): string[] => {
+        // ... 로직
+      };
+
+      // Component.tsx
+      import { getAllDescendantCategoryIds } from '../utils/categoryHierarchyUtils';
+      const Component = () => {
+        const result = getAllDescendantCategoryIds(id, categories);
+      };
+      ```
+    - **장점**:
+      - 코드 재사용성 극대화
+      - 테스트 용이성 향상
+      - 파일별 책임 명확화
+      - 유지보수 및 디버깅 용이
+      - 팀 협업 시 충돌 최소화
+
 ### Specific Implementation Guidelines
 
 - **File Management**: Always prefer editing existing files to creating new ones; never create files unless absolutely necessary
@@ -373,6 +456,25 @@ The application implements Shift+drag functionality for adding/removing memos an
 - **Collision Detection**: Use unified collision resolution function (`resolveAreaCollisions`) to prevent duplicate logic and infinite loops
 - **Shift+Drag Operations**: When implementing Shift+drag features, remember to: (1) disable collision detection, (2) freeze area bounds using cache, (3) exclude dragged item from area calculations, (4) use frozen cached bounds for overlap detection
 - **Logging**: NEVER add console.log statements in render functions, useEffect callbacks, or frequently-called functions (e.g., calculateCategoryArea, renderSingleCategoryArea) as they cause infinite log spam and make debugging impossible. Only log in event handlers (onClick, onMouseDown, etc.) or one-time initialization code
+- **Debugging and Error Tracking**:
+  - **Root Cause Analysis**: When encountering `Cannot read properties of undefined (reading 'X')` errors, don't assume the cause based on the error message alone. Use detailed logging and unminified stack traces to identify the actual source
+    - Example from recent debugging: Error message suggested `importanceRanges[0]` issue, but actual cause was `steps[currentStep]` in Tutorial component
+    - Always check the full stack trace in development/preview environments to see exact file and line number
+  - **Optional Chaining**: Always use optional chaining (`?.`) when accessing arrays or object properties that might be undefined, especially in components that receive data asynchronously
+    - **Good**: `const step = steps?.[currentStep];` or `const item = array?.find(...)`
+    - **Bad**: `const step = steps[currentStep];` (crashes if steps is undefined)
+    - Apply to all array access and nested property access where data might not be loaded yet
+  - **Debug UI Management**: Keep debug UI code commented out rather than deleted, wrapped in environment checks (`process.env.NODE_ENV === 'development'`). This allows quick re-enabling when needed without polluting production
+    - Debug tools like Eruda should be commented out by default but kept in codebase for future use
+    - Visual debug panels should only show in development, never in production or preview deployments
+    - Use comments like `// 필요시 주석 해제하여 사용` to indicate temporarily disabled debug code
+  - **Mobile-Specific Debugging**: Errors that only appear on actual mobile devices (not in desktop dev tools' mobile emulation) often indicate:
+    - Missing null/undefined checks for asynchronously loaded data
+    - Array access without optional chaining
+    - Race conditions in async data loading (data not ready when component renders)
+    - Context values not yet initialized when component mounts
+    - Always test fixes on real devices or Vercel Preview deployments before concluding they work
+    - Use environment-specific debug panels (shown only in preview) to verify data state on actual devices
 
 ## Responsive Design Guidelines (Desktop-Down Approach)
 

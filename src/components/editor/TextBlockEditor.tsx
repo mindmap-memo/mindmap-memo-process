@@ -148,7 +148,7 @@ export default function TextBlockEditor({
     if (!editor) return;
 
     // importanceRanges를 HTML로 변환
-    if (block.importanceRanges && block.importanceRanges.length > 0) {
+    if (block.importanceRanges && Array.isArray(block.importanceRanges) && block.importanceRanges.length > 0) {
       const sortedRanges = [...block.importanceRanges].sort((a, b) => a.start - b.start);
       let html = '<p>';
       let lastPos = 0;

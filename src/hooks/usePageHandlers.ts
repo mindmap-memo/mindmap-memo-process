@@ -86,10 +86,10 @@ export const usePageHandlers = ({
 
       try {
         await deletePageApi(pageId);
-        setPages((prev) => prev.filter((page) => page.id !== pageId));
+        setPages((prev) => prev?.filter((page) => page.id !== pageId));
 
         if (currentPageId === pageId) {
-          const remainingPages = pages.filter((page) => page.id !== pageId);
+          const remainingPages = pages?.filter((page) => page.id !== pageId);
           if (remainingPages.length > 0) {
             setCurrentPageId(remainingPages[0].id);
           }
@@ -108,7 +108,7 @@ export const usePageHandlers = ({
   const updatePageName = useCallback(
     (pageId: string, newName: string) => {
       setPages((prev) =>
-        prev.map((page) => (page.id === pageId ? { ...page, name: newName } : page))
+        prev?.map((page) => (page.id === pageId ? { ...page, name: newName } : page))
       );
     },
     [setPages]

@@ -7,12 +7,12 @@ import { useAnalyticsTrackers } from '../features/analytics/hooks/useAnalyticsTr
 /**
  * useQuickNavHandlers
  *
- * 단축 이동(Quick Navigation) 기능을 관리하는 커스텀 훅입니다.
+ * 즐겨찾기(Quick Navigation) 기능을 관리하는 커스텀 훅입니다.
  *
  * **주요 기능:**
- * - 메모/카테고리에 대한 단축 이동 항목 추가
- * - 단축 이동 항목 삭제
- * - 단축 이동 실행 (페이지 전환 + 화면 이동)
+ * - 메모/카테고리에 대한 즐겨찾기 항목 추가
+ * - 즐겨찾기 항목 삭제
+ * - 즐겨찾기 실행 (페이지 전환 + 화면 이동)
  * - 중복 체크
  *
  * **구현 세부사항:**
@@ -21,8 +21,8 @@ import { useAnalyticsTrackers } from '../features/analytics/hooks/useAnalyticsTr
  * - 메모는 화면 중앙에 표시
  * - 카테고리는 영역 전체가 보이도록 자동 스케일 조정
  *
- * @param props - 페이지 데이터, 현재 페이지 ID, 단축 이동 목록, 캔버스 상태 등
- * @returns 단축 이동 관련 핸들러 함수들
+ * @param props - 페이지 데이터, 현재 페이지 ID, 즐겨찾기 목록, 캔버스 상태 등
+ * @returns 즐겨찾기 관련 핸들러 함수들
  *
  * @example
  * ```tsx
@@ -41,10 +41,10 @@ import { useAnalyticsTrackers } from '../features/analytics/hooks/useAnalyticsTr
  *   setCanvasScale
  * });
  *
- * // 단축 이동 추가
+ * // 즐겨찾기 추가
  * addQuickNavItem('중요 메모', memoId, 'memo');
  *
- * // 단축 이동 실행
+ * // 즐겨찾기 실행
  * executeQuickNav(quickNavItem);
  * ```
  */
@@ -78,7 +78,7 @@ export const useQuickNavHandlers = ({
       console.log('[handleNavigateToMemo] Called with:', { memoId, pageId, currentPageId });
       const targetPageId = pageId || currentPageId;
       console.log('[handleNavigateToMemo] Target page ID:', targetPageId);
-      const targetPage = pages.find((p) => p.id === targetPageId);
+      const targetPage = pages?.find((p) => p.id === targetPageId);
       if (!targetPage) {
         console.error('[handleNavigateToMemo] Target page not found!');
         return;
@@ -88,8 +88,8 @@ export const useQuickNavHandlers = ({
       const memo = targetPage.memos.find((m) => m.id === memoId);
       if (!memo) {
         console.error('[handleNavigateToMemo] Memo not found in target page! Removing from quick nav.');
-        // 메모가 삭제되었으면 단축 이동 목록에서도 제거
-        const itemToDelete = quickNavItems.find(item => item.targetType === 'memo' && item.targetId === memoId);
+        // 메모가 삭제되었으면 즐겨찾기 목록에서도 제거
+        const itemToDelete = (quickNavItems || []).find(item => item.targetType === 'memo' && item.targetId === memoId);
         if (itemToDelete) {
           deleteQuickNavItem(itemToDelete.id);
         }
@@ -143,7 +143,7 @@ export const useQuickNavHandlers = ({
       console.log('[handleNavigateToCategory] Called with:', { categoryId, pageId, currentPageId });
       const targetPageId = pageId || currentPageId;
       console.log('[handleNavigateToCategory] Target page ID:', targetPageId);
-      const targetPage = pages.find((p) => p.id === targetPageId);
+      const targetPage = pages?.find((p) => p.id === targetPageId);
       if (!targetPage) {
         console.error('[handleNavigateToCategory] Target page not found!');
         return;
@@ -153,8 +153,8 @@ export const useQuickNavHandlers = ({
       const category = targetPage.categories?.find((c) => c.id === categoryId);
       if (!category) {
         console.error('[handleNavigateToCategory] Category not found in target page! Removing from quick nav.');
-        // 카테고리가 삭제되었으면 단축 이동 목록에서도 제거
-        const itemToDelete = quickNavItems.find(item => item.targetType === 'category' && item.targetId === categoryId);
+        // 카테고리가 삭제되었으면 즐겨찾기 목록에서도 제거
+        const itemToDelete = (quickNavItems || []).find(item => item.targetType === 'category' && item.targetId === categoryId);
         if (itemToDelete) {
           deleteQuickNavItem(itemToDelete.id);
         }
@@ -213,18 +213,18 @@ export const useQuickNavHandlers = ({
   );
 
   /**
-   * 단축 이동 항목 추가 (낙관적 업데이트)
+   * 즐겨찾기 항목 추가 (낙관적 업데이트)
    * 중복 체크 수행
    */
   const addQuickNavItem = useCallback(
     async (name: string, targetId: string, targetType: 'memo' | 'category') => {
-      // 중복 체크: 같은 페이지의 같은 타겟에 대한 단축 이동이 이미 있는지 확인
-      const isDuplicate = quickNavItems.some(
+      // 중복 체크: 같은 페이지의 같은 타겟에 대한 즐겨찾기가 이미 있는지 확인
+      const isDuplicate = (quickNavItems || []).some(
         (item) => item.targetId === targetId && item.targetType === targetType && item.pageId === currentPageId
       );
 
       if (isDuplicate) {
-        alert('이미 단축 이동이 설정되어 있습니다.');
+        alert('이미 즐겨찾기가 설정되어 있습니다.');
         return;
       }
 
@@ -240,7 +240,7 @@ export const useQuickNavHandlers = ({
 
       // 즉시 UI 업데이트
       setPages((prevPages) =>
-        prevPages.map((page) => {
+        prevPages?.map((page) => {
           if (page.id === currentPageId) {
             return {
               ...page,
@@ -278,7 +278,7 @@ export const useQuickNavHandlers = ({
         // Track analytics
         analytics.trackQuickNavCreated(targetType);
       } catch (error) {
-        console.error('단축 이동 추가 실패:', error);
+        console.error('즐겨찾기 추가 실패:', error);
         // 실패 시 롤백
         setPages((prevPages) =>
           prevPages.map((page) => {
@@ -291,18 +291,18 @@ export const useQuickNavHandlers = ({
             return page;
           })
         );
-        alert('단축 이동 추가에 실패했습니다.');
+        alert('즐겨찾기 추가에 실패했습니다.');
       }
     },
     [quickNavItems, currentPageId, setPages]
   );
 
   /**
-   * 단축 이동 중복 확인
+   * 즐겨찾기 중복 확인
    */
   const isQuickNavExists = useCallback(
     (targetId: string, targetType: 'memo' | 'category'): boolean => {
-      return quickNavItems.some(
+      return (quickNavItems || []).some(
         (item) => item.targetId === targetId && item.targetType === targetType && item.pageId === currentPageId
       );
     },
@@ -310,13 +310,13 @@ export const useQuickNavHandlers = ({
   );
 
   /**
-   * 단축 이동 항목 이름 변경 (낙관적 업데이트)
+   * 즐겨찾기 항목 이름 변경 (낙관적 업데이트)
    */
   const updateQuickNavItem = useCallback(
     async (itemId: string, newName: string) => {
       // 즉시 UI 업데이트 (낙관적 업데이트)
       setPages((prevPages) =>
-        prevPages.map((page) => {
+        prevPages?.map((page) => {
           if (page.id === currentPageId) {
             return {
               ...page,
@@ -331,7 +331,7 @@ export const useQuickNavHandlers = ({
 
       // 백그라운드에서 DB 업데이트
       updateQuickNavItemApi(itemId, newName).catch(error => {
-        console.error('단축 이동 이름 변경 실패:', error);
+        console.error('즐겨찾기 이름 변경 실패:', error);
         alert('이름 변경에 실패했습니다.');
       });
     },
@@ -339,7 +339,7 @@ export const useQuickNavHandlers = ({
   );
 
   /**
-   * 단축 이동 항목 삭제 (낙관적 업데이트)
+   * 즐겨찾기 항목 삭제 (낙관적 업데이트)
    */
   const deleteQuickNavItem = useCallback(
     async (itemId: string) => {
@@ -348,7 +348,7 @@ export const useQuickNavHandlers = ({
 
       // 즉시 UI에서 제거 (낙관적 업데이트)
       setPages((prevPages) =>
-        prevPages.map((page) => {
+        prevPages?.map((page) => {
           if (page.id === currentPageId) {
             deletedItem = (page.quickNavItems || []).find((item) => item.id === itemId);
             return {
@@ -364,7 +364,7 @@ export const useQuickNavHandlers = ({
       try {
         await deleteQuickNavItemApi(itemId);
       } catch (error) {
-        console.error('단축 이동 삭제 실패:', error);
+        console.error('즐겨찾기 삭제 실패:', error);
         // 실패 시 롤백
         if (deletedItem) {
           setPages((prevPages) =>
@@ -379,38 +379,53 @@ export const useQuickNavHandlers = ({
             })
           );
         }
-        alert('단축 이동 삭제에 실패했습니다.');
+        alert('즐겨찾기 삭제에 실패했습니다.');
       }
     },
     [currentPageId, setPages]
   );
 
   /**
-   * 단축 이동 실행
+   * 즐겨찾기 실행
    * 페이지가 다르면 페이지 전환 후 이동
    * 같은 페이지면 바로 이동
    */
   const executeQuickNav = useCallback(
     (item: QuickNavItem) => {
+      console.log('🔵 [executeQuickNav] 시작:', {
+        itemName: item.name,
+        targetId: item.targetId,
+        targetType: item.targetType,
+        itemPageId: item.pageId,
+        currentPageId: currentPageId
+      });
+
       // Track analytics
       analytics.trackQuickNavUsed(item.targetType);
 
       // 페이지가 다르면 페이지 전환
       if (item.pageId !== currentPageId) {
+        console.log('📄 [executeQuickNav] 페이지 전환 필요:', item.pageId);
         setCurrentPageId(item.pageId);
         // 페이지 전환 후 약간의 딜레이를 두고 이동 (상태 업데이트 대기)
         setTimeout(() => {
+          console.log('⏰ [executeQuickNav] setTimeout 실행 (페이지 전환 후)');
           if (item.targetType === 'memo') {
+            console.log('📝 [executeQuickNav] handleNavigateToMemo 호출');
             handleNavigateToMemo(item.targetId);
           } else {
+            console.log('📁 [executeQuickNav] handleNavigateToCategory 호출');
             handleNavigateToCategory(item.targetId);
           }
         }, 100);
       } else {
         // 같은 페이지면 바로 이동
+        console.log('✨ [executeQuickNav] 같은 페이지, 바로 이동');
         if (item.targetType === 'memo') {
+          console.log('📝 [executeQuickNav] handleNavigateToMemo 호출');
           handleNavigateToMemo(item.targetId);
         } else {
+          console.log('📁 [executeQuickNav] handleNavigateToCategory 호출');
           handleNavigateToCategory(item.targetId);
         }
       }

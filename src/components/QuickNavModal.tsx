@@ -69,7 +69,7 @@ const QuickNavModal: React.FC<QuickNavModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '600', color: '#1f2937' }}>
-          단축 이동 설정
+          즐겨찾기 설정
         </h3>
 
         <input
@@ -77,7 +77,7 @@ const QuickNavModal: React.FC<QuickNavModalProps> = ({
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={handleKeyPress}
-          placeholder="단축 이동 이름을 입력하세요"
+          placeholder="즐겨찾기 이름을 입력하세요"
           autoFocus
           style={{
             width: '100%',

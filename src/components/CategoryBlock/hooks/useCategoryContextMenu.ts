@@ -20,10 +20,31 @@ export const useCategoryContextMenu = ({
   isQuickNavExists
 }: UseCategoryContextMenuProps) => {
 
+  // 롱프레스 직후 시간을 추적하는 ref
+  const lastLongPressEndRef = React.useRef<number>(0);
+
   // 우클릭 컨텍스트 메뉴
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // 모바일(터치) 환경에서는 컨텍스트 메뉴 비활성화
+    // @ts-ignore - nativeEvent의 sourceCapabilities 체크
+    if (e.nativeEvent && e.nativeEvent.sourceCapabilities && e.nativeEvent.sourceCapabilities.firesTouchEvents) {
+      console.log('[CategoryBlock] 모바일 환경이므로 컨텍스트 메뉴 표시 안 함');
+      return;
+    }
+
+    // 롱프레스가 방금 끝났다면 (1000ms 이내) 컨텍스트 메뉴를 표시하지 않음
+    const now = Date.now();
+    if (now - lastLongPressEndRef.current < 1000) {
+      console.log('[CategoryBlock] 롱프레스 직후이므로 컨텍스트 메뉴 표시 안 함', {
+        경과시간: now - lastLongPressEndRef.current,
+        제한시간: 1000
+      });
+      return;
+    }
+
     setContextMenu({ x: e.clientX, y: e.clientY });
   };
 
@@ -59,6 +80,7 @@ export const useCategoryContextMenu = ({
   return {
     handleContextMenu,
     handleAddQuickNav,
-    handleQuickNavConfirm
+    handleQuickNavConfirm,
+    lastLongPressEndRef  // 롱프레스 종료 시간 ref export
   };
 };

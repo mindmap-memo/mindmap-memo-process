@@ -40,6 +40,8 @@ interface ImportanceFilterProps {
   onToggleFilter: (level: ImportanceLevel) => void;
   showGeneralContent: boolean;
   onToggleGeneralContent: () => void;
+  alwaysShowContent?: boolean;
+  onToggleAlwaysShowContent?: () => void;
   isMobile?: boolean;
 }
 
@@ -48,9 +50,11 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
   onToggleFilter,
   showGeneralContent,
   onToggleGeneralContent,
+  alwaysShowContent = false,
+  onToggleAlwaysShowContent,
   isMobile = false
 }) => {
-  const [isCollapsed, setIsCollapsed] = React.useState(false);
+  const [isCollapsed, setIsCollapsed] = React.useState(isMobile);
   const [position, setPosition] = React.useState({ x: 20, y: 70 });
   const [isDragging, setIsDragging] = React.useState(false);
   const [dragStart, setDragStart] = React.useState({ x: 0, y: 0 });
@@ -63,58 +67,61 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
   if (isMobile) {
     return (
       <div className={styles.mobileFilter}>
-        <div className={styles.mobileHeader}>
-          <span>중요도 필터</span>
-          <button
-            className={styles.mobileToggleButton}
-            onClick={() => setIsCollapsed(!isCollapsed)}
-          >
-            {isCollapsed ? '▼' : '▲'}
-          </button>
-        </div>
+        {/* 원형 토글 버튼 */}
+        <button
+          className={styles.mobileCircleButton}
+          onClick={() => setIsCollapsed(!isCollapsed)}
+        >
+          <span className={styles.circleButtonText}>중요도{'\n'}필터</span>
+        </button>
 
+        {/* 필터 목록 (원형 버튼 그리드) */}
         {!isCollapsed && (
-        <div className={styles.mobileContent}>
-          {importanceLevels.map(level => {
-            const isActive = activeFilters?.has(level) || false;
-            const bgColor = getImportanceStyle(level);
-            const label = IMPORTANCE_LABELS[level].replace(/^.{2}\s/, ''); // 이모지 제거
+          <div className={styles.mobileContent}>
+            {importanceLevels.map(level => {
+              const isActive = activeFilters?.has(level) || false;
+              const bgColor = getImportanceStyle(level);
+              const label = IMPORTANCE_LABELS[level].replace(/^.{2}\s/, ''); // 이모지 제거
 
-            return (
-              <div
-                key={level}
-                className={styles.mobileItem}
-                onClick={() => onToggleFilter(level)}
-              >
+              return (
                 <div
-                  className={styles.mobileColorSwatch}
-                  style={{
-                    backgroundColor: bgColor,
-                    opacity: isActive ? 1 : 0.5
-                  }}
+                  key={level}
+                  className={styles.mobileItem}
+                  onClick={() => onToggleFilter(level)}
                 >
-                  <span className={styles.swatchLabel}>{label}</span>
+                  <div
+                    className={styles.mobileColorSwatch}
+                    style={{
+                      backgroundColor: bgColor,
+                      opacity: isActive ? 1 : 0.5
+                    }}
+                  >
+                    <span className={styles.swatchLabel} style={{ color: '#000', fontSize: '10px', fontWeight: 700 }}>
+                      {label}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
 
-          {/* 일반 내용 필터 */}
-          <div
-            className={styles.mobileItem}
-            onClick={onToggleGeneralContent}
-          >
+            {/* 일반 내용 필터 */}
             <div
-              className={styles.mobileColorSwatch}
-              style={{
-                backgroundColor: '#f3f4f6',
-                opacity: showGeneralContent ? 1 : 0.5
-              }}
+              className={styles.mobileItem}
+              onClick={onToggleGeneralContent}
             >
-              <span className={styles.swatchLabel}>일반</span>
+              <div
+                className={styles.mobileColorSwatch}
+                style={{
+                  backgroundColor: '#f3f4f6',
+                  opacity: showGeneralContent ? 1 : 0.5
+                }}
+              >
+                <span className={styles.swatchLabel} style={{ color: '#000', fontSize: '10px', fontWeight: 700 }}>
+                  일반
+                </span>
+              </div>
             </div>
           </div>
-        </div>
         )}
       </div>
     );
@@ -256,6 +263,22 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
           전체 해제
         </button>
       </div>
+
+      {/* 내용 표시 토글 */}
+      {onToggleAlwaysShowContent && (
+        <div className={styles.alwaysShowSection}>
+          <label className={`${styles.item} ${styles.alwaysShowItem} ${alwaysShowContent ? styles.active : ''}`}>
+            <input
+              type="checkbox"
+              checked={alwaysShowContent}
+              onChange={onToggleAlwaysShowContent}
+            />
+            <span>
+              📄 내용 표시
+            </span>
+          </label>
+        </div>
+      )}
         </>
       )}
     </div>

@@ -4,19 +4,29 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background-color: transparent; // 태블릿 가로모드에서 Canvas가 보이도록 투명하게
+  pointer-events: none; // 레이아웃 자체는 이벤트 받지 않음
 }
 
 .viewContainer {
   flex: 1;
   overflow: hidden;
   position: relative;
-  /* 헤더는 fixed이므로 padding 제거 */
+  background-color: transparent; // 태블릿 가로모드에서 Canvas가 보이도록 투명하게
+  display: flex;
+  flex-direction: column;
+  pointer-events: none; // 컨테이너도 이벤트 받지 않음
 }
 
 .view {
+  flex: 1;
   width: 100%;
-  height: 100%;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto; // view는 이벤트 받음
+  position: relative;
+  // z-index 제거: stacking context를 만들면 MobileSearchResults를 덮어버림
 }
 
 .editorOverlay {
@@ -85,9 +95,65 @@
   }
 }
 
+.connectionButton {
+  position: fixed;
+  bottom: 92px; // FAB 버튼 위 (24 + 56 + 12)
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 28px;
+  border: none;
+  background-color: #10b981;
+  color: white;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  transition: all 0.2s ease, transform 0.3s ease;
+  z-index: 1600;
+  pointer-events: auto; // MobileLayout이 pointer-events: none이므로 필수
+
+  &.active {
+    background-color: #ef4444;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      background-color: #059669;
+      box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+    }
+
+    &.active:hover {
+      background-color: #dc2626;
+      box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+    }
+  }
+
+  // 태블릿 가로모드: 우측 패널 너비만큼 왼쪽으로 이동 (+버튼과 동일)
+  @media (min-width: 769px) and (max-width: 1366px) and (orientation: landscape) {
+    transform: translateX(calc(-1 * var(--right-panel-offset, 0px)));
+
+    &:active {
+      transform: translateX(calc(-1 * var(--right-panel-offset, 0px))) scale(0.95);
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    }
+  }
+
+  // 다른 모드에서는 scale만 적용
+  @media not all and (min-width: 769px) and (max-width: 1366px) and (orientation: landscape) {
+    &:active {
+      transform: scale(0.95);
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    }
+  }
+}
+
 .fabButton {
   position: fixed;
-  bottom: 140px; // ImportanceFilter 위
+  bottom: 24px; // 하단에서 24px
   right: 20px;
   width: 56px;
   height: 56px;
@@ -101,13 +167,9 @@
   justify-content: center;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
-  transition: all 0.2s ease;
+  transition: all 0.2s ease, transform 0.3s ease;
   z-index: 1600;
-
-  &:active {
-    transform: scale(0.95);
-    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
-  }
+  pointer-events: auto; // MobileLayout이 pointer-events: none이므로 필수
 
   @media (hover: hover) {
     &:hover {
@@ -115,17 +177,42 @@
       box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
     }
   }
+
+  // 태블릿 가로모드: 우측 패널 너비만큼 왼쪽으로 이동
+  @media (min-width: 769px) and (max-width: 1366px) and (orientation: landscape) {
+    transform: translateX(calc(-1 * var(--right-panel-offset, 0px)));
+
+    &:active {
+      transform: translateX(calc(-1 * var(--right-panel-offset, 0px))) scale(0.95);
+      box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+    }
+  }
+
+  // 다른 모드에서는 scale만 적용
+  @media not all and (min-width: 769px) and (max-width: 1366px) and (orientation: landscape) {
+    &:active {
+      transform: scale(0.95);
+      box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+    }
+  }
 }
 
 .fabMenu {
   position: fixed;
-  bottom: 205px; // FAB 버튼 위
-  right: 20px;
+  bottom: 24px; // FAB 버튼과 같은 높이
+  right: 88px; // FAB 버튼 왼쪽 (20 + 56 + 12)
   display: flex;
   flex-direction: column;
   gap: 12px;
   z-index: 1650;
-  animation: slideUp 0.2s ease-out;
+  pointer-events: auto; // MobileLayout이 pointer-events: none이므로 필수
+  transition: transform 0.3s ease, opacity 0.2s ease;
+  animation: fabMenuFadeIn 0.2s ease-out;
+
+  // 태블릿 가로모드: 우측 패널 너비만큼 왼쪽으로 이동
+  @media (min-width: 769px) and (max-width: 1366px) and (orientation: landscape) {
+    transform: translateX(calc(-1 * var(--right-panel-offset, 0px)));
+  }
 }
 
 .fabMenuItem {
@@ -194,4 +281,50 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
+}
+
+@keyframes fabMenuFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideLeft {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.noPageContainer {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fff;
+}
+
+.loadingMessage {
+  font-size: 16px;
+  color: #666;
+  text-align: center;
 }

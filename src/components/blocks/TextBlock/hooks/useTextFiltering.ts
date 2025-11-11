@@ -15,7 +15,7 @@ export const useTextFiltering = (
       return content;
     }
 
-    if (!block.importanceRanges || block.importanceRanges.length === 0) {
+    if (!block.importanceRanges || !Array.isArray(block.importanceRanges) || block.importanceRanges.length === 0) {
       return showGeneralContent === false ? '' : content;
     }
 

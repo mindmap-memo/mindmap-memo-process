@@ -59,6 +59,20 @@ export async function POST(request: NextRequest) {
         ${JSON.stringify(children)},
         ${parentId || null}
       )
+      ON CONFLICT (id) DO UPDATE SET
+        title = EXCLUDED.title,
+        tags = EXCLUDED.tags,
+        connections = EXCLUDED.connections,
+        position_x = EXCLUDED.position_x,
+        position_y = EXCLUDED.position_y,
+        original_position_x = EXCLUDED.original_position_x,
+        original_position_y = EXCLUDED.original_position_y,
+        width = EXCLUDED.width,
+        height = EXCLUDED.height,
+        is_expanded = EXCLUDED.is_expanded,
+        children = EXCLUDED.children,
+        parent_id = EXCLUDED.parent_id,
+        updated_at = NOW()
     `;
 
     return NextResponse.json({ success: true, id }, { status: 201 });

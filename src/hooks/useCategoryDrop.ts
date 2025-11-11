@@ -64,35 +64,25 @@ export const useCategoryDrop = ({
     // isShiftMode 파라미터 우선, 없으면 ref 체크 (롱프레스 지원)
     const isShiftPressed = isShiftMode !== undefined ? isShiftMode : isShiftPressedRef.current;
 
-    console.log('[detectCategoryDropForCategory] 호출됨', {
-      categoryId,
-      position,
-      isShiftPressed
-    });
-
-    const currentPage = pages.find(p => p.id === currentPageId);
+    const currentPage = pages?.find(p => p.id === currentPageId);
     if (!currentPage || !currentPage.categories) {
-      console.log('[detectCategoryDropForCategory] currentPage 또는 categories 없음');
       return;
     }
 
     const draggedCategory = currentPage.categories.find(c => c.id === categoryId);
     if (!draggedCategory) {
-      console.log('[detectCategoryDropForCategory] 드래그된 카테고리 찾지 못함:', categoryId);
       return;
     }
 
-    console.log('[detectCategoryDropForCategory] Shift 체크', {
-      isShiftPressed,
-      willCall: isShiftPressed
-    });
-
     // Shift 키가 눌려있으면 카테고리-카테고리 종속 모드
     if (isShiftPressed) {
-      console.log('[detectCategoryDropForCategory] handleShiftDropCategory 호출');
-      handleShiftDropCategory(draggedCategory, position, currentPage, shiftDragAreaCache.current);
-    } else {
-      console.log('[detectCategoryDropForCategory] Shift 안 눌림 - 종료');
+      // Object를 Map으로 변환
+      const cachedAreasMap = new Map<string, any>();
+      Object.entries(shiftDragAreaCache.current).forEach(([key, value]) => {
+        cachedAreasMap.set(key, value);
+      });
+
+      handleShiftDropCategory(draggedCategory, position, currentPage, cachedAreasMap);
     }
   }, [pages, currentPageId, isShiftPressedRef, shiftDragAreaCache, handleShiftDropCategory]);
 
@@ -108,7 +98,7 @@ export const useCategoryDrop = ({
       return;
     }
 
-    const currentPage = pages.find(p => p.id === currentPageId);
+    const currentPage = pages?.find(p => p.id === currentPageId);
     if (!currentPage || !currentPage.categories) {
       return;
     }
@@ -120,7 +110,13 @@ export const useCategoryDrop = ({
 
     // Shift 키가 눌려있으면 새 메모 복사 모드
     if (isShiftPressed) {
-      handleShiftDrop(draggedMemo, position, currentPage, shiftDragAreaCache.current);
+      // Object를 Map으로 변환
+      const cachedAreasMap = new Map<string, any>();
+      Object.entries(shiftDragAreaCache.current).forEach(([key, value]) => {
+        cachedAreasMap.set(key, value);
+      });
+
+      handleShiftDrop(draggedMemo, position, currentPage, cachedAreasMap);
       return;
     }
 

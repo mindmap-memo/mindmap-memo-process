@@ -1,4 +1,5 @@
 import React from 'react';
+import { Trash2 } from 'lucide-react';
 import { Page } from '../../../types';
 import { isInsideCollapsedCategory } from '../../../utils/categoryHierarchyUtils';
 
@@ -27,6 +28,8 @@ interface UseConnectionLineRenderingParams {
   onRemoveConnection: (fromId: string, toId: string) => void;
   onConnectMemos: (fromId: string, toId: string) => void;
   getConnectionPoints: (block: any) => any;
+  canvasScale: number;
+  onOpenEditor?: () => void;  // 모바일/태블릿 모드 판단용
 }
 
 export const useConnectionLineRendering = (params: UseConnectionLineRenderingParams) => {
@@ -39,7 +42,9 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
     dragLineEnd,
     onRemoveConnection,
     onConnectMemos,
-    getConnectionPoints
+    getConnectionPoints,
+    canvasScale,
+    onOpenEditor  // 모바일/태블릿 모드 판단용
   } = params;
 
   /**
@@ -67,23 +72,18 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
           return;
         }
 
-        // 최신 크기 정보로 연결점 계산
+        // 최신 크기 정보로 연결점 계산 (DOM 기반)
         const fromPoints = getConnectionPoints(memo);
         const toPoints = getConnectionPoints(connectedMemo);
 
-        const fromWidth = memo.size?.width || 200;
-        const fromHeight = memo.size?.height || 95;
-        const toWidth = connectedMemo.size?.width || 200;
-        const toHeight = connectedMemo.size?.height || 95;
-
-        // 원본 메모 좌표로 중심점 계산
+        // 중심점 계산 (연결점으로부터 계산)
         const centerFrom = {
-          x: memo.position.x + fromWidth / 2,
-          y: memo.position.y + fromHeight / 2
+          x: (fromPoints.left.x + fromPoints.right.x) / 2,
+          y: (fromPoints.top.y + fromPoints.bottom.y) / 2
         };
         const centerTo = {
-          x: connectedMemo.position.x + toWidth / 2,
-          y: connectedMemo.position.y + toHeight / 2
+          x: (toPoints.left.x + toPoints.right.x) / 2,
+          y: (toPoints.top.y + toPoints.bottom.y) / 2
         };
 
         const dx = centerTo.x - centerFrom.x;
@@ -109,10 +109,18 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
           }
         }
 
+        // 연결선 중간 지점 계산
+        const midX = (fromPoint.x + toPoint.x) / 2;
+        const midY = (fromPoint.y + toPoint.y) / 2;
+
+        // 모바일/태블릿 연결 모드 또는 PC 연결 해제 모드에서 삭제 UI 표시
+        const isMobileOrTablet = !!onOpenEditor;
+        const showDeleteUI = isDisconnectMode || (isMobileOrTablet && isConnecting);
+
         lines.push(
           <g key={`${memo.id}-${connId}`}>
             {/* 투명한 넓은 클릭 영역 */}
-            {isDisconnectMode && (
+            {showDeleteUI && (
               <line
                 x1={fromPoint.x}
                 y1={fromPoint.y}
@@ -131,19 +139,51 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
                 }}
               />
             )}
-            {/* 실제 보이는 연결선 */}
+            {/* 실제 보이는 연결선 - 모든 연결선 보라색 통일 */}
             <line
               x1={fromPoint.x}
               y1={fromPoint.y}
               x2={toPoint.x}
               y2={toPoint.y}
-              stroke={isDisconnectMode ? "#ef4444" : "#9ca3af"}
-              strokeWidth={isDisconnectMode ? "4" : "2"}
+              stroke={showDeleteUI ? "#ef4444" : "#a855f7"}
+              strokeWidth={showDeleteUI ? "4" : "2"}
               style={{
-                strokeDasharray: isDisconnectMode ? '5,5' : '4,4',
+                strokeDasharray: showDeleteUI ? '5,5' : '8,4',
                 pointerEvents: 'none'
               }}
             />
+            {/* Disconnect 모드 또는 모바일 연결 모드일 때 삭제 버튼 표시 */}
+            {showDeleteUI && (
+              <g transform={`translate(${midX}, ${midY})`}>
+                {/* 배경 원 */}
+                <circle
+                  r={20 / Math.sqrt(canvasScale)}
+                  fill="#ef4444"
+                  stroke="white"
+                  strokeWidth={3 / Math.sqrt(canvasScale)}
+                  style={{
+                    cursor: 'pointer',
+                    pointerEvents: 'auto',
+                    filter: 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3))'
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onRemoveConnection(memo.id, connId);
+                  }}
+                />
+                {/* 쓰레기통 아이콘 */}
+                <foreignObject
+                  x={-12 / Math.sqrt(canvasScale)}
+                  y={-12 / Math.sqrt(canvasScale)}
+                  width={24 / Math.sqrt(canvasScale)}
+                  height={24 / Math.sqrt(canvasScale)}
+                  style={{ pointerEvents: 'none' }}
+                >
+                  <Trash2 size={24 / Math.sqrt(canvasScale)} color="white" />
+                </foreignObject>
+              </g>
+            )}
           </g>
         );
       });
@@ -204,10 +244,18 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
           }
         }
 
+        // 연결선 중간 지점 계산
+        const midX = (fromPoint.x + toPoint.x) / 2;
+        const midY = (fromPoint.y + toPoint.y) / 2;
+
+        // 모바일/태블릿 연결 모드 또는 PC 연결 해제 모드에서 삭제 UI 표시
+        const isMobileOrTablet = !!onOpenEditor;
+        const showDeleteUI = isDisconnectMode || (isMobileOrTablet && isConnecting);
+
         lines.push(
           <g key={`category-${category.id}-${connId}`}>
             {/* 투명한 넓은 클릭 영역 */}
-            {isDisconnectMode && (
+            {showDeleteUI && (
               <line
                 x1={fromPoint.x}
                 y1={fromPoint.y}
@@ -226,19 +274,51 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
                 }}
               />
             )}
-            {/* 실제 보이는 연결선 (카테고리는 보라색, 메모-카테고리는 초록색) */}
+            {/* 실제 보이는 연결선 - 모든 연결선 보라색 통일 */}
             <line
               x1={fromPoint.x}
               y1={fromPoint.y}
               x2={toPoint.x}
               y2={toPoint.y}
-              stroke={isDisconnectMode ? "#ef4444" : (connectedMemo ? "#10b981" : "#a855f7")}
-              strokeWidth={isDisconnectMode ? "4" : "2"}
+              stroke={showDeleteUI ? "#ef4444" : "#a855f7"}
+              strokeWidth={showDeleteUI ? "4" : "2"}
               style={{
-                strokeDasharray: isDisconnectMode ? '5,5' : (connectedMemo ? '6,3' : '8,4'),
+                strokeDasharray: showDeleteUI ? '5,5' : '8,4',
                 pointerEvents: 'none'
               }}
             />
+            {/* Disconnect 모드 또는 모바일 연결 모드일 때 삭제 버튼 표시 */}
+            {showDeleteUI && (
+              <g transform={`translate(${midX}, ${midY})`}>
+                {/* 배경 원 */}
+                <circle
+                  r={20 / Math.sqrt(canvasScale)}
+                  fill="#ef4444"
+                  stroke="white"
+                  strokeWidth={3 / Math.sqrt(canvasScale)}
+                  style={{
+                    cursor: 'pointer',
+                    pointerEvents: 'auto',
+                    filter: 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3))'
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onRemoveConnection(category.id, connId);
+                  }}
+                />
+                {/* 쓰레기통 아이콘 */}
+                <foreignObject
+                  x={-12 / Math.sqrt(canvasScale)}
+                  y={-12 / Math.sqrt(canvasScale)}
+                  width={24 / Math.sqrt(canvasScale)}
+                  height={24 / Math.sqrt(canvasScale)}
+                  style={{ pointerEvents: 'none' }}
+                >
+                  <Trash2 size={24 / Math.sqrt(canvasScale)} color="white" />
+                </foreignObject>
+              </g>
+            )}
           </g>
         );
       });
@@ -258,15 +338,12 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
         if (connectingFromDirection) {
           fromPoint = fromPoints[connectingFromDirection];
         } else {
-          const connectingWidth = connectingMemo.size?.width || 200;
-          const connectingHeight = connectingMemo.size?.height || 95;
-
-          // 원본 메모 좌표로 중심점 계산
+          // 중심점 계산 (연결점으로부터 계산)
           const centerFrom = {
-            x: connectingMemo.position.x + connectingWidth / 2,
-            y: connectingMemo.position.y + connectingHeight / 2
+            x: (fromPoints.left.x + fromPoints.right.x) / 2,
+            y: (fromPoints.top.y + fromPoints.bottom.y) / 2
           };
-          // dragLineEnd를 원본 좌표로 변환
+
           const dx = dragLineEnd.x - centerFrom.x;
           const dy = dragLineEnd.y - centerFrom.y;
 
@@ -332,7 +409,8 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
     dragLineEnd,
     getConnectionPoints,
     onRemoveConnection,
-    onConnectMemos
+    onConnectMemos,
+    canvasScale
   ]);
 
   return {

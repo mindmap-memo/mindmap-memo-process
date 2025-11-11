@@ -1,5 +1,7 @@
 import React from 'react';
 import { CategoryBlock } from '../../../types';
+import { detectDoubleTap } from '../../../utils/doubleTapUtils';
+import { DRAG_THRESHOLD, LONG_PRESS_DURATION, POSITION_UPDATE_THROTTLE } from '../../../utils/constants';
 
 interface UseCategoryDragHandlersProps {
   category: CategoryBlock;
@@ -13,14 +15,17 @@ interface UseCategoryDragHandlersProps {
   canvasOffset: { x: number; y: number };
   pendingPosition: React.MutableRefObject<{ x: number; y: number } | null>;
   lastUpdateTime: React.MutableRefObject<number>;
-  lastTapTimeRef: React.MutableRefObject<number>;
   longPressTimerRef: React.MutableRefObject<NodeJS.Timeout | null>;
   isLongPressActive: boolean;
+  isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref 추가
+  lastLongPressEndRef?: React.MutableRefObject<number>;  // 롱프레스 종료 시간 ref
   setMouseDownPos: (value: { x: number; y: number } | null) => void;
   setDragMoved: (value: boolean) => void;
   setDragStart: (value: { x: number; y: number }) => void;
   setIsDraggingPosition: (value: boolean) => void;
   setIsLongPressActive: (value: boolean) => void;
+  setIsLongPressActiveGlobal?: (value: boolean, targetId?: string | null) => void;  // 전역 롱프레스 상태 업데이트
+  setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수 추가
   onClick?: (categoryId: string, isShiftClick?: boolean) => void;
   onDragStart?: (e: React.DragEvent) => void;
   onDragEnd?: (e: React.DragEvent) => void;
@@ -29,10 +34,6 @@ interface UseCategoryDragHandlersProps {
   onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }, isShiftMode?: boolean) => void;
   onOpenEditor?: () => void;
 }
-
-const DRAG_THRESHOLD = 5;
-const DOUBLE_TAP_DELAY = 300;
-const LONG_PRESS_DURATION = 500; // 0.5초
 
 export const useCategoryDragHandlers = ({
   category,
@@ -46,14 +47,17 @@ export const useCategoryDragHandlers = ({
   canvasOffset,
   pendingPosition,
   lastUpdateTime,
-  lastTapTimeRef,
   longPressTimerRef,
   isLongPressActive,
+  isShiftPressedRef,  // Shift ref 추가
+  lastLongPressEndRef,  // 롱프레스 종료 시간 ref
   setMouseDownPos,
   setDragMoved,
   setDragStart,
   setIsDraggingPosition,
   setIsLongPressActive,
+  setIsLongPressActiveGlobal,
+  setIsShiftPressed,  // Shift 상태 업데이트 함수
   onClick,
   onDragStart,
   onDragEnd,
@@ -62,23 +66,38 @@ export const useCategoryDragHandlers = ({
   onDetectCategoryDropForCategory,
   onOpenEditor
 }: UseCategoryDragHandlersProps) => {
+  // 롱프레스 상태를 ref로 추적 (useCallback 클로저 문제 해결)
+  const isLongPressActiveRef = React.useRef(isLongPressActive);
+  React.useEffect(() => {
+    isLongPressActiveRef.current = isLongPressActive;
+  }, [isLongPressActive]);
 
   /**
    * 롱프레스 타이머 시작
    */
   const startLongPressTimer = () => {
-    console.log('[CategoryBlock] 롱프레스 타이머 시작됨 - 1초 후 활성화 예정');
-
     // 기존 타이머가 있으면 취소
     if (longPressTimerRef.current) {
-      console.log('[CategoryBlock] 기존 타이머 취소');
       clearTimeout(longPressTimerRef.current);
     }
 
     // 1초 후 롱프레스 활성화
     longPressTimerRef.current = setTimeout(() => {
-      console.log('[CategoryBlock] 롱프레스 감지! Shift+드래그 모드 활성화');
       setIsLongPressActive(true);
+      setIsLongPressActiveGlobal?.(true, category.id);
+
+      // Shift 상태도 함께 업데이트
+      if (isShiftPressedRef) {
+        isShiftPressedRef.current = true;
+      }
+      setIsShiftPressed?.(true);
+
+      // ⚠️ 롱프레스 활성화 시 즉시 드래그 시작
+      if (!isDraggingRef.current && mouseDownPos) {
+        isDraggingRef.current = true;
+        setIsDraggingPosition(true);
+        onClick?.(category.id, false);
+      }
 
       // 햅틱 피드백 (모바일)
       if (navigator.vibrate) {
@@ -92,13 +111,18 @@ export const useCategoryDragHandlers = ({
    */
   const cancelLongPressTimer = () => {
     if (longPressTimerRef.current) {
-      console.log('[CategoryBlock] 롱프레스 타이머 취소됨');
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    // 액션 버튼(편집, 즐겨찾기, 삭제)을 클릭한 경우 드래그 로직 건너뛰기
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-action-button]')) {
+      return;
+    }
+
     // 캔버스의 드래그 선택이 시작되지 않도록 이벤트 전파 중단
     e.stopPropagation();
 
@@ -126,14 +150,11 @@ export const useCategoryDragHandlers = ({
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    console.log('[CategoryBlock TouchStart]', { categoryId: category.id, touches: e.touches.length });
-
     // 캔버스의 드래그 선택이 시작되지 않도록 이벤트 전파 중단
     e.stopPropagation();
 
     if (!isConnecting && !isEditing && e.touches.length === 1) {
       const touch = e.touches[0];
-      console.log('[CategoryBlock TouchStart] 드래그 준비 완료', { x: touch.clientX, y: touch.clientY });
 
       // 터치 다운 위치 저장 (임계값 판단용)
       setMouseDownPos({ x: touch.clientX, y: touch.clientY });
@@ -162,11 +183,11 @@ export const useCategoryDragHandlers = ({
         y: (clientY - dragStart.y - canvasOffset.y) / canvasScale
       };
 
-      // 빠른 드래그 시 업데이트 빈도 조절 (50ms마다만 업데이트)
+      // 빠른 드래그 시 업데이트 빈도 조절
       const now = Date.now();
       pendingPosition.current = newPosition;
 
-      if (now - lastUpdateTime.current >= 50) {
+      if (now - lastUpdateTime.current >= POSITION_UPDATE_THROTTLE) {
         onPositionChange(category.id, newPosition);
         lastUpdateTime.current = now;
       }
@@ -209,12 +230,9 @@ export const useCategoryDragHandlers = ({
         Math.pow(touch.clientY - mouseDownPos.y, 2)
       );
 
-      console.log('[CategoryBlock TouchMove] 임계값 체크', { distance, threshold: DRAG_THRESHOLD });
-
-      // 임계값을 넘으면 드래그 시작
-      if (distance >= DRAG_THRESHOLD) {
-        console.log('[CategoryBlock TouchMove] 드래그 시작!');
-        // 드래그가 시작되면 롱프레스 타이머 취소
+      // 롱프레스가 활성화되었거나 임계값을 넘으면 드래그 시작
+      if (isLongPressActiveRef.current || distance >= DRAG_THRESHOLD) {
+        // 드래그가 시작되면 롱프레스 타이머 취소 (아직 발동 전인 경우)
         cancelLongPressTimer();
         isDraggingRef.current = true;
         setIsDraggingPosition(true);
@@ -230,7 +248,6 @@ export const useCategoryDragHandlers = ({
 
     if (e.touches.length === 1) {
       const touch = e.touches[0];
-      console.log('[CategoryBlock TouchMove] 위치 업데이트', { x: touch.clientX, y: touch.clientY });
       updatePosition(touch.clientX, touch.clientY);
       e.preventDefault(); // 스크롤 방지
     }
@@ -241,7 +258,8 @@ export const useCategoryDragHandlers = ({
     cancelLongPressTimer();
 
     // 실제 Shift 키 또는 롱프레스로 인한 가상 Shift 모드
-    const effectiveShiftMode = shiftKey || isLongPressActive;
+    // ⚠️ 중요: ref를 사용하여 최신 값 참조 (useCallback 클로저 문제 해결)
+    const effectiveShiftMode = shiftKey || isLongPressActiveRef.current;
 
     if (isDraggingRef.current) {
       // ref를 즉시 false로 설정하여 추가 이벤트 무시
@@ -258,7 +276,6 @@ export const useCategoryDragHandlers = ({
 
       // Shift 모드(또는 롱프레스)일 때 카테고리 드롭 감지
       if (effectiveShiftMode && onDetectCategoryDropForCategory) {
-        console.log('[CategoryDragHandlers] effectiveShiftMode 활성화 - detectCategoryDropForCategory 호출');
         onDetectCategoryDropForCategory(category.id, finalPosition, true);
       }
 
@@ -273,8 +290,28 @@ export const useCategoryDragHandlers = ({
     // 모든 경우에 상태 초기화 (드래그 임계값 미달로 드래그가 시작되지 않은 경우 포함)
     setIsDraggingPosition(false);
     setMouseDownPos(null);
+
+    // Shift 상태도 함께 리셋 (롱프레스로 활성화된 경우)
+    // ⚠️ 중요: ref를 사용하여 최신 값 참조 (useCallback 클로저 문제 해결)
+    const wasLongPressActive = isLongPressActiveRef.current;
+
     setIsLongPressActive(false); // 롱프레스 상태 리셋
-  }, [onPositionDragEnd, category.id, dragStart, canvasOffset, canvasScale, isDraggingRef, pendingPosition, lastUpdateTime, setIsDraggingPosition, setMouseDownPos, dragMoved, onClick, isLongPressActive, setIsLongPressActive]);
+    // 전역 상태 업데이트
+    setIsLongPressActiveGlobal?.(false, null);
+
+    // 롱프레스가 활성화되어 있었다면 Shift도 리셋
+    if (wasLongPressActive) {
+      // 롱프레스 종료 시간 기록 (컨텍스트 메뉴 방지용)
+      if (lastLongPressEndRef) {
+        lastLongPressEndRef.current = Date.now();
+      }
+      // ref도 직접 리셋
+      if (isShiftPressedRef) {
+        isShiftPressedRef.current = false;
+      }
+      setIsShiftPressed?.(false);
+    }
+  }, [onPositionDragEnd, category.id, dragStart, canvasOffset, canvasScale, isDraggingRef, pendingPosition, lastUpdateTime, setIsDraggingPosition, setMouseDownPos, dragMoved, onClick, setIsLongPressActive, setIsLongPressActiveGlobal, setIsShiftPressed]);
 
   const handleMouseUp = React.useCallback((e: MouseEvent) => {
     finishDrag(e.clientX, e.clientY, e.shiftKey);
@@ -297,19 +334,16 @@ export const useCategoryDragHandlers = ({
     if (dragMoved || isEditing) return;
 
     // 더블탭 감지
-    const currentTime = new Date().getTime();
-    const tapTimeDiff = currentTime - lastTapTimeRef.current;
+    const isDoubleTap = detectDoubleTap(category.id);
 
-    if (tapTimeDiff < DOUBLE_TAP_DELAY && tapTimeDiff > 0) {
+    if (isDoubleTap) {
       // 더블탭: 에디터 열기
       if (onOpenEditor) {
         onOpenEditor();
       }
-      lastTapTimeRef.current = 0; // 리셋
     } else {
       // 싱글탭: 카테고리 선택만
       onClick?.(category.id, e.shiftKey);
-      lastTapTimeRef.current = currentTime;
     }
   };
 

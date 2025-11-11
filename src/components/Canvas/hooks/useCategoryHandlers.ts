@@ -151,7 +151,14 @@ export const useCategoryHandlers = (params: UseCategoryHandlersParams) => {
     e.stopPropagation();
 
     try {
-      const dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
+      const dataText = e.dataTransfer.getData('text/plain');
+
+      // 빈 문자열이거나 유효한 JSON이 아니면 조용히 무시
+      if (!dataText || dataText.trim() === '') {
+        return;
+      }
+
+      const dragData = JSON.parse(dataText);
 
       if (dragData.type === 'memo' || dragData.type === 'category') {
         onMoveToCategory(dragData.id, categoryId);
@@ -166,7 +173,8 @@ export const useCategoryHandlers = (params: UseCategoryHandlersParams) => {
         }
       }
     } catch (error) {
-      console.error('카테고리 영역 드롭 처리 중 오류:', error);
+      // JSON 파싱 실패 시 조용히 무시 (카테고리 영역 드래그는 onMouseDown으로 처리되므로 여기서는 무시)
+      return;
     }
   }, [onMoveToCategory, setDraggedCategoryAreas]);
 

@@ -28,7 +28,7 @@ export function calculateCategoryArea(
   }
   visited.add(category.id);
 
-  const childMemos = page.memos.filter(memo => memo.parentId === category.id);
+  const childMemos = page.memos?.filter(memo => memo.parentId === category.id) || [];
   const childCategories = page.categories?.filter(cat => cat.parentId === category.id) || [];
 
   // 카테고리 블록 자체의 위치와 크기
@@ -43,8 +43,10 @@ export function calculateCategoryArea(
 
   // 하위 메모들의 경계 포함
   childMemos.forEach(memo => {
+    // 메모의 실제 저장된 크기를 사용 (스케일은 Canvas에서 적용됨)
     const memoWidth = memo.size?.width || DEFAULT_MEMO_WIDTH;
     const memoHeight = memo.size?.height || DEFAULT_MEMO_HEIGHT;
+
     minX = Math.min(minX, memo.position.x);
     minY = Math.min(minY, memo.position.y);
     maxX = Math.max(maxX, memo.position.x + memoWidth);
@@ -320,17 +322,146 @@ export function centerCanvasOnPosition(
   canvasHeight: number,
   canvasScale: number
 ): { x: number; y: number } {
+  // 모바일 체크 (768px 이하)
+  const isMobile = window.innerWidth <= 768;
+
+  // 모바일에서는 실제 화면 크기 사용, PC에서는 전달된 값 사용
+  const actualCanvasWidth = isMobile ? window.innerWidth : canvasWidth;
+  const actualCanvasHeight = isMobile ? window.innerHeight : canvasHeight;
+
   // 타겟 위치를 스케일 적용한 좌표로 변환
   const scaledTargetX = targetPosition.x * canvasScale;
   const scaledTargetY = targetPosition.y * canvasScale;
 
   // 캔버스 중앙 좌표
-  const centerX = canvasWidth / 2;
-  const centerY = canvasHeight / 2;
+  const centerX = actualCanvasWidth / 2;
+  const centerY = actualCanvasHeight / 2;
 
   // 타겟이 중앙에 오도록 오프셋 계산
   const newOffsetX = centerX - scaledTargetX;
   const newOffsetY = centerY - scaledTargetY;
 
   return { x: newOffsetX, y: newOffsetY };
+}
+
+/**
+ * 메모를 화면 중앙으로 이동
+ * @param memoId - 메모 ID
+ * @param page - 현재 페이지
+ * @param canvasScale - 캔버스 스케일
+ * @param setCanvasOffset - 캔버스 오프셋 설정 함수
+ */
+export function centerOnMemo(
+  memoId: string,
+  page: Page,
+  canvasScale: number,
+  setCanvasOffset: (offset: { x: number; y: number }) => void,
+  setCanvasScale?: (scale: number) => void
+): void {
+  console.log('🎯 [centerOnMemo] 호출됨:', { memoId, pageId: page.id, currentScale: canvasScale });
+
+  const memo = page.memos?.find(m => m.id === memoId);
+  if (!memo) {
+    console.error('❌ [centerOnMemo] 메모를 찾을 수 없음:', memoId);
+    return;
+  }
+
+  const canvasElement = document.getElementById('main-canvas');
+  if (!canvasElement) {
+    console.error('❌ [centerOnMemo] Canvas 요소를 찾을 수 없음');
+    return;
+  }
+
+  const rect = canvasElement.getBoundingClientRect();
+  const centerX = rect.width / 2;
+  const centerY = rect.height / 2;
+  console.log('📐 [centerOnMemo] Canvas 크기:', { width: rect.width, height: rect.height });
+
+  const memoWidth = memo.size?.width || 200;
+  const memoHeight = memo.size?.height || 150;
+
+  // 메모의 중심점을 화면 중앙에 위치시키기
+  const itemCenterX = memo.position.x + (memoWidth / 2);
+  const itemCenterY = memo.position.y + (memoHeight / 2);
+  console.log('📍 [centerOnMemo] 메모 위치:', { x: memo.position.x, y: memo.position.y, centerX: itemCenterX, centerY: itemCenterY });
+
+  // scale을 1로 리셋 (PC 버전 로직과 동일)
+  const targetScale = 1;
+  const newOffsetX = centerX - (itemCenterX * targetScale);
+  const newOffsetY = centerY - (itemCenterY * targetScale);
+  console.log('🔄 [centerOnMemo] 새 offset 계산:', { newOffsetX, newOffsetY, targetScale });
+
+  setCanvasOffset({ x: newOffsetX, y: newOffsetY });
+  if (setCanvasScale) {
+    setCanvasScale(targetScale);
+    console.log('✅ [centerOnMemo] offset 및 scale 설정 완료');
+  } else {
+    console.log('✅ [centerOnMemo] offset 설정 완료 (scale 설정 함수 없음)');
+  }
+}
+
+/**
+ * 카테고리 영역 전체를 화면 중앙으로 이동
+ * @param categoryId - 카테고리 ID
+ * @param page - 현재 페이지
+ * @param canvasScale - 캔버스 스케일
+ * @param setCanvasOffset - 캔버스 오프셋 설정 함수
+ */
+export function centerOnCategory(
+  categoryId: string,
+  page: Page,
+  canvasScale: number,
+  setCanvasOffset: (offset: { x: number; y: number }) => void,
+  setCanvasScale?: (scale: number) => void
+): void {
+  const category = page.categories?.find(c => c.id === categoryId);
+  if (!category) return;
+
+  const canvasElement = document.getElementById('main-canvas');
+  if (!canvasElement) return;
+
+  const rect = canvasElement.getBoundingClientRect();
+  const availableWidth = rect.width;
+  const availableHeight = rect.height;
+
+  // 카테고리의 전체 영역 계산
+  const categoryArea = calculateCategoryArea(category, page);
+
+  if (categoryArea && category.isExpanded) {
+    // 영역이 있고 확장된 상태면 전체 영역이 화면에 보이도록 조정 (PC 버전 로직)
+    const areaWidth = categoryArea.width;
+    const areaHeight = categoryArea.height;
+    const areaCenterX = categoryArea.x + areaWidth / 2;
+    const areaCenterY = categoryArea.y + areaHeight / 2;
+
+    // 영역이 화면에 맞도록 스케일 계산 (여백 20% 추가)
+    const margin = 0.2;
+    const scaleX = availableWidth / (areaWidth * (1 + margin));
+    const scaleY = availableHeight / (areaHeight * (1 + margin));
+    const optimalScale = Math.min(scaleX, scaleY, 1); // 최대 1배 (확대 안함)
+
+    // 화면 중앙에 영역이 오도록 offset 계산
+    const newOffsetX = availableWidth / 2 - areaCenterX * optimalScale;
+    const newOffsetY = availableHeight / 2 - areaCenterY * optimalScale;
+
+    setCanvasOffset({ x: newOffsetX, y: newOffsetY });
+    if (setCanvasScale) {
+      setCanvasScale(optimalScale);
+    }
+  } else {
+    // 영역이 없거나 축소된 상태면 카테고리 블록만 중앙에 표시
+    const categoryWidth = category.size?.width || 200;
+    const categoryHeight = category.size?.height || 80;
+    const categoryCenterX = category.position.x + categoryWidth / 2;
+    const categoryCenterY = category.position.y + categoryHeight / 2;
+
+    const targetScale = 1;
+    const newOffsetX = availableWidth / 2 - categoryCenterX * targetScale;
+    const newOffsetY = availableHeight / 2 - categoryCenterY * targetScale;
+
+    setCanvasOffset({ x: newOffsetX, y: newOffsetY });
+    if (setCanvasScale) {
+      setCanvasScale(targetScale);
+    }
+  }
 }

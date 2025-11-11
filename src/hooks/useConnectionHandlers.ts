@@ -56,13 +56,13 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
   /**
    * 두 메모/카테고리를 연결
    * - 메모끼리만, 카테고리끼리만 연결 가능
-   * - 카테고리의 경우 부모-자식 관계가 있으면 연결 금지
+   * - 부모-자식 관계가 있으면 연결 금지 (메모-메모, 메모-카테고리, 카테고리-카테고리 모두 해당)
    */
   const connectMemos = useCallback((fromId: string, toId: string) => {
     if (fromId === toId) return;
 
     // 현재 페이지에서 아이템 타입 확인
-    const currentPageData = pages.find(p => p.id === currentPageId);
+    const currentPageData = pages?.find(p => p.id === currentPageId);
     if (!currentPageData) return;
 
     const fromMemo = currentPageData.memos.find(m => m.id === fromId);
@@ -70,22 +70,56 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
     const fromCategory = (currentPageData.categories || []).find(c => c.id === fromId);
     const toCategory = (currentPageData.categories || []).find(c => c.id === toId);
 
-    // 연결 규칙: 메모끼리만, 카테고리끼리만 연결 가능
-    const isValidConnection =
-      (fromMemo && toMemo) || // 메모-메모 연결
-      (fromCategory && toCategory); // 카테고리-카테고리 연결
+    // 연결 규칙: 메모-메모, 메모-카테고리, 카테고리-카테고리 모두 허용
+    const fromExists = fromMemo || fromCategory;
+    const toExists = toMemo || toCategory;
 
-    if (!isValidConnection) {
+    if (!fromExists || !toExists) {
       setIsConnecting(false);
       setConnectingFromId(null);
       setConnectingFromDirection(null);
       return;
     }
 
-    // 카테고리-카테고리 연결 시 부모-자식 관계 체크
-    if (fromCategory && toCategory) {
-      const categories = currentPageData.categories || [];
+    const categories = currentPageData.categories || [];
 
+    // 부모-자식 관계 체크
+    // 1. 메모-메모: 연결 허용 (제한 없음)
+
+    // 2. 메모-카테고리: 메모가 카테고리의 자식이거나, 메모의 부모가 카테고리의 자식/조상인지 확인
+    if ((fromMemo && toCategory) || (fromCategory && toMemo)) {
+      const memo = fromMemo || toMemo;
+      const category = fromCategory || toCategory;
+
+      if (memo && category) {
+        // 메모가 카테고리의 직접 자식인지 확인
+        if (memo.parentId === category.id) {
+          setIsConnecting(false);
+          setConnectingFromId(null);
+          setConnectingFromDirection(null);
+          return;
+        }
+
+        // 메모의 부모가 카테고리의 자손인지 확인
+        if (memo.parentId && isAncestor(category.id, memo.parentId, categories)) {
+          setIsConnecting(false);
+          setConnectingFromId(null);
+          setConnectingFromDirection(null);
+          return;
+        }
+
+        // 카테고리가 메모의 부모의 조상인지 확인
+        if (memo.parentId && isAncestor(memo.parentId, category.id, categories)) {
+          setIsConnecting(false);
+          setConnectingFromId(null);
+          setConnectingFromDirection(null);
+          return;
+        }
+      }
+    }
+
+    // 3. 카테고리-카테고리: 기존 로직 유지
+    if (fromCategory && toCategory) {
       // fromCategory가 toCategory의 조상인지 확인 (from이 to의 부모/조부모/...)
       const fromIsAncestorOfTo = isAncestor(fromId, toId, categories);
       // toCategory가 fromCategory의 조상인지 확인 (to가 from의 부모/조부모/...)
@@ -100,12 +134,13 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
       }
     }
 
-    setPages(prev => prev.map(page =>
+    setPages(prev => prev?.map(page =>
       page.id === currentPageId
         ? {
             ...page,
             memos: page.memos.map(memo => {
-              if (memo.id === fromId && fromMemo && toMemo) {
+              // fromId가 메모인 경우 (toId는 메모 또는 카테고리)
+              if (memo.id === fromId && fromMemo) {
                 return {
                   ...memo,
                   connections: memo.connections.includes(toId)
@@ -113,7 +148,8 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
                     : [...memo.connections, toId]
                 };
               }
-              if (memo.id === toId && fromMemo && toMemo) {
+              // toId가 메모인 경우 (fromId는 메모 또는 카테고리)
+              if (memo.id === toId && toMemo) {
                 return {
                   ...memo,
                   connections: memo.connections.includes(fromId)
@@ -124,7 +160,8 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
               return memo;
             }),
             categories: (page.categories || []).map(category => {
-              if (category.id === fromId && fromCategory && toCategory) {
+              // fromId가 카테고리인 경우 (toId는 메모 또는 카테고리)
+              if (category.id === fromId && fromCategory) {
                 return {
                   ...category,
                   connections: category.connections.includes(toId)
@@ -132,7 +169,8 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
                     : [...category.connections, toId]
                 };
               }
-              if (category.id === toId && fromCategory && toCategory) {
+              // toId가 카테고리인 경우 (fromId는 메모 또는 카테고리)
+              if (category.id === toId && toCategory) {
                 return {
                   ...category,
                   connections: category.connections.includes(fromId)
@@ -146,8 +184,9 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
         : page
     ));
 
-    setIsConnecting(false);
+    // 연결 모드는 유지하고, 시작점만 초기화 (다음 연결을 위해)
     setConnectingFromId(null);
+    setConnectingFromDirection(null);
 
     // Save canvas state for undo/redo
     if (saveCanvasState) {
@@ -159,7 +198,7 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
    * 두 메모/카테고리 간의 연결 제거
    */
   const removeConnection = useCallback((fromId: string, toId: string) => {
-    setPages(prev => prev.map(page =>
+    setPages(prev => prev?.map(page =>
       page.id === currentPageId
         ? {
             ...page,
@@ -204,14 +243,16 @@ export const useConnectionHandlers = (props: UseConnectionHandlersProps) => {
   }, [setDragLineEnd]);
 
   /**
-   * 연결 취소
+   * 연결 취소 (연결선만 제거, 연결 모드는 유지)
    */
   const cancelConnection = useCallback(() => {
-    setIsConnecting(false);
+    console.log('🔴 [연결 취소] cancelConnection 호출됨');
+    // 연결 모드는 유지하고, 연결선만 제거
     setConnectingFromId(null);
     setConnectingFromDirection(null);
     setDragLineEnd(null);
-  }, [setIsConnecting, setConnectingFromId, setConnectingFromDirection, setDragLineEnd]);
+    console.log('🔴 [연결 취소] 연결선 제거 완료 (연결 모드는 유지)');
+  }, [setConnectingFromId, setConnectingFromDirection, setDragLineEnd]);
 
   return {
     disconnectMemo,

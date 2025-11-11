@@ -8,6 +8,7 @@ interface CategoryEditViewProps {
   onCategoryUpdate: (category: CategoryBlock) => void;
   onCategorySelect: (categoryId: string, isShiftClick?: boolean) => void;
   onFocusMemo: (memoId: string) => void;
+  onFocusCategory: (categoryId: string) => void;
 }
 
 /**
@@ -20,7 +21,8 @@ const CategoryEditView: React.FC<CategoryEditViewProps> = ({
   currentPage,
   onCategoryUpdate,
   onCategorySelect,
-  onFocusMemo
+  onFocusMemo,
+  onFocusCategory
 }) => {
   const analytics = useAnalyticsTrackers();
 
@@ -48,11 +50,11 @@ const CategoryEditView: React.FC<CategoryEditViewProps> = ({
             fontWeight: '700',
             backgroundColor: 'transparent',
             outline: 'none',
-            color: '#ff9800',
+            color: '#1f2937',
             transition: 'border-bottom-color 0.2s ease'
           }}
           onFocus={(e) => {
-            e.target.style.borderBottomColor = '#ff9800';
+            e.target.style.borderBottomColor = '#8b5cf6';
           }}
           onBlur={(e) => {
             e.target.style.borderBottomColor = 'transparent';
@@ -144,54 +146,83 @@ const CategoryEditView: React.FC<CategoryEditViewProps> = ({
         />
       </div>
 
-      {/* 연결된 아이템들 */}
+      {/* 연결된 요소들 */}
       <div style={{ marginBottom: '16px' }}>
         <h4 style={{
-          fontSize: '16px',
+          fontSize: '14px',
           fontWeight: '600',
-          color: '#1f2937',
+          color: '#374151',
           marginBottom: '12px',
           paddingLeft: '20px'
         }}>
-          연결된 카테고리
+          연결된 요소 ({selectedCategory.connections?.length || 0})
         </h4>
 
         <div style={{ paddingLeft: '20px' }}>
           {selectedCategory.connections && selectedCategory.connections.length > 0 ? (
             <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px'
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '8px',
+              alignItems: 'start'
             }}>
               {selectedCategory.connections.map(connectionId => {
                 const connectedMemo = currentPage?.memos.find(m => m.id === connectionId);
                 const connectedCategory = currentPage?.categories?.find(c => c.id === connectionId);
-                const connectedItem = connectedMemo || connectedCategory;
+                const isCategory = !!connectedCategory;
+                const title = connectedMemo?.title || connectedCategory?.title || '제목 없음';
 
-                if (!connectedItem) return null;
+                if (!connectedMemo && !connectedCategory) return null;
 
                 return (
                   <div
                     key={connectionId}
-                    onClick={() => {
-                      if (connectedMemo) {
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      console.log('🔵 [CategoryEditView] 연결된 요소 클릭:', {
+                        connectionId,
+                        isCategory,
+                        title: isCategory ? connectedCategory?.title : connectedMemo?.title
+                      });
+                      if (isCategory) {
+                        console.log('📁 [CategoryEditView] onFocusCategory 호출');
+                        onFocusCategory(connectionId);
+                      } else {
+                        console.log('📝 [CategoryEditView] onFocusMemo 호출');
                         onFocusMemo(connectionId);
-                      } else if (connectedCategory) {
-                        onCategorySelect(connectionId);
                       }
                     }}
                     style={{
-                      padding: '8px 12px',
-                      backgroundColor: connectedMemo ? '#f0f9ff' : '#fff3e0',
-                      border: `1px solid ${connectedMemo ? '#bae6fd' : '#ffcc02'}`,
+                      padding: '8px 10px',
+                      backgroundColor: isCategory ? '#f3e8ff' : 'white',
+                      border: `1px solid ${isCategory ? '#d8b4fe' : '#e5e7eb'}`,
                       borderRadius: '6px',
                       cursor: 'pointer',
-                      fontSize: '14px',
-                      transition: 'all 0.2s ease'
+                      fontSize: '12px',
+                      color: isCategory ? '#7c3aed' : '#6b7280',
+                      transition: 'all 0.2s ease',
+                      textAlign: 'center',
+                      minHeight: '40px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = isCategory ? '#e9d5ff' : '#f8fafc';
+                      e.currentTarget.style.borderColor = isCategory ? '#c084fc' : '#3b82f6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = isCategory ? '#f3e8ff' : 'white';
+                      e.currentTarget.style.borderColor = isCategory ? '#d8b4fe' : '#e5e7eb';
                     }}
                   >
-                    <div style={{ fontWeight: '500' }}>
-                      {connectedMemo ? '📝 ' : ''}{connectedItem.title}
+                    <div style={{
+                      textOverflow: 'ellipsis',
+                      overflow: 'hidden',
+                      whiteSpace: 'nowrap',
+                      width: '100%'
+                    }}>
+                      {title}
                     </div>
                   </div>
                 );
@@ -206,7 +237,7 @@ const CategoryEditView: React.FC<CategoryEditViewProps> = ({
               border: '1px dashed #d1d5db',
               borderRadius: '6px'
             }}>
-              연결된 아이템이 없습니다
+              연결된 요소가 없습니다
             </div>
           )}
         </div>

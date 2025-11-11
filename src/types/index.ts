@@ -113,7 +113,7 @@ export interface Page {
   name: string;
   memos: MemoBlock[];
   categories: CategoryBlock[]; // 카테고리 블록들
-  quickNavItems?: QuickNavItem[]; // 페이지별 단축 이동 목록
+  quickNavItems?: QuickNavItem[]; // 페이지별 즐겨찾기 목록
 }
 
 // Canvas action types for history tracking

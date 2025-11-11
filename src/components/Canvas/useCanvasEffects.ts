@@ -4,6 +4,7 @@ import { calculateCategoryArea } from '../../utils/categoryAreaUtils';
 import { useCacheManagement } from './hooks/useCacheManagement';
 import { useContextMenuEffect } from './hooks/useContextMenuEffect';
 import { useCanvasKeyboard } from './hooks/useCanvasKeyboard';
+import { POSITION_UPDATE_THROTTLE } from '../../utils/constants';
 
 interface UseCanvasEffectsProps {
   // Context menu
@@ -87,6 +88,9 @@ interface UseCanvasEffectsProps {
 
   // Drag target detection
   setDragTargetCategoryId: (id: string | null) => void;
+
+  // Mobile fullscreen mode
+  fullscreen?: boolean;
 }
 
 /**
@@ -159,7 +163,8 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
     selectedMemoIds,
     selectedCategoryIds,
     onDeleteSelected,
-    setDragTargetCategoryId
+    setDragTargetCategoryId,
+    fullscreen
   } = props;
 
   // 캐시 관리 (Shift 드래그, 메모/카테고리 변경 감지)
@@ -415,11 +420,10 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
       }
 
       let lastUpdateTime = 0;
-      const throttleDelay = 50; // 50ms마다 한 번만 업데이트
 
       const handleMouseMove = (e: MouseEvent) => {
         const now = Date.now();
-        if (now - lastUpdateTime < throttleDelay) {
+        if (now - lastUpdateTime < POSITION_UPDATE_THROTTLE) {
           return; // 너무 자주 업데이트하지 않음
         }
         lastUpdateTime = now;
@@ -530,4 +534,5 @@ export const useCanvasEffects = (props: UseCanvasEffectsProps) => {
     canvasScale,
     setDragTargetCategoryId
   ]);
+
 };

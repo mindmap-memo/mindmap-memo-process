@@ -13,7 +13,13 @@ import { useState, useEffect } from 'react';
  * const isTablet = useMediaQuery('(min-width: 769px) and (max-width: 1024px)');
  */
 export const useMediaQuery = (query: string): boolean => {
-  const [matches, setMatches] = useState<boolean>(false);
+  // 초기값을 즉시 계산하여 설정 (hydration mismatch 및 초기 렌더링 오류 방지)
+  const getInitialMatches = () => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia(query).matches;
+  };
+
+  const [matches, setMatches] = useState<boolean>(getInitialMatches);
 
   useEffect(() => {
     // SSR 방어
@@ -21,8 +27,10 @@ export const useMediaQuery = (query: string): boolean => {
 
     const media = window.matchMedia(query);
 
-    // 초기 값 설정
-    setMatches(media.matches);
+    // 초기 값 설정 (상태와 실제 값이 다를 경우를 위해)
+    if (media.matches !== matches) {
+      setMatches(media.matches);
+    }
 
     // 미디어 쿼리 변경 감지
     const listener = (event: MediaQueryListEvent) => {
@@ -36,7 +44,7 @@ export const useMediaQuery = (query: string): boolean => {
     return () => {
       media.removeEventListener('change', listener);
     };
-  }, [query]);
+  }, [query, matches]);
 
   return matches;
 };

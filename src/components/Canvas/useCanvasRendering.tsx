@@ -87,12 +87,14 @@ interface UseCanvasRenderingParams {
   onCategorySelect: (categoryId: string, isShiftClick?: boolean) => void;
   onMemoSelect: (memoId: string, isShiftClick?: boolean) => void;
   onStartConnection?: (id: string, direction?: 'top' | 'bottom' | 'left' | 'right') => void;
+  onUpdateDragLine?: (mousePos: { x: number; y: number }) => void;
+  onCancelConnection?: () => void;
   onCategoryPositionChange: (categoryId: string, position: { x: number; y: number }) => void;
   onCategoryLabelPositionChange: (categoryId: string, position: { x: number; y: number }) => void;
   onCategoryToggleExpanded: (categoryId: string) => void;
   onCategoryPositionDragEnd?: (categoryId: string, finalPosition: { x: number; y: number }) => void;
   onShiftDropCategory?: (category: CategoryBlock, position: { x: number; y: number }) => void;
-  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }) => void;
+  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }, isShiftMode?: boolean) => void;
   onMemoPositionChange: (memoId: string, position: { x: number; y: number }) => void;
   onMemoSizeChange: (memoId: string, size: { width: number; height: number }) => void;
   onMemoDisplaySizeChange?: (memoId: string, displaySize: MemoDisplaySize) => void;
@@ -103,8 +105,10 @@ interface UseCanvasRenderingParams {
   onMemoDragEnd?: () => void;
   onDeleteMemoById?: (id: string) => void;
   onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
+  onDeleteQuickNav?: (targetId: string, targetType: 'memo' | 'category') => void;
   isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
   onCategoryUpdate: (category: CategoryBlock) => void;
+  onDeleteCategory: (categoryId: string) => void;
   onOpenEditor?: () => void;
 
   // 상태 Setters
@@ -128,6 +132,13 @@ interface UseCanvasRenderingParams {
   canvasOffset?: { x: number; y: number };
   handleDropOnCategoryArea: (e: React.DragEvent, categoryId: string) => void;
   handleCategoryAreaDragOver: (e: React.DragEvent) => void;
+
+  // 롱프레스 상태
+  isLongPressActive?: boolean;  // 롱프레스 활성화 상태
+  longPressTargetId?: string | null;  // 롱프레스 대상 ID
+  setIsLongPressActive?: (active: boolean, targetId?: string | null) => void;
+  setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수
+  isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref 추가
 }
 
 export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
@@ -165,6 +176,8 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     onCategorySelect,
     onMemoSelect,
     onStartConnection,
+    onUpdateDragLine,
+    onCancelConnection,
     onCategoryPositionChange,
     onCategoryLabelPositionChange,
     onCategoryToggleExpanded,
@@ -181,8 +194,10 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     onMemoDragEnd,
     onDeleteMemoById,
     onAddQuickNav,
+    onDeleteQuickNav,
     isQuickNavExists,
     onCategoryUpdate,
+    onDeleteCategory,
     onOpenEditor,
     setIsDraggingCategoryArea,
     setShiftDragInfo,
@@ -194,12 +209,18 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     setEditingCategoryTitle,
     canvasOffset,
     handleDropOnCategoryArea,
-    handleCategoryAreaDragOver
+    handleCategoryAreaDragOver,
+    isLongPressActive,  // 롱프레스 활성화 상태
+    longPressTargetId,  // 롱프레스 대상 ID
+    setIsLongPressActive,
+    setIsShiftPressed,  // Shift 상태 업데이트 함수
+    isShiftPressedRef  // Shift ref 추가
   } = params;
 
   // 연결점 계산 훅 사용
   const { getBlockConnectionPoints, getConnectionPoints } = useConnectionPoints({
-    renderedCategoryAreas
+    renderedCategoryAreas,
+    canvasScale
   });
 
   // 카테고리 영역 색상 훅 사용
@@ -232,7 +253,9 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     dragLineEnd,
     onRemoveConnection,
     onConnectMemos,
-    getConnectionPoints
+    getConnectionPoints,
+    canvasScale,
+    onOpenEditor  // 모바일/태블릿 모드 판단용
   });
 
   // 카테고리 영역 렌더링 훅 사용
@@ -266,6 +289,8 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     onCategorySelect,
     onMemoSelect,
     onStartConnection,
+    onUpdateDragLine,
+    onCancelConnection,
     onCategoryPositionChange,
     onCategoryLabelPositionChange,
     onCategoryToggleExpanded,
@@ -285,6 +310,7 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     isQuickNavExists,
     onOpenEditor,
     onCategoryUpdate,
+    onDeleteCategory,
     setIsDraggingCategoryArea,
     setShiftDragInfo,
     setDraggedCategoryAreas,
@@ -296,7 +322,12 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     canvasOffset,
     handleDropOnCategoryArea,
     handleCategoryAreaDragOver,
-    calculateArea
+    calculateArea,
+    isLongPressActive,  // 롱프레스 활성화 상태
+    longPressTargetId,  // 롱프레스 대상 ID
+    setIsLongPressActive,
+    setIsShiftPressed,  // Shift 상태 업데이트 함수
+    isShiftPressedRef  // Shift ref 추가
   });
 
   return {

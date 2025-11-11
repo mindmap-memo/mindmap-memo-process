@@ -45,13 +45,13 @@ export const useSelectedItems = ({
 }: UseSelectedItemsProps): UseSelectedItemsReturn => {
   // ===== 현재 페이지 =====
   const currentPage = useMemo(
-    () => pages.find(page => page.id === currentPageId),
+    () => pages?.find(page => page.id === currentPageId),
     [pages, currentPageId]
   );
 
   // ===== 선택된 메모 =====
   const selectedMemo = useMemo(() => {
-    if (!currentPage) return undefined;
+    if (!currentPage || !currentPage.memos) return undefined;
     const memo = currentPage.memos.find(memo => memo.id === selectedMemoId) ||
            (selectedMemoIds.length === 1 ? currentPage.memos.find(memo => memo.id === selectedMemoIds[0]) : undefined);
 
@@ -59,7 +59,7 @@ export const useSelectedItems = ({
   }, [currentPage?.memos, selectedMemoId, selectedMemoIds]);
 
   const selectedMemos = useMemo(() => {
-    if (!currentPage) return [];
+    if (!currentPage || !currentPage.memos) return [];
     return currentPage.memos.filter(memo => selectedMemoIds.includes(memo.id));
   }, [currentPage, selectedMemoIds]);
 

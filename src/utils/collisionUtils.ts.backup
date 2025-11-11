@@ -26,6 +26,7 @@ interface CollidableObject {
  * @param maxIterations - 최대 반복 횟수
  * @param movingIds - 다중 선택된 모든 메모/카테고리 ID 배열 (선택사항)
  * @param frameDelta - 이동 중인 객체의 프레임 간 이동 거리 (충돌 당한 객체가 같은 속도로 밀려나도록)
+ * @param isLongPressActive - 롱프레스 활성화 여부 (true일 경우 충돌 판정 스킵)
  */
 export function resolveUnifiedCollisions(
   movingId: string,
@@ -33,7 +34,8 @@ export function resolveUnifiedCollisions(
   page: Page,
   maxIterations: number = 10,
   movingIds?: string[],
-  frameDelta?: { x: number; y: number }
+  frameDelta?: { x: number; y: number },
+  isLongPressActive?: boolean
 ): CollisionResult {
   console.log('[resolveUnifiedCollisions] 호출됨:', {
     movingId,
@@ -41,9 +43,19 @@ export function resolveUnifiedCollisions(
     maxIterations,
     movingIds,
     frameDelta,
+    isLongPressActive,
     categoriesCount: page.categories?.length,
     memosCount: page.memos.length
   });
+
+  // 롱프레스 활성화 시 충돌 판정 스킵
+  if (isLongPressActive) {
+    console.log('[resolveUnifiedCollisions] 롱프레스 활성화 - 충돌 판정 스킵');
+    return {
+      updatedCategories: [...(page.categories || [])],
+      updatedMemos: [...page.memos]
+    };
+  }
 
   let updatedMemos = [...page.memos];
   let updatedCategories = [...(page.categories || [])];

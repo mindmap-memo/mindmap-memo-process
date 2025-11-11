@@ -31,6 +31,7 @@ interface ContentBlockProps {
   activeImportanceFilters?: Set<ImportanceLevel>;
   showGeneralContent?: boolean;
   onResetFilters?: () => void;
+  isMobile?: boolean;
 }
 
 const ContentBlockComponent: React.FC<ContentBlockProps> = ({
@@ -57,7 +58,8 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
   onSaveToHistory,
   activeImportanceFilters,
   showGeneralContent,
-  onResetFilters
+  onResetFilters,
+  isMobile = false
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -98,6 +100,7 @@ const ContentBlockComponent: React.FC<ContentBlockProps> = ({
           activeImportanceFilters={activeImportanceFilters}
           showGeneralContent={showGeneralContent}
           onResetFilters={onResetFilters}
+          isMobile={isMobile}
         />;
       case 'image':
         return <ImageBlockComponent

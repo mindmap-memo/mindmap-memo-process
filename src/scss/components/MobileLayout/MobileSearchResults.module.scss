@@ -1,0 +1,138 @@
+.searchResultsContainer {
+  position: fixed;
+  top: 60px; // MobileHeaderTop 높이 (44px) + 패딩 (16px)
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: white;
+  z-index: 10003;  // ImportanceFilter(10002)보다 위
+  overflow-y: auto;
+  padding: 16px;
+  padding-top: 0; // 필터와의 간격을 제거하여 자연스럽게 연결
+  transition: top 0.3s ease; // 부드러운 이동 애니메이션
+  pointer-events: auto; // MobileLayout이 pointer-events: none이므로 필수
+
+  // 필터가 열렸을 때 아래로 이동
+  &.withFilters {
+    top: calc(60px + var(--filter-dropdown-height, 0px));
+  }
+}
+
+.noResults {
+  text-align: center;
+  padding: 40px 20px;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.resultsSection {
+  margin-bottom: 24px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+
+  svg {
+    color: #6b7280;
+  }
+}
+
+.resultsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.resultItem {
+  padding: 12px;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:active {
+    transform: scale(0.98);
+    background-color: #f3f4f6;
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      background-color: #f3f4f6;
+      border-color: #d1d5db;
+    }
+  }
+
+  // 카테고리 결과 스타일
+  &.categoryItem {
+    background-color: #8b5cf6;
+    border-color: #8b5cf6;
+
+    &:active {
+      background-color: #7c3aed;
+    }
+
+    @media (hover: hover) {
+      &:hover {
+        background-color: #7c3aed;
+        border-color: #7c3aed;
+      }
+    }
+
+    .resultTitle {
+      color: white;
+    }
+
+    .tag {
+      background-color: rgba(255, 255, 255, 0.2);
+      color: white;
+    }
+  }
+}
+
+.resultTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.resultTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.tag {
+  font-size: 11px;
+  color: #6b7280;
+  background-color: #e5e7eb;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.resultPreview {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.5;
+  margin-top: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}

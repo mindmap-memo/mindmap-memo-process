@@ -1,4 +1,5 @@
 import { CategoryBlock, Page } from '../../../types';
+import { DRAG_THRESHOLD, LONG_PRESS_DURATION } from '../../../utils/constants';
 
 /**
  * categoryAreaDragHandlers
@@ -16,6 +17,7 @@ export interface CreateCategoryAreaDragHandlerParams {
   category: CategoryBlock;
   isConnecting: boolean;
   isShiftPressed?: boolean;
+  isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref 추가
   canvasScale: number;
   canvasOffset?: { x: number; y: number };
   currentPage?: Page;
@@ -39,7 +41,9 @@ export interface CreateCategoryAreaDragHandlerParams {
   }>>;
   onCategoryPositionChange: (categoryId: string, position: { x: number; y: number }) => void;
   onCategoryPositionDragEnd?: (categoryId: string, finalPosition: { x: number; y: number }) => void;
-  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }) => void;
+  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }, isShiftMode?: boolean) => void;
+  setIsLongPressActive?: (active: boolean, targetId?: string | null) => void;  // 롱프레스 상태 업데이트
+  setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트
 }
 
 /**
@@ -67,7 +71,9 @@ export const createCategoryAreaDragHandler = (params: CreateCategoryAreaDragHand
   } = params;
 
   return (e: React.MouseEvent) => {
-    if (e.button === 0 && !isConnecting) {
+    // PC 버전에서는 연결 모드와 관계없이 카테고리 영역 드래그 가능
+    // (연결점은 별도 핸들러로 처리)
+    if (e.button === 0) {
       // 영역 드래그 시작 - 카테고리 전체를 이동
       e.preventDefault();
       e.stopPropagation();
@@ -78,7 +84,6 @@ export const createCategoryAreaDragHandler = (params: CreateCategoryAreaDragHand
       let hasMoved = false;
       let isDraggingArea = false; // 임계값 통과 전까지는 false
       let isShiftMode = isShiftPressed || false;
-      const DRAG_THRESHOLD = 5; // 드래그 임계값 (픽셀)
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         // 임계값 확인
@@ -205,14 +210,6 @@ export const createCategoryAreaDragHandler = (params: CreateCategoryAreaDragHand
         // upEvent.shiftKey로 실시간 Shift 상태 확인
         const wasShiftPressed = upEvent?.shiftKey || isShiftMode;
 
-        console.log('[Area handleMouseUp] 호출됨', {
-          categoryId: category.id,
-          hasMoved,
-          isShiftMode,
-          upEventShiftKey: upEvent?.shiftKey,
-          wasShiftPressed
-        });
-
         setIsDraggingCategoryArea(null);
         setShiftDragInfo(null);
 
@@ -238,16 +235,12 @@ export const createCategoryAreaDragHandler = (params: CreateCategoryAreaDragHand
             onCategoryPositionDragEnd?.(category.id, finalPosition);
 
             if (wasShiftPressed) {
-              console.log('[Area handleMouseUp] Shift 눌림 - detectCategoryDropForCategory 호출');
-              // 마우스 포인터 위치로 전달 (점 충돌 검사용)
               onDetectCategoryDropForCategory?.(category.id, mousePointerPosition);
             }
           } else {
             onCategoryPositionDragEnd?.(category.id, finalPosition);
 
             if (wasShiftPressed) {
-              console.log('[Area handleMouseUp] Shift 눌림 - detectCategoryDropForCategory 호출 (fallback)');
-              // fallback: 캔버스 요소를 찾지 못한 경우 finalPosition 사용
               onDetectCategoryDropForCategory?.(category.id, finalPosition);
             }
           }
@@ -280,6 +273,7 @@ export const createCategoryAreaTouchHandler = (params: CreateCategoryAreaDragHan
     category,
     isConnecting,
     isShiftPressed,
+    isShiftPressedRef,
     canvasScale,
     canvasOffset,
     currentPage,
@@ -293,17 +287,17 @@ export const createCategoryAreaTouchHandler = (params: CreateCategoryAreaDragHan
     setDraggedCategoryAreas,
     onCategoryPositionChange,
     onCategoryPositionDragEnd,
-    onDetectCategoryDropForCategory
+    onDetectCategoryDropForCategory,
+    setIsLongPressActive,
+    setIsShiftPressed
   } = params;
 
   return (e: React.TouchEvent) => {
-    console.log('[CategoryArea TouchStart]', { categoryId: category.id, touches: e.touches.length });
-
-    if (!isConnecting && e.touches.length === 1) {
+    // 모바일 버전에서도 연결 모드와 관계없이 카테고리 영역 드래그 가능
+    // (연결점은 별도 핸들러로 처리)
+    if (e.touches.length === 1) {
       // 영역 터치 드래그 시작 - 카테고리 전체를 이동
       e.stopPropagation();
-
-      console.log('[CategoryArea TouchStart] 드래그 준비 시작');
 
       const touch = e.touches[0];
       let startX = touch.clientX;
@@ -312,7 +306,28 @@ export const createCategoryAreaTouchHandler = (params: CreateCategoryAreaDragHan
       let hasMoved = false;
       let isDraggingArea = false; // 임계값 통과 전까지는 false
       let isShiftMode = isShiftPressed || false;
-      const DRAG_THRESHOLD = 5; // 드래그 임계값 (픽셀)
+      // ⚠️ 수정: ref 객체로 변경하여 이벤트 리스너가 최신 값을 참조하도록 함
+      const isLongPressActiveRef = { current: false };
+      let longPressTimer: NodeJS.Timeout | null = null;  // 롱프레스 타이머
+
+      // 롱프레스 타이머 시작
+      const categoryId = category.id;
+      longPressTimer = setTimeout(() => {
+        isLongPressActiveRef.current = true;
+        isShiftMode = true;
+        setIsLongPressActive?.(true, categoryId);
+
+        // Shift 상태도 함께 업데이트
+        if (isShiftPressedRef) {
+          isShiftPressedRef.current = true;
+        }
+        setIsShiftPressed?.(true);
+
+        // 햅틱 피드백 (모바일)
+        if (navigator.vibrate) {
+          navigator.vibrate(50);
+        }
+      }, LONG_PRESS_DURATION);
 
       const handleTouchMove = (moveEvent: TouchEvent) => {
         if (moveEvent.touches.length !== 1) return;
@@ -323,13 +338,15 @@ export const createCategoryAreaTouchHandler = (params: CreateCategoryAreaDragHan
           Math.pow(touch.clientY - startY, 2)
         );
 
-        // 임계값을 넘으면 드래그 시작
-        if (!isDraggingArea && distance >= DRAG_THRESHOLD) {
-          isDraggingArea = true;
-          hasMoved = true;
-          console.log('[CategoryArea TouchMove] 드래그 시작 (임계값 통과)');
+        // 롱프레스가 활성화되었거나 임계값을 넘으면 드래그 시작
+        if (!isDraggingArea && (isLongPressActiveRef.current || distance >= DRAG_THRESHOLD)) {
+          // 드래그가 시작되면 롱프레스 타이머 취소 (아직 발동 전인 경우)
+          if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+          }
 
-          // 드래그 시작 시 카테고리 선택 및 초기화
+          isDraggingArea = true;
           onCategorySelect(category.id);
           setIsDraggingCategoryArea(category.id);
 
@@ -365,6 +382,8 @@ export const createCategoryAreaTouchHandler = (params: CreateCategoryAreaDragHan
         // 드래그 중일 때만 위치 업데이트
         if (!isDraggingArea) return;
 
+        hasMoved = true;
+
         const deltaX = (touch.clientX - startX) / canvasScale;
         const deltaY = (touch.clientY - startY) / canvasScale;
 
@@ -372,8 +391,6 @@ export const createCategoryAreaTouchHandler = (params: CreateCategoryAreaDragHan
           x: originalCategoryPosition.x + deltaX,
           y: originalCategoryPosition.y + deltaY
         };
-
-        console.log('[CategoryArea TouchMove] 위치 업데이트', { newPosition });
 
         onCategoryPositionChange(category.id, newPosition);
 
@@ -390,8 +407,23 @@ export const createCategoryAreaTouchHandler = (params: CreateCategoryAreaDragHan
       };
 
       const handleTouchEnd = (upEvent?: TouchEvent) => {
+        // 롱프레스 타이머 취소
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+
         // 드래그가 발생하지 않았을 때: 탭으로 처리 (카테고리 선택)
         if (!hasMoved && !isDraggingArea) {
+          // 롱프레스만 활성화되고 드래그는 안 한 경우도 리셋
+          if (isLongPressActiveRef.current) {
+            setIsLongPressActive?.(false, null);
+            if (isShiftPressedRef) {
+              isShiftPressedRef.current = false;
+            }
+            setIsShiftPressed?.(false);
+          }
+
           onCategorySelect(category.id);
           document.removeEventListener('touchmove', handleTouchMove);
           document.removeEventListener('touchend', handleTouchEnd);
@@ -399,7 +431,23 @@ export const createCategoryAreaTouchHandler = (params: CreateCategoryAreaDragHan
           return;
         }
 
-        if (!isDraggingArea) return; // 이미 종료된 경우 중복 실행 방지
+        if (!isDraggingArea) {
+          // 롱프레스만 활성화되고 드래그는 안 한 경우도 리셋
+          if (isLongPressActiveRef.current) {
+            setIsLongPressActive?.(false, null);
+            if (isShiftPressedRef) {
+              isShiftPressedRef.current = false;
+            }
+            setIsShiftPressed?.(false);
+          }
+
+          // 이미 종료된 경우에도 이벤트 리스너는 제거
+          document.removeEventListener('touchmove', handleTouchMove);
+          document.removeEventListener('touchend', handleTouchEnd);
+          document.removeEventListener('touchcancel', handleTouchEnd);
+          return;
+        }
+
         isDraggingArea = false; // 즉시 드래그 종료 플래그 설정
 
         const wasShiftPressed = isShiftMode;
@@ -407,7 +455,17 @@ export const createCategoryAreaTouchHandler = (params: CreateCategoryAreaDragHan
         setIsDraggingCategoryArea(null);
         setShiftDragInfo(null);
 
-        if (hasMoved && upEvent?.changedTouches.length) {
+        // 롱프레스가 활성화되어 있었다면 항상 Shift 리셋
+        if (isLongPressActiveRef.current) {
+          setIsLongPressActive?.(false, null);
+          // ref도 직접 리셋
+          if (isShiftPressedRef) {
+            isShiftPressedRef.current = false;
+          }
+          setIsShiftPressed?.(false);
+        }
+
+        if (hasMoved && upEvent?.changedTouches && upEvent.changedTouches.length > 0) {
           const touch = upEvent.changedTouches[0];
           const finalPosition = {
             x: originalCategoryPosition.x + (touch.clientX - startX) / canvasScale,

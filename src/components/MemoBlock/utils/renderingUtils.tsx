@@ -34,7 +34,8 @@ export const renderHighlightedText = (
   activeFilters?: Set<ImportanceLevel>,
   showGeneral?: boolean
 ) => {
-  if (!importanceRanges || importanceRanges.length === 0) {
+  // 배열이 아니거나, undefined이거나, 빈 배열이면 일반 텍스트 처리
+  if (!importanceRanges || !Array.isArray(importanceRanges) || importanceRanges.length === 0) {
     // 하이라이팅이 없는 일반 텍스트는 일반 텍스트 필터에 따라 표시/숨김
     return showGeneral === false ? '' : text;
   }
@@ -158,9 +159,9 @@ export const getHighestImportanceLevel = (memo: MemoBlockType): ImportanceLevel 
   memo.blocks.forEach(block => {
     if (block.type === 'text') {
       const textBlock = block as any; // TextBlock으로 캐스팅
-      if (textBlock.importanceRanges && textBlock.importanceRanges.length > 0) {
+      if (textBlock.importanceRanges && Array.isArray(textBlock.importanceRanges) && textBlock.importanceRanges.length > 0) {
         textBlock.importanceRanges.forEach((range: ImportanceRange) => {
-          if (!highestLevel || importancePriority.indexOf(range.level) < importancePriority.indexOf(highestLevel)) {
+          if (range && range.level && (!highestLevel || importancePriority.indexOf(range.level) < importancePriority.indexOf(highestLevel))) {
             highestLevel = range.level;
           }
         });

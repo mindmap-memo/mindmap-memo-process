@@ -71,15 +71,48 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1000;
+  z-index: 1700;  // MobileLayout 버튼들(1600)보다 위
+  pointer-events: auto;  // 오버레이 클릭으로 닫기
 }
 
 .quick-nav-panel {
   position: fixed;
   top: 70px;
-  z-index: 1001;
+  // right는 인라인 스타일로 동적 관리 (PC: 패널 너비에 따라 변경, 태블릿: CSS 변수 사용)
+  z-index: 1701;  // 오버레이보다 위
   display: flex;
   gap: 12px;
+  pointer-events: auto; // MobileLayout이 pointer-events: none이므로 필수
+  transition: right 0.3s ease; // 이동 애니메이션
+
+  // 태블릿: 버튼에 가려지지 않도록 top 위치 조정
+  @media (min-width: 769px) and (max-width: 1366px) and (pointer: coarse) {
+    top: 130px;
+  }
+
+  // 태블릿 가로모드: 우측 패널 너비(300px) + 여백(20px) = 320px (인라인 스타일 오버라이드)
+  @media (min-width: 769px) and (max-width: 1366px) and (orientation: landscape) {
+    right: calc(20px + var(--right-panel-offset, 0px)) !important;
+  }
+
+  // 모바일 버전: 풀스크린 패널
+  @media (max-width: 768px) {
+    top: 0;
+    left: 0;
+    right: 0 !important;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 2000;
+    padding: 120px 0 20px 0; // 상단 여백 120px, 좌우 0, 하단 20px
+    overflow-y: auto;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 16px;
+  }
 }
 
 .quick-nav-empty {
@@ -91,6 +124,11 @@
   color: #9ca3af;
   font-size: 13px;
   white-space: nowrap;
+
+  // 모바일: 좌우 여백 추가
+  @media (max-width: 768px) {
+    margin: 0 16px;
+  }
 }
 
 .quick-nav-section {
@@ -98,6 +136,13 @@
   flex-direction: column;
   gap: 8px;
   align-items: flex-end;
+
+  // 모바일: 전체 너비 사용
+  @media (max-width: 768px) {
+    width: 100%;
+    align-items: stretch;
+    padding: 0 16px; // 섹션에 좌우 패딩 추가
+  }
 }
 
 .quick-nav-item {
@@ -114,6 +159,17 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+
+  // 모바일: 전체 너비 사용 + 터치 영역 확보
+  @media (max-width: 768px) {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 14px;
+    min-height: 56px;
+    align-items: center;
+    flex-direction: row;
+    justify-content: space-between;
+  }
 
   &.memo {
     background-color: white;
@@ -346,4 +402,38 @@
   font-size: 24px;
   font-weight: 600;
   margin-top: 4px;
+}
+.quick-nav-mobile-close {
+  display: none; // PC에서는 숨김
+
+  @media (max-width: 768px) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 44px;
+    height: 44px;
+    background-color: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(8px);
+    border: none;
+    border-radius: 50%;
+    color: #333;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1702;  // 패널(1701)보다 위
+    transition: all 0.2s ease;
+
+    &:active {
+      transform: scale(0.95);
+      background-color: rgba(240, 240, 240, 0.9);
+    }
+
+    @media (hover: hover) {
+      &:hover {
+        background-color: rgba(240, 240, 240, 0.9);
+      }
+    }
+  }
 }

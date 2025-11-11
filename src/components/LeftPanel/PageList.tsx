@@ -63,10 +63,13 @@ export const PageList: React.FC<PageListProps> = ({
         </button>
       </div>
       <div>
-        {pages.map(page => (
+        {pages?.map(page => (
         <div
           key={page.id}
-          onClick={() => onPageSelect(page.id)}
+          onClick={() => {
+            console.log('🟢 [PageList] 페이지 div 클릭됨:', page.id, page.name);
+            onPageSelect(page.id);
+          }}
           onDoubleClick={() => onDoubleClick(page)}
           style={{
             padding: '12px 16px',

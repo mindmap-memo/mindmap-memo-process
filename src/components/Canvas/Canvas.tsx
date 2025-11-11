@@ -9,6 +9,8 @@ import { useCanvasState } from './useCanvasState';
 import { useCanvasEffects } from './useCanvasEffects';
 import { useCanvasHandlers } from './useCanvasHandlers';
 import { useCanvasRendering } from './useCanvasRendering';
+import { usePinchZoom } from './hooks/usePinchZoom';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import styles from '../../scss/components/Canvas.module.scss';
 
 interface CanvasProps {
@@ -34,7 +36,7 @@ interface CanvasProps {
   onCategoryToggleExpanded: (categoryId: string) => void;
   onMoveToCategory: (itemId: string, categoryId: string | null) => void;
   onDetectCategoryOnDrop: (memoId: string, position: { x: number; y: number }) => void;
-  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }) => void;
+  onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }, isShiftMode?: boolean) => void;
   onMemoDisplaySizeChange?: (memoId: string, displaySize: MemoDisplaySize) => void;
   onMemoTitleUpdate?: (memoId: string, title: string) => void;
   onMemoBlockUpdate?: (memoId: string, blockId: string, content: string) => void;
@@ -60,6 +62,8 @@ interface CanvasProps {
   onToggleImportanceFilter: (level: ImportanceLevel) => void;
   showGeneralContent: boolean;
   onToggleGeneralContent: () => void;
+  alwaysShowContent?: boolean;
+  onToggleAlwaysShowContent?: () => void;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
@@ -83,9 +87,16 @@ interface CanvasProps {
   setCanvasScale?: (scale: number) => void;
   onDeleteMemoById?: (id: string) => void;
   onAddQuickNav?: (name: string, targetId: string, targetType: 'memo' | 'category') => void;
+  onDeleteQuickNav?: (targetId: string, targetType: 'memo' | 'category') => void;
   isQuickNavExists?: (targetId: string, targetType: 'memo' | 'category') => boolean;
   fullscreen?: boolean;  // Mobile fullscreen mode
   onOpenEditor?: () => void;  // Mobile: Open editor on double-tap
+  isLongPressActive?: boolean;  // 롱프레스 활성화 상태
+  longPressTargetId?: string | null;  // 롱프레스 대상 ID (메모 또는 카테고리)
+  setIsLongPressActive?: (active: boolean, targetId?: string | null) => void;  // 롱프레스 상태 업데이트
+  setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수
+  isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref 추가
+  toolbarOffset?: number;  // 태블릿 가로모드: toolbar 왼쪽 이동 거리 (px)
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -137,6 +148,8 @@ const Canvas: React.FC<CanvasProps> = ({
   onToggleImportanceFilter,
   showGeneralContent,
   onToggleGeneralContent,
+  alwaysShowContent = false,
+  onToggleAlwaysShowContent,
   canUndo,
   canRedo,
   onUndo,
@@ -160,10 +173,22 @@ const Canvas: React.FC<CanvasProps> = ({
   setCanvasScale: externalSetCanvasScale,
   onDeleteMemoById,
   onAddQuickNav,
+  onDeleteQuickNav,
   isQuickNavExists,
   fullscreen = false,
-  onOpenEditor
+  onOpenEditor,
+  isLongPressActive = false,  // 롱프레스 활성화 상태
+  longPressTargetId = null,  // 롱프레스 대상 ID
+  setIsLongPressActive,
+  setIsShiftPressed,  // Shift 상태 업데이트 함수
+  isShiftPressedRef  // Shift ref 추가
 }) => {
+  // ===== Canvas Ref =====
+  const canvasRef = React.useRef<HTMLDivElement>(null);
+
+  // 태블릿 가로모드 감지 (ImportanceFilter 숨기기 위함)
+  const isTabletLandscape = useMediaQuery('(min-width: 769px) and (max-width: 1366px) and (orientation: landscape)');
+
   // ===== Canvas 로컬 상태 (useCanvasState 훅 사용) =====
   const canvasState = useCanvasState();
   const {
@@ -234,6 +259,16 @@ const Canvas: React.FC<CanvasProps> = ({
 
   // Shift 드래그 중 영역 캐시 (App.tsx에서 전달된 ref 사용하거나 로컬 ref 사용)
   const shiftDragAreaCache = shiftDragAreaCacheRef || localShiftDragAreaCache;
+
+  // ===== 핀치 줌 (모바일 전용) =====
+  usePinchZoom({
+    canvasRef,
+    canvasScale,
+    setCanvasScale,
+    canvasOffset,
+    setCanvasOffset,
+    isMobile: fullscreen  // fullscreen prop을 모바일 여부로 사용
+  });
 
   // 최근 드래그 종료된 카테고리 ID (영역 계산 로그용)
   const recentlyDraggedCategoryRef = React.useRef<string | null>(null);
@@ -332,6 +367,8 @@ const Canvas: React.FC<CanvasProps> = ({
     onCategorySelect,
     onMemoSelect,
     onStartConnection,
+    onUpdateDragLine,  // 🔥 추가: 카테고리 연결점 드래그 시 연결선이 커서를 따라가도록
+    onCancelConnection,  // 🔥 추가: 카테고리 연결 취소 시 연결선 제거
     onCategoryPositionChange,
     onCategoryLabelPositionChange,
     onCategoryToggleExpanded,
@@ -348,8 +385,10 @@ const Canvas: React.FC<CanvasProps> = ({
     onMemoDragEnd,
     onDeleteMemoById,
     onAddQuickNav,
+    onDeleteQuickNav,
     isQuickNavExists,
     onCategoryUpdate,
+    onDeleteCategory,
     setIsDraggingCategoryArea,
     setShiftDragInfo,
     setDraggedCategoryAreas,
@@ -360,7 +399,12 @@ const Canvas: React.FC<CanvasProps> = ({
     setEditingCategoryTitle,
     canvasOffset,
     handleDropOnCategoryArea,
-    handleCategoryAreaDragOver
+    handleCategoryAreaDragOver,
+    isLongPressActive,  // 롱프레스 활성화 상태
+    longPressTargetId,  // 롱프레스 대상 ID
+    setIsLongPressActive,
+    setIsShiftPressed,
+    isShiftPressedRef
   });
 
   // ===== useCanvasEffects 훅 사용 =====
@@ -417,7 +461,8 @@ const Canvas: React.FC<CanvasProps> = ({
     selectedMemoIds,
     selectedCategoryIds,
     onDeleteSelected,
-    setDragTargetCategoryId
+    setDragTargetCategoryId,
+    fullscreen
   });
 
   // 모든 메모들 렌더링 (접힌 카테고리 안의 메모는 렌더링 시 제외)
@@ -451,8 +496,10 @@ const Canvas: React.FC<CanvasProps> = ({
 
   return (
     <div
+      ref={canvasRef}
       id="main-canvas"
       data-canvas="true"
+      data-canvas-container
       data-tutorial="canvas"
       className={`${styles.canvas} ${fullscreen ? styles.fullscreen : ''}`}
       style={{
@@ -462,6 +509,7 @@ const Canvas: React.FC<CanvasProps> = ({
         height: '100%',
         overflow: 'hidden',
         backgroundColor: '#f9fafb'
+        // z-index 제거: stacking context를 만들지 않아야 ImportanceFilter와 MobileSearchResults가 제대로 표시됨
       }}
       onMouseDown={handleCanvasMouseDown}
       onMouseMove={handleMouseMove}
@@ -483,9 +531,9 @@ const Canvas: React.FC<CanvasProps> = ({
           left: 0,
           width: '100%',
           height: '100%',
-          pointerEvents: isDisconnectMode ? 'auto' : 'none',
+          pointerEvents: isDisconnectMode ? 'auto' : 'none',  // 연결 해제 모드일 때만 클릭 가능
           overflow: 'visible',
-          zIndex: isDisconnectMode ? 100 : 0
+          zIndex: isDisconnectMode ? 5 : 0
         }}
       >
         <defs>
@@ -545,10 +593,13 @@ const Canvas: React.FC<CanvasProps> = ({
                 connectingFromId={connectingFromId}
                 onStartConnection={onStartConnection}
                 onConnectMemos={onConnectMemos}
+                onCancelConnection={onCancelConnection}
+                onUpdateDragLine={onUpdateDragLine}
                 canvasScale={canvasScale}
                 canvasOffset={canvasOffset}
                 activeImportanceFilters={activeImportanceFilters}
                 showGeneralContent={showGeneralContent}
+                alwaysShowContent={alwaysShowContent}
                 enableImportanceBackground={true}
                 onDragStart={onMemoDragStart}
                 onDragEnd={onMemoDragEnd}
@@ -557,8 +608,12 @@ const Canvas: React.FC<CanvasProps> = ({
                 isShiftPressed={isShiftPressed}
                 onDelete={onDeleteMemoById}
                 onAddQuickNav={onAddQuickNav}
+                onDeleteQuickNav={onDeleteQuickNav}
                 isQuickNavExists={isQuickNavExists}
                 onOpenEditor={onOpenEditor}
+                setIsLongPressActive={setIsLongPressActive}
+                setIsShiftPressed={setIsShiftPressed}
+                isShiftPressedRef={isShiftPressedRef}
               />
             );
           })}
@@ -568,9 +623,11 @@ const Canvas: React.FC<CanvasProps> = ({
         </div>
       </div>
 
-      {/* Toolbar - fixed position (모바일에서는 숨김) */}
-      {!fullscreen && (
-      <div className={styles.toolbar}>
+      {/* Toolbar - fixed position (모바일/태블릿에서는 숨김, PC 전용) */}
+      {!fullscreen && !isTabletLandscape && (
+      <div
+        className={styles.toolbar}
+      >
         <button
           onClick={() => setCurrentTool('select')}
           className={`${styles['tool-button']} ${currentTool === 'select' ? styles.active : styles.inactive}`}
@@ -667,9 +724,11 @@ const Canvas: React.FC<CanvasProps> = ({
       </div>
       )}
 
-      {/* Canvas Undo/Redo Controls (모바일에서는 숨김) */}
-      {!fullscreen && (
-      <div className={styles['undo-redo-controls']}>
+      {/* Canvas Undo/Redo Controls (모바일/태블릿에서는 숨김, PC 전용) */}
+      {!fullscreen && !isTabletLandscape && (
+      <div
+        className={styles['undo-redo-controls']}
+      >
         <button
           data-tutorial="undo-btn"
           onClick={onUndo}
@@ -686,6 +745,18 @@ const Canvas: React.FC<CanvasProps> = ({
           className={`${styles['undo-redo-button']} ${canRedo ? styles.enabled : styles.disabled}`}
         >
           ↷ 다시실행
+        </button>
+        <button
+          onClick={() => {
+            console.log('내용 표시 버튼 클릭');
+            if (onToggleAlwaysShowContent) {
+              onToggleAlwaysShowContent();
+            }
+          }}
+          title="모든 메모의 내용을 표시"
+          className={`${styles['content-toggle-button']} ${alwaysShowContent ? styles.enabled : styles.disabled}`}
+        >
+          📄 내용 표시
         </button>
       </div>
       )}
@@ -706,16 +777,18 @@ const Canvas: React.FC<CanvasProps> = ({
         zIndex: 1000,
         userSelect: 'none'
       }}>
-        {Math.round(Math.min(canvasScale * 100, 200))}%
+        {Math.round(Math.min((canvasScale / 0.35) * 100, 571))}%
       </div>
 
-      {/* 중요도 필터 UI - 모바일/태블릿에서는 숨김 */}
-      {!fullscreen && (
+      {/* 중요도 필터 UI - 모바일/태블릿에서는 숨김, PC 전용 */}
+      {!fullscreen && !isTabletLandscape && (
         <ImportanceFilter
           activeFilters={activeImportanceFilters}
           onToggleFilter={onToggleImportanceFilter}
           showGeneralContent={showGeneralContent}
           onToggleGeneralContent={onToggleGeneralContent}
+          alwaysShowContent={alwaysShowContent}
+          onToggleAlwaysShowContent={onToggleAlwaysShowContent}
         />
       )}
 

@@ -34,7 +34,7 @@ export const getFilteredTextFromBlock = (
 
   const { content, importanceRanges } = block;
 
-  if (!importanceRanges || importanceRanges.length === 0) {
+  if (!importanceRanges || !Array.isArray(importanceRanges) || importanceRanges.length === 0) {
     // 중요도 없는 일반 텍스트
     return searchShowGeneralContent ? content : '';
   }
@@ -94,11 +94,11 @@ export const getAllMemosFromCategory = (categoryId: string, page: Page): MemoBlo
   const result: MemoBlock[] = [];
 
   // 해당 카테고리를 부모로 가진 메모 찾기
-  const childMemos = page.memos.filter(memo => memo.parentId === categoryId);
+  const childMemos = (page.memos || []).filter(memo => memo.parentId === categoryId);
   result.push(...childMemos);
 
   // 해당 카테고리를 부모로 가진 하위 카테고리들의 메모도 재귀적으로 찾기
-  const childCategories = page.categories?.filter(cat => cat.parentId === categoryId) || [];
+  const childCategories = (page.categories || []).filter(cat => cat.parentId === categoryId);
   childCategories.forEach(childCat => {
     result.push(...getAllMemosFromCategory(childCat.id, page));
   });
@@ -122,11 +122,13 @@ export const calculateImportanceCount = (
     // 텍스트 블록의 중요도 범위 계산
     if (block.type === 'text') {
       const textBlock = block as any;
-      if (textBlock.importanceRanges && textBlock.importanceRanges.length > 0) {
+      if (textBlock.importanceRanges && Array.isArray(textBlock.importanceRanges) && textBlock.importanceRanges.length > 0) {
         textBlock.importanceRanges.forEach((range: any) => {
-          totalCount++;
-          if (searchImportanceFilters && searchImportanceFilters.has(range.level)) {
-            filteredCount++;
+          if (range && range.level) {
+            totalCount++;
+            if (searchImportanceFilters && searchImportanceFilters.has(range.level)) {
+              filteredCount++;
+            }
           }
         });
       }

@@ -1,7 +1,7 @@
 import { useCallback, MutableRefObject } from 'react';
 import { Page, CategoryBlock } from '../types';
 import { calculateCategoryArea, clearCollisionDirections } from '../utils/categoryAreaUtils';
-import { resolveUnifiedCollisions } from '../utils/collisionUtils';
+import { resolveUnifiedCollisions } from '../utils/collision';
 
 interface UseCategoryPositionHandlersProps {
   pages: Page[];
@@ -17,6 +17,7 @@ interface UseCategoryPositionHandlersProps {
   clearCategoryCache: (categoryId: string) => void;
   // Shift 드래그 상태
   isShiftPressed: boolean;
+  isShiftPressedRef: MutableRefObject<boolean>;  // ref 추가
   isDraggingMemo: boolean;
   isDraggingCategory: boolean;
 }
@@ -34,6 +35,7 @@ export const useCategoryPositionHandlers = ({
   cacheCreationStarted,
   clearCategoryCache,
   isShiftPressed,
+  isShiftPressedRef,  // ref 추가
   isDraggingMemo,
   isDraggingCategory
 }: UseCategoryPositionHandlersProps) => {
@@ -44,7 +46,7 @@ export const useCategoryPositionHandlers = ({
     categoryId: string,
     position: { x: number; y: number }
   ) => {
-    setPages(prev => prev.map(page => {
+    setPages(prev => prev?.map(page => {
       if (page.id !== currentPageId) return page;
 
       // 먼저 라벨 위치 업데이트
@@ -62,11 +64,15 @@ export const useCategoryPositionHandlers = ({
       };
 
       // 충돌 판정 적용 (영역 크기 조절로 인한 충돌)
+      // 롱프레스 활성화 시 충돌 판정 스킵 (ref 사용)
       const collisionResult = resolveUnifiedCollisions(
         categoryId,
         'area',
         updatedPage,
-        10
+        10,
+        undefined,
+        undefined,
+        isShiftPressedRef.current  // ref 사용
       );
 
       return {
@@ -75,14 +81,14 @@ export const useCategoryPositionHandlers = ({
         memos: collisionResult.updatedMemos
       };
     }));
-  }, [setPages, currentPageId]);
+  }, [setPages, currentPageId, isShiftPressedRef]);
 
   // 카테고리 드래그 종료 시 드롭 감지 및 캐시 제거
   const handleCategoryPositionDragEnd = useCallback((
     categoryId: string,
     finalPosition: { x: number; y: number }
   ) => {
-    const currentPage = pages.find(p => p.id === currentPageId);
+    const currentPage = pages?.find(p => p.id === currentPageId);
     if (!currentPage || !currentPage.categories) {
       // Shift 드롭이 완료될 때까지 캐시 클리어를 지연 (500ms)
       setTimeout(() => {
@@ -138,10 +144,10 @@ export const useCategoryPositionHandlers = ({
   // 메모가 이동할 때만 업데이트
   const updateCategoryPositions = useCallback(() => {
     // ⚠️ Shift 드래그 중에는 영역 계산 스킵 (영역이 freeze된 상태)
-    const isShiftDragging = isShiftPressed && (isDraggingMemo || isDraggingCategory);
+    const isShiftDragging = isShiftPressedRef.current && (isDraggingMemo || isDraggingCategory);
     if (isShiftDragging) return;
 
-    const currentPage = pages.find(p => p.id === currentPageId);
+    const currentPage = pages?.find(p => p.id === currentPageId);
     if (!currentPage || !currentPage.categories) return;
 
     const categoriesToUpdate: CategoryBlock[] = [];
@@ -171,7 +177,7 @@ export const useCategoryPositionHandlers = ({
 
     // 업데이트가 필요한 카테고리가 있으면 한 번에 업데이트
     if (categoriesToUpdate.length > 0) {
-      setPages(prev => prev.map(page => {
+      setPages(prev => prev?.map(page => {
         if (page.id === currentPageId) {
           return {
             ...page,
@@ -184,7 +190,7 @@ export const useCategoryPositionHandlers = ({
         return page;
       }));
     }
-  }, [pages, currentPageId, setPages, isShiftPressed, isDraggingMemo, isDraggingCategory]);
+  }, [pages, currentPageId, setPages, isShiftPressedRef, isDraggingMemo, isDraggingCategory]);
 
   return {
     updateCategoryLabelPosition,

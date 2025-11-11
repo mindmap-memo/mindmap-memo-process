@@ -2,6 +2,8 @@ import React from 'react';
 import { CategoryBlock } from '../../types';
 import ContextMenu from '../ContextMenu';
 import QuickNavModal from '../QuickNavModal';
+import { Edit2, Star, Trash2 } from 'lucide-react';
+import { detectDoubleTap } from '../../utils/doubleTapUtils';
 import { useCategoryBlockState } from './hooks/useCategoryBlockState';
 import { useCategoryTitleHandlers } from './hooks/useCategoryTitleHandlers';
 import { useCategoryDragHandlers } from './hooks/useCategoryDragHandlers';
@@ -32,6 +34,8 @@ interface CategoryBlockProps {
   onStartConnection?: (categoryId: string) => void;
   onConnectItems?: (fromId: string, toId: string) => void;
   onRemoveConnection?: (fromId: string, toId: string) => void;
+  onUpdateDragLine?: (mousePos: { x: number; y: number }) => void;
+  onCancelConnection?: () => void;
   onPositionChange?: (categoryId: string, position: { x: number; y: number }) => void;
   onPositionDragEnd?: (categoryId: string, finalPosition: { x: number; y: number }, isShiftMode?: boolean) => void;
   onDetectCategoryDropForCategory?: (categoryId: string, position: { x: number; y: number }, isShiftMode?: boolean) => void;
@@ -45,6 +49,11 @@ interface CategoryBlockProps {
   isCategoryBeingDragged?: boolean;
   isShiftPressed?: boolean;
   onOpenEditor?: () => void;
+  isLongPressActive?: boolean;  // 롱프레스 상태
+  longPressTargetId?: string | null;  // 롱프레스된 타겟 ID
+  setIsLongPressActive?: (active: boolean, targetId?: string | null) => void;  // 롱프레스 상태 업데이트
+  setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수 추가
+  isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref 추가
 }
 
 const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
@@ -68,6 +77,8 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   onStartConnection,
   onConnectItems,
   onRemoveConnection,
+  onUpdateDragLine,
+  onCancelConnection,
   onPositionChange,
   onPositionDragEnd,
   onDetectCategoryDropForCategory,
@@ -80,11 +91,13 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   isDragTarget = false,
   isCategoryBeingDragged = false,
   isShiftPressed = false,
-  onOpenEditor
+  onOpenEditor,
+  isLongPressActive: globalIsLongPressActive = false,
+  longPressTargetId = null,
+  setIsLongPressActive: externalSetIsLongPressActive,
+  setIsShiftPressed,  // Shift 상태 업데이트 함수
+  isShiftPressedRef  // Shift ref 추가
 }) => {
-  // 더블탭 감지를 위한 상태
-  const lastTapTimeRef = React.useRef<number>(0);
-  const DOUBLE_TAP_DELAY = 300; // 300ms 이내 두 번 탭하면 더블탭으로 인식
   // 상태 관리
   const {
     isEditing,
@@ -132,6 +145,17 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     isSelected
   });
 
+  // 컨텍스트 메뉴 핸들러 (lastLongPressEndRef를 드래그 핸들러보다 먼저 선언)
+  const { handleContextMenu, handleAddQuickNav, handleQuickNavConfirm, lastLongPressEndRef } = useCategoryContextMenu({
+    categoryId: category.id,
+    contextMenu,
+    setContextMenu,
+    setShowQuickNavModal,
+    onDelete,
+    onAddQuickNav,
+    isQuickNavExists
+  });
+
   // 드래그 핸들러
   const { handleMouseDown, handleTouchStart, handleMouseMove, handleMouseUp, handleClick } = useCategoryDragHandlers({
     category,
@@ -145,7 +169,6 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     canvasOffset,
     pendingPosition,
     lastUpdateTime,
-    lastTapTimeRef,
     longPressTimerRef,
     isLongPressActive,
     setMouseDownPos,
@@ -153,6 +176,10 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     setDragStart,
     setIsDraggingPosition,
     setIsLongPressActive,
+    setIsLongPressActiveGlobal: externalSetIsLongPressActive,
+    setIsShiftPressed,  // Shift 상태 업데이트 함수 전달
+    isShiftPressedRef,  // Shift ref 전달
+    lastLongPressEndRef,  // 롱프레스 종료 시간 ref 전달
     onClick,
     onDragStart,
     onDragEnd,
@@ -169,18 +196,11 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     connectingFromId,
     setIsConnectionDragging,
     onStartConnection,
-    onConnectItems
-  });
-
-  // 컨텍스트 메뉴 핸들러
-  const { handleContextMenu, handleAddQuickNav, handleQuickNavConfirm } = useCategoryContextMenu({
-    categoryId: category.id,
-    contextMenu,
-    setContextMenu,
-    setShowQuickNavModal,
-    onDelete,
-    onAddQuickNav,
-    isQuickNavExists
+    onConnectItems,
+    onUpdateDragLine,
+    onCancelConnection,
+    canvasOffset,
+    canvasScale
   });
 
   // 드롭 핸들러
@@ -247,6 +267,9 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
           console.log('[CategoryBlock Native TouchStart] 롱프레스 감지! Shift+드래그 모드 활성화');
           setIsLongPressActive(true);
 
+          // 전역 롱프레스 상태 업데이트 (컨텍스트 메뉴 방지용)
+          externalSetIsLongPressActive?.(true, category.id);
+
           // 햅틱 피드백
           if (navigator.vibrate) {
             navigator.vibrate(50);
@@ -260,7 +283,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
     return () => {
       categoryRef.current?.removeEventListener('touchstart', handleNativeTouchStart);
     };
-  }, [category.id, isEditing, isConnecting, longPressTimerRef, setIsLongPressActive, categoryRef]);
+  }, [category.id, isEditing, isConnecting, longPressTimerRef, setIsLongPressActive, externalSetIsLongPressActive, categoryRef]);
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -275,7 +298,9 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
   const isTagMode = hasChildren && !isHighlighted;
 
   // Shift+드래그 또는 롱프레스 스타일 적용
-  const isShiftDragging = isDraggingPosition && (isShiftPressed || isLongPressActive);
+  // ⚠️ 중요: 롱프레스는 이 카테고리가 타겟일 때만 적용
+  const isThisCategoryLongPressed = isLongPressActive && longPressTargetId === category.id;
+  const isShiftDragging = isDraggingPosition && (isShiftPressed || isThisCategoryLongPressed);
 
   const categoryStyle: React.CSSProperties = {
     width: isTagMode ? 'auto' : '100%',
@@ -320,7 +345,7 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
 
   const titleStyle: React.CSSProperties = {
     flex: 1,
-    fontSize: isTagMode ? '13px' : '16px',
+    fontSize: isTagMode ? '13px' : '18px', // 16px → 18px로 증가
     fontWeight: isTagMode ? 500 : 600,
     color: 'white',
     backgroundColor: 'transparent',
@@ -443,13 +468,125 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
           </div>
         )}
 
-        <div style={controlsStyle}>
+        <div style={{
+          display: 'flex',
+          gap: '6px',
+          alignItems: 'center',
+          marginLeft: '8px',
+          position: 'relative',
+          zIndex: 100
+        }}>
           <button
-            style={deleteButtonStyle}
+            data-action-button
+            style={{
+              background: 'rgba(255, 255, 255, 0.2)',
+              border: '1px solid rgba(255, 255, 255, 0.4)',
+              borderRadius: '6px',
+              padding: '8px 10px',
+              fontSize: '16px',
+              cursor: 'pointer',
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: '40px',
+              height: '40px',
+              transition: 'all 0.2s ease',
+              position: 'relative',
+              zIndex: 101
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onOpenEditor) {
+                // 모바일: 에디터 열기
+                onOpenEditor();
+              } else {
+                // PC: 제목 편집 모드
+                setIsEditing(true);
+                setTimeout(() => titleRef.current?.focus(), 0);
+              }
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+            }}
+            title="편집"
+          >
+            <Edit2 size={18} />
+          </button>
+          <button
+            data-action-button
+            style={{
+              background: isQuickNavExists && isQuickNavExists(category.id, 'category') ? 'rgba(251, 191, 36, 0.3)' : 'rgba(255, 255, 255, 0.2)',
+              border: isQuickNavExists && isQuickNavExists(category.id, 'category') ? '1px solid rgba(251, 191, 36, 0.6)' : '1px solid rgba(255, 255, 255, 0.4)',
+              borderRadius: '6px',
+              padding: '8px 10px',
+              fontSize: '16px',
+              cursor: 'pointer',
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: '40px',
+              height: '40px',
+              transition: 'all 0.2s ease',
+              position: 'relative',
+              zIndex: 101
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isQuickNavExists && isQuickNavExists(category.id, 'category')) {
+                alert('이미 즐겨찾기가 설정되어 있습니다.');
+              } else {
+                onAddQuickNav?.(category.title || '제목 없는 카테고리', category.id, 'category');
+              }
+            }}
+            onMouseEnter={(e) => {
+              const isFav = isQuickNavExists && isQuickNavExists(category.id, 'category');
+              e.currentTarget.style.background = isFav ? 'rgba(251, 191, 36, 0.4)' : 'rgba(255, 255, 255, 0.3)';
+            }}
+            onMouseLeave={(e) => {
+              const isFav = isQuickNavExists && isQuickNavExists(category.id, 'category');
+              e.currentTarget.style.background = isFav ? 'rgba(251, 191, 36, 0.3)' : 'rgba(255, 255, 255, 0.2)';
+            }}
+            title="즐겨찾기"
+          >
+            <Star
+              size={18}
+              fill={isQuickNavExists && isQuickNavExists(category.id, 'category') ? 'currentColor' : 'none'}
+            />
+          </button>
+          <button
+            data-action-button
+            style={{
+              background: 'rgba(255, 77, 77, 0.2)',
+              border: '1px solid rgba(255, 77, 77, 0.4)',
+              borderRadius: '6px',
+              padding: '8px 10px',
+              fontSize: '16px',
+              cursor: 'pointer',
+              color: '#ff6b6b',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: '40px',
+              height: '40px',
+              transition: 'all 0.2s ease',
+              position: 'relative',
+              zIndex: 101
+            }}
             onClick={handleDelete}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 77, 77, 0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 77, 77, 0.2)';
+            }}
             title="카테고리 삭제"
           >
-            ✕
+            <Trash2 size={18} />
           </button>
         </div>
       </div>
@@ -471,124 +608,144 @@ const CategoryBlockComponent: React.FC<CategoryBlockProps> = ({
       )}
 
       {!isTagMode && (<>
+      {/* 연결점 - 상단 */}
       <div
+        data-category-id={category.id}
         onMouseDown={handleConnectionPointMouseDown}
         onMouseUp={handleConnectionPointMouseUp}
+        onTouchStart={handleConnectionPointMouseDown}
+        onTouchEnd={handleConnectionPointMouseUp}
         onClick={(e) => {
           e.stopPropagation();
           e.preventDefault();
         }}
         style={{
           position: 'absolute',
-          top: -8,
+          top: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? -75 : -8,
           left: '50%',
           transform: 'translateX(-50%)',
-          width: 16,
-          height: 16,
+          width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
+          height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'crosshair',
-          zIndex: 15
+          zIndex: 15,
+          touchAction: 'none'
         }}
       >
         <div style={{
-          width: 8,
-          height: 8,
+          width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
+          height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
           backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
           borderRadius: '50%',
-          border: '2px solid white',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+          border: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '5px solid white' : '2px solid white',
+          boxShadow: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '0 6px 16px rgba(0, 0, 0, 0.4)' : '0 2px 4px rgba(0,0,0,0.2)'
         }} />
       </div>
+      {/* 연결점 - 하단 */}
       <div
+        data-category-id={category.id}
         onMouseDown={handleConnectionPointMouseDown}
         onMouseUp={handleConnectionPointMouseUp}
+        onTouchStart={handleConnectionPointMouseDown}
+        onTouchEnd={handleConnectionPointMouseUp}
         onClick={(e) => {
           e.stopPropagation();
           e.preventDefault();
         }}
         style={{
           position: 'absolute',
-          bottom: -8,
+          bottom: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? -75 : -8,
           left: '50%',
           transform: 'translateX(-50%)',
-          width: 16,
-          height: 16,
+          width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
+          height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'crosshair',
-          zIndex: 15
+          zIndex: 15,
+          touchAction: 'none'
         }}
       >
         <div style={{
-          width: 8,
-          height: 8,
+          width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
+          height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
           backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
           borderRadius: '50%',
-          border: '2px solid white',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+          border: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '5px solid white' : '2px solid white',
+          boxShadow: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '0 6px 16px rgba(0, 0, 0, 0.4)' : '0 2px 4px rgba(0,0,0,0.2)'
         }} />
       </div>
+      {/* 연결점 - 좌측 */}
       <div
+        data-category-id={category.id}
         onMouseDown={handleConnectionPointMouseDown}
         onMouseUp={handleConnectionPointMouseUp}
+        onTouchStart={handleConnectionPointMouseDown}
+        onTouchEnd={handleConnectionPointMouseUp}
         onClick={(e) => {
           e.stopPropagation();
           e.preventDefault();
         }}
         style={{
           position: 'absolute',
-          left: -8,
+          left: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? -75 : -8,
           top: '50%',
           transform: 'translateY(-50%)',
-          width: 16,
-          height: 16,
+          width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
+          height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'crosshair',
-          zIndex: 15
+          zIndex: 15,
+          touchAction: 'none'
         }}
       >
         <div style={{
-          width: 8,
-          height: 8,
+          width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
+          height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
           backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
           borderRadius: '50%',
-          border: '2px solid white',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+          border: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '5px solid white' : '2px solid white',
+          boxShadow: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '0 6px 16px rgba(0, 0, 0, 0.4)' : '0 2px 4px rgba(0,0,0,0.2)'
         }} />
       </div>
+      {/* 연결점 - 우측 */}
       <div
+        data-category-id={category.id}
         onMouseDown={handleConnectionPointMouseDown}
         onMouseUp={handleConnectionPointMouseUp}
+        onTouchStart={handleConnectionPointMouseDown}
+        onTouchEnd={handleConnectionPointMouseUp}
         onClick={(e) => {
           e.stopPropagation();
           e.preventDefault();
         }}
         style={{
           position: 'absolute',
-          right: -8,
+          right: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? -75 : -8,
           top: '50%',
           transform: 'translateY(-50%)',
-          width: 16,
-          height: 16,
+          width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
+          height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 150 : 16,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'crosshair',
-          zIndex: 15
+          zIndex: 15,
+          touchAction: 'none'
         }}
       >
         <div style={{
-          width: 8,
-          height: 8,
+          width: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
+          height: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? 48 : 8,
           backgroundColor: isConnecting && connectingFromId === category.id ? '#ef4444' : '#8b5cf6',
           borderRadius: '50%',
-          border: '2px solid white',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+          border: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '5px solid white' : '2px solid white',
+          boxShadow: (isConnecting && typeof window !== 'undefined' && window.innerWidth <= 768) ? '0 6px 16px rgba(0, 0, 0, 0.4)' : '0 2px 4px rgba(0,0,0,0.2)'
         }} />
       </div>
       </>)}

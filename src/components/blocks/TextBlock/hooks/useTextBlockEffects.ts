@@ -47,8 +47,9 @@ export const useTextBlockEffects = (params: UseTextBlockEffectsParams) => {
       return;
     }
 
+    // 외부 변경이 있을 때만 동기화 (사용자 입력 중에는 무시)
     setContent(block.content);
-  }, [block.content, isFocused]);
+  }, [block.content, isFocused, content, setContent]);
 
   // 외부에서 importanceRanges가 변경되었을 때 로컬 상태 동기화
   useEffect(() => {
