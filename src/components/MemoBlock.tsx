@@ -312,13 +312,18 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
             height: Math.round(rect.height / canvasScale)
           };
 
-          // scale < 1.0일 때는 크기 업데이트 하지 않음 (역스케일링으로 인한 영역 확장 방지)
-          if (canvasScale < 1.0) {
+          // 100% 기준 스케일 (앱의 기본 스케일)
+          const BASE_SCALE = 0.35;
+
+          // 기준 스케일보다 작을 때는 크기 업데이트 하지 않음 (역스케일링으로 인한 영역 확장 방지)
+          if (canvasScale < BASE_SCALE) {
             return;
           }
 
-          // scale = 1.0일 때는 항상 업데이트 (DB에 저장된 오래된 크기 갱신)
-          const shouldUpdate = canvasScale === 1.0 ||
+          // scale >= BASE_SCALE일 때만 업데이트
+          // scale = BASE_SCALE일 때는 항상 업데이트 (DB에 저장된 오래된 크기 갱신)
+          const isAtBaseScale = Math.abs(canvasScale - BASE_SCALE) < 0.01; // BASE_SCALE에 매우 가까우면 true
+          const shouldUpdate = isAtBaseScale ||
             !memo.size ||
             Math.abs(memo.size.width - newSize.width) > 5 ||
             Math.abs(memo.size.height - newSize.height) > 5;

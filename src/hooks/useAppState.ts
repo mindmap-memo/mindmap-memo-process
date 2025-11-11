@@ -260,7 +260,6 @@ export const useAppState = (isAuthenticated: boolean = false) => {
         setLoadingProgress(100);
         // 100% 애니메이션을 보여주기 위한 짧은 대기
         setTimeout(() => {
-          console.log('[useAppState] ✨ 초기 로딩 완료 플래그 설정');
           setIsInitialLoadDone(true);
         }, 200);
       }

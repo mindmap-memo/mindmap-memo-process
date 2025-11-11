@@ -592,13 +592,7 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
 
   // 연결점 드래그 시 dragLine 업데이트 및 드롭 처리
   React.useEffect(() => {
-    console.log('🔷 [useEffect] 연결 드래그 Effect 실행', {
-      isConnectionDragging,
-      hasOnUpdateDragLine: !!onUpdateDragLine
-    });
-
     if (isConnectionDragging && onUpdateDragLine) {
-      console.log('🔷 [useEffect] 이벤트 리스너 등록 시작');
       const handleMouseMove = (e: MouseEvent) => {
         // Canvas 요소를 찾아서 rect 기준으로 변환
         const canvasElement = document.querySelector('[data-canvas-container]') as HTMLElement;
@@ -724,10 +718,8 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
       document.addEventListener('touchmove', handleTouchMove);
       document.addEventListener('mouseup', handleMouseUp);
       document.addEventListener('touchend', handleTouchEnd);
-      console.log('🔷 [useEffect] 이벤트 리스너 등록 완료 (touchend 포함)');
 
       return () => {
-        console.log('🔷 [useEffect] 이벤트 리스너 제거');
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('touchmove', handleTouchMove);
         document.removeEventListener('mouseup', handleMouseUp);

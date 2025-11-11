@@ -238,13 +238,7 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
 
   // 연결점 드래그 중일 때 document-level 이벤트 리스너 등록
   React.useEffect(() => {
-    console.log('🔷 [카테고리 연결점 useEffect] 실행', {
-      isConnectionDragging,
-      hasOnUpdateDragLine: !!onUpdateDragLine
-    });
-
     if (isConnectionDragging && onUpdateDragLine) {
-      console.log('🔷 [카테고리 연결점] 이벤트 리스너 등록 시작', { categoryId: isConnectionDragging });
       const handleMouseMove = (e: MouseEvent) => {
         const canvasElement = document.querySelector('[data-canvas-container]') as HTMLElement;
         if (canvasElement) {
