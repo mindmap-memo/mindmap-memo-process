@@ -247,6 +247,46 @@ export const useAppState = (isAuthenticated: boolean = false) => {
 
         setLoadingProgress(90);
 
+        // ===== 자동 마이그레이션: page_id "1" 문제 수정 =====
+        // 로드된 페이지 중 page_id가 "1"인 메모/카테고리가 있는지 확인
+        const hasBrokenPageIds = loadedPages.some(page =>
+          page.memos?.some(memo => memo.id.startsWith('1-memo-')) ||
+          page.categories?.some(cat => cat.id.startsWith('1-tutorial-category'))
+        );
+
+        if (hasBrokenPageIds) {
+          console.log('[useAppState] ⚠️ page_id "1" 감지됨. 자동 마이그레이션을 실행합니다...');
+          try {
+            const response = await fetch('/api/fix-page-ids', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) {
+              const result = await response.json();
+              console.log('[useAppState] ✅ 마이그레이션 완료:', result);
+
+              // 마이그레이션 후 데이터 다시 로드
+              if (result.updatedMemos > 0 || result.updatedCategories > 0) {
+                console.log('[useAppState] 🔄 수정된 데이터를 다시 로드합니다...');
+                const reloadedPages = await fetchPages();
+                const safePagesReloaded = reloadedPages.map(page => ({
+                  ...page,
+                  memos: Array.isArray(page.memos) ? page.memos : [],
+                  categories: Array.isArray(page.categories) ? page.categories : [],
+                  quickNavItems: Array.isArray(page.quickNavItems) ? page.quickNavItems : []
+                }));
+                setPages(safePagesReloaded);
+                setCurrentPageId(safePagesReloaded[0]?.id || '1');
+              }
+            } else {
+              console.error('[useAppState] ❌ 마이그레이션 실패:', await response.text());
+            }
+          } catch (migrationError) {
+            console.error('[useAppState] ❌ 마이그레이션 에러:', migrationError);
+          }
+        }
+
         // UI 렌더링을 위한 짧은 대기
         await new Promise(resolve => setTimeout(resolve, 100));
 
