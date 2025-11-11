@@ -47,8 +47,6 @@ export function calculateCategoryArea(
     const memoWidth = memo.size?.width || DEFAULT_MEMO_WIDTH;
     const memoHeight = memo.size?.height || DEFAULT_MEMO_HEIGHT;
 
-    console.log(`[Area] memo ${memo.title?.slice(0,20) || memo.id.slice(0,8)}: pos(${memo.position.x},${memo.position.y}) size(${memoWidth}x${memoHeight})`);
-
     minX = Math.min(minX, memo.position.x);
     minY = Math.min(minY, memo.position.y);
     maxX = Math.max(maxX, memo.position.x + memoWidth);
@@ -95,8 +93,6 @@ export function calculateCategoryArea(
     width: Math.max(calculatedWidth, minWidth),
     height: Math.max(calculatedHeight, minHeight)
   };
-
-  console.log(`[Area Final] ${category.title?.slice(0,20) || category.id.slice(0,8)}: bounds(${minX},${minY})-(${maxX},${maxY}) -> area pos(${finalArea.x},${finalArea.y}) size(${finalArea.width}x${finalArea.height})`);
 
   return finalArea;
 }

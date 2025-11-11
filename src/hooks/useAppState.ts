@@ -297,6 +297,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
     new Set(['critical', 'important', 'opinion', 'reference', 'question', 'idea', 'data'] as ImportanceLevel[])
   );
   const [showGeneralContent, setShowGeneralContent] = useState<boolean>(true);
+  const [alwaysShowContent, setAlwaysShowContent] = useState<boolean>(false);
 
   // ===== 드래그 선택 상태 =====
   const [isDragSelecting, setIsDragSelecting] = useState<boolean>(false);
@@ -367,6 +368,8 @@ export const useAppState = (isAuthenticated: boolean = false) => {
     setActiveImportanceFilters,
     showGeneralContent,
     setShowGeneralContent,
+    alwaysShowContent,
+    setAlwaysShowContent,
 
     // 드래그 선택
     isDragSelecting,

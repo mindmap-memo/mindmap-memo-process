@@ -511,6 +511,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
               onToggleImportanceFilter={selection?.toggleImportanceFilter || (() => {})}
               showGeneralContent={selection?.showGeneralContent ?? true}
               onToggleGeneralContent={selection?.toggleGeneralContent || (() => {})}
+              alwaysShowContent={selection?.alwaysShowContent ?? false}
+              onToggleAlwaysShowContent={selection?.toggleAlwaysShowContent}
               canUndo={canUndo}
               canRedo={canRedo}
               onUndo={onUndo}
@@ -708,13 +710,50 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
 
       {/* ImportanceFilter - 모바일에서는 하단에 가로로 배치 */}
       {!showEditor && selection && (
-        <ImportanceFilter
-          activeFilters={selection.activeImportanceFilters || []}
-          onToggleFilter={selection.toggleImportanceFilter || (() => {})}
-          showGeneralContent={selection.showGeneralContent || false}
-          onToggleGeneralContent={selection.toggleGeneralContent || (() => {})}
-          isMobile={true}
-        />
+        <>
+          <ImportanceFilter
+            activeFilters={selection.activeImportanceFilters || []}
+            onToggleFilter={selection.toggleImportanceFilter || (() => {})}
+            showGeneralContent={selection.showGeneralContent || false}
+            onToggleGeneralContent={selection.toggleGeneralContent || (() => {})}
+            alwaysShowContent={selection.alwaysShowContent || false}
+            onToggleAlwaysShowContent={selection.toggleAlwaysShowContent}
+            isMobile={true}
+          />
+
+          {/* 내용 항상 표시 버튼 - 중요도 필터 오른쪽 */}
+          <button
+            onClick={selection.toggleAlwaysShowContent}
+            style={{
+              position: 'fixed',
+              top: '60px',
+              left: '88px', // 중요도 필터 원형 버튼(56px) + 여백(32px)
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              backgroundColor: selection.alwaysShowContent ? 'rgba(139, 92, 246, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(8px)',
+              border: 'none',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease',
+              zIndex: 1700,
+              fontSize: '11px',
+              fontWeight: 600,
+              color: selection.alwaysShowContent ? '#fff' : '#333',
+              textAlign: 'center',
+              lineHeight: 1.3,
+              padding: '6px',
+              wordBreak: 'keep-all',
+              whiteSpace: 'pre-line'
+            }}
+          >
+            내용{'\n'}표시
+          </button>
+        </>
       )}
 
       {/* 뒤로가기 종료 안내 토스트 */}

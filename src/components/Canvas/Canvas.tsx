@@ -61,6 +61,8 @@ interface CanvasProps {
   onToggleImportanceFilter: (level: ImportanceLevel) => void;
   showGeneralContent: boolean;
   onToggleGeneralContent: () => void;
+  alwaysShowContent?: boolean;
+  onToggleAlwaysShowContent?: () => void;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
@@ -144,6 +146,8 @@ const Canvas: React.FC<CanvasProps> = ({
   onToggleImportanceFilter,
   showGeneralContent,
   onToggleGeneralContent,
+  alwaysShowContent = false,
+  onToggleAlwaysShowContent,
   canUndo,
   canRedo,
   onUndo,
@@ -589,6 +593,7 @@ const Canvas: React.FC<CanvasProps> = ({
                 canvasOffset={canvasOffset}
                 activeImportanceFilters={activeImportanceFilters}
                 showGeneralContent={showGeneralContent}
+                alwaysShowContent={alwaysShowContent}
                 enableImportanceBackground={true}
                 onDragStart={onMemoDragStart}
                 onDragEnd={onMemoDragEnd}
@@ -731,6 +736,18 @@ const Canvas: React.FC<CanvasProps> = ({
         >
           ↷ 다시실행
         </button>
+        <button
+          onClick={() => {
+            console.log('내용 표시 버튼 클릭');
+            if (onToggleAlwaysShowContent) {
+              onToggleAlwaysShowContent();
+            }
+          }}
+          title="모든 메모의 내용을 표시"
+          className={`${styles['undo-redo-button']} ${alwaysShowContent ? styles.enabled : styles.disabled}`}
+        >
+          📄 내용 표시
+        </button>
       </div>
       )}
 
@@ -760,6 +777,8 @@ const Canvas: React.FC<CanvasProps> = ({
           onToggleFilter={onToggleImportanceFilter}
           showGeneralContent={showGeneralContent}
           onToggleGeneralContent={onToggleGeneralContent}
+          alwaysShowContent={alwaysShowContent}
+          onToggleAlwaysShowContent={onToggleAlwaysShowContent}
         />
       )}
 

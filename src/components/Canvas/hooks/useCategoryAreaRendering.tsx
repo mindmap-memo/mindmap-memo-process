@@ -77,6 +77,7 @@ interface UseCategoryAreaRenderingParams {
   // 필터 관련
   activeImportanceFilters: Set<any>;
   showGeneralContent: boolean;
+  alwaysShowContent?: boolean;
 
   // 핸들러들
   onConnectMemos: (fromId: string, toId: string) => void;
@@ -173,6 +174,7 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
     dragHoveredMemoIds,
     activeImportanceFilters,
     showGeneralContent,
+    alwaysShowContent,
     onConnectMemos,
     onCategorySelect,
     onMemoSelect,
@@ -1533,6 +1535,7 @@ export const useCategoryAreaRendering = (params: UseCategoryAreaRenderingParams)
             canvasOffset={canvasOffset}
             activeImportanceFilters={activeImportanceFilters}
             showGeneralContent={showGeneralContent}
+            alwaysShowContent={alwaysShowContent}
             enableImportanceBackground={true}
             onDragStart={onMemoDragStart}
             onDragEnd={onMemoDragEnd}

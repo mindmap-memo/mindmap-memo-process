@@ -40,6 +40,8 @@ interface ImportanceFilterProps {
   onToggleFilter: (level: ImportanceLevel) => void;
   showGeneralContent: boolean;
   onToggleGeneralContent: () => void;
+  alwaysShowContent?: boolean;
+  onToggleAlwaysShowContent?: () => void;
   isMobile?: boolean;
 }
 
@@ -48,6 +50,8 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
   onToggleFilter,
   showGeneralContent,
   onToggleGeneralContent,
+  alwaysShowContent = false,
+  onToggleAlwaysShowContent,
   isMobile = false
 }) => {
   const [isCollapsed, setIsCollapsed] = React.useState(isMobile);
@@ -259,6 +263,22 @@ const ImportanceFilter: React.FC<ImportanceFilterProps> = ({
           전체 해제
         </button>
       </div>
+
+      {/* 내용 표시 토글 */}
+      {onToggleAlwaysShowContent && (
+        <div className={styles.alwaysShowSection}>
+          <label className={`${styles.item} ${styles.alwaysShowItem} ${alwaysShowContent ? styles.active : ''}`}>
+            <input
+              type="checkbox"
+              checked={alwaysShowContent}
+              onChange={onToggleAlwaysShowContent}
+            />
+            <span>
+              📄 내용 표시
+            </span>
+          </label>
+        </div>
+      )}
         </>
       )}
     </div>

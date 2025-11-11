@@ -34,6 +34,7 @@ interface MemoBlockProps {
   canvasOffset?: { x: number; y: number };
   activeImportanceFilters?: Set<ImportanceLevel>;
   showGeneralContent?: boolean;
+  alwaysShowContent?: boolean;
   onDragStart?: (memoId: string) => void;
   onDragEnd?: () => void;
   enableImportanceBackground?: boolean;
@@ -71,6 +72,7 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
   canvasOffset = { x: 0, y: 0 },
   activeImportanceFilters,
   showGeneralContent,
+  alwaysShowContent = false,
   enableImportanceBackground = false,
   onDragStart,
   onDragEnd,
@@ -435,17 +437,24 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
         </div>
         {/* Tags removed - 항상 숨김 */}
 
-        {/* 내용은 hover 또는 selected일 때만 표시 */}
-        {(isHovering || isSelected) && (
+        {/* 내용은 hover, selected, 또는 alwaysShowContent일 때 표시 */}
+        {(isHovering || isSelected || alwaysShowContent) && (() => {
+          // memoRef.current.offsetWidth는 이미 scale이 적용된 화면 크기
+          // 내용 영역도 메모 블록의 자식이므로 같은 scale을 받음
+          // 따라서 scale 변환 없이 그대로 사용
+          const actualWidth = memoRef.current?.offsetWidth || 0;
+          const memoWidth = actualWidth - 24; // padding 제외
+          const contentWidth = memoWidth < 150 ? 150 : memoWidth; // 150px보다 작으면 150px, 크면 메모 블록 너비 사용
+          console.log(`[Content Width] ${memo.title?.slice(0,20) || memo.id.slice(0,8)} | actualWidth: ${actualWidth}px | memoWidth: ${memoWidth}px | contentWidth: ${contentWidth}px | scale: ${canvasScale}`);
+
+          return (
           <div
             onDoubleClick={handleAllBlocksDoubleClick}
             onTouchEnd={handleTouchEnd}
             className={`${styles.contentContainer} ${isSelected ? styles.editable : styles.notEditable}`}
             style={{
               fontSize: `${14 / (canvasScale || 1)}px`,
-              width: `${Math.max(180, memo.size?.width || sizeConfig.width) / (canvasScale || 1)}px`,
-              minWidth: `${Math.max(180, memo.size?.width || sizeConfig.width) / (canvasScale || 1)}px`,
-              maxWidth: `${Math.max(180, memo.size?.width || sizeConfig.width) / (canvasScale || 1)}px`,
+              width: `${contentWidth}px`,
               maxHeight: `${500 / Math.sqrt(canvasScale || 1)}px`,
               zIndex: isSelected ? 1000 : 50
             }}
@@ -670,7 +679,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
               </>
             )}
           </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* 연결점들 - 메모 블록 외부에 배치 */}

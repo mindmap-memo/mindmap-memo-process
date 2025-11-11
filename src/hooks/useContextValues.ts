@@ -71,8 +71,11 @@ interface UseContextValuesProps {
   setActiveImportanceFilters: React.Dispatch<React.SetStateAction<Set<ImportanceLevel>>>;
   showGeneralContent: boolean;
   setShowGeneralContent: React.Dispatch<React.SetStateAction<boolean>>;
+  alwaysShowContent: boolean;
+  setAlwaysShowContent: React.Dispatch<React.SetStateAction<boolean>>;
   toggleImportanceFilter: (level: ImportanceLevel) => void;
   toggleGeneralContent: () => void;
+  toggleAlwaysShowContent: () => void;
 
   // Panel
   leftPanelOpen: boolean;
@@ -174,8 +177,11 @@ export const useContextValues = (props: UseContextValuesProps) => {
     setActiveImportanceFilters: props.setActiveImportanceFilters,
     showGeneralContent: props.showGeneralContent,
     setShowGeneralContent: props.setShowGeneralContent,
+    alwaysShowContent: props.alwaysShowContent,
+    setAlwaysShowContent: props.setAlwaysShowContent,
     toggleImportanceFilter: props.toggleImportanceFilter,
-    toggleGeneralContent: props.toggleGeneralContent
+    toggleGeneralContent: props.toggleGeneralContent,
+    toggleAlwaysShowContent: props.toggleAlwaysShowContent
   }), [
     props.selectedMemoId, props.setSelectedMemoId, props.selectedMemoIds, props.setSelectedMemoIds,
     props.selectedMemo, props.selectedMemos, props.selectedCategoryId, props.setSelectedCategoryId,
@@ -185,7 +191,8 @@ export const useContextValues = (props: UseContextValuesProps) => {
     props.dragHoveredCategoryIds, props.setDragHoveredCategoryIds, props.isDragSelectingWithShift,
     props.setIsDragSelectingWithShift, props.handleMemoSelect, props.selectCategory,
     props.activeImportanceFilters, props.setActiveImportanceFilters,
-    props.showGeneralContent, props.setShowGeneralContent, props.toggleImportanceFilter, props.toggleGeneralContent
+    props.showGeneralContent, props.setShowGeneralContent, props.alwaysShowContent, props.setAlwaysShowContent,
+    props.toggleImportanceFilter, props.toggleGeneralContent, props.toggleAlwaysShowContent
   ]);
 
   // ===== Panel Context =====

@@ -667,8 +667,11 @@ const App: React.FC = () => {
     setActiveImportanceFilters: appState.setActiveImportanceFilters,
     showGeneralContent: appState.showGeneralContent,
     setShowGeneralContent: appState.setShowGeneralContent,
+    alwaysShowContent: appState.alwaysShowContent,
+    setAlwaysShowContent: appState.setAlwaysShowContent,
     toggleImportanceFilter,
     toggleGeneralContent: () => appState.setShowGeneralContent(!appState.showGeneralContent),
+    toggleAlwaysShowContent: () => appState.setAlwaysShowContent(!appState.alwaysShowContent),
 
     // Panel
     leftPanelOpen,
