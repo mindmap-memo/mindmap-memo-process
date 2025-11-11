@@ -22,13 +22,26 @@ export const useAnalytics = () => {
   // 세션 시작 (useEffect 내부에서만 호출됨)
   const startSession = async (email: string) => {
     // 이미 세션이 활성화되어 있으면 중복 생성 방지
-    if (isSessionActiveRef.current) return;
+    if (isSessionActiveRef.current) {
+      console.log('[Analytics] Session already active, skipping duplicate start');
+      return;
+    }
+
+    // 이미 세션 ID가 있으면 중복 생성 방지
+    if (sessionIdRef.current) {
+      console.log('[Analytics] Session ID already exists, skipping duplicate start');
+      return;
+    }
+
+    // 플래그를 먼저 설정하여 동시 호출 차단
+    isSessionActiveRef.current = true;
 
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     sessionIdRef.current = sessionId;
     sessionStartTimeRef.current = Date.now();
-    isSessionActiveRef.current = true;
     sessionEndedRef.current = false;
+
+    console.log('[Analytics] Starting new session:', sessionId);
 
     try {
       await fetch('/api/analytics/session', {
@@ -42,6 +55,9 @@ export const useAnalytics = () => {
       });
     } catch (error) {
       console.error('Failed to start analytics session:', error);
+      // 에러 시 플래그 초기화
+      isSessionActiveRef.current = false;
+      sessionIdRef.current = null;
     }
   };
 

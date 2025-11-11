@@ -8,8 +8,9 @@ import { useAnalytics } from './useAnalytics';
  * App.tsx에서 간편하게 사용할 수 있도록 함
  *
  * **디바운싱 처리:**
- * - 제목/내용 수정 이벤트는 2초 디바운싱 적용
+ * - 제목/내용 수정, 검색, 태그 생성 이벤트는 2초 디바운싱 적용
  * - 마지막 입력 후 2초 동안 추가 입력이 없을 때만 이벤트 기록
+ * - 반복적인 타이핑 이벤트로 인한 DB 부하 방지
  */
 export const useAnalyticsTrackers = () => {
   const { trackEvent } = useAnalytics();
@@ -18,6 +19,8 @@ export const useAnalyticsTrackers = () => {
   const memoTitleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const memoContentTimerRef = useRef<NodeJS.Timeout | null>(null);
   const categoryTitleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const searchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const tagTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const trackMemoCreated = useCallback(() => {
     trackEvent('memo_created');
@@ -35,8 +38,14 @@ export const useAnalyticsTrackers = () => {
     trackEvent('page_created');
   }, [trackEvent]);
 
+  // 검색 디바운싱: 2초 동안 추가 입력이 없을 때만 이벤트 기록
   const trackSearch = useCallback((query: string) => {
-    trackEvent('search_performed', { query });
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+    }
+    searchTimerRef.current = setTimeout(() => {
+      trackEvent('search_performed', { query });
+    }, 2000);
   }, [trackEvent]);
 
   const trackImportanceAssigned = useCallback((importance: string) => {
@@ -55,8 +64,14 @@ export const useAnalyticsTrackers = () => {
     trackEvent('quick_nav_used', { type });
   }, [trackEvent]);
 
+  // 태그 생성 디바운싱: 2초 동안 추가 입력이 없을 때만 이벤트 기록
   const trackTagCreated = useCallback((tag: string) => {
-    trackEvent('tag_created', { tag });
+    if (tagTimerRef.current) {
+      clearTimeout(tagTimerRef.current);
+    }
+    tagTimerRef.current = setTimeout(() => {
+      trackEvent('tag_created', { tag });
+    }, 2000);
   }, [trackEvent]);
 
   const trackTutorialStarted = useCallback(() => {
