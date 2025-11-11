@@ -113,17 +113,57 @@ export const useAnalytics = () => {
     // 세션 시작
     startSession(email);
 
-    // 페이지 종료 시 세션 종료
-    const handleBeforeUnload = () => {
+    // 세션 종료 핸들러 (모바일 브라우저 호환성 강화)
+    const handleSessionEnd = () => {
       endSession(email);
     };
 
+    // 페이지 종료 시 세션 종료 (데스크톱)
+    const handleBeforeUnload = () => {
+      handleSessionEnd();
+    };
+
+    // 페이지 숨김 시 세션 종료 (모바일 - 더 안정적)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        handleSessionEnd();
+      }
+    };
+
+    // iOS Safari에서 페이지 종료 시 (beforeunload가 작동하지 않을 때)
+    const handlePageHide = () => {
+      handleSessionEnd();
+    };
+
+    // 주기적 heartbeat (30초마다 세션 업데이트)
+    const heartbeatInterval = setInterval(() => {
+      if (sessionIdRef.current && sessionStartTimeRef.current) {
+        const durationSeconds = Math.floor((Date.now() - sessionStartTimeRef.current) / 1000);
+        fetch('/api/analytics/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: sessionIdRef.current,
+            userEmail: email,
+            action: 'end',
+            durationSeconds
+          }),
+          keepalive: true // 페이지가 종료되어도 요청이 완료되도록 함
+        }).catch(err => console.error('Heartbeat failed:', err));
+      }
+    }, 30000); // 30초마다
+
     window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
 
     return () => {
-      // cleanup 시에만 세션 종료 (beforeunload에서 이미 처리되므로 중복 호출되지 않음)
-      endSession(email);
+      // cleanup 시 세션 종료
+      handleSessionEnd();
+      clearInterval(heartbeatInterval);
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
     };
   }, [session?.user?.email]);
 
