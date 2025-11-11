@@ -346,7 +346,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
         reader.onload = (e) => {
           if (selectedMemo && e.target?.result) {
             const newBlock = {
-              id: `${Date.now()}${Math.random()}`,
+              id: `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               type: 'image' as const,
               url: e.target.result as string,
               src: e.target.result as string,
@@ -365,7 +365,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
         reader.onload = (e) => {
           if (selectedMemo && e.target?.result) {
             const newBlock = {
-              id: `${Date.now()}${Math.random()}`,
+              id: `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               type: 'file' as const,
               url: e.target.result as string,
               name: file.name,
@@ -393,7 +393,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
       if (type === 'text') {
         const newBlock = {
-          id: `${Date.now()}${Math.random()}`,
+          id: `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           type: 'text' as const,
           content: '',
         };
@@ -428,7 +428,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
       if (pendingFileType === 'image') {
         const newBlock = {
-          id: `${Date.now()}${Math.random()}`,
+          id: `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           type: 'image' as const,
           url: event.target.result as string,
           src: event.target.result as string,
@@ -439,7 +439,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
         });
       } else {
         const newBlock = {
-          id: `${Date.now()}${Math.random()}`,
+          id: `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           type: 'file' as const,
           url: event.target.result as string,
           name: file.name,
