@@ -2,16 +2,34 @@ import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { requireAuth } from '../../../../lib/auth';
 
-const sql = neon(process.env.DATABASE_URL!);
-
 // PUT /api/pages/[id] - Update page
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // DATABASE_URL 확인
+    if (!process.env.DATABASE_URL) {
+      console.error('DATABASE_URL is not set');
+      return NextResponse.json(
+        { error: 'Database configuration error', details: 'DATABASE_URL is not set' },
+        { status: 500 }
+      );
+    }
+
+    const sql = neon(process.env.DATABASE_URL);
+
     // Require authentication
-    const user = await requireAuth();
+    let user;
+    try {
+      user = await requireAuth();
+    } catch (authError) {
+      console.error('Auth error:', authError);
+      return NextResponse.json(
+        { error: 'Authentication failed', details: authError instanceof Error ? authError.message : 'Unknown auth error' },
+        { status: 401 }
+      );
+    }
 
     const { id } = await params;
     const body = await request.json();
@@ -48,8 +66,28 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // DATABASE_URL 확인
+    if (!process.env.DATABASE_URL) {
+      console.error('DATABASE_URL is not set');
+      return NextResponse.json(
+        { error: 'Database configuration error', details: 'DATABASE_URL is not set' },
+        { status: 500 }
+      );
+    }
+
+    const sql = neon(process.env.DATABASE_URL);
+
     // Require authentication
-    const user = await requireAuth();
+    let user;
+    try {
+      user = await requireAuth();
+    } catch (authError) {
+      console.error('Auth error:', authError);
+      return NextResponse.json(
+        { error: 'Authentication failed', details: authError instanceof Error ? authError.message : 'Unknown auth error' },
+        { status: 401 }
+      );
+    }
 
     const { id } = await params;
 

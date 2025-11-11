@@ -2,13 +2,31 @@ import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { requireAuth } from '../../../lib/auth';
 
-const sql = neon(process.env.DATABASE_URL!);
-
 // GET /api/pages - Get all pages with their memos and categories
 export async function GET() {
   try {
+    // DATABASE_URL 확인
+    if (!process.env.DATABASE_URL) {
+      console.error('DATABASE_URL is not set');
+      return NextResponse.json(
+        { error: 'Database configuration error', details: 'DATABASE_URL is not set' },
+        { status: 500 }
+      );
+    }
+
+    const sql = neon(process.env.DATABASE_URL);
+
     // Require authentication
-    const user = await requireAuth();
+    let user;
+    try {
+      user = await requireAuth();
+    } catch (authError) {
+      console.error('Auth error:', authError);
+      return NextResponse.json(
+        { error: 'Authentication failed', details: authError instanceof Error ? authError.message : 'Unknown auth error' },
+        { status: 401 }
+      );
+    }
 
     // Fetch all pages for this user
     const pages = await sql`
@@ -139,8 +157,15 @@ export async function GET() {
     return NextResponse.json({ pages: pagesData });
   } catch (error) {
     console.error('Error fetching pages:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error('Error details:', { message: errorMessage, stack: errorStack });
     return NextResponse.json(
-      { error: 'Failed to fetch pages' },
+      {
+        error: 'Failed to fetch pages',
+        details: errorMessage,
+        timestamp: new Date().toISOString()
+      },
       { status: 500 }
     );
   }
@@ -149,8 +174,28 @@ export async function GET() {
 // POST /api/pages - Create new page
 export async function POST(request: NextRequest) {
   try {
+    // DATABASE_URL 확인
+    if (!process.env.DATABASE_URL) {
+      console.error('DATABASE_URL is not set');
+      return NextResponse.json(
+        { error: 'Database configuration error', details: 'DATABASE_URL is not set' },
+        { status: 500 }
+      );
+    }
+
+    const sql = neon(process.env.DATABASE_URL);
+
     // Require authentication
-    const user = await requireAuth();
+    let user;
+    try {
+      user = await requireAuth();
+    } catch (authError) {
+      console.error('Auth error:', authError);
+      return NextResponse.json(
+        { error: 'Authentication failed', details: authError instanceof Error ? authError.message : 'Unknown auth error' },
+        { status: 401 }
+      );
+    }
 
     const body = await request.json();
     const { id, name } = body;
@@ -170,8 +215,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, id }, { status: 201 });
   } catch (error) {
     console.error('Error creating page:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error('Error details:', { message: errorMessage, stack: errorStack });
     return NextResponse.json(
-      { error: 'Failed to create page' },
+      {
+        error: 'Failed to create page',
+        details: errorMessage,
+        timestamp: new Date().toISOString()
+      },
       { status: 500 }
     );
   }

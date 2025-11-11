@@ -2,13 +2,31 @@ import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { requireAuth } from '../../../lib/auth';
 
-const sql = neon(process.env.DATABASE_URL!);
-
 // POST /api/categories - Create new category
 export async function POST(request: NextRequest) {
   try {
+    // DATABASE_URL 확인
+    if (!process.env.DATABASE_URL) {
+      console.error('DATABASE_URL is not set');
+      return NextResponse.json(
+        { error: 'Database configuration error', details: 'DATABASE_URL is not set' },
+        { status: 500 }
+      );
+    }
+
+    const sql = neon(process.env.DATABASE_URL);
+
     // Require authentication
-    const user = await requireAuth();
+    let user;
+    try {
+      user = await requireAuth();
+    } catch (authError) {
+      console.error('Auth error:', authError);
+      return NextResponse.json(
+        { error: 'Authentication failed', details: authError instanceof Error ? authError.message : 'Unknown auth error' },
+        { status: 401 }
+      );
+    }
 
     const text = await request.text();
     if (!text) {
@@ -78,8 +96,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, id }, { status: 201 });
   } catch (error) {
     console.error('Error creating category:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error('Error details:', { message: errorMessage, stack: errorStack });
     return NextResponse.json(
-      { error: 'Failed to create category' },
+      {
+        error: 'Failed to create category',
+        details: errorMessage,
+        timestamp: new Date().toISOString()
+      },
       { status: 500 }
     );
   }

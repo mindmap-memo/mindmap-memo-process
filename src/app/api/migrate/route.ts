@@ -3,13 +3,31 @@ import { neon } from '@neondatabase/serverless';
 import { requireAuth } from '../../../lib/auth';
 import { Page } from '../../../types';
 
-const sql = neon(process.env.DATABASE_URL!);
-
 // POST /api/migrate - Migrate localStorage data to database
 export async function POST(request: NextRequest) {
   try {
+    // DATABASE_URL 확인
+    if (!process.env.DATABASE_URL) {
+      console.error('DATABASE_URL is not set');
+      return NextResponse.json(
+        { error: 'Database configuration error', details: 'DATABASE_URL is not set' },
+        { status: 500 }
+      );
+    }
+
+    const sql = neon(process.env.DATABASE_URL);
+
     // Require authentication
-    const user = await requireAuth();
+    let user;
+    try {
+      user = await requireAuth();
+    } catch (authError) {
+      console.error('Auth error:', authError);
+      return NextResponse.json(
+        { error: 'Authentication failed', details: authError instanceof Error ? authError.message : 'Unknown auth error' },
+        { status: 401 }
+      );
+    }
 
     const body = await request.json();
     const { pages } = body as { pages: Page[] };
@@ -145,10 +163,15 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Migration error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error('Error details:', { message: errorMessage, stack: errorStack });
     return NextResponse.json(
       {
         error: 'Migration failed',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        details: errorMessage,
+        stack: errorStack,
+        timestamp: new Date().toISOString()
       },
       { status: 500 }
     );
