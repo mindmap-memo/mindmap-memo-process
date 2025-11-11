@@ -744,7 +744,7 @@ const Canvas: React.FC<CanvasProps> = ({
             }
           }}
           title="모든 메모의 내용을 표시"
-          className={`${styles['undo-redo-button']} ${alwaysShowContent ? styles.enabled : styles.disabled}`}
+          className={`${styles['content-toggle-button']} ${alwaysShowContent ? styles.enabled : styles.disabled}`}
         >
           📄 내용 표시
         </button>
