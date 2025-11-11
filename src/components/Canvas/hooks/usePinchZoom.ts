@@ -103,8 +103,8 @@ export const usePinchZoom = ({
         const scaleChange = currentDistance / initialDistanceRef.current;
         let newScale = initialScaleRef.current * scaleChange;
 
-        // 스케일 제한 (0.1배 ~ 3배)
-        newScale = Math.max(0.1, Math.min(3, newScale));
+        // 스케일 제한 (0.01배 ~ 5배) - PC와 동일하게 설정
+        newScale = Math.max(0.01, Math.min(5, newScale));
 
         // 터치 중심점을 기준으로 줌 (좌표 변환)
         if (touchCenterRef.current) {

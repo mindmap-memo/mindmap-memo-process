@@ -152,7 +152,15 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
                               )}
                             </div>
                             <button
-                              onClick={(e) => {
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (window.confirm(`"${itemTitle}" 즐겨찾기를 삭제하시겠습니까?`)) {
+                                  onDeleteQuickNavItem(item.id);
+                                }
+                              }}
+                              onTouchEnd={(e) => {
+                                e.preventDefault();
                                 e.stopPropagation();
                                 if (window.confirm(`"${itemTitle}" 즐겨찾기를 삭제하시겠습니까?`)) {
                                   onDeleteQuickNavItem(item.id);
@@ -199,7 +207,15 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
                               )}
                             </div>
                             <button
-                              onClick={(e) => {
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (window.confirm(`"${itemTitle}" 즐겨찾기를 삭제하시겠습니까?`)) {
+                                  onDeleteQuickNavItem(item.id);
+                                }
+                              }}
+                              onTouchEnd={(e) => {
+                                e.preventDefault();
                                 e.stopPropagation();
                                 if (window.confirm(`"${itemTitle}" 즐겨찾기를 삭제하시겠습니까?`)) {
                                   onDeleteQuickNavItem(item.id);
