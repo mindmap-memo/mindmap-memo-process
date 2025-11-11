@@ -176,14 +176,15 @@ export const useAppState = (isAuthenticated: boolean = false) => {
           // 첫 로그인: 기본 페이지를 DB에 생성
           console.log('첫 로그인 감지. 기본 페이지를 데이터베이스에 생성합니다.');
 
-          // DEFAULT_PAGES를 DB에 생성
+          // DEFAULT_PAGES를 DB에 생성 (각 사용자마다 고유한 ID 생성)
           const createdPages: Page[] = [];
           for (const page of DEFAULT_PAGES) {
             if (!page) continue; // 안전성 체크
 
             try {
-              // 1. 페이지 생성
-              const newPage = await createPage(page.id, page.name);
+              // 1. 고유한 페이지 ID 생성 (타임스탬프 기반)
+              const uniquePageId = `page-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              const newPage = await createPage(uniquePageId, page.name);
               console.log(`✅ 페이지 생성 완료: ${page.name}`);
 
               // 2. 메모 생성
@@ -197,7 +198,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
                   });
                   const createdMemo = await createMemo({
                     ...memo,
-                    pageId: page.id,
+                    pageId: uniquePageId,
                   });
                   createdMemos.push(createdMemo);
                 } catch (memoError) {
@@ -212,7 +213,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
                 try {
                   const createdCategory = await createCategory({
                     ...category,
-                    pageId: page.id,
+                    pageId: uniquePageId,
                   });
                   createdCategories.push(createdCategory);
                 } catch (categoryError) {
