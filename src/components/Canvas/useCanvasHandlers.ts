@@ -317,19 +317,55 @@ export const useCanvasHandlers = (params: UseCanvasHandlersParams) => {
     // 카테고리 영역인지 확인
     const isCategoryArea = target.hasAttribute('data-category-area');
 
-    // 메모 블록, 카테고리 블록, 카테고리 영역을 터치한 경우는 패닝하지 않음
-    const isMemoOrCategory = target.closest('[data-memo-block="true"]') ||
+    // 연결점을 터치했는지 확인 (가장 먼저 체크해야 함!)
+    // data 속성으로 정확하게 감지
+    const isConnectionPoint = target.hasAttribute('data-connection-point') ||
+                             target.hasAttribute('data-connection-dot') ||
+                             target.closest('[data-connection-point]');
+
+    // 디버깅: 터치한 요소와 모든 data 속성 확인
+    const allDataAttrs: Record<string, string> = {};
+    Array.from(target.attributes).forEach(attr => {
+      if (attr.name.startsWith('data-')) {
+        allDataAttrs[attr.name] = attr.value;
+      }
+    });
+
+    console.log('🟡 [Canvas handleTouchStart]', {
+      isConnecting,
+      isConnectionPoint,
+      hasDataConnectionPoint: target.hasAttribute('data-connection-point'),
+      hasDataConnectionDot: target.hasAttribute('data-connection-dot'),
+      closestConnectionPoint: !!target.closest('[data-connection-point]'),
+      targetTagName: target.tagName,
+      targetClassName: target.className,
+      allDataAttrs,
+      parentElement: target.parentElement?.tagName,
+      parentClassName: target.parentElement?.className
+    });
+
+    // 연결 모드에서 연결점을 터치한 경우: 패닝하지 않고 MemoBlock의 핸들러가 처리하도록 함
+    if (isConnecting && isConnectionPoint) {
+      console.log('✅ [Canvas] 연결점 터치 감지 - MemoBlock 핸들러로 위임');
+      // 여기서 return하면 MemoBlock의 onTouchStart가 실행됨
+      return;
+    }
+
+    // 연결점이 아닌 메모 블록, 카테고리 블록을 터치한 경우는 패닝하지 않음
+    const isMemoOrCategory = (target.closest('[data-memo-block="true"]') && !isConnectionPoint) ||
                              target.closest('[data-category-block="true"]') ||
                              target.closest('button') ||
                              isCategoryArea;
 
     if (isMemoOrCategory) {
+      console.log('🔶 [Canvas] 메모/카테고리 터치 - 패닝 차단');
       return;
     }
 
-    // 캔버스 배경 터치 시 패닝 시작 (연결 모드에서도 허용)
+    // 캔버스 배경 터치 시 패닝 시작 (연결 모드에서도 허용, 단 연결점이 아닌 경우만)
     if (e.touches.length === 1) {
       const touch = e.touches[0];
+      console.log('🟢 [Canvas] 패닝 시작');
       setIsPanning(true);
       setPanStart({
         x: touch.clientX,

@@ -783,6 +783,12 @@ const App: React.FC = () => {
           quickNav={quickNavContextValue}
         >
           <MobileLayout
+          userEmail={session?.user?.email || undefined}
+          onLogout={async () => {
+            if (window.confirm('Mindmap-Memo 로그아웃하시겠습니까?')) {
+              await signOut({ callbackUrl: '/login' });
+            }
+          }}
           tutorialState={tutorialState}
           tutorialMode={tutorialMode}
           handleStartTutorialWrapper={handleStartTutorialWrapper}

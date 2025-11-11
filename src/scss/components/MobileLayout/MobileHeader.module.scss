@@ -30,6 +30,12 @@
   align-items: center;
   justify-content: flex-end;
   height: 56px;
+  pointer-events: none; // 배경은 투명하게
+
+  // 하위 버튼들만 클릭 가능하게
+  > * {
+    pointer-events: auto;
+  }
 }
 
 .backButton {

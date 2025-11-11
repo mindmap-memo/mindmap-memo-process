@@ -46,6 +46,7 @@ interface RightPanelProps {
   showGeneralContent?: boolean;
   onResetFilters?: () => void;
   onClose?: () => void;
+  isTablet?: boolean;
 }
 
 const RightPanel: React.FC<RightPanelProps> = ({
@@ -66,12 +67,14 @@ const RightPanel: React.FC<RightPanelProps> = ({
   activeImportanceFilters,
   showGeneralContent = true,
   onResetFilters,
-  onClose
+  onClose,
+  isTablet = false
 }) => {
   const [selectedBlocks, setSelectedBlocks] = React.useState<string[]>([]);
   const [dragSelectedBlocks, setDragSelectedBlocks] = React.useState<string[]>([]);
   const [dragJustCompleted, setDragJustCompleted] = React.useState(false);
   const [pendingFileType, setPendingFileType] = React.useState<'image' | 'file' | null>(null);
+  const [isTabletCollapsed, setIsTabletCollapsed] = React.useState(false); // 태블릿 모드 접기/펼치기 상태
 
   const blocksContainerRef = React.useRef<HTMLDivElement>(null);
   const rightPanelRef = React.useRef<HTMLDivElement>(null);
@@ -472,15 +475,18 @@ const RightPanel: React.FC<RightPanelProps> = ({
         display: 'flex',
         height: '100vh',
         flexDirection: 'column',
-      backgroundColor: '#f8f9fa',
-      borderLeft: '1px solid #e1e5e9',
-      position: isFullscreen ? 'fixed' : 'relative',
-      top: isFullscreen ? 0 : 'auto',
-      left: isFullscreen ? 0 : 'auto',
-      width: isFullscreen ? '100vw' : `${width}px`,
-      minWidth: '250px',
-      zIndex: isFullscreen ? 9999 : 'auto'
-    }}>
+        backgroundColor: '#f8f9fa',
+        borderLeft: '1px solid #e1e5e9',
+        position: isFullscreen ? 'fixed' : (isTablet ? 'fixed' : 'relative'),
+        top: isFullscreen ? 0 : (isTablet ? 0 : 'auto'),
+        right: isTablet ? 0 : 'auto',
+        left: isFullscreen ? 0 : 'auto',
+        width: isFullscreen ? '100vw' : (isTablet ? (isTabletCollapsed ? '40px' : `${width}px`) : `${width}px`),
+        minWidth: isTablet ? 'auto' : '250px',
+        zIndex: isFullscreen ? 9999 : (isTablet ? 1500 : 10),  // 일반 모드도 Canvas보다 위
+        transition: isTablet ? 'width 0.3s ease' : 'none',
+        pointerEvents: 'auto'
+      }}>
       {!isFullscreen && (
         <Resizer
           direction="right"
@@ -495,6 +501,9 @@ const RightPanel: React.FC<RightPanelProps> = ({
         showGeneralContent={showGeneralContent}
         onResetFilters={onResetFilters}
         onClose={onClose}
+        isTablet={isTablet}
+        isTabletCollapsed={isTabletCollapsed}
+        onToggleTabletCollapse={() => setIsTabletCollapsed(!isTabletCollapsed)}
       />
 
       <div

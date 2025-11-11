@@ -10,6 +10,9 @@
   perspective: 1000px;
   // 자식 요소의 절대 위치 기준점
   // position: relative를 추가하지 않음 (transform 때문에 이미 기준점이 됨)
+  // 연결점이 메모 블록 외부에 배치되므로 overflow: visible 필수
+  overflow: visible;
+  pointer-events: none; // wrapper는 이벤트 받지 않음, 자식만 받음
 }
 
 .memoBlockContainer {
@@ -21,6 +24,7 @@
   z-index: 10;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   width: fit-content;
+  pointer-events: auto; // wrapper가 pointer-events: none이므로 자식은 auto 필수
 
   &.selected {
     background-color: #f3f4f6;
@@ -377,35 +381,36 @@
 
 .connectionPoint {
   position: absolute;
-  width: 16px;
-  height: 16px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: crosshair;
   z-index: 15;
   transition: all 0.2s ease;
+  pointer-events: auto; // wrapper가 pointer-events: none이므로 연결점도 auto 필수
 
   &.top {
-    top: -8px;
+    top: -12px;
     left: 50%;
     transform: translateX(-50%);
   }
 
   &.bottom {
-    bottom: -8px;
+    bottom: -12px;
     left: 50%;
     transform: translateX(-50%);
   }
 
   &.left {
-    left: -8px;
+    left: -12px;
     top: 50%;
     transform: translateY(-50%);
   }
 
   &.right {
-    right: -8px;
+    right: -12px;
     top: 50%;
     transform: translateY(-50%);
   }
@@ -442,11 +447,11 @@
   }
 
   .connectionDot {
-    width: 8px;
-    height: 8px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
-    border: 2px solid white;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    border: 3px solid white;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
     transition: all 0.2s ease;
 
     &.default {

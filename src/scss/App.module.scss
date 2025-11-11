@@ -71,13 +71,14 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1000;
+  z-index: 1700;  // MobileLayout 버튼들(1600)보다 위
+  pointer-events: auto;  // 오버레이 클릭으로 닫기
 }
 
 .quick-nav-panel {
   position: fixed;
   top: 70px;
-  z-index: 1001;
+  z-index: 1701;  // 오버레이보다 위
   display: flex;
   gap: 12px;
 
@@ -413,7 +414,7 @@
     color: #333;
     cursor: pointer;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    z-index: 2001;
+    z-index: 1702;  // 패널(1701)보다 위
     transition: all 0.2s ease;
 
     &:active {

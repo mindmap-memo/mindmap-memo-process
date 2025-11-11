@@ -687,38 +687,54 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
       <div
         className={`${styles.connectionPoint} ${styles.top} ${isConnecting && onOpenEditor ? styles.enlarged : ''}`}
         data-memo-id={memo.id}
+        data-connection-point="true"
         onMouseDown={handleConnectionPointMouseDown}
         onTouchStart={handleConnectionPointMouseDown}
-        style={{ touchAction: 'none' }}
+        style={{
+          touchAction: 'none',
+          transform: !onOpenEditor && canvasScale ? `translateX(-50%) scale(${1 / canvasScale})` : undefined
+        }}
       >
-        <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} />
+        <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} data-connection-dot="true" />
       </div>
       <div
         className={`${styles.connectionPoint} ${styles.bottom} ${isConnecting && onOpenEditor ? styles.enlarged : ''}`}
         data-memo-id={memo.id}
+        data-connection-point="true"
         onMouseDown={handleConnectionPointMouseDown}
         onTouchStart={handleConnectionPointMouseDown}
-        style={{ touchAction: 'none' }}
+        style={{
+          touchAction: 'none',
+          transform: !onOpenEditor && canvasScale ? `translateX(-50%) scale(${1 / canvasScale})` : undefined
+        }}
       >
-        <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} />
+        <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} data-connection-dot="true" />
       </div>
       <div
         className={`${styles.connectionPoint} ${styles.left} ${isConnecting && onOpenEditor ? styles.enlarged : ''}`}
         data-memo-id={memo.id}
+        data-connection-point="true"
         onMouseDown={handleConnectionPointMouseDown}
         onTouchStart={handleConnectionPointMouseDown}
-        style={{ touchAction: 'none' }}
+        style={{
+          touchAction: 'none',
+          transform: !onOpenEditor && canvasScale ? `translateY(-50%) scale(${1 / canvasScale})` : undefined
+        }}
       >
-        <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} />
+        <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} data-connection-dot="true" />
       </div>
       <div
         className={`${styles.connectionPoint} ${styles.right} ${isConnecting && onOpenEditor ? styles.enlarged : ''}`}
         data-memo-id={memo.id}
+        data-connection-point="true"
         onMouseDown={handleConnectionPointMouseDown}
         onTouchStart={handleConnectionPointMouseDown}
-        style={{ touchAction: 'none' }}
+        style={{
+          touchAction: 'none',
+          transform: !onOpenEditor && canvasScale ? `translateY(-50%) scale(${1 / canvasScale})` : undefined
+        }}
       >
-        <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} />
+        <div className={`${styles.connectionDot} ${isConnecting && connectingFromId === memo.id ? styles.connecting : styles.default}`} data-connection-dot="true" />
       </div>
 
       {/* 클릭/터치 시작 시 힌트 UI - 메모 상단에 표시 */}

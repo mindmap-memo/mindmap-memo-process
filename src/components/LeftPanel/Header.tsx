@@ -13,6 +13,7 @@ interface HeaderProps {
   onSearchBlur: () => void;
   onClearSearch: () => void;
   onToggleFilters: () => void;
+  fullscreen?: boolean; // 모바일 풀스크린 모드
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -25,10 +26,24 @@ export const Header: React.FC<HeaderProps> = ({
   onSearchFocus,
   onSearchBlur,
   onClearSearch,
-  onToggleFilters
+  onToggleFilters,
+  fullscreen = false
 }) => {
   return (
     <div className={styles.header}>
+      <div className={styles.headerTop}>
+        <h2 className={styles.title}>마인드맵</h2>
+        {onStartTutorial && (
+          <button
+            onClick={onStartTutorial}
+            className={styles.tutorialButton}
+            title="튜토리얼 다시 보기"
+          >
+            ?
+          </button>
+        )}
+      </div>
+
       {/* 사용자 정보 영역 */}
       {userEmail && (
         <div className={styles.userInfo}>
@@ -45,21 +60,9 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
-      <div className={styles.headerTop}>
-        <h2 className={styles.title}>마인드맵</h2>
-        {onStartTutorial && (
-          <button
-            onClick={onStartTutorial}
-            className={styles.tutorialButton}
-            title="튜토리얼 다시 보기"
-          >
-            ?
-          </button>
-        )}
-      </div>
-
-      {/* 검색 UI */}
-      <div className={styles.searchSection}>
+      {/* 검색 UI - PC에서만 표시 */}
+      {!fullscreen && (
+        <div className={styles.searchSection}>
         <div className={styles.searchInputRow}>
           <input
             data-tutorial="search"
@@ -103,7 +106,8 @@ export const Header: React.FC<HeaderProps> = ({
             필터
           </button>
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 };

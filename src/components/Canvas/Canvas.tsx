@@ -504,6 +504,7 @@ const Canvas: React.FC<CanvasProps> = ({
         height: '100%',
         overflow: 'hidden',
         backgroundColor: '#f9fafb'
+        // z-index 제거: stacking context를 만들지 않아야 ImportanceFilter와 MobileSearchResults가 제대로 표시됨
       }}
       onMouseDown={handleCanvasMouseDown}
       onMouseMove={handleMouseMove}
@@ -525,9 +526,9 @@ const Canvas: React.FC<CanvasProps> = ({
           left: 0,
           width: '100%',
           height: '100%',
-          pointerEvents: (isDisconnectMode || isConnecting) ? 'auto' : 'none',
+          pointerEvents: isDisconnectMode ? 'auto' : 'none',  // 연결 해제 모드일 때만 클릭 가능
           overflow: 'visible',
-          zIndex: (isDisconnectMode || isConnecting) ? 100 : 0
+          zIndex: isDisconnectMode ? 5 : 0
         }}
       >
         <defs>

@@ -166,6 +166,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
         }}
         onClearSearch={clearSearch}
         onToggleFilters={() => setShowSearchFilters(!showSearchFilters)}
+        fullscreen={fullscreen}
       />
 
       <SearchFilters

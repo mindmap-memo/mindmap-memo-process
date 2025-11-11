@@ -10,6 +10,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  z-index: 10001;  // MemoBlock 최대값(10000)보다 위
 
   &.fullscreen {
     width: 100% !important;
@@ -99,6 +100,8 @@
 
 .searchSection {
   margin-bottom: 16px;
+  position: relative;
+  z-index: 10002;  // Canvas보다 위
 }
 
 .searchInputRow {
@@ -174,6 +177,8 @@
   background-color: #f8f9fa;
   border-radius: 6px;
   margin-bottom: 8px;
+  position: relative;
+  z-index: 10002;  // Canvas보다 위
 }
 
 .filterSection {
@@ -269,6 +274,8 @@
 .searchResults {
   margin-bottom: 24px;
   flex: 0 0 auto;
+  position: relative;
+  z-index: 10002;  // Canvas보다 위
 }
 
 .searchResultsHeader {
@@ -462,6 +469,8 @@
 
 .pagesSection {
   margin-bottom: 24px;
+  position: relative;
+  z-index: 10002;  // Canvas보다 위
 }
 
 .pagesSectionHeader {
