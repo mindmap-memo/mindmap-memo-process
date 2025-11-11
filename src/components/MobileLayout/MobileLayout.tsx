@@ -96,6 +96,7 @@ interface MobileLayoutProps {
   isQuickNavExists: (targetId: string, targetType: 'memo' | 'category') => boolean;
   onMemoUpdate: (memoId: string, updates: Partial<MemoBlock>) => void;
   onFocusMemo: (memoId: string) => void;
+  onFocusCategory: (categoryId: string) => void;
   onResetFilters: () => void;
   canUndo: boolean;
   canRedo: boolean;
@@ -194,6 +195,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   isQuickNavExists,
   onMemoUpdate,
   onFocusMemo,
+  onFocusCategory,
   onResetFilters,
   canUndo,
   canRedo,
@@ -227,9 +229,17 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   const [showFabMenu, setShowFabMenu] = React.useState(false);
   const [showFilters, setShowFilters] = React.useState(false);
   const [showExitToast, setShowExitToast] = React.useState(false);
+  const [isTabletCollapsed, setIsTabletCollapsed] = React.useState(false); // 태블릿 가로모드 우측 패널 접기 상태
 
-  // 태블릿 가로 모드 감지 (RightPanel을 우측 패널로 표시)
-  const isTabletLandscape = useMediaQuery('(min-width: 769px) and (max-width: 1366px) and (orientation: landscape) and (pointer: coarse)');
+  // 태블릿 가로 모드 감지 (RightPanel을 우측 패널로 표시) - 테스트용: pointer 조건 제거
+  const isTabletLandscape = useMediaQuery('(min-width: 769px) and (max-width: 1366px) and (orientation: landscape)');
+
+  // 태블릿 가로모드 초기값 설정: 우측 패널을 펼친 상태로 시작
+  React.useEffect(() => {
+    if (isTabletLandscape && !showEditor) {
+      setShowEditor(true);
+    }
+  }, [isTabletLandscape]); // showEditor를 의존성에서 제거하여 초기 1회만 실행
 
   // Context에서 필요한 상태와 핸들러 가져오기
   const appState = useAppStateContext();
@@ -237,6 +247,25 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   const connection = useConnection();
   const panel = usePanel();
   const quickNav = useQuickNav();
+
+  // 태블릿 가로모드에서 우측 패널 상태에 따라 CSS 변수를 전역으로 설정
+  React.useEffect(() => {
+    // 태블릿 가로모드이고, 에디터가 보이고, 패널이 접히지 않은 경우에만 offset 적용
+    const offset = isTabletLandscape && showEditor && !isTabletCollapsed
+      ? '300px'
+      : '0px';
+    document.documentElement.style.setProperty('--right-panel-offset', offset);
+    console.log('🌐 [MobileLayout] 전역 CSS 변수 설정:', {
+      isTabletLandscape,
+      showEditor,
+      isTabletCollapsed,
+      offset
+    });
+
+    return () => {
+      document.documentElement.style.removeProperty('--right-panel-offset');
+    };
+  }, [isTabletLandscape, showEditor, isTabletCollapsed]);
 
   // 태블릿 가로 모드에서 메모/카테고리 선택 시 자동으로 RightPanel 표시
   React.useEffect(() => {
@@ -370,18 +399,19 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   // }, [selection.selectedMemoId, selection.selectedCategoryId, setShowEditor]);
 
   return (
-    <div className={styles.mobileLayout}>
-      {/* 마이그레이션 프롬프트 */}
-      {needsMigration && (
-        <MigrationPromptComponent
-          status={migrationStatus}
-          error={migrationError}
-          result={migrationResult}
-          onMigrate={migrate}
-          onSkip={skipMigration}
-          onDeleteLegacyData={deleteLegacyData}
-        />
-      )}
+    <React.Fragment>
+      <div className={styles.mobileLayout}>
+        {/* 마이그레이션 프롬프트 */}
+        {needsMigration && (
+          <MigrationPromptComponent
+            status={migrationStatus}
+            error={migrationError}
+            result={migrationResult}
+            onMigrate={migrate}
+            onSkip={skipMigration}
+            onDeleteLegacyData={deleteLegacyData}
+          />
+        )}
 
       {/* 상단 헤더 - 뒤로가기, 검색, 실행취소/다시실행 */}
       {!showPages && (
@@ -422,8 +452,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
                 if (currentPage && selection && appState) {
                   // 메모 선택
                   selection.handleMemoSelect(memoId);
-                  // 화면 중앙으로 이동
-                  centerOnMemo(memoId, currentPage, appState.canvasScale, appState.setCanvasOffset);
+                  // 화면 중앙으로 이동 (scale 리셋 포함)
+                  centerOnMemo(memoId, currentPage, appState.canvasScale, appState.setCanvasOffset, appState.setCanvasScale);
                 }
                 // 검색창 닫기
                 setSearchQuery('');
@@ -433,8 +463,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
                 if (currentPage && selection && appState) {
                   // 카테고리 선택
                   selection.selectCategory(categoryId);
-                  // 카테고리 영역 전체를 화면 중앙으로 이동
-                  centerOnCategory(categoryId, currentPage, appState.canvasScale, appState.setCanvasOffset);
+                  // 카테고리 영역 전체를 화면 중앙으로 이동 (scale 조정 포함)
+                  centerOnCategory(categoryId, currentPage, appState.canvasScale, appState.setCanvasOffset, appState.setCanvasScale);
                 }
                 // 검색창 닫기
                 setSearchQuery('');
@@ -483,13 +513,23 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         <div
           className={styles.view}
           style={{
-            paddingRight: isTabletLandscape && showEditor ? '300px' : '0'
-          }}
+            paddingRight: isTabletLandscape && showEditor && !isTabletCollapsed ? '300px' : '0',
+            '--right-panel-offset': (() => {
+              const offset = isTabletLandscape && showEditor && !isTabletCollapsed ? '300px' : '0px';
+              console.log('🔧 [MobileLayout] CSS 변수 설정:', {
+                isTabletLandscape,
+                showEditor,
+                isTabletCollapsed,
+                offset
+              });
+              return offset;
+            })()
+          } as React.CSSProperties}
         >
           {currentPage && !showPages ? (
             <>
               <Canvas
-              fullscreen
+              fullscreen={!isTabletLandscape}
               currentPage={currentPage}
               selectedMemoId={selection?.selectedMemoId}
               selectedMemoIds={selection?.selectedMemoIds || []}
@@ -611,68 +651,73 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
           )}
         </div>
 
-        {/* Editor 뷰 - showEditor가 true일 때만 표시 */}
-        {showEditor && (
-          isTabletLandscape ? (
-            // 태블릿 가로 모드: PC처럼 우측 패널로 표시
-            <RightPanel
-              selectedMemo={selectedMemo}
-              selectedMemos={selectedMemos}
-              selectedCategory={selectedCategory}
-              selectedCategories={selectedCategories}
-              currentPage={currentPage}
-              onMemoUpdate={onMemoUpdate}
-              onCategoryUpdate={onCategoryUpdate}
-              onMemoSelect={selection?.handleMemoSelect || (() => {})}
-              onCategorySelect={selection?.selectCategory || (() => {})}
-              onFocusMemo={onFocusMemo}
-              width={300}
-              onResize={() => {}}
-              isFullscreen={false}
-              onToggleFullscreen={() => {}}
-              activeImportanceFilters={selection?.activeImportanceFilters || []}
-              showGeneralContent={selection?.showGeneralContent || false}
-              onResetFilters={onResetFilters}
-              onClose={() => setShowEditor(false)}
-              isTablet={true}
-            />
-          ) : (
-            // 모바일/태블릿 세로: 전체 화면 오버레이로 표시
-            <div className={styles.editorOverlay}>
-              <div className={styles.editorContainer}>
-                <div className={styles.editorHeader}>
-                  <button
-                    className={styles.closeButton}
-                    onClick={() => setShowEditor(false)}
-                  >
-                    ✕
-                  </button>
-                </div>
-                <RightPanel
-                  selectedMemo={selectedMemo}
-                  selectedMemos={selectedMemos}
-                  selectedCategory={selectedCategory}
-                  selectedCategories={selectedCategories}
-                  currentPage={currentPage}
-                  onMemoUpdate={onMemoUpdate}
-                  onCategoryUpdate={onCategoryUpdate}
-                  onMemoSelect={selection?.handleMemoSelect || (() => {})}
-                  onCategorySelect={selection?.selectCategory || (() => {})}
-                  onFocusMemo={onFocusMemo}
-                  width={panel?.rightPanelWidth || 400}
-                  onResize={(panel as any)?.handleRightPanelResize || (() => {})}
-                  isFullscreen={true}
-                  onToggleFullscreen={() => {}}
-                  activeImportanceFilters={selection?.activeImportanceFilters || []}
-                  showGeneralContent={selection?.showGeneralContent || false}
-                  onResetFilters={onResetFilters}
-                  onClose={() => setShowEditor(false)}
-                />
+        {/* Editor 뷰 - 모바일/태블릿 세로: 전체 화면 오버레이로 표시 */}
+        {showEditor && !isTabletLandscape && (
+          <div className={styles.editorOverlay}>
+            <div className={styles.editorContainer}>
+              <div className={styles.editorHeader}>
+                <button
+                  className={styles.closeButton}
+                  onClick={() => setShowEditor(false)}
+                >
+                  ✕
+                </button>
               </div>
+              <RightPanel
+                selectedMemo={selectedMemo}
+                selectedMemos={selectedMemos}
+                selectedCategory={selectedCategory}
+                selectedCategories={selectedCategories}
+                currentPage={currentPage}
+                onMemoUpdate={onMemoUpdate}
+                onCategoryUpdate={onCategoryUpdate}
+                onMemoSelect={selection?.handleMemoSelect || (() => {})}
+                onCategorySelect={selection?.selectCategory || (() => {})}
+                onFocusMemo={onFocusMemo}
+                onFocusCategory={onFocusCategory}
+                width={panel?.rightPanelWidth || 400}
+                onResize={(panel as any)?.handleRightPanelResize || (() => {})}
+                isFullscreen={true}
+                onToggleFullscreen={() => {}}
+                activeImportanceFilters={selection?.activeImportanceFilters || []}
+                showGeneralContent={selection?.showGeneralContent || false}
+                onResetFilters={onResetFilters}
+                onClose={() => setShowEditor(false)}
+              />
             </div>
-          )
+          </div>
         )}
       </div>
+
+      </div>
+
+      {/* 태블릿 가로모드 RightPanel - Canvas 위에 완전히 독립적인 overlay로 표시 */}
+      {showEditor && isTabletLandscape && (
+        <RightPanel
+          selectedMemo={selectedMemo}
+          selectedMemos={selectedMemos}
+          selectedCategory={selectedCategory}
+          selectedCategories={selectedCategories}
+          currentPage={currentPage}
+          onMemoUpdate={onMemoUpdate}
+          onCategoryUpdate={onCategoryUpdate}
+          onMemoSelect={selection?.handleMemoSelect || (() => {})}
+          onCategorySelect={selection?.selectCategory || (() => {})}
+          onFocusMemo={onFocusMemo}
+          onFocusCategory={onFocusCategory}
+          width={300}
+          onResize={() => {}}
+          isFullscreen={false}
+          onToggleFullscreen={() => {}}
+          activeImportanceFilters={selection?.activeImportanceFilters || []}
+          showGeneralContent={selection?.showGeneralContent || false}
+          onResetFilters={onResetFilters}
+          onClose={() => setShowEditor(false)}
+          isTablet={true}
+          isTabletCollapsed={isTabletCollapsed}
+          onToggleTabletCollapse={() => setIsTabletCollapsed(!isTabletCollapsed)}
+        />
+      )}
 
       {/* 튜토리얼 */}
       {tutorialState.isActive && (
@@ -695,28 +740,23 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
           quickNavItems={quickNav.quickNavItems}
           pages={appState?.pages || []}
           currentPageId={appState?.currentPageId || ''}
-          rightPanelOpen={false}
-          rightPanelWidth={0}
+          rightPanelOpen={isTabletLandscape && showEditor}
+          rightPanelWidth={isTabletLandscape && showEditor ? 300 : 0}
           showQuickNavPanel={showQuickNavPanel}
           onTogglePanel={() => setShowQuickNavPanel(false)}
           onExecuteQuickNav={(item: any) => {
-            // 먼저 기본 실행 (페이지 전환 등)
+            console.log('🚀 [MobileLayout] QuickNav 항목 클릭:', {
+              itemName: item.name,
+              targetId: item.targetId,
+              targetType: item.targetType,
+              pageId: item.pageId,
+              currentPageId: appState?.currentPageId
+            });
+            // App.tsx에서 전달받은 executeQuickNav 사용 (PC 버전과 동일한 로직)
             onExecuteQuickNav(item);
-
-            // 화면 이동 처리
-            const currentPage = appState?.pages?.find(p => p.id === (item.pageId || appState.currentPageId));
-            if (currentPage && appState) {
-              if (item.targetType === 'memo') {
-                // 메모로 이동
-                centerOnMemo(item.targetId, currentPage, appState.canvasScale, appState.setCanvasOffset);
-              } else {
-                // 카테고리로 이동
-                centerOnCategory(item.targetId, currentPage, appState.canvasScale, appState.setCanvasOffset);
-              }
-            }
-
             // 패널 닫기
             setShowQuickNavPanel(false);
+            console.log('✅ [MobileLayout] QuickNav 실행 완료, 패널 닫기');
           }}
           onUpdateQuickNavItem={onUpdateQuickNavItem}
           onDeleteQuickNavItem={onDeleteQuickNavItem}
@@ -762,8 +802,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         </div>
       )}
 
-      {/* 연결선 생성 버튼 - FAB 버튼 위 */}
-      {!showEditor && connection && (
+      {/* 연결선 생성 버튼 - FAB 버튼 위 (태블릿 가로모드에서는 항상 표시) */}
+      {(!showEditor || isTabletLandscape) && connection && (
         <button
           className={`${styles.connectionButton} ${connection.isConnecting ? styles.active : ''}`}
           onClick={() => {
@@ -783,8 +823,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         </button>
       )}
 
-      {/* FAB 버튼 - 우측 하단 */}
-      {!showEditor && (
+      {/* FAB 버튼 - 우측 하단 (태블릿 가로모드에서는 항상 표시) */}
+      {(!showEditor || isTabletLandscape) && (
         <button
           className={styles.fabButton}
           onClick={() => setShowFabMenu(!showFabMenu)}
@@ -794,8 +834,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         </button>
       )}
 
-      {/* ImportanceFilter - 모바일에서는 하단에 가로로 배치 */}
-      {!showEditor && selection && (
+      {/* ImportanceFilter - 모바일에서는 하단에 가로로 배치 (태블릿 가로모드에서는 항상 표시) */}
+      {(!showEditor || isTabletLandscape) && selection && (
         <>
           <ImportanceFilter
             activeFilters={selection.activeImportanceFilters || []}
@@ -863,6 +903,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
           뒤로가기 버튼을 한번 더 누르면 종료됩니다
         </div>
       )}
-    </div>
+    </React.Fragment>
   );
 };
