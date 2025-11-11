@@ -355,17 +355,27 @@ export function centerOnMemo(
   memoId: string,
   page: Page,
   canvasScale: number,
-  setCanvasOffset: (offset: { x: number; y: number }) => void
+  setCanvasOffset: (offset: { x: number; y: number }) => void,
+  setCanvasScale?: (scale: number) => void
 ): void {
+  console.log('🎯 [centerOnMemo] 호출됨:', { memoId, pageId: page.id, currentScale: canvasScale });
+
   const memo = page.memos?.find(m => m.id === memoId);
-  if (!memo) return;
+  if (!memo) {
+    console.error('❌ [centerOnMemo] 메모를 찾을 수 없음:', memoId);
+    return;
+  }
 
   const canvasElement = document.getElementById('main-canvas');
-  if (!canvasElement) return;
+  if (!canvasElement) {
+    console.error('❌ [centerOnMemo] Canvas 요소를 찾을 수 없음');
+    return;
+  }
 
   const rect = canvasElement.getBoundingClientRect();
   const centerX = rect.width / 2;
   const centerY = rect.height / 2;
+  console.log('📐 [centerOnMemo] Canvas 크기:', { width: rect.width, height: rect.height });
 
   const memoWidth = memo.size?.width || 200;
   const memoHeight = memo.size?.height || 150;
@@ -373,11 +383,21 @@ export function centerOnMemo(
   // 메모의 중심점을 화면 중앙에 위치시키기
   const itemCenterX = memo.position.x + (memoWidth / 2);
   const itemCenterY = memo.position.y + (memoHeight / 2);
+  console.log('📍 [centerOnMemo] 메모 위치:', { x: memo.position.x, y: memo.position.y, centerX: itemCenterX, centerY: itemCenterY });
 
-  const newOffsetX = centerX - (itemCenterX * canvasScale);
-  const newOffsetY = centerY - (itemCenterY * canvasScale);
+  // scale을 1로 리셋 (PC 버전 로직과 동일)
+  const targetScale = 1;
+  const newOffsetX = centerX - (itemCenterX * targetScale);
+  const newOffsetY = centerY - (itemCenterY * targetScale);
+  console.log('🔄 [centerOnMemo] 새 offset 계산:', { newOffsetX, newOffsetY, targetScale });
 
   setCanvasOffset({ x: newOffsetX, y: newOffsetY });
+  if (setCanvasScale) {
+    setCanvasScale(targetScale);
+    console.log('✅ [centerOnMemo] offset 및 scale 설정 완료');
+  } else {
+    console.log('✅ [centerOnMemo] offset 설정 완료 (scale 설정 함수 없음)');
+  }
 }
 
 /**
@@ -391,7 +411,8 @@ export function centerOnCategory(
   categoryId: string,
   page: Page,
   canvasScale: number,
-  setCanvasOffset: (offset: { x: number; y: number }) => void
+  setCanvasOffset: (offset: { x: number; y: number }) => void,
+  setCanvasScale?: (scale: number) => void
 ): void {
   const category = page.categories?.find(c => c.id === categoryId);
   if (!category) return;
@@ -400,31 +421,47 @@ export function centerOnCategory(
   if (!canvasElement) return;
 
   const rect = canvasElement.getBoundingClientRect();
-  const centerX = rect.width / 2;
-  const centerY = rect.height / 2;
+  const availableWidth = rect.width;
+  const availableHeight = rect.height;
 
   // 카테고리의 전체 영역 계산
   const categoryArea = calculateCategoryArea(category, page);
 
-  let targetPosition: { x: number; y: number };
-  let targetSize: { width: number; height: number };
+  if (categoryArea && category.isExpanded) {
+    // 영역이 있고 확장된 상태면 전체 영역이 화면에 보이도록 조정 (PC 버전 로직)
+    const areaWidth = categoryArea.width;
+    const areaHeight = categoryArea.height;
+    const areaCenterX = categoryArea.x + areaWidth / 2;
+    const areaCenterY = categoryArea.y + areaHeight / 2;
 
-  if (categoryArea) {
-    // 영역 전체를 중앙에 배치
-    targetPosition = { x: categoryArea.x, y: categoryArea.y };
-    targetSize = { width: categoryArea.width, height: categoryArea.height };
+    // 영역이 화면에 맞도록 스케일 계산 (여백 20% 추가)
+    const margin = 0.2;
+    const scaleX = availableWidth / (areaWidth * (1 + margin));
+    const scaleY = availableHeight / (areaHeight * (1 + margin));
+    const optimalScale = Math.min(scaleX, scaleY, 1); // 최대 1배 (확대 안함)
+
+    // 화면 중앙에 영역이 오도록 offset 계산
+    const newOffsetX = availableWidth / 2 - areaCenterX * optimalScale;
+    const newOffsetY = availableHeight / 2 - areaCenterY * optimalScale;
+
+    setCanvasOffset({ x: newOffsetX, y: newOffsetY });
+    if (setCanvasScale) {
+      setCanvasScale(optimalScale);
+    }
   } else {
-    // 영역이 없으면 라벨만 중앙에 배치
-    targetPosition = category.position;
-    targetSize = category.size || { width: 200, height: 100 };
+    // 영역이 없거나 축소된 상태면 카테고리 블록만 중앙에 표시
+    const categoryWidth = category.size?.width || 200;
+    const categoryHeight = category.size?.height || 80;
+    const categoryCenterX = category.position.x + categoryWidth / 2;
+    const categoryCenterY = category.position.y + categoryHeight / 2;
+
+    const targetScale = 1;
+    const newOffsetX = availableWidth / 2 - categoryCenterX * targetScale;
+    const newOffsetY = availableHeight / 2 - categoryCenterY * targetScale;
+
+    setCanvasOffset({ x: newOffsetX, y: newOffsetY });
+    if (setCanvasScale) {
+      setCanvasScale(targetScale);
+    }
   }
-
-  // 카테고리 영역의 중심점을 화면 중앙에 위치시키기
-  const itemCenterX = targetPosition.x + (targetSize.width / 2);
-  const itemCenterY = targetPosition.y + (targetSize.height / 2);
-
-  const newOffsetX = centerX - (itemCenterX * canvasScale);
-  const newOffsetY = centerY - (itemCenterY * canvasScale);
-
-  setCanvasOffset({ x: newOffsetX, y: newOffsetY });
 }

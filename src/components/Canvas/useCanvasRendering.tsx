@@ -254,7 +254,8 @@ export const useCanvasRendering = (params: UseCanvasRenderingParams) => {
     onRemoveConnection,
     onConnectMemos,
     getConnectionPoints,
-    canvasScale
+    canvasScale,
+    onOpenEditor  // 모바일/태블릿 모드 판단용
   });
 
   // 카테고리 영역 렌더링 훅 사용

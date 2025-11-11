@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Maximize2, ChevronRight, ChevronLeft } from 'lucide-react';
+import { X, Maximize2 } from 'lucide-react';
 import { ImportanceLevel } from '../../types';
 import { isDefaultFilterState } from './utils/blockUtils';
 
@@ -107,71 +107,35 @@ const PanelHeader: React.FC<PanelHeaderProps> = ({
         )}
       </div>
 
-      {/* 태블릿 모드 버튼들 */}
-      {isTablet && (
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {/* 전체화면 버튼 */}
-          {onToggleFullscreen && (
-            <button
-              onClick={onToggleFullscreen}
-              style={{
-                padding: '8px',
-                border: '1px solid #e1e5e9',
-                borderRadius: '6px',
-                backgroundColor: 'white',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '16px',
-                color: '#6b7280',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#f3f4f6';
-                e.currentTarget.style.color = '#374151';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'white';
-                e.currentTarget.style.color = '#6b7280';
-              }}
-              title="전체화면"
-            >
-              <Maximize2 size={16} />
-            </button>
-          )}
-
-          {/* 접기/펼치기 버튼 */}
-          {onToggleTabletCollapse && (
-            <button
-              onClick={onToggleTabletCollapse}
-              style={{
-                padding: '8px',
-                border: '1px solid #e1e5e9',
-                borderRadius: '6px',
-                backgroundColor: 'white',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '16px',
-                color: '#6b7280',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#f3f4f6';
-                e.currentTarget.style.color = '#374151';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'white';
-                e.currentTarget.style.color = '#6b7280';
-              }}
-              title={isTabletCollapsed ? "패널 펼치기" : "패널 접기"}
-            >
-              {isTabletCollapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-            </button>
-          )}
-        </div>
+      {/* 태블릿 모드 전체화면 버튼 */}
+      {isTablet && onToggleFullscreen && (
+        <button
+          onClick={onToggleFullscreen}
+          style={{
+            padding: '8px',
+            border: '1px solid #e1e5e9',
+            borderRadius: '6px',
+            backgroundColor: 'white',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '16px',
+            color: '#6b7280',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#f3f4f6';
+            e.currentTarget.style.color = '#374151';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'white';
+            e.currentTarget.style.color = '#6b7280';
+          }}
+          title="전체화면"
+        >
+          <Maximize2 size={16} />
+        </button>
       )}
 
       {/* PC 모드 전체화면 버튼 - 모바일/태블릿에서는 숨김 */}

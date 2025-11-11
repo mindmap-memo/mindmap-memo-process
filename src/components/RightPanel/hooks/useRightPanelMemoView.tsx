@@ -13,6 +13,7 @@ interface UseRightPanelMemoViewProps {
   handleTagInputKeyPress: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   removeTag: (tag: string) => void;
   onFocusMemo: (memoId: string) => void;
+  onFocusCategory: (categoryId: string) => void;
 }
 
 export const useRightPanelMemoView = ({
@@ -26,7 +27,8 @@ export const useRightPanelMemoView = ({
   handleTagInputChange,
   handleTagInputKeyPress,
   removeTag,
-  onFocusMemo
+  onFocusMemo,
+  onFocusCategory
 }: UseRightPanelMemoViewProps) => {
 
   const renderTitleInput = () => {
@@ -176,7 +178,7 @@ export const useRightPanelMemoView = ({
             margin: 0,
             marginRight: '8px'
           }}>
-            연결된 메모 ({selectedMemo.connections.length})
+            연결된 요소 ({selectedMemo.connections.length})
           </h4>
           <svg
             width="12"
@@ -206,21 +208,31 @@ export const useRightPanelMemoView = ({
           }}>
             {selectedMemo.connections.map(connectionId => {
               const connectedMemo = currentPage?.memos.find(m => m.id === connectionId);
-              return connectedMemo ? (
+              const connectedCategory = currentPage?.categories?.find(c => c.id === connectionId);
+              const isCategory = !!connectedCategory;
+              const title = connectedMemo?.title || connectedCategory?.title || '제목 없음';
+
+              if (!connectedMemo && !connectedCategory) return null;
+
+              return (
                 <div
                   key={connectionId}
                   onClick={(e) => {
                     e.stopPropagation();
-                    onFocusMemo(connectionId);
+                    if (isCategory) {
+                      onFocusCategory(connectionId);
+                    } else {
+                      onFocusMemo(connectionId);
+                    }
                   }}
                   style={{
                     padding: '8px 10px',
-                    backgroundColor: 'white',
-                    border: '1px solid #e5e7eb',
+                    backgroundColor: isCategory ? '#f3e8ff' : 'white',
+                    border: `1px solid ${isCategory ? '#d8b4fe' : '#e5e7eb'}`,
                     borderRadius: '6px',
                     cursor: 'pointer',
                     fontSize: '12px',
-                    color: '#6b7280',
+                    color: isCategory ? '#7c3aed' : '#6b7280',
                     transition: 'all 0.2s ease',
                     textAlign: 'center',
                     minHeight: '40px',
@@ -229,12 +241,12 @@ export const useRightPanelMemoView = ({
                     justifyContent: 'center'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f8fafc';
-                    e.currentTarget.style.borderColor = '#3b82f6';
+                    e.currentTarget.style.backgroundColor = isCategory ? '#e9d5ff' : '#f8fafc';
+                    e.currentTarget.style.borderColor = isCategory ? '#c084fc' : '#3b82f6';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'white';
-                    e.currentTarget.style.borderColor = '#e5e7eb';
+                    e.currentTarget.style.backgroundColor = isCategory ? '#f3e8ff' : 'white';
+                    e.currentTarget.style.borderColor = isCategory ? '#d8b4fe' : '#e5e7eb';
                   }}
                 >
                   <div style={{
@@ -243,10 +255,10 @@ export const useRightPanelMemoView = ({
                     whiteSpace: 'nowrap',
                     width: '100%'
                   }}>
-                    {connectedMemo.title || '제목 없음'}
+                    {title}
                   </div>
                 </div>
-              ) : null;
+              );
             })}
           </div>
         )}

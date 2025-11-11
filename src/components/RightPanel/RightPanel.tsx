@@ -38,6 +38,7 @@ interface RightPanelProps {
   onMemoSelect: (memoId: string, isShiftClick?: boolean) => void;
   onCategorySelect: (categoryId: string, isShiftClick?: boolean) => void;
   onFocusMemo: (memoId: string) => void;
+  onFocusCategory: (categoryId: string) => void;
   width: number;
   onResize: (deltaX: number) => void;
   isFullscreen?: boolean;
@@ -47,6 +48,8 @@ interface RightPanelProps {
   onResetFilters?: () => void;
   onClose?: () => void;
   isTablet?: boolean;
+  isTabletCollapsed?: boolean;
+  onToggleTabletCollapse?: () => void;
 }
 
 const RightPanel: React.FC<RightPanelProps> = ({
@@ -60,6 +63,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
   onMemoSelect,
   onCategorySelect,
   onFocusMemo,
+  onFocusCategory,
   width,
   onResize,
   isFullscreen = false,
@@ -68,13 +72,14 @@ const RightPanel: React.FC<RightPanelProps> = ({
   showGeneralContent = true,
   onResetFilters,
   onClose,
-  isTablet = false
+  isTablet = false,
+  isTabletCollapsed = false,
+  onToggleTabletCollapse
 }) => {
   const [selectedBlocks, setSelectedBlocks] = React.useState<string[]>([]);
   const [dragSelectedBlocks, setDragSelectedBlocks] = React.useState<string[]>([]);
   const [dragJustCompleted, setDragJustCompleted] = React.useState(false);
   const [pendingFileType, setPendingFileType] = React.useState<'image' | 'file' | null>(null);
-  const [isTabletCollapsed, setIsTabletCollapsed] = React.useState(false); // 태블릿 모드 접기/펼치기 상태
 
   const blocksContainerRef = React.useRef<HTMLDivElement>(null);
   const rightPanelRef = React.useRef<HTMLDivElement>(null);
@@ -308,7 +313,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
     handleTagInputChange,
     handleTagInputKeyPress,
     removeTag,
-    onFocusMemo
+    onFocusMemo,
+    onFocusCategory
   });
 
   // 빈 공간 메뉴 렌더링 훅 사용
@@ -475,23 +481,63 @@ const RightPanel: React.FC<RightPanelProps> = ({
         display: 'flex',
         height: '100vh',
         flexDirection: 'column',
-        backgroundColor: '#f8f9fa',
-        borderLeft: '1px solid #e1e5e9',
+        backgroundColor: isTablet && isTabletCollapsed ? 'transparent' : '#f8f9fa',
+        borderLeft: isTablet && isTabletCollapsed ? 'none' : '1px solid #e1e5e9',
         position: isFullscreen ? 'fixed' : (isTablet ? 'fixed' : 'relative'),
         top: isFullscreen ? 0 : (isTablet ? 0 : 'auto'),
         right: isTablet ? 0 : 'auto',
         left: isFullscreen ? 0 : 'auto',
-        width: isFullscreen ? '100vw' : (isTablet ? (isTabletCollapsed ? '40px' : `${width}px`) : `${width}px`),
+        width: isFullscreen ? '100vw' : (isTablet ? (isTabletCollapsed ? '0px' : `${width}px`) : `${width}px`),
         minWidth: isTablet ? 'auto' : '250px',
         zIndex: isFullscreen ? 9999 : (isTablet ? 1500 : 10),  // 일반 모드도 Canvas보다 위
         transition: isTablet ? 'width 0.3s ease' : 'none',
-        pointerEvents: 'auto'
+        pointerEvents: isTablet && isTabletCollapsed ? 'none' : 'auto',
+        overflow: isTablet && isTabletCollapsed ? 'hidden' : 'visible'
       }}>
-      {!isFullscreen && (
+      {!isFullscreen && !isTablet && (
         <Resizer
           direction="right"
           onResize={onResize}
         />
+      )}
+
+      {/* 태블릿 모드 접기/펼치기 버튼 - 왼쪽 테두리 가운데 */}
+      {isTablet && onToggleTabletCollapse && (
+        <button
+          onClick={onToggleTabletCollapse}
+          style={{
+            position: 'fixed',
+            right: isTabletCollapsed ? '-1px' : `${width - 1}px`,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: '40px',
+            height: '60px',
+            border: '1px solid #e1e5e9',
+            borderRight: 'none',
+            borderRadius: '8px 0 0 8px',
+            backgroundColor: 'white',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#6b7280',
+            zIndex: 1600,
+            boxShadow: '-2px 0 8px rgba(0, 0, 0, 0.1)',
+            transition: 'right 0.3s ease',
+            pointerEvents: 'auto'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#f3f4f6';
+            e.currentTarget.style.color = '#374151';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'white';
+            e.currentTarget.style.color = '#6b7280';
+          }}
+          title={isTabletCollapsed ? "패널 펼치기" : "패널 접기"}
+        >
+          {isTabletCollapsed ? '◀' : '▶'}
+        </button>
       )}
 
       <PanelHeader
@@ -503,7 +549,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
         onClose={onClose}
         isTablet={isTablet}
         isTabletCollapsed={isTabletCollapsed}
-        onToggleTabletCollapse={() => setIsTabletCollapsed(!isTabletCollapsed)}
+        onToggleTabletCollapse={undefined}
       />
 
       <div
@@ -527,6 +573,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
             onCategoryUpdate={onCategoryUpdate}
             onCategorySelect={onCategorySelect}
             onFocusMemo={onFocusMemo}
+            onFocusCategory={onFocusCategory}
           />
         ) : selectedMemo ? (
           // 단일 메모 편집 모드
@@ -656,8 +703,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
         </div>
       )}
 
-      {/* 블록 추가 버튼 */}
-      {renderAddBlockButton()}
+      {/* 블록 추가 버튼 - 태블릿에서는 숨김 */}
+      {!isTablet && renderAddBlockButton()}
     </div>
   );
 };

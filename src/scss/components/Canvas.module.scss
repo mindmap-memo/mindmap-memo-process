@@ -115,6 +115,12 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   border: 1px solid #e1e5e9;
   z-index: 1000;
+  transition: transform 0.3s ease;
+
+  // 태블릿 가로모드: 우측 패널 너비만큼 왼쪽으로 이동
+  @media (min-width: 769px) and (max-width: 1366px) and (orientation: landscape) {
+    transform: translateX(calc(-50% - var(--right-panel-offset, 0px)));
+  }
 }
 
 .tool-button {

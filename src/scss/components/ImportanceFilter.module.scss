@@ -135,6 +135,8 @@
   cursor: default;
   user-select: none;
   pointer-events: auto; // MobileLayout이 pointer-events: none이므로 필수
+
+  // 태블릿 가로모드: 제자리 고정 (이동 X)
 }
 
 .mobileCircleButton {

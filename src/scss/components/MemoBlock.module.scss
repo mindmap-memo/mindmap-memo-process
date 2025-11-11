@@ -415,8 +415,8 @@
     transform: translateY(-50%);
   }
 
-  // 모바일에서 연결 모드일 때 연결점 크기 확대
-  @media (max-width: 768px) {
+  // 모바일/태블릿 가로모드에서 연결 모드일 때 연결점 크기 확대
+  @media (max-width: 768px), (min-width: 769px) and (max-width: 1366px) and (orientation: landscape) {
     &.enlarged {
       width: 150px;
       height: 150px;

@@ -25,16 +25,34 @@
   height: 44px;
 }
 
+.searchAndControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+
+  // 태블릿 가로모드: 간격만 좁힘 (이동 X)
+  @media (min-width: 769px) and (max-width: 1366px) and (orientation: landscape) {
+    gap: 6px; // 간격을 절반으로 줄임
+  }
+}
+
 .mobileHeaderBottom {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   height: 56px;
   pointer-events: none; // 배경은 투명하게
+  transition: transform 0.3s ease;
 
   // 하위 버튼들만 클릭 가능하게
   > * {
     pointer-events: auto;
+  }
+
+  // 태블릿 가로모드: 우측 패널 너비만큼 왼쪽으로 이동
+  @media (min-width: 769px) and (max-width: 1366px) and (orientation: landscape) {
+    transform: translateX(calc(-1 * var(--right-panel-offset, 0px)));
   }
 }
 

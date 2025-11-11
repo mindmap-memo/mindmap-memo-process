@@ -78,20 +78,28 @@
 .quick-nav-panel {
   position: fixed;
   top: 70px;
+  // right는 인라인 스타일로 동적 관리 (PC: 패널 너비에 따라 변경, 태블릿: CSS 변수 사용)
   z-index: 1701;  // 오버레이보다 위
   display: flex;
   gap: 12px;
+  pointer-events: auto; // MobileLayout이 pointer-events: none이므로 필수
+  transition: right 0.3s ease; // 이동 애니메이션
 
   // 태블릿: 버튼에 가려지지 않도록 top 위치 조정
   @media (min-width: 769px) and (max-width: 1366px) and (pointer: coarse) {
     top: 130px;
   }
 
+  // 태블릿 가로모드: 우측 패널 너비(300px) + 여백(20px) = 320px (인라인 스타일 오버라이드)
+  @media (min-width: 769px) and (max-width: 1366px) and (orientation: landscape) {
+    right: calc(20px + var(--right-panel-offset, 0px)) !important;
+  }
+
   // 모바일 버전: 풀스크린 패널
   @media (max-width: 768px) {
     top: 0;
     left: 0;
-    right: 0;
+    right: 0 !important;
     bottom: 0;
     width: 100vw;
     height: 100vh;

@@ -148,7 +148,8 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
     memoRef,
     setIsLongPressActive,
     setIsShiftPressed,  // Shift 상태 업데이트 함수 전달
-    isShiftPressedRef  // Shift ref 전달
+    isShiftPressedRef,  // Shift ref 전달
+    onOpenEditor  // 모바일/태블릿 모드 판단용
   });
 
   // 핸들러 훅 사용
@@ -445,7 +446,6 @@ const MemoBlock: React.FC<MemoBlockProps> = ({
           const minWidth = 150 / (canvasScale || 1); // 최소 너비를 scale로 나눔
           const memoWidth = actualWidth - 24; // padding 제외
           const contentWidth = memoWidth < minWidth ? minWidth : memoWidth;
-          console.log(`[Content Width] ${memo.title?.slice(0,20) || memo.id.slice(0,8)} | actualWidth: ${actualWidth}px | minWidth: ${minWidth}px | memoWidth: ${memoWidth}px | contentWidth: ${contentWidth}px | scale: ${canvasScale}`);
 
           return (
           <div

@@ -29,6 +29,7 @@ interface UseConnectionLineRenderingParams {
   onConnectMemos: (fromId: string, toId: string) => void;
   getConnectionPoints: (block: any) => any;
   canvasScale: number;
+  onOpenEditor?: () => void;  // 모바일/태블릿 모드 판단용
 }
 
 export const useConnectionLineRendering = (params: UseConnectionLineRenderingParams) => {
@@ -42,7 +43,8 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
     onRemoveConnection,
     onConnectMemos,
     getConnectionPoints,
-    canvasScale
+    canvasScale,
+    onOpenEditor  // 모바일/태블릿 모드 판단용
   } = params;
 
   /**
@@ -111,9 +113,9 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
         const midX = (fromPoint.x + toPoint.x) / 2;
         const midY = (fromPoint.y + toPoint.y) / 2;
 
-        // 모바일 연결 모드 또는 PC 연결 해제 모드에서 삭제 UI 표시
-        const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
-        const showDeleteUI = isDisconnectMode || (isMobile && isConnecting);
+        // 모바일/태블릿 연결 모드 또는 PC 연결 해제 모드에서 삭제 UI 표시
+        const isMobileOrTablet = !!onOpenEditor;
+        const showDeleteUI = isDisconnectMode || (isMobileOrTablet && isConnecting);
 
         lines.push(
           <g key={`${memo.id}-${connId}`}>
@@ -246,9 +248,9 @@ export const useConnectionLineRendering = (params: UseConnectionLineRenderingPar
         const midX = (fromPoint.x + toPoint.x) / 2;
         const midY = (fromPoint.y + toPoint.y) / 2;
 
-        // 모바일 연결 모드 또는 PC 연결 해제 모드에서 삭제 UI 표시
-        const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
-        const showDeleteUI = isDisconnectMode || (isMobile && isConnecting);
+        // 모바일/태블릿 연결 모드 또는 PC 연결 해제 모드에서 삭제 UI 표시
+        const isMobileOrTablet = !!onOpenEditor;
+        const showDeleteUI = isDisconnectMode || (isMobileOrTablet && isConnecting);
 
         lines.push(
           <g key={`category-${category.id}-${connId}`}>

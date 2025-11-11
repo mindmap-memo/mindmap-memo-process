@@ -529,7 +529,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
           {currentPage && !showPages ? (
             <>
               <Canvas
-              fullscreen={!isTabletLandscape}
+              fullscreen={true}  // 태블릿 가로모드도 모바일 방식 사용 (연결 모드 포함)
               currentPage={currentPage}
               selectedMemoId={selection?.selectedMemoId}
               selectedMemoIds={selection?.selectedMemoIds || []}
@@ -764,8 +764,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         />
       )}
 
-      {/* FAB 메뉴 - 메모/카테고리 선택 */}
-      {!showEditor && showFabMenu && (
+      {/* FAB 메뉴 - 메모/카테고리 선택 (태블릿 가로모드에서는 항상 표시) */}
+      {(!showEditor || isTabletLandscape) && showFabMenu && (
         <div className={styles.fabMenu}>
           <div
             className={styles.fabMenuItem}
@@ -807,14 +807,20 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         <button
           className={`${styles.connectionButton} ${connection.isConnecting ? styles.active : ''}`}
           onClick={() => {
+            console.log('🔗 [MobileLayout] 연결 버튼 클릭:', {
+              isConnecting: connection.isConnecting,
+              connectingFromId: connection.connectingFromId
+            });
             if (connection.isConnecting) {
               // 연결 모드 완전히 종료
               connection.setIsConnecting?.(false);
               connection.setConnectingFromId?.(null);
               onCancelConnection();
+              console.log('🔗 [MobileLayout] 연결 모드 종료');
             } else {
               // 연결 모드 활성화 (메모 선택 없이도 가능)
               connection.setIsConnecting?.(true);
+              console.log('🔗 [MobileLayout] 연결 모드 활성화');
             }
           }}
           aria-label={connection.isConnecting ? "연결 취소" : "연결선 생성"}

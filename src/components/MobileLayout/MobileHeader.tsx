@@ -55,9 +55,9 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
   return (
     <>
       <div className={styles.mobileHeaderContainer}>
-        {/* 첫 번째 줄: 뒤로가기 + 검색 + undo/redo + 필터 */}
+        {/* 첫 번째 줄: 뒤로가기 + 검색/undo/redo */}
         <div className={styles.mobileHeaderTop}>
-          {/* 왼쪽: 뒤로가기 버튼 */}
+          {/* 왼쪽: 뒤로가기 버튼 (제자리) */}
           <button
             className={styles.backButton}
             onClick={onBackToPages}
@@ -66,69 +66,72 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
             <ArrowLeft size={24} />
           </button>
 
-          {/* 중앙: 검색창 */}
-          <div className={styles.searchContainer}>
-            <Search size={16} className={styles.searchIcon} />
-            <input
-              type="text"
-              placeholder="검색..."
-              value={searchQuery}
-              onChange={(e) => onSearchChange?.(e.target.value)}
-              onFocus={() => setIsSearchFocused(true)}
-              onBlur={() => setIsSearchFocused(false)}
-              className={styles.searchInput}
-            />
-            {isSearchMode && (
-              <button
-                className={styles.clearButton}
-                onMouseDown={(e) => {
-                  e.preventDefault(); // blur 방지
-                  onSearchChange?.('');
-                  setIsSearchFocused(false);
-                }}
-                aria-label="검색 취소"
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
+          {/* 중앙/오른쪽: 검색 + undo/redo (태블릿 가로모드에서 이동) */}
+          <div className={styles.searchAndControls}>
+            {/* 중앙: 검색창 */}
+            <div className={styles.searchContainer}>
+              <Search size={16} className={styles.searchIcon} />
+              <input
+                type="text"
+                placeholder="검색..."
+                value={searchQuery}
+                onChange={(e) => onSearchChange?.(e.target.value)}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => setIsSearchFocused(false)}
+                className={styles.searchInput}
+              />
+              {isSearchMode && (
+                <button
+                  className={styles.clearButton}
+                  onMouseDown={(e) => {
+                    e.preventDefault(); // blur 방지
+                    onSearchChange?.('');
+                    setIsSearchFocused(false);
+                  }}
+                  aria-label="검색 취소"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
 
-          {/* 오른쪽: undo/redo + 필터 */}
-          <div className={styles.rightButtons}>
-            {!isSearchMode && (
-              <>
+            {/* 오른쪽: undo/redo + 필터 */}
+            <div className={styles.rightButtons}>
+              {!isSearchMode && (
+                <>
+                  <button
+                    className={styles.undoRedoButton}
+                    onClick={onUndo}
+                    disabled={!canUndo}
+                    style={{ opacity: canUndo ? 1 : 0.4 }}
+                    aria-label="실행 취소"
+                  >
+                    <Undo size={20} />
+                  </button>
+                  <button
+                    className={styles.undoRedoButton}
+                    onClick={onRedo}
+                    disabled={!canRedo}
+                    style={{ opacity: canRedo ? 1 : 0.4 }}
+                    aria-label="다시 실행"
+                  >
+                    <Redo size={20} />
+                  </button>
+                </>
+              )}
+              {isSearchMode && (
                 <button
-                  className={styles.undoRedoButton}
-                  onClick={onUndo}
-                  disabled={!canUndo}
-                  style={{ opacity: canUndo ? 1 : 0.4 }}
-                  aria-label="실행 취소"
+                  className={`${styles.filterButton} ${showFilters ? styles.active : ''}`}
+                  onMouseDown={(e) => {
+                    e.preventDefault(); // 검색창 blur 방지
+                    onToggleFilters?.(!showFilters);
+                  }}
+                  aria-label="검색 필터"
                 >
-                  <Undo size={20} />
+                  <Filter size={20} />
                 </button>
-                <button
-                  className={styles.undoRedoButton}
-                  onClick={onRedo}
-                  disabled={!canRedo}
-                  style={{ opacity: canRedo ? 1 : 0.4 }}
-                  aria-label="다시 실행"
-                >
-                  <Redo size={20} />
-                </button>
-              </>
-            )}
-            {isSearchMode && (
-              <button
-                className={`${styles.filterButton} ${showFilters ? styles.active : ''}`}
-                onMouseDown={(e) => {
-                  e.preventDefault(); // 검색창 blur 방지
-                  onToggleFilters?.(!showFilters);
-                }}
-                aria-label="검색 필터"
-              >
-                <Filter size={20} />
-              </button>
-            )}
+              )}
+            </div>
           </div>
         </div>
 

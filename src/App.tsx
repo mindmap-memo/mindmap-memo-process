@@ -196,7 +196,8 @@ const App: React.FC = () => {
     handleDragSelectEnd,
     toggleImportanceFilter,
     resetFiltersToDefault,
-    focusOnMemo
+    focusOnMemo,
+    focusOnCategory
   } = selectionHandlers;
 
   // ===== Canvas History 관리 =====
@@ -706,9 +707,9 @@ const App: React.FC = () => {
   // ===== 반응형 분기 =====
   // 모바일/태블릿 감지: 터치 기기는 모두 모바일 레이아웃 사용
   const isMobilePortrait = useMediaQuery('(max-width: 768px)'); // 모바일 세로
-  const isTabletPortrait = useMediaQuery('(min-width: 769px) and (max-width: 1024px) and (orientation: portrait) and (pointer: coarse)'); // 태블릿 세로
-  const isTabletLandscape = useMediaQuery('(min-width: 769px) and (max-width: 1366px) and (orientation: landscape) and (pointer: coarse)'); // 태블릿 가로
-  const isMobileLandscape = useMediaQuery('(max-height: 600px) and (orientation: landscape) and (pointer: coarse)'); // 모바일 가로
+  const isTabletPortrait = useMediaQuery('(min-width: 769px) and (max-width: 1024px) and (orientation: portrait)'); // 태블릿 세로 (테스트용: pointer 조건 제거)
+  const isTabletLandscape = useMediaQuery('(min-width: 769px) and (max-width: 1366px) and (orientation: landscape)'); // 태블릿 가로 (테스트용: pointer 조건 제거)
+  const isMobileLandscape = useMediaQuery('(max-height: 600px) and (orientation: landscape)'); // 모바일 가로 (테스트용: pointer 조건 제거)
   const isMobile = isMobilePortrait || isTabletPortrait || isTabletLandscape || isMobileLandscape;
 
   // 초기 로딩이 완료될 때까지 로딩 인디케이터 표시
@@ -855,6 +856,7 @@ const App: React.FC = () => {
           isQuickNavExists={isQuickNavExists}
           onMemoUpdate={updateMemo}
           onFocusMemo={focusOnMemo}
+          onFocusCategory={focusOnCategory}
           onResetFilters={resetFiltersToDefault}
           canUndo={canUndo}
           canRedo={canRedo}
@@ -884,7 +886,12 @@ const App: React.FC = () => {
       connection={connectionContextValue}
       quickNav={quickNavContextValue}
     >
-      <div className={styles['app-container']}>
+      <div
+        className={styles['app-container']}
+        style={{
+          '--right-panel-offset': isTabletLandscape && rightPanelOpen ? '300px' : '0px'
+        } as React.CSSProperties}
+      >
         {/* 왼쪽 패널 */}
         {leftPanelOpen && (
         <LeftPanel
@@ -1046,6 +1053,7 @@ const App: React.FC = () => {
           onMemoSelect={handleMemoSelect}
           onCategorySelect={selectCategory}
           onFocusMemo={focusOnMemo}
+          onFocusCategory={focusOnCategory}
           width={rightPanelWidth}
           onResize={handleRightPanelResize}
           isFullscreen={panelState.isRightPanelFullscreen}

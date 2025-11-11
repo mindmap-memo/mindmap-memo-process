@@ -328,7 +328,18 @@ export const useMemoHandlers = (props: UseMemoHandlersProps) => {
 
         return {
           ...page,
-          memos: page.memos.filter(memo => memo.id !== memoIdToDelete),
+          // 다른 메모들의 connections 배열에서 삭제된 메모 ID 제거
+          memos: page.memos
+            .filter(memo => memo.id !== memoIdToDelete)
+            .map(memo => ({
+              ...memo,
+              connections: memo.connections.filter(connId => connId !== memoIdToDelete)
+            })),
+          // 카테고리들의 connections 배열에서도 삭제된 메모 ID 제거
+          categories: page.categories?.map(category => ({
+            ...category,
+            connections: category.connections?.filter(connId => connId !== memoIdToDelete) || []
+          })),
           // 단축 이동 목록에서도 삭제된 메모 제거
           quickNavItems: (page.quickNavItems || []).filter(item => item.targetId !== memoIdToDelete)
         };

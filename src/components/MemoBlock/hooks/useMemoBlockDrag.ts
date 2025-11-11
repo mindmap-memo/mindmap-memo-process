@@ -37,6 +37,7 @@ interface UseMemoBlockDragParams {
   memoRef?: React.RefObject<HTMLDivElement | null>;
   setIsLongPressActive?: (active: boolean, targetId?: string | null) => void;
   setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수 추가
+  onOpenEditor?: () => void;  // 모바일/태블릿 모드 판단용
 }
 
 export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
@@ -61,7 +62,8 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
     connectingFromId,
     memoRef,
     setIsLongPressActive: externalSetIsLongPressActive,
-    setIsShiftPressed  // Shift 상태 업데이트 함수
+    setIsShiftPressed,  // Shift 상태 업데이트 함수
+    onOpenEditor  // 모바일/태블릿 모드 판단용
   } = params;
 
   // 드래그 상태
@@ -248,16 +250,17 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
   /**
    * 연결점 마우스/터치 다운 핸들러
    * PC: 항상 작동 (연결 모드 불필요)
-   * 모바일: 연결 모드일 때만 작동
+   * 모바일/태블릿: 연결 모드일 때만 작동
    */
   const handleConnectionPointMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
-    console.log('🔵 [연결점 클릭]', { memoId: memo.id, isConnecting, connectingFromId });
+    console.log('🔵 [연결점 클릭]', { memoId: memo.id, isConnecting, connectingFromId, onOpenEditor: !!onOpenEditor });
 
-    const isMobile = window.innerWidth <= 768;
+    // onOpenEditor가 있으면 모바일/태블릿 모드 (연결 모드 필요)
+    const isMobileOrTablet = !!onOpenEditor;
 
-    // PC는 항상, 모바일은 연결 모드일 때만 드래그 시작
-    if (!isMobile || isConnecting) {
+    // PC는 항상, 모바일/태블릿은 연결 모드일 때만 드래그 시작
+    if (!isMobileOrTablet || isConnecting) {
       setIsConnectionDragging(true);
       console.log('🔵 [연결 드래그 시작]', { memoId: memo.id });
       // 아직 시작 메모가 설정되지 않았으면 설정
@@ -271,15 +274,16 @@ export const useMemoBlockDrag = (params: UseMemoBlockDragParams) => {
   /**
    * 연결점 마우스/터치 업 핸들러
    * PC: 항상 작동
-   * 모바일: 연결 모드일 때만 작동
+   * 모바일/태블릿: 연결 모드일 때만 작동
    */
   const handleConnectionPointMouseUp = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
 
-    const isMobile = window.innerWidth <= 768;
+    // onOpenEditor가 있으면 모바일/태블릿 모드 (연결 모드 필요)
+    const isMobileOrTablet = !!onOpenEditor;
 
-    // PC이거나 모바일 연결 모드일 때 연결 완성
-    if ((!isMobile || isConnecting) && connectingFromId && connectingFromId !== memo.id) {
+    // PC이거나 모바일/태블릿 연결 모드일 때 연결 완성
+    if ((!isMobileOrTablet || isConnecting) && connectingFromId && connectingFromId !== memo.id) {
       onConnectMemos?.(connectingFromId, memo.id);
     }
     setIsConnectionDragging(false);

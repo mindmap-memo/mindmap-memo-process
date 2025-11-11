@@ -10,6 +10,7 @@ import { useCanvasEffects } from './useCanvasEffects';
 import { useCanvasHandlers } from './useCanvasHandlers';
 import { useCanvasRendering } from './useCanvasRendering';
 import { usePinchZoom } from './hooks/usePinchZoom';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import styles from '../../scss/components/Canvas.module.scss';
 
 interface CanvasProps {
@@ -95,6 +96,7 @@ interface CanvasProps {
   setIsLongPressActive?: (active: boolean, targetId?: string | null) => void;  // 롱프레스 상태 업데이트
   setIsShiftPressed?: (pressed: boolean) => void;  // Shift 상태 업데이트 함수
   isShiftPressedRef?: React.MutableRefObject<boolean>;  // Shift ref 추가
+  toolbarOffset?: number;  // 태블릿 가로모드: toolbar 왼쪽 이동 거리 (px)
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -183,6 +185,9 @@ const Canvas: React.FC<CanvasProps> = ({
 }) => {
   // ===== Canvas Ref =====
   const canvasRef = React.useRef<HTMLDivElement>(null);
+
+  // 태블릿 가로모드 감지 (ImportanceFilter 숨기기 위함)
+  const isTabletLandscape = useMediaQuery('(min-width: 769px) and (max-width: 1366px) and (orientation: landscape)');
 
   // ===== Canvas 로컬 상태 (useCanvasState 훅 사용) =====
   const canvasState = useCanvasState();
@@ -618,9 +623,11 @@ const Canvas: React.FC<CanvasProps> = ({
         </div>
       </div>
 
-      {/* Toolbar - fixed position (모바일에서는 숨김) */}
-      {!fullscreen && (
-      <div className={styles.toolbar}>
+      {/* Toolbar - fixed position (모바일/태블릿에서는 숨김, PC 전용) */}
+      {!fullscreen && !isTabletLandscape && (
+      <div
+        className={styles.toolbar}
+      >
         <button
           onClick={() => setCurrentTool('select')}
           className={`${styles['tool-button']} ${currentTool === 'select' ? styles.active : styles.inactive}`}
@@ -717,9 +724,11 @@ const Canvas: React.FC<CanvasProps> = ({
       </div>
       )}
 
-      {/* Canvas Undo/Redo Controls (모바일에서는 숨김) */}
-      {!fullscreen && (
-      <div className={styles['undo-redo-controls']}>
+      {/* Canvas Undo/Redo Controls (모바일/태블릿에서는 숨김, PC 전용) */}
+      {!fullscreen && !isTabletLandscape && (
+      <div
+        className={styles['undo-redo-controls']}
+      >
         <button
           data-tutorial="undo-btn"
           onClick={onUndo}
@@ -771,8 +780,8 @@ const Canvas: React.FC<CanvasProps> = ({
         {Math.round(Math.min((canvasScale / 0.35) * 100, 571))}%
       </div>
 
-      {/* 중요도 필터 UI - 모바일/태블릿에서는 숨김 */}
-      {!fullscreen && (
+      {/* 중요도 필터 UI - 모바일/태블릿에서는 숨김, PC 전용 */}
+      {!fullscreen && !isTabletLandscape && (
         <ImportanceFilter
           activeFilters={activeImportanceFilters}
           onToggleFilter={onToggleImportanceFilter}

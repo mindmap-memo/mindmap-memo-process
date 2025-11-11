@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { Page, QuickNavItem } from '../types';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import styles from '../scss/App.module.scss';
 
 interface QuickNavPanelProps {
@@ -39,6 +40,13 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
   // quickNavItems가 undefined일 경우를 대비한 안전 장치
   const safeQuickNavItems = quickNavItems || [];
 
+  // 태블릿 가로모드 감지 (테스트용: pointer 조건 제거)
+  const isTabletLandscape = useMediaQuery('(min-width: 769px) and (max-width: 1366px) and (orientation: landscape)');
+
+  // 태블릿 가로모드에서는 항상 우측 패널이 있다고 가정 (너비 300px)
+  const effectiveRightPanelOpen = isTabletLandscape ? true : rightPanelOpen;
+  const effectiveRightPanelWidth = isTabletLandscape ? 300 : rightPanelWidth;
+
   // 즐겨찾기 아이템의 실시간 제목을 가져오는 함수
   const getItemTitle = (item: QuickNavItem): string => {
     const targetPage = pages?.find(p => p.id === item.pageId);
@@ -63,7 +71,7 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
           onClick={onTogglePanel}
           className={styles['quick-nav-button']}
           style={{
-            right: rightPanelOpen ? `${rightPanelWidth + 20}px` : '20px'
+            right: effectiveRightPanelOpen ? `${effectiveRightPanelWidth + 20}px` : '20px'
           }}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -91,7 +99,10 @@ export const QuickNavPanel: React.FC<QuickNavPanelProps> = ({
           <div
             className={styles['quick-nav-panel']}
             style={{
-              right: rightPanelOpen ? `${rightPanelWidth + 20}px` : '20px'
+              // 태블릿 가로모드가 아닐 때만 right 값 적용 (태블릿 가로모드는 CSS가 처리)
+              ...(isTabletLandscape ? {} : {
+                right: effectiveRightPanelOpen ? `${effectiveRightPanelWidth + 20}px` : '20px'
+              })
             }}
             onClick={(e) => e.stopPropagation()}
           >

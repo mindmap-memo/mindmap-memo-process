@@ -392,25 +392,40 @@ export const useQuickNavHandlers = ({
    */
   const executeQuickNav = useCallback(
     (item: QuickNavItem) => {
+      console.log('🔵 [executeQuickNav] 시작:', {
+        itemName: item.name,
+        targetId: item.targetId,
+        targetType: item.targetType,
+        itemPageId: item.pageId,
+        currentPageId: currentPageId
+      });
+
       // Track analytics
       analytics.trackQuickNavUsed(item.targetType);
 
       // 페이지가 다르면 페이지 전환
       if (item.pageId !== currentPageId) {
+        console.log('📄 [executeQuickNav] 페이지 전환 필요:', item.pageId);
         setCurrentPageId(item.pageId);
         // 페이지 전환 후 약간의 딜레이를 두고 이동 (상태 업데이트 대기)
         setTimeout(() => {
+          console.log('⏰ [executeQuickNav] setTimeout 실행 (페이지 전환 후)');
           if (item.targetType === 'memo') {
+            console.log('📝 [executeQuickNav] handleNavigateToMemo 호출');
             handleNavigateToMemo(item.targetId);
           } else {
+            console.log('📁 [executeQuickNav] handleNavigateToCategory 호출');
             handleNavigateToCategory(item.targetId);
           }
         }, 100);
       } else {
         // 같은 페이지면 바로 이동
+        console.log('✨ [executeQuickNav] 같은 페이지, 바로 이동');
         if (item.targetType === 'memo') {
+          console.log('📝 [executeQuickNav] handleNavigateToMemo 호출');
           handleNavigateToMemo(item.targetId);
         } else {
+          console.log('📁 [executeQuickNav] handleNavigateToCategory 호출');
           handleNavigateToCategory(item.targetId);
         }
       }
