@@ -207,6 +207,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // page_id "1" 금지 (레거시 버그 방지)
+    if (id === '1') {
+      console.error('Attempted to create page with id "1"');
+      return NextResponse.json(
+        { error: 'Invalid page ID', details: 'Page ID "1" is not allowed' },
+        { status: 400 }
+      );
+    }
+
     await sql`
       INSERT INTO pages (id, name, user_id)
       VALUES (${id}, ${name}, ${user.id})

@@ -54,6 +54,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // page_id "1" 금지 (레거시 버그 방지)
+    if (pageId === '1') {
+      console.error('Attempted to create category with page_id "1"');
+      return NextResponse.json(
+        { error: 'Invalid page ID', details: 'Page ID "1" is not allowed for categories' },
+        { status: 400 }
+      );
+    }
+
     await sql`
       INSERT INTO categories (
         id, page_id, user_id, title, tags, connections,

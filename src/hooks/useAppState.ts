@@ -40,7 +40,7 @@ import { fetchPages, createPage, createMemo, createCategory } from '../utils/api
 export const useAppState = (isAuthenticated: boolean = false) => {
   // ===== 페이지 & 데이터 상태 =====
   const [pages, setPages] = useState<Page[]>([]);
-  const [currentPageId, setCurrentPageId] = useState<string>('1');
+  const [currentPageId, setCurrentPageId] = useState<string>(''); // 빈 문자열로 시작, 로드 후 설정됨
   const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
 
@@ -50,7 +50,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
     if (!isAuthenticated) {
       console.log('[useAppState] 🔓 인증되지 않음 - 기본 데이터 사용');
       setPages(DEFAULT_PAGES);
-      setCurrentPageId('1');
+      setCurrentPageId(DEFAULT_PAGES[0]?.id || 'default-page');
       setIsInitialLoadDone(true);
       setLoadingProgress(100);
       return;
@@ -150,7 +150,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
               // 페이지 생성 실패 시 DEFAULT_PAGES 사용
               console.warn('페이지 업데이트 실패. 기본 페이지로 폴백합니다.');
               setPages(DEFAULT_PAGES);
-              setCurrentPageId(DEFAULT_PAGES[0]?.id || '1');
+              setCurrentPageId(DEFAULT_PAGES[0]?.id || 'default-page-fallback');
             }
           } else {
             // 이미 데이터가 있으면 그대로 사용
@@ -170,7 +170,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
             });
 
             setPages(safePages);
-            setCurrentPageId(safePages[0]?.id || '1');
+            setCurrentPageId(safePages[0]?.id || 'default-page-safe');
           }
         } else {
           // 첫 로그인: 기본 페이지를 DB에 생성
@@ -241,7 +241,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
             // 페이지 생성 실패 시 로컬 DEFAULT_PAGES 사용
             console.warn('페이지 생성 실패. 로컬 페이지를 사용합니다.');
             setPages(DEFAULT_PAGES);
-            setCurrentPageId(DEFAULT_PAGES[0]?.id || '1');
+            setCurrentPageId(DEFAULT_PAGES[0]?.id || 'default-page-created');
           }
         }
 
@@ -277,7 +277,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
                   quickNavItems: Array.isArray(page.quickNavItems) ? page.quickNavItems : []
                 }));
                 setPages(safePagesReloaded);
-                setCurrentPageId(safePagesReloaded[0]?.id || '1');
+                setCurrentPageId(safePagesReloaded[0]?.id || 'default-page-reloaded');
               }
             } else {
               console.error('[useAppState] ❌ 마이그레이션 실패:', await response.text());
@@ -294,7 +294,7 @@ export const useAppState = (isAuthenticated: boolean = false) => {
         console.error('[useAppState] ❌ 데이터베이스 연결 실패. 기본 페이지로 시작합니다:', error);
         console.log('[useAppState] 💡 데이터베이스를 사용하려면 create-tables.sql을 실행하세요.');
         setPages(DEFAULT_PAGES);
-        setCurrentPageId('1');
+        setCurrentPageId(DEFAULT_PAGES[0]?.id || 'default-page');
         setLoadingProgress(90);
       } finally {
         console.log('[useAppState] 🏁 데이터 로딩 완료 - 진행률 100%');
