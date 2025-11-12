@@ -13,11 +13,15 @@ export const authOptions: NextAuthOptions = {
         params: {
           prompt: "consent",
           access_type: "offline",
-          response_type: "code"
+          response_type: "code",
+          // state 파라미터를 명시적으로 포함
+          state: true
         }
       },
       // 모바일 User-Agent 허용 설정
       allowDangerousEmailAccountLinking: true,
+      // 체크 옵션 추가 (state 쿠키 검증 완화)
+      checks: ['state'],
       profile(profile) {
         return {
           id: profile.sub,
@@ -41,7 +45,58 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: process.env.NEXTAUTH_URL?.startsWith('https://')
+        secure: process.env.NEXTAUTH_URL?.startsWith('https://'),
+        maxAge: 30 * 24 * 60 * 60 // 30 days
+      }
+    },
+    callbackUrl: {
+      name: `${process.env.NEXTAUTH_URL?.startsWith('https://') ? '__Secure-' : ''}next-auth.callback-url`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NEXTAUTH_URL?.startsWith('https://'),
+        maxAge: 60 * 15 // 15 minutes
+      }
+    },
+    csrfToken: {
+      name: `${process.env.NEXTAUTH_URL?.startsWith('https://') ? '__Host-' : ''}next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NEXTAUTH_URL?.startsWith('https://'),
+        maxAge: 60 * 15 // 15 minutes
+      }
+    },
+    pkceCodeVerifier: {
+      name: `${process.env.NEXTAUTH_URL?.startsWith('https://') ? '__Secure-' : ''}next-auth.pkce.code_verifier`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NEXTAUTH_URL?.startsWith('https://'),
+        maxAge: 60 * 15 // 15 minutes
+      }
+    },
+    state: {
+      name: `${process.env.NEXTAUTH_URL?.startsWith('https://') ? '__Secure-' : ''}next-auth.state`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NEXTAUTH_URL?.startsWith('https://'),
+        maxAge: 60 * 15 // 15 minutes
+      }
+    },
+    nonce: {
+      name: `${process.env.NEXTAUTH_URL?.startsWith('https://') ? '__Secure-' : ''}next-auth.nonce`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NEXTAUTH_URL?.startsWith('https://'),
+        maxAge: 60 * 15 // 15 minutes
       }
     }
   },
@@ -114,4 +169,25 @@ export const authOptions: NextAuthOptions = {
     signIn: '/login',
   },
   secret: process.env.NEXTAUTH_SECRET,
+  // 디버그 모드 활성화 (개발 환경에서만)
+  debug: process.env.NODE_ENV === 'development',
+  // 세션 전략 명시
+  session: {
+    strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+  // 에러 로깅 강화
+  logger: {
+    error(code, metadata) {
+      console.error('[NextAuth Error]', code, metadata);
+    },
+    warn(code) {
+      console.warn('[NextAuth Warn]', code);
+    },
+    debug(code, metadata) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[NextAuth Debug]', code, metadata);
+      }
+    },
+  },
 };
