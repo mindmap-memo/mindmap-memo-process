@@ -22,6 +22,17 @@
   height: 0;
 }
 
+/* Placeholder for textBlock node */
+.ProseMirror .text-block-node.is-editor-empty::before,
+.ProseMirror .text-block-node.is-node-empty::before,
+.ProseMirror .text-block-node:empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #9ca3af;
+  pointer-events: none;
+  height: 0;
+}
+
 /* Paragraphs - 노션 스타일 블록 */
 .ProseMirror p {
   margin: 0;

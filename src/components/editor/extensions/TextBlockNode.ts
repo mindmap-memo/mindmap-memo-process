@@ -58,12 +58,13 @@ export const TextBlockNode = Node.create({
     ];
   },
 
-  renderHTML({ HTMLAttributes }) {
+  renderHTML({ node, HTMLAttributes }) {
+    const isEmpty = node.content.size === 0;
     return [
       'div',
       mergeAttributes(HTMLAttributes, {
         'data-type': 'text-block',
-        class: 'text-block-node',
+        class: `text-block-node${isEmpty ? ' is-empty' : ''}`,
       }),
       0,
     ];

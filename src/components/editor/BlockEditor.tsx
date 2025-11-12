@@ -348,7 +348,27 @@ export default function BlockEditor({
       Gapcursor,
       ImportanceMark,
       Placeholder.configure({
-        placeholder,
+        placeholder: ({ node, editor }) => {
+          // textBlock이 아니면 placeholder 표시 안 함
+          if (node.type.name !== 'textBlock') return '';
+
+          // 에디터 전체에 1글자라도 있으면 placeholder 표시 안 함
+          const doc = editor.state.doc;
+          let hasContent = false;
+
+          doc.descendants((n) => {
+            if (n.type.name === 'text' && n.text && n.text.trim().length > 0) {
+              hasContent = true;
+              return false; // 순회 중단
+            }
+          });
+
+          // 내용이 있으면 빈 문자열 반환 (placeholder 숨김)
+          if (hasContent) return '';
+
+          // 내용이 없으면 placeholder 표시
+          return placeholder;
+        },
       }),
     ],
     content: blocksToEditorContent(initialBlocks),

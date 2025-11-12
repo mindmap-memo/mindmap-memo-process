@@ -23,6 +23,28 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
 
   const { importance } = node.attrs;
 
+  // 노드가 비어있는지 확인
+  const isEmpty = node.content.size === 0;
+
+  // 에디터 전체에 텍스트가 있는지 확인
+  const checkEditorContent = React.useCallback(() => {
+    if (!editor) return false;
+
+    const doc = editor.state.doc;
+    let hasContent = false;
+
+    doc.descendants((n) => {
+      if (n.type.name === 'text' && n.text && n.text.trim().length > 0) {
+        hasContent = true;
+        return false; // 순회 중단
+      }
+    });
+
+    return hasContent;
+  }, [editor]);
+
+  const hasEditorContent = checkEditorContent();
+
   // 네이티브 이벤트 리스너 등록
   React.useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -373,15 +395,33 @@ export default function TextBlockNodeView({ node, selected, updateAttributes, de
         </div>
 
         {/* 에디터 콘텐츠 */}
-        <NodeViewContent
-          ref={contentRef}
-          as="div"
-          style={{
-            flex: 1,
-            minWidth: 0,
-            outline: 'none',
-          }}
-        />
+        <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+          <NodeViewContent
+            ref={contentRef}
+            as="div"
+            style={{
+              flex: 1,
+              minWidth: 0,
+              outline: 'none',
+            }}
+          />
+          {/* Placeholder */}
+          {isEmpty && !hasEditorContent && (
+            <div
+              contentEditable={false}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                color: '#9ca3af',
+                pointerEvents: 'none',
+                userSelect: 'none',
+              }}
+            >
+              텍스트를 입력하세요...
+            </div>
+          )}
+        </div>
       </div>
     </NodeViewWrapper>
   );
