@@ -23,6 +23,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, excluded: true });
     }
 
+    // 중복 방지: 같은 세션, 같은 이벤트 타입, 3초 이내의 중복 이벤트는 무시
+    const recentDuplicate = await sql`
+      SELECT id FROM analytics_events
+      WHERE session_id = ${sessionId}
+        AND event_type = ${eventType}
+        AND created_at > NOW() - INTERVAL '3 seconds'
+      LIMIT 1
+    `;
+
+    if (recentDuplicate.length > 0) {
+      console.log(`[Analytics] Duplicate event prevented: ${eventType} in session ${sessionId}`);
+      return NextResponse.json({ success: true, duplicate: true });
+    }
+
     const eventId = `evt_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
     await sql`

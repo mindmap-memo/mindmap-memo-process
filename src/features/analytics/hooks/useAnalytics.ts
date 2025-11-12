@@ -2,99 +2,30 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { AnalyticsEventType } from '../types';
 import { isEmailExcluded } from '../utils/excludedEmails';
+import { sessionManager } from '../utils/sessionManager';
 
 /**
  * useAnalytics
  *
  * 애널리틱스 이벤트 추적 훅
- * - 세션 시작/종료 자동 추적
+ * - 세션 시작/종료 자동 추적 (전역 세션 관리자 사용)
  * - 이벤트 기록 함수 제공
  * - 제외된 이메일 계정은 추적하지 않음
- * - 세션 중복 생성 방지
+ * - 여러 컴포넌트에서 호출해도 세션은 하나만 생성됨
  */
 export const useAnalytics = () => {
   const { data: session } = useSession();
-  const sessionIdRef = useRef<string | null>(null);
-  const sessionStartTimeRef = useRef<number | null>(null);
-  const isSessionActiveRef = useRef<boolean>(false);
-  const sessionEndedRef = useRef<boolean>(false);
+  const mountedRef = useRef<boolean>(false);
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 세션 시작 (useEffect 내부에서만 호출됨)
-  const startSession = async (email: string) => {
-    // 이미 세션이 활성화되어 있으면 중복 생성 방지
-    if (isSessionActiveRef.current) {
-      console.log('[Analytics] Session already active, skipping duplicate start');
-      return;
-    }
-
-    // 이미 세션 ID가 있으면 중복 생성 방지
-    if (sessionIdRef.current) {
-      console.log('[Analytics] Session ID already exists, skipping duplicate start');
-      return;
-    }
-
-    // 플래그를 먼저 설정하여 동시 호출 차단
-    isSessionActiveRef.current = true;
-
-    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    sessionIdRef.current = sessionId;
-    sessionStartTimeRef.current = Date.now();
-    sessionEndedRef.current = false;
-
-    console.log('[Analytics] Starting new session:', sessionId);
-
-    try {
-      await fetch('/api/analytics/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId,
-          userEmail: email,
-          action: 'start'
-        })
-      });
-    } catch (error) {
-      console.error('Failed to start analytics session:', error);
-      // 에러 시 플래그 초기화
-      isSessionActiveRef.current = false;
-      sessionIdRef.current = null;
-    }
-  };
-
-  // 세션 종료 (useEffect cleanup이나 beforeunload에서 호출됨)
-  const endSession = async (email: string) => {
-    if (!sessionIdRef.current || !sessionStartTimeRef.current) return;
-
-    // 이미 종료된 세션은 다시 종료하지 않음
-    if (sessionEndedRef.current) return;
-
-    sessionEndedRef.current = true;
-    isSessionActiveRef.current = false;
-
-    const durationSeconds = Math.floor((Date.now() - sessionStartTimeRef.current) / 1000);
-
-    try {
-      await fetch('/api/analytics/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: sessionIdRef.current,
-          userEmail: email,
-          action: 'end',
-          durationSeconds
-        })
-      });
-    } catch (error) {
-      console.error('Failed to end analytics session:', error);
-    }
-  };
 
   // 이벤트 추적
   const trackEvent = useCallback(async (
     eventType: AnalyticsEventType,
     eventData?: Record<string, any>
   ) => {
-    if (!sessionIdRef.current || !session?.user?.email) return;
+    const sessionInfo = sessionManager.getSessionInfo();
+    if (!sessionInfo.sessionId || !session?.user?.email) return;
 
     // 제외된 이메일은 추적하지 않음
     if (isEmailExcluded(session.user.email)) return;
@@ -104,7 +35,7 @@ export const useAnalytics = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sessionId: sessionIdRef.current,
+          sessionId: sessionInfo.sessionId,
           userEmail: session.user.email,
           eventType,
           eventData
@@ -123,15 +54,16 @@ export const useAnalytics = () => {
     // 제외된 이메일은 추적하지 않음
     if (isEmailExcluded(email)) return;
 
-    // 이미 세션이 활성화되어 있으면 중복 시작 방지 (Strict Mode 대응)
-    if (isSessionActiveRef.current && sessionIdRef.current) return;
+    // 이미 마운트되었으면 중복 실행 방지 (Strict Mode 대응)
+    if (mountedRef.current) return;
+    mountedRef.current = true;
 
-    // 세션 시작
-    startSession(email);
+    // 전역 세션 관리자를 통해 세션 시작
+    sessionManager.startSession(email);
 
-    // 세션 종료 핸들러 (모바일 브라우저 호환성 강화)
+    // 세션 종료 핸들러
     const handleSessionEnd = () => {
-      endSession(email);
+      sessionManager.endSession();
     };
 
     // 페이지 종료 시 세션 종료 (데스크톱)
@@ -152,21 +84,8 @@ export const useAnalytics = () => {
     };
 
     // 주기적 heartbeat (30초마다 세션 업데이트)
-    const heartbeatInterval = setInterval(() => {
-      if (sessionIdRef.current && sessionStartTimeRef.current) {
-        const durationSeconds = Math.floor((Date.now() - sessionStartTimeRef.current) / 1000);
-        fetch('/api/analytics/session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: sessionIdRef.current,
-            userEmail: email,
-            action: 'end',
-            durationSeconds
-          }),
-          keepalive: true // 페이지가 종료되어도 요청이 완료되도록 함
-        }).catch(err => console.error('Heartbeat failed:', err));
-      }
+    heartbeatIntervalRef.current = setInterval(() => {
+      sessionManager.updateSession();
     }, 30000); // 30초마다
 
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -176,10 +95,14 @@ export const useAnalytics = () => {
     return () => {
       // cleanup 시 세션 종료
       handleSessionEnd();
-      clearInterval(heartbeatInterval);
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('pagehide', handlePageHide);
+      mountedRef.current = false;
     };
   }, [session?.user?.email]);
 

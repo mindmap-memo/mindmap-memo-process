@@ -13,9 +13,7 @@ export const authOptions: NextAuthOptions = {
         params: {
           prompt: "consent",
           access_type: "offline",
-          response_type: "code",
-          // state 파라미터를 명시적으로 포함
-          state: true
+          response_type: "code"
         }
       },
       // 모바일 User-Agent 허용 설정
